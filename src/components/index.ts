@@ -6,4 +6,6 @@ export { DangerousActionDialog } from "./DangerousActionDialog";
 export { HostLockBadge } from "./HostLockBadge";
 export { QRPanel } from "./QRPanel";
 export { RoundHeader } from "./RoundHeader";
+export { StageDrawCard } from "./StageDrawCard";
+export { StageSetPanel } from "./StageSetPanel";
 export { TournamentLogo } from "./TournamentLogo";
