@@ -64,6 +64,9 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Edits are allowed until voting closes.
 - Failed saves preserve the previous server-confirmed ballot.
 - View-only users cannot vote or affect turnout.
+- Player cannot submit until both sets are complete.
+- `No bans for this set` completes a set explicitly.
+- Existing ballots show the duplicate-device warning copy.
 
 ## Stage and Results Tests
 

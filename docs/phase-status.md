@@ -269,3 +269,53 @@ Status: complete
 - Stage currently displays Round 1 because current-round state is not persistent yet. Later voting/round state phases should drive the active round.
 - Draw animation is CSS reveal-on-render, not a host-stepped reveal sequence. More detailed stage control can build on the same draw state in later phases.
 - Visual verification was limited to build/static checks in this phase; full browser-driven E2E and screenshot coverage begins when Playwright is introduced.
+
+## Phase 7 - Player Room, View-Only Mode, And Ballot Flow
+
+Status: complete
+
+### Acceptance Criteria
+
+- Room landing: `/room` already offers `I am a player voting` and `View charts only`
+- Player identity: `/vote` uses active roster players only and exact label `Select your start.gg username`
+- Username confirmation: exact confirmation copy appears after selection
+- Existing ballot detection: submitted player IDs trigger the duplicate-device warning and latest valid ballot wins in the server store
+- Ballot flow: Set 1, Set 2, and Review/Submit steps are implemented
+- Submit blocking: player cannot submit until both sets are complete
+- No bans: `No bans for this set` explicitly completes a set and clears bans
+- Ban max: UI and server validation cap bans at 2 per set
+- Ballot editing: saved view offers `Change vote`; new save revisions replace prior valid ballot
+- View-only mode: `/charts` reads draw state and exposes no submit controls
+- Inactive players: filtered out of the voting dropdown
+- After close/reveal phone behavior: `/vote` has closed/revealing and revealed phone status views for later state-machine phases
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit tests: passed with `npm run test` (13 files, 35 tests)
+- E2E: placeholder passed with `npm run test:e2e`
+- Chart import: passed with `npm run import:charts`
+- Image fallback cache: passed with `npm run cache:chart-images -- --fallback-only`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- Production build: passed with `npm run build`
+
+### Changed Files
+
+- Added ballot validation and in-memory ballot store under `src/lib/vote`
+- Extended server-only admin state with ballot state
+- Added `/vote` server actions and client ballot flow
+- Replaced `/vote` placeholder with active-player identity, set voting, review, submit, saved/edit, closed, and revealed views
+- Updated `/charts` to view draw state without voting controls
+- Updated README, testing checklist, and phase status
+
+### Manual Review
+
+- Product rules: the voting form covers both chart sets in one round ballot, bans are capped at 2 per set, no-ban is explicit, no vague skip button was added, and latest valid ballot revision wins.
+- Security: ballot submission is a server action and validates drawn chart IDs server-side; view-only route has no mutation action.
+- Data: ballots are stored server-side in memory with revision count and submitted timestamp until Supabase persistence is wired.
+- UI: phone card layout uses two columns with the 7th card centered; identity and duplicate warning copy match the product spec.
+- Tests: unit coverage verifies no-ban completion, ban completion, latest ballot replacement, and phone status transitions.
+
+### Risks And Assumptions
+
+- Voting open/closed timers and pause behavior are not implemented until Phase 8. Phase 7 adds the phone display states that Phase 8 and Phase 9 will drive.
+- Ballot state is in-memory until Supabase persistence is wired. It survives browser refresh in one server process but not server restart or multiple instances.
+- Current route state is still fixed to Round 1 until later round-state work.
