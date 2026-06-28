@@ -1,6 +1,6 @@
 # Testing Checklist
 
-This checklist is a Phase 0 baseline. It should be expanded as automated tests are added.
+This checklist is a Phase 1 baseline. It should be expanded as automated tests are added.
 
 ## Static Checks
 
@@ -8,9 +8,17 @@ This checklist is a Phase 0 baseline. It should be expanded as automated tests a
 - `npm run typecheck`
 - `npm run test`
 - `npm run build`
-- E2E tests once available
+- E2E is not available in Phase 1 and should be added when Playwright is introduced.
 
-These commands are expected after Phase 1 scaffolds the app.
+## Phase 1 Shell Tests
+
+- `/stage` loads.
+- `/room` loads and offers `I am a player voting` and `View charts only`.
+- `/vote` loads with the exact label `Select your start.gg username`.
+- `/charts` loads as a view-only chart display shell.
+- `/results` loads with the closed-voting stage reveal message.
+- `/coolguy69` loads as the admin route shell.
+- Tournament constants define S16/S17, S18/S19, S20/S21, and S22/D23.
 
 ## Product Rule Tests
 

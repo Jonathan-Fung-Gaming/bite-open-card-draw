@@ -1,9 +1,10 @@
 # Event-Day Runbook
 
-This runbook is a Phase 0 placeholder. It must be updated as implementation details are added.
+This runbook starts as a Phase 1 scaffold and must be updated as implementation details are added.
 
 ## Before the Event
 
+- Run `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` on the release branch.
 - Confirm production environment variables are set in Vercel and not committed to Git.
 - Confirm Supabase migrations are applied.
 - Confirm chart data has been imported from `data/source/charts.csv`.
@@ -48,3 +49,4 @@ For each round:
 - Dangerous actions must summarize the change and require admin password re-entry.
 - Manual ballots and overrides must be auditable.
 - If a real secret is exposed, rotate it before continuing.
+- If the website fails, pause and fix the website unless the tournament director explicitly decides on an outside-the-app fallback.

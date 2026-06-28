@@ -4,9 +4,7 @@ Tournament voting and stage visualization app for Pump It Up Open Stage.
 
 ## Current status
 
-Phase 0 setup.
-
-The app is not implemented yet.
+Phase 1 scaffold is in progress.
 
 ## Source files
 
@@ -32,9 +30,7 @@ public/brand/tournament-logo.png
 
 ## Development
 
-Development commands will be added during Phase 1.
-
-Expected commands after scaffold:
+Development commands:
 
 ```bash
 npm run dev
@@ -42,4 +38,13 @@ npm run lint
 npm run typecheck
 npm run test
 npm run build
+```
+
+End-to-end tests are not available yet. They will be added in a later phase when Playwright is
+introduced.
+
+Use the project command wrapper:
+
+```bash
+rtk npm run build
 ```
