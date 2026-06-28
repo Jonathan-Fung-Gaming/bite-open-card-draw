@@ -29,6 +29,7 @@ export default function VotePage() {
   const draws = getRoundDrawRecords(roundNumber);
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(roundNumber);
   const phoneStatus = adminState.ballotStore.getPhoneStatus(roundNumber);
+  const result = adminState.resultStore.getRoundResult(roundNumber);
 
   if (snapshot.status === "voting_paused") {
     return (
@@ -62,14 +63,21 @@ export default function VotePage() {
   }
 
   if (snapshot.status === "results_revealed") {
+    const selectedCharts =
+      result?.revealPhase === "final"
+        ? result.sets.map((set) => set.selectedChart)
+        : phoneStatus.phase === "revealed"
+          ? phoneStatus.selectedCharts
+          : [];
+
     return (
       <main className="min-h-screen">
         <RoundHeader title={`Round ${roundNumber} Final Charts`} status="Results revealed" />
         <section className="mx-auto max-w-4xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5">
-            {phoneStatus.phase === "revealed" ? (
+            {selectedCharts.length === 2 ? (
               <div className="grid gap-3 md:grid-cols-2">
-                {phoneStatus.selectedCharts.map((chart) => (
+                {selectedCharts.map((chart) => (
                   <article key={chart.id} className="rounded border border-ember-300/30 bg-black/25 p-4">
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
                       {chart.displayDifficulty}
@@ -84,7 +92,25 @@ export default function VotePage() {
             )}
             <details className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
               <summary className="cursor-pointer font-bold uppercase text-ember-300">Full ban counts</summary>
-              <p className="mt-2">Ban counts are available after result computation.</p>
+              {result?.revealPhase === "final" ? (
+                <div className="mt-3 grid gap-3">
+                  {result.sets.map((set) => (
+                    <div key={set.roundSetId}>
+                      <p className="font-bold text-white">{set.displayLabel}</p>
+                      <ol className="mt-2 grid gap-1">
+                        {set.rows.map((row) => (
+                          <li key={row.chart.id} className="flex justify-between gap-3">
+                            <span>{row.chart.name}</span>
+                            <span className="font-mono text-ember-300">{row.banCount}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2">Ban counts are available after result computation.</p>
+              )}
             </details>
           </div>
         </section>

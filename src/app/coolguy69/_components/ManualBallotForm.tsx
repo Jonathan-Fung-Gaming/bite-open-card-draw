@@ -43,7 +43,7 @@ export function ManualBallotForm({
 
       {!canSubmitManualBallot ? (
         <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
-          Manual ballots are available while voting is open or after voting closes but before results reveal.
+          Manual ballots are available while voting is open or after voting closes but before results are computed.
         </p>
       ) : null}
 

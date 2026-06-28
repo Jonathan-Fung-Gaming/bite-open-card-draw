@@ -7,8 +7,11 @@ import {
   addPlayerAction,
   adminLoginAction,
   adminLogoutAction,
+  advanceResultRevealAction,
   bulkImportPlayersAction,
   closeVotingAction,
+  computeResultsAction,
+  downloadPrivateCsvAction,
   drawRoundSetAction,
   releaseHostControlAction,
   manualBallotAction,
@@ -24,6 +27,7 @@ import {
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
 import { HostHeartbeat } from "./_components/HostHeartbeat";
 import { ManualBallotForm } from "./_components/ManualBallotForm";
+import { PrivateCsvDownload } from "./_components/PrivateCsvDownload";
 import { getRoundDrawRecords, getSubmittedPlayerIdsForRound, getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { formatVotingTime } from "@/lib/vote/voting-window";
 
@@ -79,6 +83,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const votingSnapshot = getVotingRoundSnapshot(currentRoundNumber);
   const currentRoundDraws = getRoundDrawRecords(currentRoundNumber);
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(currentRoundNumber);
+  const result = adminState.resultStore.getRoundResult(currentRoundNumber);
   const drawControls = ROUND_SET_DEFINITIONS.map((set) => ({
     set,
     activeDraw: adminState.drawStateStore.getActiveDraw(set.roundNumber, set.setOrder),
@@ -200,6 +205,52 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </form>
             </div>
           </section>
+          <section className="metal-panel rounded-lg p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Result Reveal Controls
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">Round {currentRoundNumber}</h2>
+              </div>
+              <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                {result?.revealPhase.replaceAll("_", " ") ?? "not computed"}
+              </p>
+            </div>
+            <p className="mt-4 rounded border border-ember-300/25 bg-black/25 p-3 text-sm text-metal-300">
+              Revealing live counts is sensitive. Confirm the stage is ready before advancing.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <form action={computeResultsAction}>
+                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                <button
+                  className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                  disabled={!canControl || votingSnapshot.status !== "voting_closed" || Boolean(result)}
+                  type="submit"
+                >
+                  Compute Results
+                </button>
+              </form>
+              <form action={advanceResultRevealAction}>
+                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                <button
+                  className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                  disabled={!canControl || !result || result.revealPhase === "final"}
+                  type="submit"
+                >
+                  Next Reveal Step
+                </button>
+              </form>
+            </div>
+            <div className="mt-4">
+              <PrivateCsvDownload
+                roundNumber={currentRoundNumber}
+                enabled={Boolean(result && result.revealPhase === "final")}
+                autoDownloadKey={result?.finalRevealedAt ? `${result.id}:${result.finalRevealedAt}` : null}
+                action={downloadPrivateCsvAction}
+              />
+            </div>
+          </section>
           <ManualBallotForm
             action={manualBallotAction}
             roundNumber={currentRoundNumber}
@@ -207,7 +258,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             draws={currentRoundDraws}
             existingPlayerIds={submittedPlayerIds}
             canControl={canControl}
-            canSubmitManualBallot={votingSnapshot.canAcceptManualBallot}
+            canSubmitManualBallot={votingSnapshot.canAcceptManualBallot && !result}
           />
           <section className="metal-panel rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">

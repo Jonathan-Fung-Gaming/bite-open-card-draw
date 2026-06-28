@@ -1,23 +1,39 @@
-import { ChartCard, RoundHeader } from "@/components";
-import { PLACEHOLDER_CHARTS } from "@/lib/tournament";
+import { ResultSetPanel, RoundHeader, StageDrawCard } from "@/components";
+import { adminState } from "@/lib/server/admin-state";
+
+export const dynamic = "force-dynamic";
 
 export default function ResultsPage() {
-  const selectedCharts = [PLACEHOLDER_CHARTS[0], PLACEHOLDER_CHARTS[7]];
+  const roundNumber = 1;
+  const result = adminState.resultStore.getRoundResult(roundNumber);
+
+  if (!result || result.revealPhase !== "final") {
+    return (
+      <main className="min-h-screen">
+        <RoundHeader title="Round 1 Results" status="Awaiting stage reveal" />
+        <section className="mx-auto max-w-3xl px-5 py-5">
+          <div className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300">
+            <p>Voting is closed.</p>
+            <p>Results are being revealed on stage.</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen">
-      <RoundHeader title="Round 1 Final Charts" status="Results display shell" />
-      <section className="mx-auto max-w-6xl px-5 py-5">
-        <div className="metal-panel rounded-lg p-5">
-          <p className="text-center text-lg font-bold text-metal-300">
-            Voting is closed. Results are being revealed on stage.
-          </p>
-          <div className="rune-divider my-5" />
-          <div className="grid gap-4 md:grid-cols-2">
-            {selectedCharts.map((chart, index) => (
-              <ChartCard key={chart.id} chart={chart} index={index + 1} selected />
-            ))}
-          </div>
+      <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Results revealed" />
+      <section className="mx-auto grid max-w-6xl gap-5 px-5 py-5">
+        <div className="grid gap-4 md:grid-cols-2">
+          {result.sets.map((set, index) => (
+            <StageDrawCard key={set.roundSetId} chart={set.selectedChart} index={index + 1} />
+          ))}
+        </div>
+        <div className="grid gap-5">
+          {result.sets.map((set) => (
+            <ResultSetPanel key={set.roundSetId} set={set} showWinner />
+          ))}
         </div>
       </section>
     </main>

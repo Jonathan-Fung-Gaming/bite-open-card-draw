@@ -374,3 +374,57 @@ Status: complete
 - Current route state remains fixed to Round 1 until later round progression work.
 - There is no special correction workflow yet after results reveal; Phase 8 blocks normal/manual ballot changes at that point as required.
 - Manual ballot checkbox UX relies on server validation for the 1-2 ban limit and no-bans exclusivity; richer client validation can be added later without changing the server contract.
+
+## Phase 9 - Results Computation, Rune-Wheel Tiebreak, Final Reveal, And CSV Export
+
+Status: complete
+
+### Acceptance Criteria
+
+- Result computation: each drawn chart gets a ban count, including zero-ban charts
+- Sort order: result rows reveal from most banned to least banned, with tied rows sorted alphabetically
+- Selection: each set selects the chart with the fewest bans
+- Tiebreaks: tied least-ban charts use a backend-decided winner before reveal
+- Rune wheel: 2-4 chart least-ban ties produce a 12-slot wheel animation that reveals the committed winner
+- Fallback ties: 5+ chart least-ban ties use a plain fallback reveal with the backend winner already committed
+- Stage sequence: host can reveal Set 1 counts, Set 1 selected chart, Set 2 counts, Set 2 selected chart, then the final two charts
+- Final screen: `/stage` shows `ROUND X FINAL CHARTS` with exactly two selected charts after final reveal
+- Phone behavior: `/vote` shows the closed/revealing message until final reveal, then selected charts first and expandable full ban counts
+- View-only behavior: `/charts` and `/results` show post-reveal results only after final reveal
+- Private CSV: admin download includes player-level rows, manual overrides, selected charts, and tiebreak flags
+- CSV auto-download: admin client attempts one automatic private CSV download after final reveal and keeps a manual button
+- Selected songs: final reveal marks selected song keys for later draw exclusion
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit tests: passed with `npm run test` (16 files, 45 tests)
+- E2E: placeholder passed with `npm run test:e2e`
+- Chart import: passed with `npm run import:charts`
+- Image fallback cache: passed with `npm run cache:chart-images -- --fallback-only`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- Production build: passed with `npm run build`
+
+### Changed Files
+
+- Added result computation, reveal state, and private CSV modules under `src/lib/results`
+- Extended server-only admin state with a result store
+- Added result display components for count rows, selected highlights, and rune-wheel tiebreak reveal
+- Added admin result controls and private CSV download behavior
+- Updated `/stage`, `/vote`, `/charts`, and `/results` to use committed result state
+- Extended ballot metadata with `replacedExistingBallot`
+- Added result and CSV unit tests
+- Updated README, testing checklist, and phase status
+
+### Manual Review
+
+- Product rules: results use ban counts only, include zero-ban charts, choose least-ban charts, and do not use browser randomness for tiebreak decisions.
+- Reveal flow: public phones and view-only pages do not show result details until the host reaches the final reveal.
+- Security: result computation and reveal actions are server actions behind admin session and host lock; private CSV download requires an admin session.
+- Data: private CSV rows include unsubmitted eligible players, manual override fields, selected charts, and tiebreak flags.
+- UI: stage final screen shows exactly the two selected charts, and result rows use both count badges and small bars.
+
+### Risks And Assumptions
+
+- Result state is still in-memory until Supabase persistence is wired. It survives refresh in one server process but not server restart or multiple instances.
+- Current route state remains fixed to Round 1 until later round progression work.
+- Manual ballots are blocked after result computation to avoid stale committed results; a future correction/override workflow should handle post-compute changes.
+- CSV auto-download depends on browser download permissions; the manual button remains available after final reveal.

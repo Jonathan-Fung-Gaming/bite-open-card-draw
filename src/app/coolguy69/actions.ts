@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHostToken } from "@/lib/admin/host-lock";
+import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import { adminState } from "@/lib/server/admin-state";
 import { getRoundDrawRecords, getVotingRoundSnapshot, revalidateTournamentViews } from "@/lib/server/voting-round";
 import {
@@ -283,6 +284,10 @@ export async function manualBallotAction(formData: FormData) {
       throw new Error("Manual ballots are allowed only before results reveal.");
     }
 
+    if (adminState.resultStore.getRoundResult(roundNumber)) {
+      throw new Error("Manual ballots must be entered before results are computed.");
+    }
+
     const playerId = getString(formData, "playerId");
     const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === playerId);
 
@@ -328,6 +333,7 @@ export async function manualBallotAction(formData: FormData) {
         source: "manual_admin",
         manualReason: reason,
         manualOverride: snapshot.postCloseManualBallotsAreOverrides,
+        replacedExistingBallot: Boolean(existing),
       },
     );
 
@@ -337,4 +343,82 @@ export async function manualBallotAction(formData: FormData) {
   }
 
   revalidateTournamentViews(revalidatePath);
+}
+
+export async function computeResultsAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const snapshot = getVotingRoundSnapshot(roundNumber);
+
+    if (snapshot.status !== "voting_closed") {
+      throw new Error("Voting must be closed before results are computed.");
+    }
+
+    adminState.resultStore.computeRound({
+      roundNumber,
+      draws: getRoundDrawRecords(roundNumber),
+      ballots: adminState.ballotStore.listForRound(roundNumber),
+      eligiblePlayers: snapshot.eligiblePlayers,
+      now: snapshot.serverNow,
+    });
+    adminState.votingWindowStore.setResultsPhase(roundNumber, "results_computed");
+    adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not compute results.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function advanceResultRevealAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const result = adminState.resultStore.advanceReveal(roundNumber);
+
+    if (result.revealPhase === "final") {
+      adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealed");
+      adminState.ballotStore.setPhoneStatus(roundNumber, {
+        phase: "revealed",
+        selectedCharts: result.sets.map((set) => ({
+          id: set.selectedChart.id,
+          name: set.selectedChart.name,
+          artist: set.selectedChart.artist,
+          displayDifficulty: set.selectedChart.displayDifficulty,
+        })),
+      });
+
+      for (const set of result.sets) {
+        adminState.drawStateStore.markSelectedSong(set.selectedChart.songKey);
+      }
+    } else {
+      adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealing");
+      adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
+    }
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not advance result reveal.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
+  await requireAdminSession();
+
+  const result = adminState.resultStore.getRoundResult(roundNumber);
+
+  if (!result || result.revealPhase !== "final") {
+    throw new Error("Private CSV is available only after the final reveal.");
+  }
+
+  return {
+    filename: `round-${roundNumber}-private-ballots.csv`,
+    csv: generatePrivateBallotCsv({
+      result,
+      ballots: adminState.ballotStore.listForRound(roundNumber),
+    }),
+  };
 }

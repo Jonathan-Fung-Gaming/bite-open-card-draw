@@ -38,6 +38,7 @@ export class BallotStore {
       source: options.source ?? "player",
       manualReason,
       manualOverride: options.manualOverride ?? false,
+      replacedExistingBallot: options.replacedExistingBallot ?? false,
     };
 
     this.ballots.set(key, ballot);

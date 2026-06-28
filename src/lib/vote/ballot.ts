@@ -18,6 +18,7 @@ export type RoundBallot = {
   source: "player" | "manual_admin";
   manualReason: string | null;
   manualOverride: boolean;
+  replacedExistingBallot: boolean;
 };
 
 export type PhoneRoundStatus =
@@ -48,6 +49,7 @@ export type SubmitRoundBallotOptions = {
   source?: RoundBallot["source"];
   manualReason?: string;
   manualOverride?: boolean;
+  replacedExistingBallot?: boolean;
 };
 
 export function isSetChoiceComplete(choice: BallotSetChoice) {

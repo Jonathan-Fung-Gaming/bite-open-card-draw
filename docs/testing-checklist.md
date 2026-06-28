@@ -86,6 +86,13 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Phones show selected charts first after reveal completion.
 - Full ban counts are expandable after reveal completion.
 - Final reveal shows both selected charts together.
+- Result rows include zero-ban charts.
+- Result rows sort from most banned to least banned.
+- Least-ban charts are selected.
+- Tied least-ban charts use backend-decided tiebreaks.
+- 2-4 chart least-ban ties show a 12-slot rune wheel.
+- 5+ chart least-ban ties use the plain fallback reveal.
+- `/results` stays closed/revealing until the final stage reveal finishes.
 
 ## Admin Tests
 
@@ -99,6 +106,7 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Duplicate active start.gg usernames are blocked.
 - Current-round eligibility changes require password and audit reason.
 - Private CSV export includes player-level ballots, manual overrides, selected charts, and tiebreak flags.
+- Private CSV auto-downloads once after final reveal and remains available by manual button.
 
 ## Draw Tests
 
