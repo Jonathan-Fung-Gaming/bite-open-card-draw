@@ -8,7 +8,11 @@ import {
   adminLoginAction,
   adminLogoutAction,
   bulkImportPlayersAction,
+  drawRoundSetAction,
   releaseHostControlAction,
+  rerollFullRoundAction,
+  rerollOneChartAction,
+  rerollRoundSetAction,
   setPlayerActiveStatusAction,
   takeHostControlAction,
 } from "./actions";
@@ -63,6 +67,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const inactivePlayers = players.filter((player) => !player.active);
   const activeCount = adminState.rosterStore.getActivePlayerCount();
   const canControl = hostSnapshot.status === "active";
+  const drawControls = ROUND_SET_DEFINITIONS.map((set) => ({
+    set,
+    activeDraw: adminState.drawStateStore.getActiveDraw(set.roundNumber, set.setOrder),
+    historyCount: adminState.drawStateStore.getDrawHistory(set.roundNumber, set.setOrder).length,
+  }));
 
   return (
     <AdminLayout hostStatus={hostSnapshot.status}>
@@ -97,6 +106,150 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     Draw {set.drawCount} / Max bans {set.maxBans}
                   </p>
                 </div>
+              ))}
+            </div>
+          </section>
+          <section className="metal-panel rounded-lg p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Draw Controls
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">All Rounds</h2>
+              </div>
+              <form action={rerollFullRoundAction} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <select
+                  name="roundNumber"
+                  disabled={!canControl}
+                  className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                >
+                  <option value="1">Round 1</option>
+                  <option value="2">Round 2</option>
+                  <option value="3">Round 3</option>
+                  <option value="4">Round 4</option>
+                </select>
+                <input
+                  name="adminPassword"
+                  type="password"
+                  required
+                  disabled={!canControl}
+                  placeholder="Admin password"
+                  className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                />
+                <input
+                  name="reason"
+                  required
+                  disabled={!canControl}
+                  placeholder="Reroll reason"
+                  className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                />
+                <button
+                  className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                  disabled={!canControl}
+                  type="submit"
+                >
+                  Reroll Round
+                </button>
+              </form>
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              {drawControls.map(({ set, activeDraw, historyCount }) => (
+                <section key={set.displayLabel} className="rounded border border-metal-700 bg-black/20 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-ember-300">
+                        Round {set.roundNumber} - Set {set.setOrder}
+                      </p>
+                      <h3 className="text-xl font-black text-white">{set.displayLabel}</h3>
+                    </div>
+                    <form action={drawRoundSetAction}>
+                      <input type="hidden" name="roundNumber" value={set.roundNumber} />
+                      <input type="hidden" name="setOrder" value={set.setOrder} />
+                      <button
+                        className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                        disabled={!canControl || Boolean(activeDraw)}
+                        type="submit"
+                      >
+                        Draw Set
+                      </button>
+                    </form>
+                  </div>
+                  {activeDraw ? (
+                    <div className="mt-3 grid gap-2">
+                      <p className="text-xs uppercase tracking-[0.16em] text-metal-300">
+                        Version {activeDraw.version} / Pool {activeDraw.eligiblePoolCount} / History {historyCount}
+                      </p>
+                      {activeDraw.charts.map((chart, index) => (
+                        <div
+                          key={chart.id}
+                          className="grid gap-2 rounded border border-metal-700 bg-black/25 p-2 text-sm md:grid-cols-[1fr_auto]"
+                        >
+                          <div>
+                            <p className="font-semibold text-white">
+                              {index + 1}. {chart.name}
+                            </p>
+                            <p className="text-xs text-metal-300">{chart.artist}</p>
+                          </div>
+                          <form action={rerollOneChartAction} className="grid gap-2 sm:grid-cols-3">
+                            <input type="hidden" name="roundNumber" value={set.roundNumber} />
+                            <input type="hidden" name="setOrder" value={set.setOrder} />
+                            <input type="hidden" name="chartId" value={chart.id} />
+                            <input
+                              name="adminPassword"
+                              type="password"
+                              required
+                              disabled={!canControl}
+                              placeholder="Password"
+                              className="rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white"
+                            />
+                            <input
+                              name="reason"
+                              required
+                              disabled={!canControl}
+                              placeholder="Reason"
+                              className="rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white"
+                            />
+                            <button
+                              className="rounded border border-ember-300/30 px-2 py-1 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                              disabled={!canControl}
+                              type="submit"
+                            >
+                              Reroll
+                            </button>
+                          </form>
+                        </div>
+                      ))}
+                      <form action={rerollRoundSetAction} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                        <input type="hidden" name="roundNumber" value={set.roundNumber} />
+                        <input type="hidden" name="setOrder" value={set.setOrder} />
+                        <input
+                          name="adminPassword"
+                          type="password"
+                          required
+                          disabled={!canControl}
+                          placeholder="Admin password"
+                          className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          name="reason"
+                          required
+                          disabled={!canControl}
+                          placeholder="Set reroll reason"
+                          className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                        />
+                        <button
+                          className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                          disabled={!canControl}
+                          type="submit"
+                        >
+                          Reroll Set
+                        </button>
+                      </form>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-metal-300">No active draw.</p>
+                  )}
+                </section>
               ))}
             </div>
           </section>

@@ -85,3 +85,13 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Duplicate active start.gg usernames are blocked.
 - Current-round eligibility changes require password and audit reason.
 - Private CSV export includes player-level ballots, manual overrides, selected charts, and tiebreak flags.
+
+## Draw Tests
+
+- Each set draws exactly 7 unique charts.
+- Excluded charts are not drawn.
+- Selected songs from prior rounds are not drawn.
+- The same song is not drawn in both sets of the same round.
+- Rerolling one chart, one set, or one round preserves draw history.
+- Voting cannot open until both sets in the round are drawn.
+- Draw and reroll actions use server-side randomness and require active host control.

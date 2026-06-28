@@ -11,9 +11,11 @@ Implemented now:
 - roster add, bulk import, active/inactive toggle, and restore
 - duplicate active start.gg username blocking
 - emergency current-round eligibility form with password re-entry and audit reason
+- chart draw controls for all round sets
+- reroll one chart, one set, or one round with password re-entry and audit reason
 
-Draw controls, voting controls, result reveal controls, manual ballot overrides, and private CSV
-export are added in later phases.
+Voting controls, result reveal controls, manual ballot overrides, and private CSV export are added
+in later phases.
 
 ## Required Admin Rules
 
@@ -43,6 +45,6 @@ Dangerous actions include:
 
 ## Current Phase Notes
 
-The Phase 4 implementation uses server-only in-memory stores for host lock and roster state because
-local Supabase credentials/tooling are not available. This keeps all mutations server-side for local
-testing, but persistence must move to Supabase tables before event use.
+The Phase 5 implementation uses server-only in-memory stores for host lock, roster, and draw state
+because local Supabase credentials/tooling are not available. This keeps all mutations server-side
+for local testing, but persistence must move to Supabase tables before event use.
