@@ -226,3 +226,46 @@ Status: complete
 - Draw state is in-memory until Supabase credentials/tooling are available. It survives browser refresh in one server process but not server restart, serverless cold starts, or multiple instances.
 - The admin UI displays draw controls in the admin route only; dramatic stage visualization begins in Phase 6.
 - Chart exclusion UI is not fully wired to the draw store yet. The draw engine supports excluded chart keys, and persistent exclusion management should be connected when Supabase-backed chart exclusions are implemented.
+
+## Phase 6 - Stage Display And Draw Visualization
+
+Status: complete
+
+### Acceptance Criteria
+
+- Stage can reveal Set 1 and Set 2: implemented with animated stage cards for active draw records
+- Stage shows both sets together: `/stage` renders both round set panels from server draw state
+- QR code points to `/room`: existing `QRPanel` remains on the stage page
+- Timer and QR are readable on projector: stage sidebar keeps large timer/status and QR panel
+- Missing chart image fallback: stage cards use `public/chart-images/fallback-card.svg` when no local image path exists
+- Refresh returns stage to current state: `/stage` reads server-only draw state on every request and is marked dynamic
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit tests: passed with `npm run test` (12 files, 32 tests)
+- E2E: placeholder passed with `npm run test:e2e`
+- Chart import: passed with `npm run import:charts`
+- Image fallback cache: passed with `npm run cache:chart-images -- --fallback-only`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- Production build: passed with `npm run build`
+
+### Changed Files
+
+- Added stage view helper and unit test in `src/lib/stage`
+- Added stage-specific draw card and set panel components
+- Updated `/stage` to render dynamic server draw state instead of static placeholders
+- Added card reveal animation CSS
+- Updated README, testing checklist, and phase status
+
+### Manual Review
+
+- Product rules: stage still shows the two fixed sets for the current round and does not decide draw results in browser code.
+- Security: stage route reads server state only; it does not expose admin secrets, password hashes, service-role keys, or mutation controls.
+- Data: stage refresh reflects the in-memory active draw records created by admin draw controls in the same server process.
+- UI: stage uses uploaded logo through `RoundHeader`, a readable timer/QR sidebar, original industrial/rune styling, animated chart cards, and 4+3 card layout on wide screens.
+- Tests: unit coverage verifies stage readiness depends on both set draws.
+
+### Risks And Assumptions
+
+- Stage currently displays Round 1 because current-round state is not persistent yet. Later voting/round state phases should drive the active round.
+- Draw animation is CSS reveal-on-render, not a host-stepped reveal sequence. More detailed stage control can build on the same draw state in later phases.
+- Visual verification was limited to build/static checks in this phase; full browser-driven E2E and screenshot coverage begins when Playwright is introduced.
