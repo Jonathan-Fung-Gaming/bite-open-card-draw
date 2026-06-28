@@ -22,6 +22,10 @@ Server-only keys must remain server-only.
 
 Tournament-changing writes should go through server-side code.
 
+Phase 2 server modules that may read service-role keys, admin hashes, or session secrets must import
+`server-only`. Browser-safe Supabase code may use only `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+
 ## Admin route
 
 The admin route is `/coolguy69`, but the path is not security.

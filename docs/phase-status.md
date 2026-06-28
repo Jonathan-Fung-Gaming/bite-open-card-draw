@@ -39,3 +39,47 @@ Status: complete
 - E2E tests are not available yet; they should be added when Playwright is introduced in a later phase.
 - The production build detected a local `.env.local`, but `.gitignore` excludes it and no local secret value was read or committed.
 - npm audit for production dependencies passed after forcing patched PostCSS via npm overrides.
+
+## Phase 2 - Database Schema And Server Foundation
+
+Status: complete
+
+### Acceptance Criteria
+
+- Migrations: SQL migration created at `supabase/migrations/20260628050200_initial_schema.sql`
+- Local migration apply: blocked because neither Supabase CLI nor `psql` is installed in this environment
+- Round set seed data: present in migration and statically tested
+- Server-side Supabase client: created in `src/lib/server/supabase.ts`
+- Client-side code cannot import server-only secrets: server secret modules import `server-only`; browser client uses only `NEXT_PUBLIC_*`
+- Placeholder mutation functions: complete for all Phase 2 required contracts
+- Basic database tests: passed with `npm run test`
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Production build: passed with `npm run build`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- E2E: not available because Playwright is not introduced yet
+
+### Changed Files
+
+- Added Supabase migration with core tournament tables, indexes, locked round/set seed data, and row level security enabled on all core tables
+- Added database metadata and partial Supabase database types in `src/lib/db`
+- Added browser-safe Supabase anon client helper in `src/lib/db/browser-client.ts`
+- Added server-only environment and service-role Supabase helpers in `src/lib/server`
+- Added Zod mutation contracts and placeholder server-side mutation functions for all tournament-changing operations
+- Added migration and mutation contract tests
+- Updated data model and security docs
+- Updated package dependencies for Supabase, `server-only`, and Zod
+
+### Manual Review
+
+- Product rules: schema preserves four rounds, two fixed sets per round, draw count 7, max bans 2, duplicate active username blocking, round player eligibility snapshots, ballot revisions, manual overrides, result snapshots, and tiebreak records.
+- Security: service-role key, admin password hash, and session secret are read only from server-only modules; RLS is enabled with no permissive browser policies; tournament mutation functions are server-only placeholders.
+- Data: tables cover the Phase 2 required list plus `round_player_eligibility` for the active-player snapshot rule.
+- UI: no Phase 2 UI behavior was added beyond existing route shells.
+- Tests: static migration tests verify required tables, RLS, round-set seed rows, active username uniqueness, and completed ballot choice constraints.
+
+### Risks And Assumptions
+
+- The SQL migration has not been applied to a live or local Supabase database because required local tooling is unavailable. It is statically tested but still needs a real Supabase apply check once tooling/project credentials are available.
+- Mutation functions validate input shape and clearly return `not_implemented`; real database behavior begins in later phases.
+- Database types are partial hand-written types for the Phase 2 scaffold and should be replaced or expanded from Supabase-generated types once the schema stabilizes.

@@ -1,6 +1,7 @@
 # Data Model
 
-This document records the intended data model. Phase 1 has no database yet.
+This document records the intended data model. Phase 2 adds the first Supabase migration at
+`supabase/migrations/20260628050200_initial_schema.sql`.
 
 ## Core Entities
 
@@ -22,6 +23,7 @@ This document records the intended data model. Phase 1 has no database yet.
 - `admin_actions`: audit log for tournament-changing actions
 - `host_locks`: active host browser and heartbeat state
 - `image_assets`: cached chart art and fallback assets
+- `round_player_eligibility`: active player snapshot for a round after voting opens
 
 ## Locked Round Sets
 
@@ -38,3 +40,9 @@ Every set draws exactly 7 charts and allows at most 2 bans per player.
 
 The database and server-side code will be authoritative for draws, ballot acceptance, timer state,
 result computation, tiebreaks, manual overrides, and CSV export.
+
+## Security Defaults
+
+The Phase 2 migration enables row level security on every core table and defines no browser-write
+policies. Tournament-changing writes are intended to run through server-only modules using the
+Supabase service-role client.
