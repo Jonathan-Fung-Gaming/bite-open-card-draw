@@ -178,3 +178,51 @@ Status: complete
 - In-memory admin state survives browser refresh in the same dev/server process but does not survive server restart or multi-instance deployment. Supabase persistence is required before event use.
 - Login requires `ADMIN_PASSWORD_HASH` and `SESSION_SECRET` to be configured. Without them, the admin page still loads but login returns a configuration error.
 - The current dangerous eligibility form is the first use of the dangerous action dialog; later dangerous actions must reuse the same password re-entry pattern.
+
+## Phase 5 - Chart Draw Engine And Reroll Controls
+
+Status: complete
+
+### Acceptance Criteria
+
+- Each set draws exactly 7 unique charts: implemented and covered by unit tests
+- Excluded chart keys are filtered before draw: implemented and covered by unit tests
+- Selected songs from prior rounds are excluded: implemented and covered by unit tests
+- Same song is not drawn in both sets of the same round: implemented and covered by unit tests
+- Rerolls preserve history: one-chart and set rerolls create new versions and supersede prior active draw records
+- Voting cannot open until both sets are drawn: implemented as `canOpenVoting`
+- Backend randomness: draw engine uses Node `crypto.randomInt`, never browser randomness
+- Backend draw state survives browser refresh: server-only in-memory draw state is shared across admin page refreshes in the same process
+- Admin draw controls: active host can draw every required set and reroll one chart, one set, or one round
+- Dangerous rerolls: reroll actions require active host control, admin password re-entry, and reason
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit tests: passed with `npm run test` (11 files, 31 tests)
+- E2E: placeholder passed with `npm run test:e2e`
+- Chart import: passed with `npm run import:charts`
+- Image fallback cache: passed with `npm run cache:chart-images -- --fallback-only`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- Production build: passed with `npm run build`
+
+### Changed Files
+
+- Added draw engine and draw state store under `src/lib/draw`
+- Added draw engine/state unit tests
+- Extended server-only admin state with draw state
+- Added admin server actions for draw set, reroll chart, reroll set, and reroll round
+- Added `/coolguy69` draw controls for all required round sets
+- Updated admin runbook, testing checklist, README, and phase status
+
+### Manual Review
+
+- Product rules: draw set definitions still match the product spec; draws are 7 charts; only selected prior songs are blocked from future draws; same-round duplicate songs are blocked across the two sets.
+- Security: draw/reroll actions run server-side, require a valid admin session and active host control, and rerolls require password re-entry plus reason.
+- Data: draw versions are preserved in server memory with superseded timestamps, eligible pool counts, chart order, and reason.
+- UI: admin controls expose all required sets and keep controls disabled for read-only admins.
+- Tests: unit coverage verifies draw count, uniqueness, exclusions, prior selected song blocking, same-round duplicate blocking, history preservation, one-chart reroll, and voting-open readiness.
+
+### Risks And Assumptions
+
+- Draw state is in-memory until Supabase credentials/tooling are available. It survives browser refresh in one server process but not server restart, serverless cold starts, or multiple instances.
+- The admin UI displays draw controls in the admin route only; dramatic stage visualization begins in Phase 6.
+- Chart exclusion UI is not fully wired to the draw store yet. The draw engine supports excluded chart keys, and persistent exclusion management should be connected when Supabase-backed chart exclusions are implemented.

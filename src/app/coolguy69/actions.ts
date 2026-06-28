@@ -137,3 +137,69 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
 
   revalidatePath("/coolguy69");
 }
+
+export async function drawRoundSetAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    adminState.drawStateStore.drawRoundSet({
+      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
+      setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not draw round set.");
+  }
+
+  revalidatePath("/coolguy69");
+}
+
+export async function rerollOneChartAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    adminState.drawStateStore.rerollOneChart({
+      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
+      setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
+      chartId: getString(formData, "chartId"),
+      reason: getString(formData, "reason"),
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not reroll chart.");
+  }
+
+  revalidatePath("/coolguy69");
+}
+
+export async function rerollRoundSetAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    adminState.drawStateStore.rerollRoundSet({
+      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
+      setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
+      reason: getString(formData, "reason"),
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not reroll round set.");
+  }
+
+  revalidatePath("/coolguy69");
+}
+
+export async function rerollFullRoundAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    adminState.drawStateStore.rerollFullRound({
+      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
+      reason: getString(formData, "reason"),
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not reroll full round.");
+  }
+
+  revalidatePath("/coolguy69");
+}

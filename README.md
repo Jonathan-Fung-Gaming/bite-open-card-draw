@@ -4,7 +4,7 @@ Tournament voting and stage visualization app for Pump It Up Open Stage.
 
 ## Current status
 
-Phase 4 admin authentication, host lock, and roster management is complete.
+Phase 5 chart draw engine and reroll controls are complete.
 
 ## Source files
 
