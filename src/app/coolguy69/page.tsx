@@ -8,16 +8,24 @@ import {
   adminLoginAction,
   adminLogoutAction,
   bulkImportPlayersAction,
+  closeVotingAction,
   drawRoundSetAction,
   releaseHostControlAction,
+  manualBallotAction,
+  openVotingAction,
+  pauseVotingAction,
   rerollFullRoundAction,
   rerollOneChartAction,
   rerollRoundSetAction,
+  resumeVotingAction,
   setPlayerActiveStatusAction,
   takeHostControlAction,
 } from "./actions";
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
 import { HostHeartbeat } from "./_components/HostHeartbeat";
+import { ManualBallotForm } from "./_components/ManualBallotForm";
+import { getRoundDrawRecords, getSubmittedPlayerIdsForRound, getVotingRoundSnapshot } from "@/lib/server/voting-round";
+import { formatVotingTime } from "@/lib/vote/voting-window";
 
 type AdminPageProps = {
   searchParams?: Promise<{
@@ -67,6 +75,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const inactivePlayers = players.filter((player) => !player.active);
   const activeCount = adminState.rosterStore.getActivePlayerCount();
   const canControl = hostSnapshot.status === "active";
+  const currentRoundNumber = 1;
+  const votingSnapshot = getVotingRoundSnapshot(currentRoundNumber);
+  const currentRoundDraws = getRoundDrawRecords(currentRoundNumber);
+  const submittedPlayerIds = getSubmittedPlayerIdsForRound(currentRoundNumber);
   const drawControls = ROUND_SET_DEFINITIONS.map((set) => ({
     set,
     activeDraw: adminState.drawStateStore.getActiveDraw(set.roundNumber, set.setOrder),
@@ -109,6 +121,94 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               ))}
             </div>
           </section>
+          <section className="metal-panel rounded-lg p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Voting Controls
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">Round {currentRoundNumber}</h2>
+              </div>
+              <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                {votingSnapshot.status.replaceAll("_", " ")}
+              </p>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <div className="rounded border border-metal-700 bg-black/25 p-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Timer</p>
+                <p className="mt-2 font-mono text-3xl font-black tabular-nums text-white">
+                  {formatVotingTime(votingSnapshot.remainingMs)}
+                </p>
+              </div>
+              <div className="rounded border border-metal-700 bg-black/25 p-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Ballots submitted</p>
+                <p className="mt-2 text-3xl font-black text-white">
+                  {votingSnapshot.submittedCount} / {votingSnapshot.eligibleCount}
+                </p>
+              </div>
+              <div className="rounded border border-metal-700 bg-black/25 p-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Ban selections cast</p>
+                <p className="mt-2 text-3xl font-black text-white">{votingSnapshot.banSelectionsCast}</p>
+              </div>
+              <div className="rounded border border-metal-700 bg-black/25 p-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Extension</p>
+                <p className="mt-2 text-3xl font-black text-white">
+                  {votingSnapshot.extensionUsed ? "Used" : "Ready"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <form action={openVotingAction}>
+                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                <button
+                  className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                  disabled={!canControl || !votingSnapshot.canOpen}
+                  type="submit"
+                >
+                  Open Voting
+                </button>
+              </form>
+              <form action={pauseVotingAction}>
+                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                <button
+                  className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
+                  disabled={!canControl || !votingSnapshot.canPause}
+                  type="submit"
+                >
+                  Pause
+                </button>
+              </form>
+              <form action={resumeVotingAction}>
+                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                <button
+                  className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
+                  disabled={!canControl || !votingSnapshot.canResume}
+                  type="submit"
+                >
+                  Resume
+                </button>
+              </form>
+              <form action={closeVotingAction}>
+                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                <button
+                  className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                  disabled={!canControl || !votingSnapshot.canClose}
+                  type="submit"
+                >
+                  Close Voting
+                </button>
+              </form>
+            </div>
+          </section>
+          <ManualBallotForm
+            action={manualBallotAction}
+            roundNumber={currentRoundNumber}
+            players={votingSnapshot.eligiblePlayers}
+            draws={currentRoundDraws}
+            existingPlayerIds={submittedPlayerIds}
+            canControl={canControl}
+            canSubmitManualBallot={votingSnapshot.canAcceptManualBallot}
+          />
           <section className="metal-panel rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>

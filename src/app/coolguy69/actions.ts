@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHostToken } from "@/lib/admin/host-lock";
 import { adminState } from "@/lib/server/admin-state";
+import { getRoundDrawRecords, getVotingRoundSnapshot, revalidateTournamentViews } from "@/lib/server/voting-round";
 import {
   clearAdminCookies,
   clearHostTokenCookie,
@@ -18,6 +19,10 @@ function getString(formData: FormData, name: string) {
   const value = formData.get(name);
 
   return typeof value === "string" ? value : "";
+}
+
+function getStringList(formData: FormData, name: string) {
+  return formData.getAll(name).filter((value): value is string => typeof value === "string");
 }
 
 function redirectWithError(message: string) {
@@ -202,4 +207,134 @@ export async function rerollFullRoundAction(formData: FormData) {
   }
 
   revalidatePath("/coolguy69");
+}
+
+export async function openVotingAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const snapshot = getVotingRoundSnapshot(roundNumber);
+
+    adminState.votingWindowStore.openVoting({
+      roundNumber,
+      drawsReady: snapshot.drawnSetCount === 2,
+      eligiblePlayers: snapshot.eligiblePlayers,
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not open voting.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function pauseVotingAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+
+    getVotingRoundSnapshot(roundNumber);
+    adminState.votingWindowStore.pauseVoting(roundNumber);
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not pause voting.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function resumeVotingAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    adminState.votingWindowStore.resumeVoting(Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4);
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not resume voting.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function closeVotingAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+
+    adminState.votingWindowStore.closeVoting(roundNumber);
+    adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not close voting.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function manualBallotAction(formData: FormData) {
+  await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+
+    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const snapshot = getVotingRoundSnapshot(roundNumber);
+
+    if (!snapshot.canAcceptManualBallot) {
+      throw new Error("Manual ballots are allowed only before results reveal.");
+    }
+
+    const playerId = getString(formData, "playerId");
+    const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === playerId);
+
+    if (!player) {
+      throw new Error("Manual ballot player must be eligible for the voting window.");
+    }
+
+    const reason = getString(formData, "reason").trim();
+
+    if (!reason) {
+      throw new Error("Manual ballot reason is required.");
+    }
+
+    const existing = adminState.ballotStore.get(roundNumber, playerId);
+    const replaceExisting = getString(formData, "replaceExistingBallot") === "yes";
+
+    if (existing && !replaceExisting) {
+      throw new Error("This player already has a submitted ballot. Are you sure you want to replace it?");
+    }
+
+    const draws = getRoundDrawRecords(roundNumber);
+    const choices = draws.map((draw) => {
+      const noBans = getString(formData, `noBans:${draw.id}`) === "true";
+
+      return {
+        roundSetId: draw.id,
+        displayLabel: draw.displayLabel,
+        noBans,
+        bannedChartIds: noBans ? [] : getStringList(formData, `bans:${draw.id}`),
+      };
+    });
+
+    adminState.ballotStore.submit(
+      {
+        roundNumber,
+        playerId: player.id,
+        playerStartggUsername: player.startggUsername,
+        choices,
+      },
+      draws,
+      snapshot.serverNow,
+      {
+        source: "manual_admin",
+        manualReason: reason,
+        manualOverride: snapshot.postCloseManualBallotsAreOverrides,
+      },
+    );
+
+    getVotingRoundSnapshot(roundNumber);
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not save manual ballot.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
 }

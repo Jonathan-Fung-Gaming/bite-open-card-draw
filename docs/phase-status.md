@@ -319,3 +319,58 @@ Status: complete
 - Voting open/closed timers and pause behavior are not implemented until Phase 8. Phase 7 adds the phone display states that Phase 8 and Phase 9 will drive.
 - Ballot state is in-memory until Supabase persistence is wired. It survives browser refresh in one server process but not server restart or multiple instances.
 - Current route state is still fixed to Round 1 until later round-state work.
+
+## Phase 8 - Voting Window, Timer Logic, Pause, Turnout, And Manual Ballots
+
+Status: complete
+
+### Acceptance Criteria
+
+- Timer source: voting windows use server-side time for `openedAt`, `closesAt`, pause remaining time, extension deadlines, final-change deadlines, and ballot timestamps
+- One 10-minute window: opening voting snapshots eligible players and sets one deadline for both drawn sets
+- Draw gate: voting cannot open until both sets are drawn
+- Turnout display: stage and admin show `Ballots submitted: X / Y` and `Ban selections cast: Z` without public chart-by-chart live counts
+- 75% extension: normal expiration below 75% turnout automatically enters one `extension_1_minute` state and then closes regardless of turnout
+- Everyone submitted early: all eligible submitted before normal expiration enters `final_30_seconds`, allows edits, and then closes
+- Pause behavior: host pause freezes countdown, submissions, and edits; resume restores the remaining official time
+- Player saves: `/vote` accepts submissions only while `voting_open`, `final_30_seconds`, or `extension_1_minute`
+- Eligible snapshot: `/vote` uses the active/current-round eligible snapshot captured when voting opens, not later roster edits
+- Manual ballots: admin can enter a password-gated manual ballot while voting is open or after close before result reveal
+- Existing ballot warning: manual admin entry shows `This player already has a submitted ballot.` and `Are you sure you want to replace it?`
+- Post-close overrides: manual ballots saved after close are marked `manualOverride` for the future private CSV export
+- Reveal lock: manual and player ballot saves are blocked after `results_revealed`
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit tests: passed with `npm run test` (14 files, 42 tests)
+- E2E: placeholder passed with `npm run test:e2e`
+- Chart import: passed with `npm run import:charts`
+- Image fallback cache: passed with `npm run cache:chart-images -- --fallback-only`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- Production build: passed with `npm run build`
+
+### Changed Files
+
+- Added `VotingWindowStore` state machine and tests under `src/lib/vote`
+- Extended ballot records with player/manual source, manual reason, and manual override metadata
+- Added server-only voting round snapshot helpers for draw records, eligible players, turnout, and view revalidation
+- Wired `/vote` submissions to the voting-window state and eligible-player snapshot
+- Wired `/stage` to server-time timer state and public turnout display
+- Added admin voting controls for open, pause, resume, and close
+- Added password-gated manual ballot entry with replace-existing warning
+- Extended roster eligibility resolution to include current-round emergency additions
+- Updated README, testing checklist, and phase status
+
+### Manual Review
+
+- Product rules: one round ballot still covers both sets, voting opens only after both sets are drawn, the active eligible roster is snapshotted on open, and edits are allowed only while server state says voting is open.
+- Security: tournament-changing actions remain server actions; manual ballots require host control plus admin password re-entry; public screens expose only turnout totals, not live chart counts.
+- Timer behavior: client countdowns are visual only; official deadlines and transitions are computed by the server-side voting store.
+- Data: post-close manual ballots carry `manualOverride` and reason metadata so Phase 9 CSV export can include them.
+- Tests: unit coverage verifies the 10-minute deadline, 75% extension, final 30 seconds, pause/resume, post-reveal manual lock, manual override metadata, and current-round eligibility resolution.
+
+### Risks And Assumptions
+
+- Voting window state is still in-memory until Supabase persistence is wired. It survives refresh in one server process but not server restart or multiple instances.
+- Current route state remains fixed to Round 1 until later round progression work.
+- There is no special correction workflow yet after results reveal; Phase 8 blocks normal/manual ballot changes at that point as required.
+- Manual ballot checkbox UX relies on server validation for the 1-2 ban limit and no-bans exclusivity; richer client validation can be added later without changing the server contract.

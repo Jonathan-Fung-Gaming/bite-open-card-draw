@@ -2,15 +2,18 @@
 
 import { useMemo, useState, useTransition } from "react";
 import type { DrawRecord } from "@/lib/draw/draw-state";
-import type { RosterPlayer } from "@/lib/admin/roster";
 import type { BallotSetChoice } from "@/lib/vote/ballot";
+import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
 import { getExistingBallotAction, submitRoundBallotAction } from "./actions";
 
 type BallotFlowProps = {
   roundNumber: 1 | 2 | 3 | 4;
-  players: RosterPlayer[];
+  players: EligiblePlayerSnapshot[];
   draws: DrawRecord[];
   submittedPlayerIds: string[];
+  statusLabel: string;
+  timerText: string;
+  turnoutText: string;
 };
 
 function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
@@ -22,7 +25,15 @@ function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
   }));
 }
 
-export function BallotFlow({ roundNumber, players, draws, submittedPlayerIds }: BallotFlowProps) {
+export function BallotFlow({
+  roundNumber,
+  players,
+  draws,
+  submittedPlayerIds,
+  statusLabel,
+  timerText,
+  turnoutText,
+}: BallotFlowProps) {
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [step, setStep] = useState(0);
@@ -102,6 +113,13 @@ export function BallotFlow({ roundNumber, players, draws, submittedPlayerIds }: 
   if (!confirmed) {
     return (
       <section className="metal-panel rounded-lg p-5">
+        <div className="mb-5 grid gap-2 rounded border border-metal-700 bg-black/25 p-3 sm:grid-cols-[1fr_auto]">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">{statusLabel}</p>
+            <p className="mt-1 text-sm text-metal-300">{turnoutText}</p>
+          </div>
+          <p className="font-mono text-3xl font-black tabular-nums text-white">{timerText}</p>
+        </div>
         <label className="text-sm font-bold uppercase tracking-[0.16em] text-ember-300" htmlFor="startgg-username">
           Select your start.gg username
         </label>

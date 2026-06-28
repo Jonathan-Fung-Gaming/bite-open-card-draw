@@ -35,6 +35,26 @@ export class RosterStore {
     return this.listPlayers().filter((player) => player.active).length;
   }
 
+  listEligiblePlayersForRound(roundNumber: 1 | 2 | 3 | 4) {
+    const eligible = new Map<string, RosterPlayer>();
+
+    for (const player of this.listPlayers()) {
+      if (player.active) {
+        eligible.set(player.id, player);
+      }
+    }
+
+    for (const entry of this.currentRoundEligibility.filter((candidate) => candidate.roundNumber === roundNumber)) {
+      const player = this.players.get(entry.playerId);
+
+      if (player) {
+        eligible.set(player.id, player);
+      }
+    }
+
+    return [...eligible.values()].sort((left, right) => left.startggUsername.localeCompare(right.startggUsername));
+  }
+
   getPlayer(playerId: string) {
     return this.players.get(playerId) ?? null;
   }

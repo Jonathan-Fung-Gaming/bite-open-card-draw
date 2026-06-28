@@ -15,6 +15,9 @@ export type RoundBallot = {
   choices: BallotSetChoice[];
   submittedAt: string;
   revision: number;
+  source: "player" | "manual_admin";
+  manualReason: string | null;
+  manualOverride: boolean;
 };
 
 export type PhoneRoundStatus =
@@ -41,6 +44,12 @@ export type SubmitRoundBallotInput = {
   choices: BallotSetChoice[];
 };
 
+export type SubmitRoundBallotOptions = {
+  source?: RoundBallot["source"];
+  manualReason?: string;
+  manualOverride?: boolean;
+};
+
 export function isSetChoiceComplete(choice: BallotSetChoice) {
   return choice.noBans
     ? choice.bannedChartIds.length === 0
@@ -52,8 +61,15 @@ export function validateRoundBallot(input: SubmitRoundBallotInput, draws: readon
     throw new Error("Both chart sets must be drawn before voting.");
   }
 
+  const drawIds = new Set(draws.map((draw) => draw.id));
+  const choiceIds = new Set(input.choices.map((choice) => choice.roundSetId));
+
   if (input.choices.length !== 2 || !input.choices.every(isSetChoiceComplete)) {
     throw new Error("Both chart sets must be completed before submitting.");
+  }
+
+  if (choiceIds.size !== drawIds.size || [...choiceIds].some((choiceId) => !drawIds.has(choiceId))) {
+    throw new Error("Ballot must include exactly one completed choice for each drawn chart set.");
   }
 
   for (const choice of input.choices) {
@@ -63,10 +79,22 @@ export function validateRoundBallot(input: SubmitRoundBallotInput, draws: readon
       throw new Error("Ballot choice references an unknown chart set.");
     }
 
+    if (new Set(choice.bannedChartIds).size !== choice.bannedChartIds.length) {
+      throw new Error("Duplicate chart bans are not allowed.");
+    }
+
     const drawnChartIds = new Set(draw.charts.map((chart) => chart.id));
 
     if (choice.bannedChartIds.some((chartId) => !drawnChartIds.has(chartId))) {
       throw new Error("Ballot choice references a chart outside the drawn set.");
     }
   }
+}
+
+export function countBanSelections(ballots: readonly RoundBallot[]) {
+  return ballots.reduce(
+    (total, ballot) =>
+      total + ballot.choices.reduce((choiceTotal, choice) => choiceTotal + choice.bannedChartIds.length, 0),
+    0,
+  );
 }

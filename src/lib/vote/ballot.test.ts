@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeChartRow } from "@/lib/charts/normalize";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import { BallotStore } from "./ballot-store";
-import { isSetChoiceComplete } from "./ballot";
+import { countBanSelections, isSetChoiceComplete } from "./ballot";
 
 function draw(id: string, displayLabel: string, level: string): DrawRecord {
   const charts = Array.from({ length: 7 }, (_, index) =>
@@ -98,5 +98,35 @@ describe("ballot validation and store", () => {
       selectedCharts: [{ id: "chart", name: "Song", artist: "Artist", displayDifficulty: "S16" }],
     });
     expect(store.getPhoneStatus(1).phase).toBe("revealed");
+  });
+
+  it("marks post-close manual ballots as overrides for export", () => {
+    const store = new BallotStore();
+    const draws = [draw("set-1", "S16", "16"), draw("set-2", "S17", "17")];
+    const firstChart = draws[0]?.charts[0]?.id ?? "";
+
+    const ballot = store.submit(
+      {
+        roundNumber: 1,
+        playerId: "player-2",
+        playerStartggUsername: "ManualPlayer",
+        choices: [
+          { roundSetId: "set-1", displayLabel: "S16", noBans: false, bannedChartIds: [firstChart] },
+          { roundSetId: "set-2", displayLabel: "S17", noBans: true, bannedChartIds: [] },
+        ],
+      },
+      draws,
+      "manual",
+      {
+        source: "manual_admin",
+        manualReason: "phone died",
+        manualOverride: true,
+      },
+    );
+
+    expect(ballot.source).toBe("manual_admin");
+    expect(ballot.manualReason).toBe("phone died");
+    expect(ballot.manualOverride).toBe(true);
+    expect(countBanSelections([ballot])).toBe(1);
   });
 });

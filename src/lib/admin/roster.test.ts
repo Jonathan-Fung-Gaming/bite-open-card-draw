@@ -35,4 +35,18 @@ describe("roster store", () => {
       }),
     ).toThrow("Audit reason is required");
   });
+
+  it("includes emergency current-round players in the round eligibility list", () => {
+    const store = new RosterStore();
+    const active = store.createOrUpdatePlayer({ startggUsername: "ActivePlayer", active: true, now: "now" });
+    const inactive = store.createOrUpdatePlayer({ startggUsername: "InactivePlayer", active: false, now: "now" });
+
+    store.addPlayerToCurrentRoundEligibility({
+      playerId: inactive.id,
+      roundNumber: 1,
+      reason: "late correction",
+    });
+
+    expect(store.listEligiblePlayersForRound(1).map((player) => player.id)).toEqual([active.id, inactive.id]);
+  });
 });

@@ -67,6 +67,13 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Player cannot submit until both sets are complete.
 - `No bans for this set` completes a set explicitly.
 - Existing ballots show the duplicate-device warning copy.
+- Server time sets `opened_at` and the 10-minute `closes_at` deadline.
+- Turnout below 75% at normal expiration triggers exactly one 1-minute extension.
+- All eligible players submitting early triggers a 30-second final-change warning.
+- Host pause freezes the timer, submissions, and edits.
+- Manual ballots require admin password re-entry and a reason.
+- Manual ballots after close are marked as private export overrides.
+- Ballots cannot change after results reveal without a later correction workflow.
 
 ## Stage and Results Tests
 
