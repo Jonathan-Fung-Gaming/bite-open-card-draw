@@ -20,6 +20,7 @@ export const CORE_DATABASE_TABLES = [
   "admin_actions",
   "host_locks",
   "image_assets",
+  "tournament_state_snapshots",
 ] as const;
 
 export type CoreDatabaseTable = (typeof CORE_DATABASE_TABLES)[number];

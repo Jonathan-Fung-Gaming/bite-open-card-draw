@@ -68,6 +68,21 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["players"]["Insert"]>;
       };
+      tournament_state_snapshots: {
+        Row: {
+          id: string;
+          schema_version: number;
+          state: Json;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          schema_version?: number;
+          state: Json;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["tournament_state_snapshots"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

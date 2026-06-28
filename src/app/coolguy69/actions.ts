@@ -6,6 +6,7 @@ import { createHostToken } from "@/lib/admin/host-lock";
 import type { AdminSessionPayload } from "@/lib/admin/session";
 import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import { adminState, resetTournamentOperationalState } from "@/lib/server/admin-state";
+import { hydrateTournamentState, persistTournamentState } from "@/lib/server/persistence";
 import {
   getRoundDrawRecords,
   getVotingRoundSnapshot,
@@ -102,6 +103,7 @@ export async function takeHostControlAction(formData: FormData) {
   const force = getString(formData, "forceHostTakeover") === "true";
 
   try {
+    await hydrateTournamentState();
     const before = adminState.hostLockStore.getSnapshot(session.sessionId);
     const result = adminState.hostLockStore.acquire(session.sessionId, hostToken, Date.now(), {
       force,
@@ -120,6 +122,7 @@ export async function takeHostControlAction(formData: FormData) {
         previousOwnerSessionId: result.takeover ? before.ownerSessionId : null,
       },
     });
+    await persistTournamentState();
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not take host control.");
   }
@@ -131,14 +134,19 @@ export async function refreshHostLockAction() {
   const session = await requireAdminSession();
   const hostToken = await getHostTokenCookie();
 
+  await hydrateTournamentState();
+
   if (hostToken) {
     adminState.hostLockStore.refresh(session.sessionId, hostToken);
+    await persistTournamentState();
   }
 }
 
 export async function releaseHostControlAction() {
   const session = await requireAdminSession();
   const hostToken = await getHostTokenCookie();
+
+  await hydrateTournamentState();
 
   if (hostToken) {
     adminState.hostLockStore.release(session.sessionId, hostToken);
@@ -149,6 +157,7 @@ export async function releaseHostControlAction() {
     summary: "Released host control.",
     tournamentChanging: false,
   });
+  await persistTournamentState();
   await clearHostTokenCookie();
   revalidatePath("/coolguy69");
 }
@@ -156,6 +165,8 @@ export async function releaseHostControlAction() {
 async function requireActiveHost() {
   const session = await requireAdminSession();
   const hostToken = await getHostTokenCookie();
+
+  await hydrateTournamentState();
 
   if (!hostToken || !adminState.hostLockStore.refresh(session.sessionId, hostToken)) {
     throw new Error("Host control is required for this action.");
@@ -181,6 +192,7 @@ export async function addPlayerAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not add player.");
   }
 
+  await persistTournamentState();
   revalidatePath("/coolguy69");
 }
 
@@ -197,6 +209,7 @@ export async function bulkImportPlayersAction(formData: FormData) {
     summary: `Bulk imported roster names: ${result.created} created, ${result.skipped} skipped.`,
     metadata: result,
   });
+  await persistTournamentState();
   revalidatePath("/coolguy69");
 }
 
@@ -218,6 +231,7 @@ export async function setPlayerActiveStatusAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not update player.");
   }
 
+  await persistTournamentState();
   revalidatePath("/coolguy69");
 }
 
@@ -258,6 +272,7 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
     );
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -283,6 +298,7 @@ export async function drawRoundSetAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not draw round set.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -318,6 +334,7 @@ export async function rerollOneChartAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll chart.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -348,6 +365,7 @@ export async function rerollRoundSetAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll round set.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -374,6 +392,7 @@ export async function rerollFullRoundAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll full round.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -401,6 +420,7 @@ export async function openVotingAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not open voting.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -421,6 +441,7 @@ export async function pauseVotingAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not pause voting.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -440,6 +461,7 @@ export async function resumeVotingAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not resume voting.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -460,6 +482,7 @@ export async function closeVotingAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not close voting.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -557,6 +580,7 @@ export async function manualBallotAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not save manual ballot.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -590,6 +614,7 @@ export async function computeResultsAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not compute results.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -630,11 +655,13 @@ export async function advanceResultRevealAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not advance result reveal.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
 export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
   await requireAdminSession();
+  await hydrateTournamentState();
 
   const result = adminState.resultStore.getRoundResult(roundNumber);
 
@@ -667,6 +694,7 @@ export async function setCurrentRoundAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not set current round.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -684,6 +712,7 @@ export async function advanceCurrentRoundAction() {
     redirectWithError(error instanceof Error ? error.message : "Could not advance round.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -714,6 +743,7 @@ export async function startRehearsalModeAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not start rehearsal mode.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -736,6 +766,7 @@ export async function resetRehearsalModeAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not reset rehearsal data.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -817,6 +848,7 @@ export async function seedRehearsalTiebreakAction() {
     );
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -861,6 +893,7 @@ export async function reopenVotingAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not reopen voting.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -884,6 +917,7 @@ export async function resetRoundAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not reset round.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -952,5 +986,6 @@ export async function overrideResultAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not override result.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }

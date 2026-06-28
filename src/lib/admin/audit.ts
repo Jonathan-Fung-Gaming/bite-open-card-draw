@@ -18,6 +18,10 @@ export type AdminAuditRecord = {
   tournamentChanging: boolean;
 };
 
+export type AdminAuditStoreSnapshot = {
+  records: AdminAuditRecord[];
+};
+
 export class AdminAuditStore {
   private records: AdminAuditRecord[] = [];
 
@@ -52,5 +56,23 @@ export class AdminAuditStore {
 
   list(limit = 25) {
     return this.records.slice(0, limit);
+  }
+
+  exportSnapshot(): AdminAuditStoreSnapshot {
+    return {
+      records: this.records.map((record) => ({
+        ...record,
+        metadata: { ...record.metadata },
+        affectedRecords: record.affectedRecords.map((affected) => ({ ...affected })),
+      })),
+    };
+  }
+
+  importSnapshot(snapshot: AdminAuditStoreSnapshot) {
+    this.records = snapshot.records.map((record) => ({
+      ...record,
+      metadata: { ...record.metadata },
+      affectedRecords: record.affectedRecords.map((affected) => ({ ...affected })),
+    }));
   }
 }

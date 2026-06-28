@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminState } from "@/lib/server/admin-state";
+import { hydrateTournamentState, persistTournamentState } from "@/lib/server/persistence";
 import {
   getRoundDrawRecords,
   getSubmittedPlayerIdsForRound,
@@ -12,10 +13,14 @@ import type { SubmitRoundBallotInput } from "@/lib/vote/ballot";
 import { formatVotingStatusLabel, formatVotingTime } from "@/lib/vote/voting-window";
 
 export async function getExistingBallotAction(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
+  await hydrateTournamentState();
+
   return adminState.ballotStore.get(roundNumber, playerId);
 }
 
 export async function getVoteLiveStateAction(roundNumber: 1 | 2 | 3 | 4, playerId?: string) {
+  await hydrateTournamentState();
+
   const snapshot = getVotingRoundSnapshot(roundNumber);
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(roundNumber);
   const result = adminState.resultStore.getRoundResult(roundNumber);
@@ -34,6 +39,8 @@ export async function getVoteLiveStateAction(roundNumber: 1 | 2 | 3 | 4, playerI
 }
 
 export async function submitRoundBallotAction(input: SubmitRoundBallotInput) {
+  await hydrateTournamentState();
+
   const snapshot = getVotingRoundSnapshot(input.roundNumber);
   const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === input.playerId);
 
@@ -57,6 +64,7 @@ export async function submitRoundBallotAction(input: SubmitRoundBallotInput) {
   );
 
   getVotingRoundSnapshot(input.roundNumber);
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 
   return ballot;

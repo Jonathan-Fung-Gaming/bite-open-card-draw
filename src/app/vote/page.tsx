@@ -1,6 +1,7 @@
 import { RoundHeader } from "@/components";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import { adminState } from "@/lib/server/admin-state";
+import { hydrateTournamentState } from "@/lib/server/persistence";
 import {
   getRoundDrawRecords,
   getSubmittedPlayerIdsForRound,
@@ -12,7 +13,9 @@ import { VoteAutoRefresh } from "./VoteAutoRefresh";
 
 export const dynamic = "force-dynamic";
 
-export default function VotePage() {
+export default async function VotePage() {
+  await hydrateTournamentState();
+
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const snapshot = getVotingRoundSnapshot(roundNumber);
   const draws = getRoundDrawRecords(roundNumber);

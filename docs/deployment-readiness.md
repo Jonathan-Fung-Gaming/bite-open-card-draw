@@ -19,6 +19,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 ADMIN_PASSWORD_HASH
 SESSION_SECRET
+TOURNAMENT_STATE_BACKEND=supabase
 ```
 
 Generate `ADMIN_PASSWORD_HASH` with the supported `scrypt:v1:<salt_hex>:<hash_hex>` format. Store the plaintext shared admin password outside the repo.
@@ -59,7 +60,10 @@ Then verify:
 rtk npm run test
 ```
 
-The current local implementation still uses server-only in-memory operational stores. Use a single local rehearsal/server process for rehearsals. Before a real production event on Vercel, persist operational state to Supabase tables or run an explicitly controlled single-process host.
+For event or deployed use, set `TOURNAMENT_STATE_BACKEND=supabase`. In that mode the app hydrates
+operational tournament state from Supabase before server reads and persists it after successful
+tournament-changing actions. Leaving `TOURNAMENT_STATE_BACKEND=memory` is for tests, local demos, or
+single-process development only.
 
 ## Data Setup Workflow
 

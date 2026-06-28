@@ -333,6 +333,77 @@ cached artwork population remain open.
   round; it does not repair already-exported CSV files outside the app.
 - Real cached artwork remains unverified and `RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028` remain open.
 
+## Remediation Phase 5 - Supabase Persistence
+
+Status: complete for the Phase 5 persistence layer; not event-ready because real cached artwork,
+chart exclusion UI/image pipeline hardening, and final rehearsal/CI reconciliation remain open.
+
+### Acceptance Criteria
+
+- Supabase repository: added a server-only `SupabaseOperationalStateRepository` that stores the
+  authoritative tournament snapshot in `public.tournament_state_snapshots`.
+- Runtime backend mode: `TOURNAMENT_STATE_BACKEND=supabase` selects Supabase persistence for
+  deployed/event use; the memory backend remains only for tests, local demos, and single-process
+  development.
+- Hydration and saves: admin, stage, vote, charts, and results server reads hydrate from persistence;
+  successful tournament-changing server actions persist state before revalidating views.
+- Persisted operational state: roster, inactive/restored players, current-round eligibility, host
+  lock/heartbeat, draw/reroll history, drawn chart order, excluded chart keys, voting windows,
+  ballots/revisions/manual metadata, result snapshots/reveal phase, current round, rehearsal mode,
+  and admin audit records are included in the snapshot.
+- Selected-song exclusions: restored draw state derives selected prior songs from persisted final
+  result snapshots rather than trusting only an in-memory set.
+- Placeholder cleanup: removed the unused Phase 2 `tournament-mutations` placeholder module now that
+  implemented server actions are the mutation boundary.
+
+### Changed Files
+
+- Persistence service: `src/lib/persistence/operational-state.ts`,
+  `src/lib/persistence/repository.ts`, `src/lib/server/persistence.ts`,
+  `src/lib/server/supabase-operational-state.ts`
+- Store snapshots: `src/lib/admin/audit.ts`, `src/lib/admin/host-lock.ts`,
+  `src/lib/admin/roster.ts`, `src/lib/draw/draw-state.ts`,
+  `src/lib/vote/ballot-store.ts`, `src/lib/vote/voting-window.ts`,
+  `src/lib/results/result-store.ts`, `src/lib/round/round-state.ts`,
+  `src/lib/server/admin-state.ts`
+- App wiring: `src/app/coolguy69/actions.ts`, `src/app/coolguy69/page.tsx`,
+  `src/app/vote/actions.ts`, `src/app/vote/page.tsx`, `src/app/stage/page.tsx`,
+  `src/app/charts/page.tsx`, `src/app/results/page.tsx`
+- Schema/docs/tests: `supabase/migrations/20260628050200_initial_schema.sql`,
+  `src/lib/db/database.types.ts`, `src/lib/db/schema.ts`, `.env.example`,
+  `src/lib/persistence/operational-state.test.ts`, `docs/deployment-readiness.md`,
+  `docs/phase-status.md`, `docs/remediation-issue-checklist.md`
+
+### Checks Run
+
+- `rtk npm run typecheck` - passed
+- `rtk npm run test -- src/lib/persistence/operational-state.test.ts src/lib/admin/host-lock.test.ts src/lib/vote/voting-window.test.ts src/lib/results/result-store.test.ts src/lib/draw/draw-state.test.ts` - passed
+- `rtk npm run lint` - passed
+- `rtk npm run test` - passed, 24 files / 67 tests
+- `rtk git diff --check` - passed
+- `rtk npm run build` - passed
+- `rtk npm run test:e2e` - passed, 2 Playwright tests
+
+### Manual Review
+
+- Product rules: no tournament rules changed; the existing server-side draw, voting, result, and
+  tiebreak logic remains the authority inside the persisted operational snapshot.
+- Security: service-role Supabase access stays in server-only modules; browser code only receives
+  existing public/read payloads and no password hashes or service keys.
+- Persistence: server components and server actions hydrate before reading mutable tournament state;
+  successful mutations persist the snapshot before public revalidation.
+- CSV/privacy: private CSV generation remains admin-session gated and now hydrates persisted
+  result/ballot state before exporting.
+
+### Risks And Assumptions
+
+- `TOURNAMENT_STATE_BACKEND=supabase` must be set for deployed/event use. The default memory backend
+  is only for local tests and demos.
+- The Phase 5 persistence layer stores an operational snapshot row rather than fully rewriting every
+  workflow against each normalized Supabase table. The existing normalized tables remain available
+  for later reporting or migration hardening.
+- Real cached artwork remains unverified and `RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028` remain open.
+
 ## Phase 1 - Project Scaffold, Docs, And Route Skeleton
 
 Status: complete

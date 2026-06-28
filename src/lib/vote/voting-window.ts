@@ -23,7 +23,7 @@ export type EligiblePlayerSnapshot = Pick<RosterPlayer, "id" | "startggUsername"
 
 type TimedVotingStatus = "voting_open" | "final_30_seconds" | "extension_1_minute";
 
-type VotingWindowRecord = {
+export type VotingWindowRecord = {
   roundNumber: 1 | 2 | 3 | 4;
   status: VotingRoundStatus;
   eligiblePlayers: EligiblePlayerSnapshot[];
@@ -36,6 +36,10 @@ type VotingWindowRecord = {
   pausedFromStatus: TimedVotingStatus | null;
   remainingMsWhenPaused: number | null;
   updatedAt: string;
+};
+
+export type VotingWindowStoreSnapshot = {
+  windows: VotingWindowRecord[];
 };
 
 export type VotingRoundSnapshot = {
@@ -480,5 +484,26 @@ export class VotingWindowStore {
       canAcceptManualBallot: isManualBallotAllowed(record.status),
       postCloseManualBallotsAreOverrides: isPostCloseManualOverride(record.status),
     };
+  }
+
+  exportSnapshot(): VotingWindowStoreSnapshot {
+    return {
+      windows: [...this.windows.values()].map((window) => ({
+        ...window,
+        eligiblePlayers: window.eligiblePlayers.map((player) => ({ ...player })),
+      })),
+    };
+  }
+
+  importSnapshot(snapshot: VotingWindowStoreSnapshot) {
+    this.windows = new Map(
+      snapshot.windows.map((window) => [
+        window.roundNumber,
+        {
+          ...window,
+          eligiblePlayers: window.eligiblePlayers.map((player) => ({ ...player })),
+        },
+      ]),
+    );
   }
 }

@@ -19,6 +19,10 @@ type HostLockRecord = {
   expiresAt: number;
 };
 
+export type HostLockStoreSnapshot = {
+  lock: HostLockRecord | null;
+};
+
 function hashHostToken(hostToken: string) {
   return createHash("sha256").update(hostToken).digest("hex");
 }
@@ -106,5 +110,15 @@ export class HostLockStore {
     }
 
     return false;
+  }
+
+  exportSnapshot(): HostLockStoreSnapshot {
+    return {
+      lock: this.lock ? { ...this.lock } : null,
+    };
+  }
+
+  importSnapshot(snapshot: HostLockStoreSnapshot) {
+    this.lock = snapshot.lock ? { ...snapshot.lock } : null;
   }
 }

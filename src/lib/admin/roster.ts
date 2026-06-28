@@ -17,6 +17,11 @@ export type CurrentRoundEligibilityEntry = {
   addedAt: string;
 };
 
+export type RosterStoreSnapshot = {
+  players: RosterPlayer[];
+  currentRoundEligibility: CurrentRoundEligibilityEntry[];
+};
+
 export function normalizeStartggUsername(value: string) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
@@ -199,5 +204,17 @@ export class RosterStore {
 
   listCurrentRoundEligibility() {
     return [...this.currentRoundEligibility];
+  }
+
+  exportSnapshot(): RosterStoreSnapshot {
+    return {
+      players: this.listPlayers(),
+      currentRoundEligibility: this.listCurrentRoundEligibility(),
+    };
+  }
+
+  importSnapshot(snapshot: RosterStoreSnapshot) {
+    this.players = new Map(snapshot.players.map((player) => [player.id, { ...player }]));
+    this.currentRoundEligibility = snapshot.currentRoundEligibility.map((entry) => ({ ...entry }));
   }
 }

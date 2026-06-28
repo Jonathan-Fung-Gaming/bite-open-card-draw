@@ -1,0 +1,66 @@
+import "server-only";
+import { adminState } from "@/lib/server/admin-state";
+import {
+  createOperationalStateSnapshot,
+  restoreOperationalStateSnapshot,
+  type AdminStateStores,
+} from "@/lib/persistence/operational-state";
+import {
+  MemoryOperationalStateRepository,
+  type OperationalStateRepository,
+} from "@/lib/persistence/repository";
+import { SupabaseOperationalStateRepository } from "@/lib/server/supabase-operational-state";
+
+export type TournamentStateBackend = "memory" | "supabase";
+
+const globalForPersistence = globalThis as typeof globalThis & {
+  biteOpenMemoryOperationalStateRepository?: MemoryOperationalStateRepository;
+};
+
+function getMemoryRepository() {
+  return (
+    globalForPersistence.biteOpenMemoryOperationalStateRepository ??
+    (globalForPersistence.biteOpenMemoryOperationalStateRepository =
+      new MemoryOperationalStateRepository())
+  );
+}
+
+export function getTournamentStateBackend(): TournamentStateBackend {
+  return process.env.TOURNAMENT_STATE_BACKEND === "supabase" ? "supabase" : "memory";
+}
+
+export function getOperationalStateRepository(): OperationalStateRepository {
+  return getTournamentStateBackend() === "supabase"
+    ? new SupabaseOperationalStateRepository()
+    : getMemoryRepository();
+}
+
+export async function hydrateTournamentState(
+  stores: AdminStateStores = adminState,
+  repository = getOperationalStateRepository(),
+) {
+  const snapshot = await repository.load();
+
+  if (snapshot) {
+    restoreOperationalStateSnapshot(stores, snapshot);
+  }
+}
+
+export async function persistTournamentState(
+  stores: AdminStateStores = adminState,
+  repository = getOperationalStateRepository(),
+) {
+  await repository.save(createOperationalStateSnapshot(stores));
+}
+
+export async function withPersistedTournamentState<T>(
+  callback: () => T | Promise<T>,
+  stores: AdminStateStores = adminState,
+  repository = getOperationalStateRepository(),
+) {
+  await hydrateTournamentState(stores, repository);
+  const result = await callback();
+  await persistTournamentState(stores, repository);
+
+  return result;
+}

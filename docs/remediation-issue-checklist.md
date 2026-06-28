@@ -48,35 +48,35 @@ Do not mark an item complete unless the fix is implemented, verified by an appro
 
 | Done |      ID | Issue                                                                                              | Evidence |
 | ---- | ------: | -------------------------------------------------------------------------------------------------- | -------- |
-| [ ]  | RIC-029 | Tournament operational state is database-authoritative, not process-local memory.                  |          |
-| [ ]  | RIC-030 | Roster state persists across server restart and multiple app instances.                            |          |
-| [ ]  | RIC-031 | Draw state persists across server restart and multiple app instances.                              |          |
-| [ ]  | RIC-032 | Ballot state persists across server restart and multiple app instances.                            |          |
-| [ ]  | RIC-033 | Voting window state persists across server restart and multiple app instances.                     |          |
-| [ ]  | RIC-034 | Host lock state persists across server restart and multiple app instances.                         |          |
-| [ ]  | RIC-035 | Result/reveal state persists across server restart and multiple app instances.                     |          |
-| [ ]  | RIC-036 | Current round state persists across server restart and multiple app instances.                     |          |
-| [ ]  | RIC-037 | Selected prior songs are derived from persisted results, not only an in-memory set.                |          |
-| [ ]  | RIC-038 | Chart exclusions are persisted and applied by live draw services.                                  |          |
-| [ ]  | RIC-039 | Supabase service/repository layer is used for tournament-changing operations.                      |          |
-| [ ]  | RIC-040 | Placeholder mutation functions are replaced or removed for implemented workflows.                  |          |
-| [ ]  | RIC-041 | In-memory stores are limited to tests, local fakes, or explicitly documented non-production modes. |          |
+| [x]  | RIC-029 | Tournament operational state is database-authoritative, not process-local memory.                  | Phase 5: `TOURNAMENT_STATE_BACKEND=supabase` hydrates mutable server state from `tournament_state_snapshots` before reads and persists it after successful mutations. |
+| [x]  | RIC-030 | Roster state persists across server restart and multiple app instances.                            | Phase 5: `RosterStore.exportSnapshot/importSnapshot` is included in the persisted operational snapshot; `operational-state.test.ts` verifies store recreation and shared-repository updates. |
+| [x]  | RIC-031 | Draw state persists across server restart and multiple app instances.                              | Phase 5: draw histories, versions, chart order, excluded keys, and selected-song derivation are serialized; persistence tests restore active draws after store recreation. |
+| [x]  | RIC-032 | Ballot state persists across server restart and multiple app instances.                            | Phase 5: `BallotStore` serializes ballots, revisions, manual metadata, replacement flags, and phone status; persistence tests restore submitted ballots. |
+| [x]  | RIC-033 | Voting window state persists across server restart and multiple app instances.                     | Phase 5: `VotingWindowStore` serializes opened/closed deadlines, pause state, extension state, final-warning state, and eligible snapshots; persistence tests restore the open window. |
+| [x]  | RIC-034 | Host lock state persists across server restart and multiple app instances.                         | Phase 5: `HostLockStore` serializes owner, token hash, heartbeat, and expiry; refresh/takeover/release actions hydrate and persist lock state. |
+| [x]  | RIC-035 | Result/reveal state persists across server restart and multiple app instances.                     | Phase 5: `ResultStore` serializes result snapshots, rows, selected charts, tiebreak metadata, reveal phase, and final timestamps; public result pages hydrate before rendering. |
+| [x]  | RIC-036 | Current round state persists across server restart and multiple app instances.                     | Phase 5: `RoundStateStore` serializes current round and rehearsal mode, and admin/stage/vote/charts/results pages hydrate before reading it. |
+| [x]  | RIC-037 | Selected prior songs are derived from persisted results, not only an in-memory set.                | Phase 5: `restoreOperationalStateSnapshot` rebuilds selected song keys from persisted final result snapshots; `operational-state.test.ts` verifies stale in-memory selections are ignored. |
+| [x]  | RIC-038 | Chart exclusions are persisted and applied by live draw services.                                  | Phase 5: `DrawStateStore` persists `excludedChartKeys`, imports them on hydrate, and live draw eligibility already applies those keys through `getEligibleChartsForSet`. |
+| [x]  | RIC-039 | Supabase service/repository layer is used for tournament-changing operations.                      | Phase 5: `src/lib/server/persistence.ts` selects `SupabaseOperationalStateRepository` for `TOURNAMENT_STATE_BACKEND=supabase`; server actions hydrate before mutation and persist after success. |
+| [x]  | RIC-040 | Placeholder mutation functions are replaced or removed for implemented workflows.                  | Phase 5: removed unused `src/lib/server/tournament-mutations.ts` Phase 2 placeholder module; implemented Next server actions are the mutation boundary. |
+| [x]  | RIC-041 | In-memory stores are limited to tests, local fakes, or explicitly documented non-production modes. | Phase 5: `.env.example` and `docs/deployment-readiness.md` document `TOURNAMENT_STATE_BACKEND=memory` as tests/local demos only and require `supabase` for deployed/event use. |
 
 ## Draws, Exclusions, And Auditability
 
 | Done |      ID | Issue                                                                                           | Evidence |
 | ---- | ------: | ----------------------------------------------------------------------------------------------- | -------- |
-| [ ]  | RIC-042 | Draw history is durably persisted.                                                              |          |
-| [ ]  | RIC-043 | Reroll history is durably persisted.                                                            |          |
-| [ ]  | RIC-044 | Drawn chart order is persisted.                                                                 |          |
-| [ ]  | RIC-045 | Eligible pool snapshot or reconstructable eligibility criteria are stored for each draw/reroll. |          |
+| [x]  | RIC-042 | Draw history is durably persisted.                                                              | Phase 5: the persisted operational snapshot includes every `DrawRecord` in `DrawStateStore.drawHistory`; the Supabase backend stores that snapshot in `tournament_state_snapshots`. |
+| [x]  | RIC-043 | Reroll history is durably persisted.                                                            | Phase 5: superseded draw records and newer reroll versions are serialized together, preserving reroll history across hydrate/restore. |
+| [x]  | RIC-044 | Drawn chart order is persisted.                                                                 | Phase 5: each draw record serializes its ordered `charts` array; persistence tests restore active draws with all 7 chart positions intact. |
+| [x]  | RIC-045 | Eligible pool snapshot or reconstructable eligibility criteria are stored for each draw/reroll. | Phase 5: persisted draw records include `eligiblePoolCount`, round/set/version/reason, excluded keys, draw history, and final selected-song derivation needed to reconstruct eligibility criteria. |
 | [ ]  | RIC-046 | Admin can pre-exclude charts from the app.                                                      |          |
 | [ ]  | RIC-047 | Admin can re-include excluded charts from the app.                                              |          |
 | [ ]  | RIC-048 | Chart exclusions require and store reasons.                                                     |          |
 | [ ]  | RIC-049 | Excluded charts cannot be drawn.                                                                |          |
-| [ ]  | RIC-050 | Selected songs from prior rounds cannot be drawn in later rounds after restart.                 |          |
-| [ ]  | RIC-051 | Same-round duplicate-song prevention remains covered by tests.                                  |          |
-| [ ]  | RIC-052 | Draw/reroll actions are linked to admin audit records.                                          |          |
+| [x]  | RIC-050 | Selected songs from prior rounds cannot be drawn in later rounds after restart.                 | Phase 5: selected prior songs are restored from persisted final results before draw eligibility runs; `operational-state.test.ts` verifies restore derivation. |
+| [x]  | RIC-051 | Same-round duplicate-song prevention remains covered by tests.                                  | Phase 5 verification: `draw-engine.test.ts` covers songs already drawn in the other set of the same round being excluded from eligibility. |
+| [x]  | RIC-052 | Draw/reroll actions are linked to admin audit records.                                          | Phase 5: Phase 4 draw/reroll audit records are now included in the persisted audit snapshot, tying draw IDs and reroll reasons to admin actions across restarts. |
 
 ## Player, Voting, And Phone UX
 
@@ -121,9 +121,9 @@ Do not mark an item complete unless the fix is implemented, verified by an appro
 | [x]  | RIC-084 | Reset-round workflow exists.                                                                                            | Phase 4: `resetRoundAction` clears result, ballot, voting-window, draw, and selected-song state for the chosen round. |
 | [x]  | RIC-085 | Result correction/override workflow exists and is treated as dangerous/emergency-only.                                  | Phase 4: `overrideResultAction` requires host control, password, reason, and a computed result, then records a dangerous `result_correction_override` audit entry. |
 | [x]  | RIC-086 | Manual ballot timing matches the final product rule or is explicitly clarified in docs.                                 | Phase 4: `manualBallotAction` allows open/closed pre-reveal manual ballots; computed-but-unrevealed results are cleared for recompute, while reveal-started results require correction override. |
-| [ ]  | RIC-087 | Private CSV export remains admin-only after persistence migration.                                                      |          |
-| [ ]  | RIC-088 | Private CSV includes player-level ballot data, selected charts, tiebreak flags, and manual override markers.            |          |
-| [ ]  | RIC-089 | Private CSV includes or can trace reroll/audit context.                                                                 |          |
+| [x]  | RIC-087 | Private CSV export remains admin-only after persistence migration.                                                      | Phase 5: `downloadPrivateCsvAction` still requires an admin session, hydrates persisted state before export, and remains reachable only from `/coolguy69`. |
+| [x]  | RIC-088 | Private CSV includes player-level ballot data, selected charts, tiebreak flags, and manual override markers.            | Phase 5 verification: existing `private-csv.test.ts` covers player-level rows, selected charts, tiebreak flags, manual override fields, and replacement metadata; export now hydrates persisted state first. |
+| [x]  | RIC-089 | Private CSV includes or can trace reroll/audit context.                                                                 | Phase 5: persisted draw history keeps reroll versions/reasons, and persisted admin audit records link draw/reroll actions to affected draw/chart records for traceability. |
 
 ## QR, Routes, And Public Screens
 
@@ -134,8 +134,8 @@ Do not mark an item complete unless the fix is implemented, verified by an appro
 | [x]  | RIC-092 | QR uses `NEXT_PUBLIC_SITE_URL` or an equivalent configured event origin.                         | Phase 2: `src/lib/public-url.ts` uses `NEXT_PUBLIC_SITE_URL` when present and falls back to `/room`; `public-url.test.ts` covers configured and fallback origins. |
 | [x]  | RIC-093 | Short event URL is visible beneath the QR.                                                       | Phase 2: `QRPanel` renders `formatShortEventUrl(roomUrl)` below the QR; e2e verifies `127.0.0.1:3100/room` is visible. |
 | [ ]  | RIC-094 | `/charts` reflects current draw/result state without manual refresh where needed.                |          |
-| [ ]  | RIC-095 | `/results` reflects final reveal state from persisted data.                                      |          |
-| [ ]  | RIC-096 | Required routes remain present: `/stage`, `/room`, `/vote`, `/charts`, `/results`, `/coolguy69`. |          |
+| [x]  | RIC-095 | `/results` reflects final reveal state from persisted data.                                      | Phase 5: `/results` is now async and calls `hydrateTournamentState()` before reading the current round result. |
+| [x]  | RIC-096 | Required routes remain present: `/stage`, `/room`, `/vote`, `/charts`, `/results`, `/coolguy69`. | Phase 5 verification: required route files remain under `src/app`, and the full build/e2e gates verify they compile/load. |
 
 ## Tests, CI, And Reliability
 
@@ -146,8 +146,8 @@ Do not mark an item complete unless the fix is implemented, verified by an appro
 | [x]  | RIC-099 | Two-tab admin/stage e2e proves stage updates without refresh.                                              | Phase 1: `tests/e2e/full-flow.spec.ts` opens a separate `/stage` tab and verifies draw, reroll, voting-open, and final-reveal updates without manual stage navigation.        |
 | [x]  | RIC-100 | Phone polling/status e2e proves phone state updates without manual refresh.                                | Phase 3: `tests/e2e/full-flow.spec.ts` keeps a phone tab open after submit, verifies close-state auto-update, then verifies final results appear without phone navigation; `rtk npm run test:e2e` passes. |
 | [ ]  | RIC-101 | DB-backed integration tests cover roster, draws, ballots, voting windows, host lock, and results.          |                                                                                                                                                                               |
-| [ ]  | RIC-102 | Cold-start persistence test proves state survives process/store recreation.                                |                                                                                                                                                                               |
-| [ ]  | RIC-103 | Multi-instance or equivalent persistence test proves two app instances see the same state.                 |                                                                                                                                                                               |
+| [x]  | RIC-102 | Cold-start persistence test proves state survives process/store recreation.                                | Phase 5: `operational-state.test.ts` saves a snapshot, recreates all stores, restores it, and verifies roster, host lock, draws, voting window, and ballot state.             |
+| [x]  | RIC-103 | Multi-instance or equivalent persistence test proves two app instances see the same state.                 | Phase 5: `operational-state.test.ts` uses two independent store containers with one shared repository and verifies writes from one are visible to the other.                  |
 | [ ]  | RIC-104 | 100-player load-sized test runs against persistent services.                                               |                                                                                                                                                                               |
 | [x]  | RIC-105 | Stage screenshot/visual checks cover two 7-card rows, QR, timer, chart images, tiebreak, and final reveal. | Phase 2: Playwright checks two 7-card stage rows, real QR SVG and short URL, readable timer/QR bounding boxes, rendered stage image natural width, sealed/revealed tiebreak wheel, and final stage list with exactly two cards. |
 | [ ]  | RIC-106 | CI runs only stable gates and does not require production secrets.                                         |                                                                                                                                                                               |
@@ -167,7 +167,7 @@ Do not mark an item complete unless the fix is implemented, verified by an appro
 | [x]  | RIC-115 | Remediation phase notes list changed files, checks run, risks, and assumptions.                                          | Phase 0: `docs/phase-status.md` includes changed files, checks run, manual review, risks, and assumptions for Remediation Phase 0.                                                 |
 | [x]  | RIC-116 | Final release checklist links to this remediation issue checklist.                                                       | Phase 0: `docs/release-checklist.md` includes a remediation gate linking this checklist.                                                                                           |
 | [ ]  | RIC-117 | Local `.env.local` remains ignored and no real secrets are committed.                                                    |                                                                                                                                                                                    |
-| [ ]  | RIC-118 | Documentation no longer claims Vercel/serverless event readiness while operational state is in memory.                   |                                                                                                                                                                                    |
+| [x]  | RIC-118 | Documentation no longer claims Vercel/serverless event readiness while operational state is in memory.                   | Phase 5: `docs/deployment-readiness.md` now requires `TOURNAMENT_STATE_BACKEND=supabase` for deployed/event use and limits memory mode to tests/local demos.                       |
 
 ## Final Closure Gate
 
