@@ -37,11 +37,19 @@ npm run dev
 npm run lint
 npm run typecheck
 npm run test
+npm run test:e2e
 npm run build
+npm run import:charts
+npm run cache:chart-images
 ```
 
-End-to-end tests are not available yet. They will be added in a later phase when Playwright is
-introduced.
+End-to-end tests are a placeholder until Playwright is introduced.
+
+For a local fallback-only image manifest:
+
+```bash
+npm run cache:chart-images -- --fallback-only
+```
 
 Use the project command wrapper:
 

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="Fallback chart artwork">
+  <rect width="640" height="360" fill="#080706"/>
+  <rect x="18" y="18" width="604" height="324" rx="10" fill="#14110e" stroke="#ff7a1a" stroke-opacity="0.45" stroke-width="2"/>
+  <path d="M60 286H580" stroke="#ffb95c" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M84 80H556V248H84Z" fill="#1b1916" stroke="#777169" stroke-opacity="0.5"/>
+  <path d="M116 112H524V216H116Z" fill="#080706" stroke="#c94313" stroke-opacity="0.55"/>
+  <path d="M188 192L254 112L320 192L386 112L452 192" fill="none" stroke="#ff7a1a" stroke-width="10" stroke-linejoin="round"/>
+  <text x="320" y="286" text-anchor="middle" fill="#fff4e6" font-family="Arial, sans-serif" font-size="34" font-weight="800" letter-spacing="4">OPEN STAGE</text>
+  <text x="320" y="318" text-anchor="middle" fill="#c0bab0" font-family="Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="3">CHART ART FALLBACK</text>
+</svg>

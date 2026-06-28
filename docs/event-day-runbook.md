@@ -7,8 +7,9 @@ This runbook starts as a Phase 1 scaffold and must be updated as implementation 
 - Run `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` on the release branch.
 - Confirm production environment variables are set in Vercel and not committed to Git.
 - Confirm Supabase migrations are applied.
-- Confirm chart data has been imported from `data/source/charts.csv`.
-- Confirm chart artwork is cached locally or served from controlled storage.
+- Run `npm run import:charts` and confirm required pools have at least 7 eligible charts.
+- Run `npm run cache:chart-images` before the event, or `npm run cache:chart-images -- --fallback-only` for a local fallback manifest.
+- Confirm chart artwork is cached locally or has fallback cards.
 - Confirm the tournament logo renders correctly.
 - Confirm the admin password hash and session secret are configured.
 - Confirm the player roster has been imported and reviewed.

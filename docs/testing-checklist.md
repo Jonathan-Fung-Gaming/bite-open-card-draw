@@ -7,8 +7,11 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - `npm run lint`
 - `npm run typecheck`
 - `npm run test`
+- `npm run test:e2e`
 - `npm run build`
-- E2E is not available in Phase 1 and should be added when Playwright is introduced.
+- `npm run import:charts`
+- `npm run cache:chart-images -- --fallback-only`
+- E2E is a placeholder until Playwright is introduced.
 
 ## Phase 1 Shell Tests
 
@@ -19,6 +22,16 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - `/results` loads with the closed-voting stage reveal message.
 - `/coolguy69` loads as the admin route shell.
 - Tournament constants define S16/S17, S18/S19, S20/S21, and S22/D23.
+
+## Phase 3 Import Tests
+
+- CSV parser validates required source columns.
+- Chart type and level normalize to S16, S17, D23, etc.
+- Song keys and chart keys are stable.
+- Duplicate chart keys are skipped and reported.
+- Required pools have at least 7 eligible charts.
+- Exclusions and re-inclusions change eligibility.
+- Image cache planning deduplicates remote artwork and falls back safely.
 
 ## Product Rule Tests
 
