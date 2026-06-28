@@ -521,3 +521,44 @@ Status: complete
 - Operational stores remain in-memory. Local rehearsal works in one server process; production event use still needs Supabase-backed persistence or an explicitly controlled single-process host.
 - Forced tiebreak seeding is a rehearsal helper only and is blocked outside rehearsal mode.
 - Full browser e2e still exercises Round 1; the four-round rehearsal workflow is documented and supported through current-round admin controls.
+
+## Phase 12 - Final Polish, Runbook Verification, And Release Checklist
+
+Status: complete
+
+### Acceptance Criteria
+
+- Release checklist: `docs/release-checklist.md` exists and covers environment, data, roster, admin/host, public screens, results/export, and final checks
+- Event-day runbook: includes before-event, stage laptop, projector/stream capture, QR, phone, admin laptop, host lock, before-round, during-voting, after-close, CSV location, and website-failure sections
+- GitHub Actions: `.github/workflows/ci.yml` exists and runs install, Playwright browser install, lint, typecheck, tests, chart import, fallback image cache, production audit, build, and e2e
+- Critical UI flow review: release checklist explicitly covers stage readability, phone voting, QR, timer readability, selected chart highlight, final two-chart screen, inactive restore, manual override, and CSV download behavior
+- Full four-round rehearsal: supported through Phase 11 current-round/rehearsal controls and documented in `docs/rehearsal-runbook.md`
+- Private CSV verification: release checklist and Playwright e2e cover private CSV download behavior
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (19 files, 51 tests)
+- E2E: passed with `npm run test:e2e` (1 Playwright test)
+- Chart import: passed with `npm run import:charts`
+- Image fallback cache: passed with `npm run cache:chart-images -- --fallback-only`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- Production build: passed with `npm run build`
+
+### Changed Files
+
+- Added GitHub Actions CI workflow
+- Added release checklist
+- Expanded event-day runbook with final operating flow
+- Updated README, testing checklist, and phase status
+
+### Manual Review
+
+- Tournament rules: no tournament rule constants changed; final docs preserve two sets per round, one voting window, explicit no-ban, least-ban selection, server-decided tiebreaks, and private CSV handling.
+- Security: CI uses no production secrets; Playwright e2e generates test-only auth material at runtime; release docs keep secrets in Vercel/local env only.
+- UI/ops: release checklist requires manual verification of the projector, phone, QR, timer, final selected chart, admin dangerous action, inactive restore, manual override, and CSV flows.
+- Tests: local final gates match the workflow gates, with Playwright e2e included because it runs against generated local test credentials.
+
+### Risks And Assumptions
+
+- Operational stores remain in-memory. Production event use still needs Supabase-backed persistence or an explicitly controlled single-process host.
+- GitHub Actions includes Playwright e2e and installs Chromium; if CI browser install becomes unreliable, keep e2e as a documented local rehearsal gate rather than requiring production secrets.
+- Playwright currently covers a full Round 1 smoke path; four-round validation is supported and documented as a rehearsal workflow.

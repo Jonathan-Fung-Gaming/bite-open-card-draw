@@ -88,6 +88,53 @@ For each round:
 - Confirm phones do not show results before stage reveal finishes.
 - Confirm the final two selected charts are visible together.
 
+## Before Each Round
+
+1. Confirm active players.
+2. Restore an inactive player if there was an admin or roster error.
+3. Set the current round in `/coolguy69`.
+4. Draw Set 1.
+5. Confirm Set 1 appears on `/stage`.
+6. Draw Set 2.
+7. Confirm Set 2 appears on `/stage`.
+8. Show both sets.
+9. Open voting.
+10. Monitor turnout.
+11. Do not reveal public chart-by-chart counts.
+
+## During Voting
+
+Host may:
+
+- pause voting if something breaks
+- resume voting after the fix
+- manually enter a ballot if necessary
+- close voting manually only if event operations require it
+
+Host should not show admin screens, private CSV data, or live chart-by-chart information on projector or stream.
+
+## After Voting Closes
+
+1. Enter any approved manual ballot before results are computed.
+2. Compute results.
+3. Reveal Set 1 results.
+4. Resolve Set 1.
+5. Reveal Set 2 results.
+6. Resolve Set 2.
+7. Show final two charts.
+8. Download private CSV.
+9. Move to the next round.
+
+## If The Website Fails
+
+Use this fallback:
+
+```text
+Pause and fix the website.
+```
+
+Do not switch to random selection unless the tournament director explicitly decides on an outside-the-app fallback.
+
 ## After the Final Reveal
 
 - Confirm the private ballot CSV auto-downloads.

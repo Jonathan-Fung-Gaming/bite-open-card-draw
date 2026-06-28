@@ -136,3 +136,10 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Rehearsal reset clears operational state and returns to tournament mode.
 - Forced rehearsal tiebreak seeding is blocked outside rehearsal mode.
 - Deployment, data setup, event-day, and rehearsal workflows are documented.
+
+## Phase 12 Release Tests
+
+- `docs/release-checklist.md` exists and covers env, data, roster, admin, public screens, results, CSV, and final checks.
+- GitHub Actions CI runs stable quality gates on pull requests and `main`.
+- Event-day runbook includes before-event, before-round, during-voting, after-close, and website-failure flows.
+- Final local checks match CI gates plus e2e, import, fallback cache, audit, and production build.
