@@ -97,5 +97,5 @@ This helper writes `.env.local`, which is ignored by Git. It does not commit or 
 - Generate `SESSION_SECRET` later and store it only in `.env.local` and Vercel environment variables.
 - Store production/staging environment variables in Vercel project settings later; do not commit them.
 - Link the Vercel project to the local repo after Phase 1 creates the Next.js app.
-- Create or designate a `main` branch on GitHub if you want pull requests into `main`; currently the remote only has `phase/00-setup`.
+- `main` now exists on GitHub and is the repository default branch.
 - Review the GitHub warning about `public/brand/tournament-logo.png` being larger than 50 MB and decide in Phase 1 or Phase 3 whether to replace it with an optimized committed asset or use external controlled storage.
