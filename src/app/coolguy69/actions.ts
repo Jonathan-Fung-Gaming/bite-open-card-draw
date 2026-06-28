@@ -136,11 +136,23 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
 
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
-    adminState.rosterStore.addPlayerToCurrentRoundEligibility({
+    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const entry = adminState.rosterStore.addPlayerToCurrentRoundEligibility({
       playerId: getString(formData, "playerId"),
-      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
+      roundNumber,
       reason: getString(formData, "reason"),
     });
+    const player = adminState.rosterStore.getPlayer(entry.playerId);
+
+    if (player) {
+      adminState.votingWindowStore.addEligiblePlayerToOpenRound({
+        roundNumber,
+        player: {
+          id: player.id,
+          startggUsername: player.startggUsername,
+        },
+      });
+    }
   } catch (error) {
     redirectWithError(
       error instanceof Error ? error.message : "Could not update round eligibility.",

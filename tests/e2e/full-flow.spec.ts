@@ -75,7 +75,10 @@ async function waitForVisibleTiebreakReveal(page: Page, expectedPanelCount: numb
   });
 }
 
-test("full round smoke flow reaches final reveal and downloads private CSV", async ({ page }) => {
+test("full round smoke flow reaches final reveal and downloads private CSV", async ({
+  page,
+  browser,
+}) => {
   await goto(page, "/stage");
   await expect(page.getByText("Round 1 Draw")).toBeVisible();
 
@@ -123,19 +126,39 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible({ timeout: 7000 });
   await expectReadableVotingAccess(stagePage);
 
-  await goto(page, "/vote");
-  await page.getByLabel("Select your start.gg username").selectOption({ label: "Alpha" });
-  await page.getByRole("button", { name: "Confirm" }).click();
-  await page.getByRole("button").filter({ hasText: "S16" }).first().click();
-  await page.getByRole("button", { name: "Next" }).click();
-  await page.getByLabel("No bans for this set").check();
-  await page.getByRole("button", { name: "Review" }).click();
-  await page.getByRole("button", { name: "Submit Ballot" }).click();
-  await expect(page.getByText("Ballot Saved")).toBeVisible();
+  const phonePage = await page.context().newPage();
+  await goto(phonePage, "/vote");
+  await phonePage.getByLabel("Select your start.gg username").selectOption({ label: "Alpha" });
+  await phonePage.getByRole("button", { name: "Confirm" }).click();
+  await phonePage.getByRole("button").filter({ hasText: "S16" }).first().click();
+  await phonePage.getByRole("button", { name: "Next" }).click();
+  await phonePage.getByLabel("No bans for this set").check();
+  await phonePage.getByRole("button", { name: "Review" }).click();
+  await phonePage.getByRole("button", { name: "Submit Ballot" }).click();
+  await expect(phonePage.getByText("Ballot Saved")).toBeVisible();
+  await expect(phonePage.getByText("Server-confirmed timestamp:")).toBeVisible();
+  await expect(phonePage.getByText("S16")).toBeVisible();
+  await expect(phonePage.getByText("No bans for this set")).toBeVisible();
 
-  await goto(page, "/coolguy69");
+  await phonePage.reload({ waitUntil: "domcontentloaded" });
+  await expect(phonePage.getByText("Ballot Saved")).toBeVisible({ timeout: 7000 });
+  await expect(phonePage.getByText("Loaded saved revision 1.")).toBeVisible();
+  await expect(phonePage.getByText("Server-confirmed timestamp:")).toBeVisible();
+
+  const duplicatePhonePage = await browser.newPage();
+  await duplicatePhonePage.goto(new URL("/vote", page.url()).toString(), {
+    waitUntil: "domcontentloaded",
+  });
+  await duplicatePhonePage.getByLabel("Select your start.gg username").selectOption({ label: "Alpha" });
+  await expect(
+    duplicatePhonePage.getByText("A ballot already exists for this start.gg username"),
+  ).toBeVisible({ timeout: 7000 });
+  await duplicatePhonePage.close();
+
   await page.getByRole("button", { name: "Close Voting" }).click();
   await expect(page.getByText("voting closed")).toBeVisible();
+  await expect(phonePage.getByText("Voting is closed.")).toBeVisible({ timeout: 7000 });
+  await expect(phonePage.getByText("Results are being revealed on stage.")).toBeVisible();
   await page.getByRole("button", { name: "Compute Results" }).click();
   await expect(page.getByText("results computed")).toBeVisible();
 
@@ -152,14 +175,17 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
       .locator("section", { hasText: "Result Reveal Controls" })
       .getByText("final", { exact: true }),
   ).toBeVisible();
-  await expect(stagePage.getByText("ROUND 1 FINAL CHARTS")).toBeVisible({ timeout: 7000 });
+  await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+    timeout: 7000,
+  });
+  await expect(phonePage.getByText("Full ban counts")).toBeVisible({ timeout: 7000 });
 
   await goto(page, "/stage");
-  await expect(page.getByText("ROUND 1 FINAL CHARTS")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
   await expect(page.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card")).toHaveCount(2);
 
   await goto(page, "/results");
-  await expect(page.getByText("ROUND 1 FINAL CHARTS")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
 
   await goto(page, "/vote");
   await expect(page.getByText("Full ban counts")).toBeVisible();

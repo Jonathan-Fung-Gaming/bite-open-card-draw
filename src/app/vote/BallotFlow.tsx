@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawRecord } from "@/lib/draw/draw-state";
-import type { BallotSetChoice } from "@/lib/vote/ballot";
+import type { BallotSetChoice, RoundBallot } from "@/lib/vote/ballot";
 import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
-import { getExistingBallotAction, submitRoundBallotAction } from "./actions";
+import { getExistingBallotAction, getVoteLiveStateAction, submitRoundBallotAction } from "./actions";
 
 type BallotFlowProps = {
   roundNumber: 1 | 2 | 3 | 4;
@@ -15,7 +16,11 @@ type BallotFlowProps = {
   statusLabel: string;
   timerText: string;
   turnoutText: string;
+  canSubmit: boolean;
+  eligiblePlayerIds: string[];
 };
+
+const IDENTITY_STORAGE_KEY = "bite-open-card-draw:startgg-identity:v1";
 
 function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
   return draws.map((draw) => ({
@@ -26,6 +31,73 @@ function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
   }));
 }
 
+function readRememberedIdentity() {
+  try {
+    const raw = window.localStorage.getItem(IDENTITY_STORAGE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as {
+      playerId?: unknown;
+      startggUsername?: unknown;
+    };
+
+    return typeof parsed.playerId === "string" && typeof parsed.startggUsername === "string"
+      ? {
+          playerId: parsed.playerId,
+          startggUsername: parsed.startggUsername,
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberIdentity(player: EligiblePlayerSnapshot) {
+  window.localStorage.setItem(
+    IDENTITY_STORAGE_KEY,
+    JSON.stringify({
+      playerId: player.id,
+      startggUsername: player.startggUsername,
+    }),
+  );
+}
+
+function choicesFromBallot(draws: DrawRecord[], ballot: RoundBallot) {
+  return draws.map((draw) => {
+    const existing = ballot.choices.find((choice) => choice.roundSetId === draw.id);
+    const chartIds = new Set(draw.charts.map((chart) => chart.id));
+    const bannedChartIds = existing?.bannedChartIds.filter((chartId) => chartIds.has(chartId)) ?? [];
+
+    return {
+      roundSetId: draw.id,
+      displayLabel: draw.displayLabel,
+      noBans: Boolean(existing?.noBans) && bannedChartIds.length === 0,
+      bannedChartIds,
+    };
+  });
+}
+
+function describeChoice(draw: DrawRecord | undefined, choice: BallotSetChoice) {
+  if (choice.noBans) {
+    return "No bans for this set";
+  }
+
+  if (!draw || choice.bannedChartIds.length === 0) {
+    return `${choice.bannedChartIds.length} ban selection(s)`;
+  }
+
+  const names = choice.bannedChartIds.map((chartId) => {
+    const chart = draw.charts.find((candidate) => candidate.id === chartId);
+
+    return chart ? chart.name : chartId;
+  });
+
+  return names.join(", ");
+}
+
 export function BallotFlow({
   roundNumber,
   players,
@@ -34,16 +106,30 @@ export function BallotFlow({
   statusLabel,
   timerText,
   turnoutText,
+  canSubmit: initialCanSubmit,
+  eligiblePlayerIds,
 }: BallotFlowProps) {
+  const router = useRouter();
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [step, setStep] = useState(0);
   const [choices, setChoices] = useState(() => emptyChoices(draws));
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [existingBallot, setExistingBallot] = useState<RoundBallot | null>(null);
+  const [lookupPending, setLookupPending] = useState(false);
+  const [liveCanSubmit, setLiveCanSubmit] = useState(initialCanSubmit);
+  const [liveStatusLabel, setLiveStatusLabel] = useState(statusLabel);
+  const [liveTimerText, setLiveTimerText] = useState(timerText);
+  const [liveTurnoutText, setLiveTurnoutText] = useState(turnoutText);
+  const [liveSubmittedPlayerIds, setLiveSubmittedPlayerIds] = useState(submittedPlayerIds);
   const [isPending, startTransition] = useTransition();
+  const initializedIdentityRef = useRef(false);
+  const eligibleFingerprintRef = useRef(eligiblePlayerIds.join("|"));
+  const refreshRequestedRef = useRef(false);
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null;
-  const alreadySubmitted = submittedPlayerIds.includes(selectedPlayerId);
+  const alreadySubmitted =
+    liveSubmittedPlayerIds.includes(selectedPlayerId) || existingBallot !== null;
   const currentDraw = draws[step];
   const currentChoice = choices[step];
   const canSubmit = choices.every(
@@ -52,13 +138,149 @@ export function BallotFlow({
       (!choice.noBans && choice.bannedChartIds.length >= 1 && choice.bannedChartIds.length <= 2),
   );
 
+  const loadExistingBallot = useCallback(
+    async (
+      playerId: string,
+      options: { autoConfirmExisting?: boolean; resetWhenMissing?: boolean } = {},
+    ) => {
+      setLookupPending(true);
+
+      try {
+        const ballot = await getExistingBallotAction(roundNumber, playerId);
+
+        setExistingBallot(ballot);
+
+        if (ballot) {
+          setChoices(choicesFromBallot(draws, ballot));
+          setSavedAt(ballot.submittedAt);
+          setMessage(`Loaded saved revision ${ballot.revision}.`);
+
+          if (options.autoConfirmExisting) {
+            setConfirmed(true);
+          }
+        } else if (options.resetWhenMissing) {
+          setChoices(emptyChoices(draws));
+          setSavedAt(null);
+          setMessage(null);
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Could not load saved ballot.");
+      } finally {
+        setLookupPending(false);
+      }
+    },
+    [draws, roundNumber],
+  );
+
   const warning = useMemo(() => {
     if (!selectedPlayer || !alreadySubmitted) {
       return null;
     }
 
-    return `A ballot already exists for this start.gg username. Only continue if you are ${selectedPlayer.startggUsername}. The latest valid submitted ballot will count.`;
-  }, [alreadySubmitted, selectedPlayer]);
+    if (existingBallot) {
+      return `A ballot already exists for this start.gg username from ${existingBallot.submittedAt}. Only continue if you are ${selectedPlayer.startggUsername}. A second phone can replace the prior ballot; the latest valid submitted ballot will count.`;
+    }
+
+    return `A ballot already exists for this start.gg username. Only continue if you are ${selectedPlayer.startggUsername}. A second phone can replace the prior ballot; the latest valid submitted ballot will count.`;
+  }, [alreadySubmitted, existingBallot, selectedPlayer]);
+
+  useEffect(() => {
+    setLiveCanSubmit(initialCanSubmit);
+    setLiveStatusLabel(statusLabel);
+    setLiveTimerText(timerText);
+    setLiveTurnoutText(turnoutText);
+    setLiveSubmittedPlayerIds(submittedPlayerIds);
+    eligibleFingerprintRef.current = eligiblePlayerIds.join("|");
+  }, [
+    eligiblePlayerIds,
+    initialCanSubmit,
+    statusLabel,
+    submittedPlayerIds,
+    timerText,
+    turnoutText,
+  ]);
+
+  useEffect(() => {
+    if (initializedIdentityRef.current) {
+      return;
+    }
+
+    const remembered = readRememberedIdentity();
+
+    if (!remembered) {
+      initializedIdentityRef.current = true;
+      return;
+    }
+
+    const rememberedPlayer =
+      players.find((player) => player.id === remembered.playerId) ??
+      players.find((player) => player.startggUsername === remembered.startggUsername);
+
+    if (!rememberedPlayer) {
+      return;
+    }
+
+    initializedIdentityRef.current = true;
+    setSelectedPlayerId(rememberedPlayer.id);
+    void loadExistingBallot(rememberedPlayer.id, { autoConfirmExisting: true });
+  }, [loadExistingBallot, players]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const state = await getVoteLiveStateAction(roundNumber, selectedPlayerId || undefined);
+
+        if (cancelled) {
+          return;
+        }
+
+        setLiveCanSubmit(state.canSubmit);
+        setLiveStatusLabel(state.statusLabel);
+        setLiveTimerText(state.timerText);
+        setLiveTurnoutText(state.turnoutText);
+        setLiveSubmittedPlayerIds(state.submittedPlayerIds);
+
+        const nextEligibleFingerprint = state.eligiblePlayerIds.join("|");
+
+        if (nextEligibleFingerprint !== eligibleFingerprintRef.current) {
+          eligibleFingerprintRef.current = nextEligibleFingerprint;
+          router.refresh();
+        }
+
+        if (state.existingBallot) {
+          setExistingBallot(state.existingBallot);
+
+          if (savedAt || !confirmed) {
+            setChoices(choicesFromBallot(draws, state.existingBallot));
+            setSavedAt(state.existingBallot.submittedAt);
+          }
+        }
+
+        if (!state.canSubmit && !refreshRequestedRef.current) {
+          refreshRequestedRef.current = true;
+          setMessage("Voting state changed. Ballot changes are disabled while this phone refreshes.");
+          router.refresh();
+        }
+      } catch {
+        if (!cancelled) {
+          setMessage("Could not refresh voting status. Server validation still protects submissions.");
+        }
+      }
+    }
+
+    const interval = window.setInterval(() => {
+      void poll();
+    }, 1500);
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [confirmed, draws, roundNumber, router, savedAt, selectedPlayerId]);
 
   function updateChoice(nextChoice: BallotSetChoice) {
     setChoices((current) => current.map((choice, index) => (index === step ? nextChoice : choice)));
@@ -82,7 +304,11 @@ export function BallotFlow({
   }
 
   function submit() {
-    if (!selectedPlayer || !canSubmit) {
+    if (!selectedPlayer || !canSubmit || !liveCanSubmit) {
+      if (!liveCanSubmit) {
+        setMessage("Voting is not open for ballot changes.");
+      }
+
       return;
     }
 
@@ -95,8 +321,13 @@ export function BallotFlow({
           choices,
         });
 
+        rememberIdentity(selectedPlayer);
+        setExistingBallot(ballot);
         setSavedAt(ballot.submittedAt);
         setMessage(`Saved revision ${ballot.revision}.`);
+        setLiveSubmittedPlayerIds((current) =>
+          current.includes(selectedPlayer.id) ? current : [...current, selectedPlayer.id],
+        );
       } catch (error) {
         setMessage(
           error instanceof Error
@@ -123,12 +354,17 @@ export function BallotFlow({
         <div className="mb-5 grid gap-2 rounded border border-metal-700 bg-black/25 p-3 sm:grid-cols-[1fr_auto]">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
-              {statusLabel}
+              {liveStatusLabel}
             </p>
-            <p className="mt-1 text-sm text-metal-300">{turnoutText}</p>
+            <p className="mt-1 text-sm text-metal-300">{liveTurnoutText}</p>
           </div>
-          <p className="font-mono text-3xl font-black tabular-nums text-white">{timerText}</p>
+          <p className="font-mono text-3xl font-black tabular-nums text-white">{liveTimerText}</p>
         </div>
+        {!liveCanSubmit ? (
+          <p className="mb-4 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">
+            Voting is not accepting ballot changes right now.
+          </p>
+        ) : null}
         <label
           className="text-sm font-bold uppercase tracking-[0.16em] text-ember-300"
           htmlFor="startgg-username"
@@ -140,10 +376,16 @@ export function BallotFlow({
           className="mt-3 w-full rounded border border-metal-700 bg-black/35 px-3 py-3 text-white"
           value={selectedPlayerId}
           onChange={(event) => {
-            setSelectedPlayerId(event.target.value);
+            const playerId = event.target.value;
+
+            setSelectedPlayerId(playerId);
+            setConfirmed(false);
+            setSavedAt(null);
+            setExistingBallot(null);
+            setChoices(emptyChoices(draws));
             setMessage(null);
-            if (event.target.value) {
-              void getExistingBallotAction(roundNumber, event.target.value);
+            if (playerId) {
+              void loadExistingBallot(playerId, { resetWhenMissing: true });
             }
           }}
         >
@@ -166,11 +408,17 @@ export function BallotFlow({
         ) : null}
         <button
           className="button-metal mt-5 w-full rounded px-4 py-3 font-black uppercase disabled:opacity-40"
-          disabled={!selectedPlayer}
-          onClick={() => setConfirmed(true)}
+          disabled={!selectedPlayer || lookupPending || !liveCanSubmit}
+          onClick={() => {
+            if (selectedPlayer) {
+              rememberIdentity(selectedPlayer);
+            }
+
+            setConfirmed(true);
+          }}
           type="button"
         >
-          Confirm
+          {lookupPending ? "Checking saved ballot" : "Confirm"}
         </button>
       </section>
     );
@@ -186,13 +434,34 @@ export function BallotFlow({
           {selectedPlayer?.startggUsername}
         </h1>
         <p className="mt-3 text-metal-300">Server-confirmed timestamp: {savedAt}</p>
+        <div className="mt-5 grid gap-3">
+          {choices.map((choice) => {
+            const draw = draws.find((candidate) => candidate.id === choice.roundSetId);
+
+            return (
+              <div
+                key={choice.roundSetId}
+                className="rounded border border-metal-700 bg-black/25 p-3"
+              >
+                <p className="font-bold text-white">{choice.displayLabel}</p>
+                <p className="mt-1 text-sm text-metal-300">{describeChoice(draw, choice)}</p>
+              </div>
+            );
+          })}
+        </div>
         {message ? <p className="mt-3 text-sm text-ember-300">{message}</p> : null}
-        <button
-          className="button-metal mt-5 rounded px-4 py-3 font-black uppercase"
-          onClick={() => setSavedAt(null)}
-        >
-          Change vote
-        </button>
+        {liveCanSubmit ? (
+          <button
+            className="button-metal mt-5 rounded px-4 py-3 font-black uppercase"
+            onClick={() => setSavedAt(null)}
+          >
+            Change vote
+          </button>
+        ) : (
+          <p className="mt-5 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">
+            Voting is no longer open for changes.
+          </p>
+        )}
       </section>
     );
   }
@@ -216,7 +485,10 @@ export function BallotFlow({
               <p className="mt-1 text-sm text-metal-300">
                 {choice.noBans
                   ? "No bans for this set"
-                  : `${choice.bannedChartIds.length} ban selection(s)`}
+                  : describeChoice(
+                      draws.find((draw) => draw.id === choice.roundSetId),
+                      choice,
+                    )}
               </p>
             </div>
           ))}
@@ -231,7 +503,7 @@ export function BallotFlow({
           </button>
           <button
             className="button-metal rounded px-4 py-3 font-black uppercase disabled:opacity-40"
-            disabled={!canSubmit || isPending}
+            disabled={!canSubmit || isPending || !liveCanSubmit}
             onClick={submit}
           >
             Submit Ballot
@@ -247,6 +519,11 @@ export function BallotFlow({
         Step {step + 1}: Set {step + 1}
       </p>
       <h1 className="mt-2 text-3xl font-black uppercase text-white">{currentDraw?.displayLabel}</h1>
+      {!liveCanSubmit ? (
+        <p className="mt-4 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">
+          Voting is not accepting ballot changes right now.
+        </p>
+      ) : null}
       <div className="mt-4 grid grid-cols-2 gap-3">
         {currentDraw?.charts.map((chart, index) => {
           const selected = currentChoice?.bannedChartIds.includes(chart.id) ?? false;
@@ -262,6 +539,7 @@ export function BallotFlow({
                 })`,
               }}
               onClick={() => toggleBan(chart.id)}
+              disabled={!liveCanSubmit}
               type="button"
             >
               <span className="relative text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
@@ -279,6 +557,7 @@ export function BallotFlow({
         <input
           type="checkbox"
           checked={currentChoice?.noBans ?? false}
+          disabled={!liveCanSubmit}
           onChange={(event) =>
             currentChoice &&
             updateChoice({
@@ -302,6 +581,7 @@ export function BallotFlow({
         <button
           className="button-metal rounded px-4 py-3 font-black uppercase disabled:opacity-40"
           disabled={
+            !liveCanSubmit ||
             !currentChoice ||
             !(
               (currentChoice.noBans && currentChoice.bannedChartIds.length === 0) ||

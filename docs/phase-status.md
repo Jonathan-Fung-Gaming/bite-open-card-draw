@@ -209,6 +209,63 @@ and later remediation phases remain open.
 - The stage polling interval is still 2000ms, so e2e waits account for lightweight refresh timing.
 - Operational state remains in-memory until the later Supabase persistence remediation phase.
 
+## Remediation Phase 3 - Phone Live State And Ballot UX
+
+Status: complete for the Phase 3 code paths; not event-ready because real cached artwork population,
+admin safety, persistence, and later remediation phases remain open.
+
+### Acceptance Criteria
+
+- Phone live refresh: active ballot screens poll server-backed voting state every 1500ms through
+  `getVoteLiveStateAction`; paused, closed, revealed, and waiting `/vote` states refresh every 2000ms.
+- Status transitions: phone UI updates from server state for pause/resume, final 30 seconds,
+  one-minute extension, close, results revealing, and final reveal without manual navigation.
+- Saved ballot recovery: selecting a start.gg username or reloading a remembered phone uses the
+  existing ballot lookup to prefill saved choices and the server-confirmed timestamp.
+- Remembered identity: the selected start.gg username is stored in device `localStorage` for the
+  event and reused after refresh.
+- Duplicate-use warning: a second device selecting an already-submitted username sees a warning before
+  confirmation, including that the latest valid submitted ballot counts.
+- Stale mutation safety: active ballot controls disable when the live snapshot reports voting is not
+  accepting changes, and the server action still rejects stale invalid submissions.
+- Emergency eligibility: password-gated current-round inactive-player add now updates an already-open
+  voting snapshot and recalculates the turnout denominator.
+
+### Changed Files
+
+- Phone voting UI and polling: `src/app/vote/BallotFlow.tsx`,
+  `src/app/vote/VoteAutoRefresh.tsx`, `src/app/vote/actions.ts`, `src/app/vote/page.tsx`
+- Voting state: `src/lib/vote/voting-window.ts`, `src/lib/vote/voting-window.test.ts`
+- Admin eligibility action: `src/app/coolguy69/actions.ts`
+- E2E coverage: `tests/e2e/full-flow.spec.ts`
+- Documentation: `docs/phase-status.md`, `docs/remediation-issue-checklist.md`
+
+### Checks Run
+
+- `rtk npm run lint` - passed
+- `rtk npm run typecheck` - passed
+- `rtk npm run test` - passed, 22 files / 59 tests
+- `rtk npm run test:e2e` - passed, 2 Playwright tests
+- `rtk npm run build` - passed
+
+### Manual Review
+
+- Product rules: voting still uses one round ballot covering both chart sets, explicit no-ban remains
+  required for zero bans, and latest valid submitted ballot continues to win.
+- Phone UX: saved choices and timestamps are visible after refresh; `Change vote` remains available
+  only while server state allows player ballot changes.
+- Security: phone polling exposes only voting status, turnout summary, eligibility/submitted IDs, and
+  the selected player's existing ballot lookup; ballot mutations still go through server actions.
+- Eligibility: emergency current-round additions keep the active voting snapshot authoritative for the
+  in-memory phase and update turnout math.
+
+### Risks And Assumptions
+
+- Operational state remains in-memory until the later Supabase persistence remediation phase.
+- Phone polling is intentionally lightweight rather than instant; the server remains the final guard
+  against stale submissions during the interval between polls.
+- Real cached artwork remains unverified and `RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028` remain open.
+
 ## Phase 1 - Project Scaffold, Docs, And Route Skeleton
 
 Status: complete

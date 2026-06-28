@@ -110,6 +110,39 @@ describe("voting window store", () => {
     expect(resumed.remainingMs).toBe(8 * 60 * 1000);
   });
 
+  it("adds emergency current-round eligibility to an already-open voting snapshot", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players.slice(0, 2),
+      nowMs: 0,
+    });
+
+    const before = snapshot(store, ["player-1"], 1_000, players);
+
+    expect(before.eligibleCount).toBe(2);
+    expect(before.submittedCount).toBe(1);
+
+    store.addEligiblePlayerToOpenRound({
+      roundNumber: 1,
+      player: players[2] ?? { id: "player-3", startggUsername: "Charlie" },
+      nowMs: 2_000,
+    });
+
+    const after = snapshot(store, ["player-1"], 2_000, players);
+
+    expect(after.eligiblePlayers.map((player) => player.id)).toEqual([
+      "player-1",
+      "player-2",
+      "player-3",
+    ]);
+    expect(after.eligibleCount).toBe(3);
+    expect(after.submittedCount).toBe(1);
+    expect(after.turnoutRatio).toBeCloseTo(1 / 3);
+  });
+
   it("blocks manual ballots after results reveal", () => {
     const store = new VotingWindowStore();
 

@@ -6,23 +6,11 @@ import {
   getSubmittedPlayerIdsForRound,
   getVotingRoundSnapshot,
 } from "@/lib/server/voting-round";
-import { formatVotingTime, type VotingRoundSnapshot } from "@/lib/vote/voting-window";
+import { formatVotingStatusLabel, formatVotingTime } from "@/lib/vote/voting-window";
 import { BallotFlow } from "./BallotFlow";
+import { VoteAutoRefresh } from "./VoteAutoRefresh";
 
 export const dynamic = "force-dynamic";
-
-function votingStatusLabel(snapshot: VotingRoundSnapshot) {
-  switch (snapshot.status) {
-    case "final_30_seconds":
-      return "Final 30 seconds";
-    case "extension_1_minute":
-      return "One-minute extension";
-    case "voting_open":
-      return "Voting open";
-    default:
-      return "Voting";
-  }
-}
 
 export default function VotePage() {
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
@@ -35,6 +23,7 @@ export default function VotePage() {
   if (snapshot.status === "voting_paused") {
     return (
       <main className="min-h-screen">
+        <VoteAutoRefresh />
         <RoundHeader title="Voting Paused" status={`Round ${roundNumber}`} />
         <section className="mx-auto max-w-2xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300">
@@ -52,6 +41,7 @@ export default function VotePage() {
   ) {
     return (
       <main className="min-h-screen">
+        <VoteAutoRefresh />
         <RoundHeader title="Voting Closed" status={`Round ${roundNumber}`} />
         <section className="mx-auto max-w-2xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300">
@@ -73,6 +63,7 @@ export default function VotePage() {
 
     return (
       <main className="min-h-screen">
+        <VoteAutoRefresh />
         <RoundHeader title={`Round ${roundNumber} Final Charts`} status="Results revealed" />
         <section className="mx-auto max-w-4xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5">
@@ -141,6 +132,7 @@ export default function VotePage() {
 
     return (
       <main className="min-h-screen">
+        <VoteAutoRefresh />
         <RoundHeader title="Player Ballot" status={`Round ${roundNumber}`} />
         <section className="mx-auto max-w-2xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5 text-lg font-bold text-metal-300">
@@ -155,7 +147,7 @@ export default function VotePage() {
     <main className="min-h-screen">
       <RoundHeader
         title="Player Ballot"
-        status={`${votingStatusLabel(snapshot)} - Round ${roundNumber}`}
+        status={`${formatVotingStatusLabel(snapshot.status)} - Round ${roundNumber}`}
       />
       <section className="mx-auto max-w-4xl px-5 py-5">
         <BallotFlow
@@ -163,9 +155,11 @@ export default function VotePage() {
           players={snapshot.eligiblePlayers}
           draws={draws}
           submittedPlayerIds={submittedPlayerIds}
-          statusLabel={votingStatusLabel(snapshot)}
+          statusLabel={formatVotingStatusLabel(snapshot.status)}
           timerText={formatVotingTime(snapshot.remainingMs)}
           turnoutText={`Ballots submitted: ${snapshot.submittedCount} / ${snapshot.eligibleCount}`}
+          canSubmit={snapshot.canSubmit}
+          eligiblePlayerIds={snapshot.eligiblePlayers.map((player) => player.id)}
         />
       </section>
     </main>

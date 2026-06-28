@@ -115,6 +115,35 @@ export function formatVotingTime(remainingMs: number) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+export function formatVotingStatusLabel(status: VotingRoundStatus) {
+  switch (status) {
+    case "final_30_seconds":
+      return "Final 30 seconds";
+    case "extension_1_minute":
+      return "One-minute extension";
+    case "voting_open":
+      return "Voting open";
+    case "voting_paused":
+      return "Voting paused";
+    case "voting_closed":
+      return "Voting closed";
+    case "results_computed":
+      return "Results computed";
+    case "results_revealing":
+      return "Results revealing";
+    case "results_revealed":
+      return "Results revealed";
+    case "ready_to_vote":
+      return "Ready to vote";
+    case "drawing":
+      return "Drawing";
+    case "round_complete":
+      return "Round complete";
+    default:
+      return "Voting";
+  }
+}
+
 export function isPlayerSubmissionOpen(status: VotingRoundStatus) {
   return status === "voting_open" || status === "final_30_seconds" || status === "extension_1_minute";
 }
@@ -236,6 +265,32 @@ export class VotingWindowStore {
     record.pausedFromStatus = null;
     record.remainingMsWhenPaused = null;
     record.updatedAt = toIso(nowMs);
+
+    return record;
+  }
+
+  addEligiblePlayerToOpenRound(input: {
+    roundNumber: 1 | 2 | 3 | 4;
+    player: EligiblePlayerSnapshot;
+    nowMs?: number;
+  }) {
+    const record = this.windows.get(input.roundNumber);
+
+    if (!record) {
+      return null;
+    }
+
+    if (
+      record.status === "results_revealed" ||
+      record.status === "round_complete"
+    ) {
+      throw new Error("Current-round eligibility cannot change after results reveal.");
+    }
+
+    const eligiblePlayers = dedupePlayers([...record.eligiblePlayers, input.player]);
+
+    record.eligiblePlayers = eligiblePlayers;
+    record.updatedAt = toIso(input.nowMs ?? this.clock());
 
     return record;
   }
