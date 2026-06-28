@@ -1,11 +1,19 @@
 import { AlertTriangle } from "lucide-react";
+import type { ReactNode } from "react";
 
 type DangerousActionDialogProps = {
   action: string;
   consequence: string;
+  children?: ReactNode;
+  disabled?: boolean;
 };
 
-export function DangerousActionDialog({ action, consequence }: DangerousActionDialogProps) {
+export function DangerousActionDialog({
+  action,
+  consequence,
+  children,
+  disabled = false,
+}: DangerousActionDialogProps) {
   return (
     <section className="rounded-lg border border-ember-500/35 bg-ember-900/20 p-4">
       <div className="flex items-start gap-3">
@@ -20,11 +28,14 @@ export function DangerousActionDialog({ action, consequence }: DangerousActionDi
       </label>
       <input
         id="danger-password"
+        name="adminPassword"
         type="password"
-        disabled
+        required
+        disabled={disabled}
         placeholder="Required before destructive actions"
         className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-metal-300"
       />
+      {children}
     </section>
   );
 }

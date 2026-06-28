@@ -130,3 +130,51 @@ Status: complete
 - The fallback-only cache run does not download third-party images. Full image fetching is available through `npm run cache:chart-images` and should be run before the event on a network-enabled machine.
 - Generated manifests under `data/generated/*.json` are ignored because they are reproducible from the source CSV and can be several megabytes.
 - Real Supabase chart upserts still depend on Phase 2 credentials/tooling becoming available; local generated JSON is the offline/import verification artifact for this phase.
+
+## Phase 4 - Admin Authentication, Host Lock, And Roster Management
+
+Status: complete
+
+### Acceptance Criteria
+
+- `/coolguy69` requires password: implemented with login-only unauthenticated view
+- Admin password storage: verifies `ADMIN_PASSWORD_HASH`; plaintext password is never stored
+- Admin session cookie: signed HTTP-only cookie with 30-minute max age
+- Host lock: implemented with server-side lock, host token cookie, heartbeat client, release action, and takeover behavior after expiry
+- Read-only admin browsers: roster and dangerous controls are disabled and server actions reject mutations without active host control
+- Roster management: add player, bulk import, mark active/inactive, reactivate inactive players, and active count are implemented
+- Duplicate active start.gg usernames: blocked in the roster store and covered by tests
+- Current-round eligibility: inactive player addition requires active host control, admin password re-entry, and audit reason
+- Dangerous action dialog: reusable password/reason-capable component is wired for current-round eligibility
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit tests: passed with `npm run test` (9 files, 25 tests)
+- E2E: placeholder passed with `npm run test:e2e`
+- Chart import: passed with `npm run import:charts`
+- Image fallback cache: passed with `npm run cache:chart-images -- --fallback-only`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- Production build: passed with `npm run build`
+
+### Changed Files
+
+- Added admin password hash verification, signed session tokens, host lock store, and roster store
+- Added server-only admin auth/state helpers
+- Added `/coolguy69` server actions for login/logout, host lock, roster edits, and dangerous eligibility changes
+- Replaced the admin route shell with password-gated admin UI and host-lock-aware controls
+- Added host heartbeat and inactivity timer client components
+- Added unit tests for password hashing, host lock behavior, and roster behavior
+- Updated admin docs, testing checklist, and `.env.example`
+
+### Manual Review
+
+- Product rules: roster uses start.gg usernames, keeps inactive players visible/restorable, blocks duplicate active usernames, and gates current-round eligibility changes behind dangerous confirmation.
+- Security: admin password is checked against a hash only; sessions and host tokens use HTTP-only cookies; tournament-changing admin actions require a server-side session and active host control.
+- Data: Phase 4 uses server-only in-memory stores because Supabase credentials/tooling are unavailable; later phases should move these operations to Supabase tables.
+- UI: `/coolguy69` is no longer a public console; unauthenticated users see only login. Read-only admins can view state but cannot operate roster or dangerous controls.
+- Tests: unit coverage verifies password hashing, duplicate active username blocking, inactive restore, current-round eligibility reason requirement, host lock ownership, and host lock expiry takeover.
+
+### Risks And Assumptions
+
+- In-memory admin state survives browser refresh in the same dev/server process but does not survive server restart or multi-instance deployment. Supabase persistence is required before event use.
+- Login requires `ADMIN_PASSWORD_HASH` and `SESSION_SECRET` to be configured. Without them, the admin page still loads but login returns a configuration error.
+- The current dangerous eligibility form is the first use of the dangerous action dialog; later dangerous actions must reuse the same password re-entry pattern.

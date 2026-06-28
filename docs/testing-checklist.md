@@ -75,9 +75,13 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 
 ## Admin Tests
 
+- `/coolguy69` shows only the password login form without a valid admin session.
+- Admin sessions use an HTTP-only signed cookie.
+- Admin sessions expire after inactivity.
 - Host lock allows one active host.
 - Host heartbeat expires and allows takeover.
 - Other admin browsers are read-only without host control.
 - Roster import and active/inactive player controls work.
+- Duplicate active start.gg usernames are blocked.
 - Current-round eligibility changes require password and audit reason.
 - Private CSV export includes player-level ballots, manual overrides, selected charts, and tiebreak flags.

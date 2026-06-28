@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
-import { HostLockBadge } from "./HostLockBadge";
+import { HostLockBadge, type HostLockBadgeProps } from "./HostLockBadge";
 import { TournamentLogo } from "./TournamentLogo";
 
 type AdminLayoutProps = {
   children: ReactNode;
+  hostStatus?: HostLockBadgeProps["status"];
 };
 
-export function AdminLayout({ children }: AdminLayoutProps) {
+export function AdminLayout({ children, hostStatus = "inactive" }: AdminLayoutProps) {
   return (
     <main className="min-h-screen px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
@@ -20,7 +21,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <h1 className="mt-1 text-3xl font-black uppercase text-white">coolguy69</h1>
             </div>
           </div>
-          <HostLockBadge status="inactive" />
+          <HostLockBadge status={hostStatus} />
         </header>
         {children}
       </div>

@@ -5,6 +5,8 @@ type HostLockBadgeProps = {
   status: "inactive" | "active" | "readonly";
 };
 
+export type { HostLockBadgeProps };
+
 const statusCopy = {
   inactive: "Host lock inactive",
   active: "Host control active",
