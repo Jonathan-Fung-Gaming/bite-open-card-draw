@@ -4,7 +4,7 @@ Tournament voting and stage visualization app for Pump It Up Open Stage.
 
 ## Current status
 
-Phase 6 stage display and draw visualization is complete.
+Phase 7 player room, view-only mode, and ballot flow is complete.
 
 ## Source files
 
