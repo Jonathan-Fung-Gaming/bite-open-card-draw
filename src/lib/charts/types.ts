@@ -8,7 +8,16 @@ export const EXPECTED_CHART_CSV_COLUMNS = [
   "bg_img",
 ] as const;
 
-export const REQUIRED_CHART_POOLS = ["S16", "S17", "S18", "S19", "S20", "S21", "S22", "D23"] as const;
+export const REQUIRED_CHART_POOLS = [
+  "S16",
+  "S17",
+  "S18",
+  "S19",
+  "S20",
+  "S21",
+  "S22",
+  "D23",
+] as const;
 
 export type RequiredChartPool = (typeof REQUIRED_CHART_POOLS)[number];
 

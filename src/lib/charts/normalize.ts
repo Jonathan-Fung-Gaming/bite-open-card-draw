@@ -43,7 +43,12 @@ export function buildSongKey(name: string, artist: string): string {
   return `${normalizeKeyPart(name)}__${normalizeKeyPart(artist)}`;
 }
 
-export function buildChartKey(name: string, artist: string, chartType: "s" | "d", level: number): string {
+export function buildChartKey(
+  name: string,
+  artist: string,
+  chartType: "s" | "d",
+  level: number,
+): string {
   return `${buildSongKey(name, artist)}__${chartType}${level}`;
 }
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyChartExclusions, getEligibleTournamentCharts, upsertChartExclusion } from "./exclusions";
+import {
+  applyChartExclusions,
+  getEligibleTournamentCharts,
+  upsertChartExclusion,
+} from "./exclusions";
 import { buildChartKey, normalizeChartRow, normalizeKeyPart, parseChartLevel } from "./normalize";
 
 const rawRow = {
@@ -36,7 +40,13 @@ describe("chart normalization", () => {
 
     expect(getEligibleTournamentCharts(withExclusion)).toHaveLength(0);
 
-    const reIncluded = upsertChartExclusion(excluded, chart.chartKey, false, "metadata fixed", "later");
+    const reIncluded = upsertChartExclusion(
+      excluded,
+      chart.chartKey,
+      false,
+      "metadata fixed",
+      "later",
+    );
     const restored = applyChartExclusions([chart], reIncluded);
 
     expect(getEligibleTournamentCharts(restored)).toHaveLength(1);

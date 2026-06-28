@@ -4,7 +4,7 @@ Tournament voting and stage visualization app for Pump It Up Open Stage.
 
 ## Current status
 
-Phase 1 scaffold is in progress.
+Phase 3 chart import, normalization, and fallback image cache tooling is complete.
 
 ## Source files
 

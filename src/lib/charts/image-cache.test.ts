@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyImageAssetsToCharts, FALLBACK_CHART_IMAGE_PATH, planImageAssets } from "./image-cache";
+import {
+  applyImageAssetsToCharts,
+  FALLBACK_CHART_IMAGE_PATH,
+  planImageAssets,
+} from "./image-cache";
 import { normalizeChartRow } from "./normalize";
 
 describe("chart image cache planning", () => {

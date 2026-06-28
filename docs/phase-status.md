@@ -91,42 +91,42 @@ Status: complete
 ### Acceptance Criteria
 
 - Chart import: passed with `npm run import:charts`
-- Source CSV: loaded from `data/source/charts.csv`
-- Required columns: validated by importer and tests
-- Required pools: all have at least 7 eligible charts
-- Pool counts: S16 189, S17 196, S18 189, S19 167, S20 135, S21 150, S22 97, D23 125
-- Duplicate chart keys: handled by importer and covered by tests; current source report has none
-- Exclusions and re-inclusions: implemented in pure helpers and covered by tests
-- Image cache: fallback manifest generated with `npm run cache:chart-images -- --fallback-only`
-- Image assets: 639 planned assets using `/chart-images/fallback-card.svg` in fallback-only mode
+- Source data: imported from `data/source/charts.csv`
+- Import result: 4,426 unique S/D charts imported from 4,571 source rows
+- Unsupported rows: 145 `c` type rows skipped because tournament pools only use S/D charts
+- Duplicate chart keys: 0 in the supplied CSV
+- Required pools: S16=189, S17=196, S18=189, S19=167, S20=135, S21=150, S22=97, D23=125
+- Image cache/fallback: passed with `npm run cache:chart-images -- --fallback-only`
+- Image result: 639 unique image asset records planned with fallback art at `public/chart-images/fallback-card.svg`
+- Exclusions and re-inclusions: covered by unit tests in `src/lib/charts/normalize.test.ts`
 - Lint: passed with `npm run lint`
 - Typecheck: passed with `npm run typecheck`
-- Unit tests: passed with `npm run test`
-- E2E: placeholder passed with `npm run test:e2e`
+- Unit tests: passed with `npm run test` (6 files, 19 tests)
 - Production build: passed with `npm run build`
+- E2E: placeholder passed with `npm run test:e2e`; Playwright is not introduced yet
 - Production dependency audit: passed with `npm audit --omit=dev`
 
 ### Changed Files
 
-- Added chart normalization, import, exclusion, and image-cache modules in `src/lib/charts`
-- Added chart importer/cache tests
-- Added `scripts/import-charts.ts` and `scripts/cache-chart-images.ts`
+- Added chart domain modules in `src/lib/charts`
 - Added `npm run import:charts` and `npm run cache:chart-images`
-- Added `data/generated/.gitkeep`; generated chart JSON artifacts are local outputs ignored by git
-- Added original fallback chart artwork at `public/chart-images/fallback-card.svg`
-- Added and committed the placeholder `test:e2e` script target so the existing script is not broken before Playwright is introduced
-- Updated README, testing checklist, and event-day runbook with chart setup commands
+- Added chart import and fallback cache scripts in `scripts`
+- Added local fallback chart art in `public/chart-images/fallback-card.svg`
+- Added generated-output ignore rules and `data/generated/.gitkeep`
+- Updated README, testing checklist, and event-day runbook with import/cache workflow
+- Added `csv-parse` and `tsx` dependencies
 
 ### Manual Review
 
-- Product rules: importer preserves only S/D chart types for tournament use, validates the required pools, marks matching charts eligible by default, and does not alter draw or selection rules.
-- Security: scripts read local source data and write generated public-safe chart metadata; no secrets or service-role keys are involved.
-- Data: malformed CSV rows with unquoted commas and quotes are repaired; unsupported chart type `c` rows are skipped and reported because only S and D pools are in scope.
-- UI: no new live UI behavior was added; fallback artwork is original and does not use official DOOM assets.
-- Tests: import, normalization, duplicate handling, malformed row repair, exclusions, re-inclusions, and image fallback planning are covered.
+- Product rules: normalization limits active tournament pools to S16/S17, S18/S19, S20/S21, and S22/D23; each required pool has far more than 7 eligible charts in current source data.
+- Security: import/cache scripts do not read service-role keys or browser secrets; generated chart data contains public chart metadata and remote art references only.
+- Data: chart type, level, display difficulty, song key, and chart key are stable; duplicate chart keys are detected and skipped; unsupported `c` chart rows are reported rather than silently mixed into tournament pools.
+- Exclusions: helper functions require a reason and support both exclusion and re-inclusion by chart key.
+- Images: cache planning deduplicates remote `bg_img` URLs and uses a committed original fallback card when live downloads are unavailable.
+- Tests: unit tests cover normalization, duplicate handling, required pool validation against the real CSV, exclusion/re-inclusion, and image fallback planning.
 
 ### Risks And Assumptions
 
-- The final image check used fallback-only mode to avoid downloading hundreds of live third-party assets during local validation. The remote-fetch path is implemented in `npm run cache:chart-images`; run it before the event on a stable network to populate local cached artwork.
-- `data/generated/charts.json` and `data/generated/charts-with-images.json` are generated local snapshots from the current CSV and should be regenerated if `data/source/charts.csv` changes.
-- The CSV contains unsupported `c` chart rows. They are skipped by design because the product spec only uses S and D chart pools.
+- The fallback-only cache run does not download third-party images. Full image fetching is available through `npm run cache:chart-images` and should be run before the event on a network-enabled machine.
+- Generated manifests under `data/generated/*.json` are ignored because they are reproducible from the source CSV and can be several megabytes.
+- Real Supabase chart upserts still depend on Phase 2 credentials/tooling becoming available; local generated JSON is the offline/import verification artifact for this phase.

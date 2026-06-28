@@ -63,7 +63,6 @@ async function fetchAsset(asset: ImageAsset, publicDir: string): Promise<ImageAs
 }
 
 async function main() {
-async function main() {
   const generatedDir = path.resolve(process.cwd(), "data/generated");
   const publicDir = path.resolve(process.cwd(), "public");
   const chartsPath = path.join(generatedDir, "charts.json");
@@ -97,7 +96,10 @@ async function main() {
       ];
 
   writeJson(path.join(generatedDir, "image-assets.json"), assets);
-  writeJson(path.join(generatedDir, "charts-with-images.json"), applyImageAssetsToCharts(charts, assets));
+  writeJson(
+    path.join(generatedDir, "charts-with-images.json"),
+    applyImageAssetsToCharts(charts, assets),
+  );
 
   const cachedCount = assets.filter((asset) => asset.status === "cached").length;
   const fallbackCount = assets.filter((asset) => asset.status !== "cached").length;
@@ -109,11 +111,5 @@ async function main() {
 
 main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
-}
-
-main().catch((error: unknown) => {
-  console.error(error);
   process.exit(1);
 });

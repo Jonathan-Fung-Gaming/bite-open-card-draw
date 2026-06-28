@@ -1,6 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { createFallbackChartRows, importChartRows, parseChartCsv } from "../src/lib/charts/importer";
+import {
+  createFallbackChartRows,
+  importChartRows,
+  parseChartCsv,
+} from "../src/lib/charts/importer";
 
 function readArg(name: string, fallback: string) {
   const prefix = `--${name}=`;
@@ -45,10 +49,14 @@ console.log(
 );
 
 if (report.duplicateChartKeys.length > 0) {
-  console.log(`Detected ${report.duplicateChartKeys.length} duplicate chart key rows; duplicates were skipped.`);
+  console.log(
+    `Detected ${report.duplicateChartKeys.length} duplicate chart key rows; duplicates were skipped.`,
+  );
 }
 
 if (report.poolsWithTooFewCharts.length > 0) {
-  console.error(`Required pools with fewer than 7 eligible charts: ${report.poolsWithTooFewCharts.join(", ")}`);
+  console.error(
+    `Required pools with fewer than 7 eligible charts: ${report.poolsWithTooFewCharts.join(", ")}`,
+  );
   process.exitCode = 1;
 }

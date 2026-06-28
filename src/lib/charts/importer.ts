@@ -47,12 +47,10 @@ function repairRawChartRecord(record: readonly string[], sourceRowNumber: number
 
   const [label, type, level, bgImg] = record.slice(-4);
   const leading = record.slice(0, -4);
-  let best:
-    | {
-        score: number;
-        row: RawChartCsvRow;
-      }
-    | null = null;
+  let best: {
+    score: number;
+    row: RawChartCsvRow;
+  } | null = null;
 
   for (let nameEnd = 1; nameEnd <= leading.length - 2; nameEnd += 1) {
     for (let nameKrEnd = nameEnd + 1; nameKrEnd <= leading.length - 1; nameKrEnd += 1) {
