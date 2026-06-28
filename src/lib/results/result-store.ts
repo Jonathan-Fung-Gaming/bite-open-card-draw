@@ -48,6 +48,45 @@ export class ResultStore {
     return this.results.get(roundNumber) ?? null;
   }
 
+  clearRoundResult(roundNumber: 1 | 2 | 3 | 4) {
+    this.results.delete(roundNumber);
+  }
+
+  resetRound(roundNumber: 1 | 2 | 3 | 4) {
+    this.clearRoundResult(roundNumber);
+  }
+
+  overrideSelectedChart(input: {
+    roundNumber: 1 | 2 | 3 | 4;
+    setOrder: 1 | 2;
+    chartId: string;
+    now?: string;
+  }) {
+    const result = this.requireResult(input.roundNumber);
+    const set = result.sets.find((candidate) => candidate.setOrder === input.setOrder);
+
+    if (!set) {
+      throw new Error("Result set not found.");
+    }
+
+    const row = set.rows.find((candidate) => candidate.chart.id === input.chartId);
+
+    if (!row) {
+      throw new Error("Override chart must be part of the computed result set.");
+    }
+
+    set.selectedChart = row.chart;
+    set.tiebreakWinnerChartId = set.tiebreakUsed ? row.chart.id : null;
+    set.rows = set.rows.map((candidate) => ({
+      ...candidate,
+      selected: candidate.chart.id === row.chart.id,
+    }));
+    set.winnerRevealStartedAt = set.winnerRevealStartedAt ?? input.now ?? new Date().toISOString();
+    result.revealPhaseStartedAt = input.now ?? new Date().toISOString();
+
+    return result;
+  }
+
   advanceReveal(roundNumber: 1 | 2 | 3 | 4, now = new Date().toISOString()) {
     const result = this.requireResult(roundNumber);
 

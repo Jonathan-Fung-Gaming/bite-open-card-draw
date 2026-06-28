@@ -20,4 +20,20 @@ describe("host lock store", () => {
 
     expect(store.getSnapshot("session-b", 1000 + HOST_LOCK_TTL_MS + 1).status).toBe("active");
   });
+
+  it("blocks unexpired takeover unless force is explicit", () => {
+    const store = new HostLockStore();
+
+    store.acquire("session-a", "token-a", 1000);
+
+    expect(() => store.acquire("session-b", "token-b", 1001)).toThrow(
+      "Active host lock is still unexpired",
+    );
+    expect(store.getSnapshot("session-a", 1001).status).toBe("active");
+
+    const takeover = store.acquire("session-b", "token-b", 1002, { force: true });
+
+    expect(takeover.takeover).toBe(true);
+    expect(store.getSnapshot("session-b", 1002).status).toBe("active");
+  });
 });

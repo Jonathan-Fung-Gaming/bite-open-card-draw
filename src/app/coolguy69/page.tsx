@@ -17,10 +17,13 @@ import {
   releaseHostControlAction,
   manualBallotAction,
   openVotingAction,
+  overrideResultAction,
   pauseVotingAction,
+  reopenVotingAction,
   rerollFullRoundAction,
   rerollOneChartAction,
   rerollRoundSetAction,
+  resetRoundAction,
   resumeVotingAction,
   resetRehearsalModeAction,
   seedRehearsalTiebreakAction,
@@ -34,6 +37,7 @@ import { HostHeartbeat } from "./_components/HostHeartbeat";
 import { ManualBallotForm } from "./_components/ManualBallotForm";
 import { PrivateCsvDownload } from "./_components/PrivateCsvDownload";
 import { getRoundDrawRecords, getSubmittedPlayerIdsForRound, getVotingRoundSnapshot } from "@/lib/server/voting-round";
+import type { RoundBallot } from "@/lib/vote/ballot";
 import { formatVotingTime } from "@/lib/vote/voting-window";
 
 type AdminPageProps = {
@@ -41,6 +45,26 @@ type AdminPageProps = {
     error?: string;
   }>;
 };
+
+function buildLiveCountRows(draws: ReturnType<typeof getRoundDrawRecords>, ballots: RoundBallot[]) {
+  return draws.map((draw) => ({
+    id: draw.id,
+    displayLabel: draw.displayLabel,
+    rows: draw.charts.map((chart) => {
+      const banCount = ballots.reduce((total, ballot) => {
+        const choice = ballot.choices.find((candidate) => candidate.roundSetId === draw.id);
+
+        return total + (choice?.bannedChartIds.includes(chart.id) ? 1 : 0);
+      }, 0);
+
+      return {
+        id: chart.id,
+        name: chart.name,
+        banCount,
+      };
+    }),
+  }));
+}
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const session = await getAdminSessionFromCookies();
@@ -88,8 +112,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const currentRoundNumber = roundSnapshot.currentRound;
   const votingSnapshot = getVotingRoundSnapshot(currentRoundNumber);
   const currentRoundDraws = getRoundDrawRecords(currentRoundNumber);
+  const currentRoundBallots = adminState.ballotStore.listForRound(currentRoundNumber);
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(currentRoundNumber);
   const result = adminState.resultStore.getRoundResult(currentRoundNumber);
+  const liveCountRows = buildLiveCountRows(currentRoundDraws, currentRoundBallots);
+  const auditRecords = adminState.auditStore.list(12);
   const drawControls = ROUND_SET_DEFINITIONS.map((set) => ({
     set,
     activeDraw: adminState.drawStateStore.getActiveDraw(set.roundNumber, set.setOrder),
@@ -163,12 +190,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <p className="mt-1 text-xs text-metal-300">
                   This resets operational state and loads a 12-player test roster.
                 </p>
+                <p className="mt-2 text-xs font-bold text-ember-300">
+                  Dangerous action: this clears current in-memory tournament operation data.
+                </p>
                 <input
                   name="adminPassword"
                   type="password"
                   required
                   disabled={!canControl}
                   placeholder="Admin password"
+                  className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                />
+                <textarea
+                  name="reason"
+                  required
+                  disabled={!canControl}
+                  rows={2}
+                  placeholder="Audit reason"
                   className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
                 />
                 <button
@@ -197,12 +235,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <p className="mt-1 text-xs text-metal-300">
                   This clears rehearsal state and returns to tournament mode.
                 </p>
+                <p className="mt-2 text-xs font-bold text-ember-300">
+                  Dangerous action: this clears current in-memory rehearsal operation data.
+                </p>
                 <input
                   name="adminPassword"
                   type="password"
                   required
                   disabled={!canControl}
                   placeholder="Admin password"
+                  className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                />
+                <textarea
+                  name="reason"
+                  required
+                  disabled={!canControl}
+                  rows={2}
+                  placeholder="Audit reason"
                   className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
                 />
                 <button
@@ -240,6 +289,40 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               ))}
             </div>
+          </section>
+          <section className="metal-panel rounded-lg p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+              Sensitive Admin Counts
+            </p>
+            <h2 className="mt-1 text-2xl font-black uppercase text-white">Live Chart Counts</h2>
+            <details className="mt-4 rounded border border-ember-300/30 bg-ember-900/15 p-3">
+              <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
+                Show live counts
+              </summary>
+              <p className="mt-3 text-sm text-metal-300">
+                Keep this closed on projector or stream. This warning does not require another password because
+                it does not change tournament state.
+              </p>
+              <div className="mt-4 grid gap-3">
+                {liveCountRows.length === 0 ? (
+                  <p className="text-sm text-metal-300">Draw both current-round sets before live counts appear.</p>
+                ) : (
+                  liveCountRows.map((set) => (
+                    <div key={set.id} className="rounded border border-metal-700 bg-black/25 p-3">
+                      <p className="font-bold text-white">{set.displayLabel}</p>
+                      <ol className="mt-2 grid gap-1 text-sm text-metal-300">
+                        {set.rows.map((row) => (
+                          <li key={row.id} className="flex justify-between gap-3">
+                            <span>{row.name}</span>
+                            <span className="font-mono text-ember-300">{row.banCount}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ))
+                )}
+              </div>
+            </details>
           </section>
           <section className="metal-panel rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -373,8 +456,145 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             draws={currentRoundDraws}
             existingPlayerIds={submittedPlayerIds}
             canControl={canControl}
-            canSubmitManualBallot={votingSnapshot.canAcceptManualBallot && !result}
+            canSubmitManualBallot={
+              votingSnapshot.canAcceptManualBallot && (!result || result.revealPhase === "computed")
+            }
           />
+          <section className="grid gap-4 xl:grid-cols-3">
+            <form action={reopenVotingAction}>
+              <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+              <DangerousActionDialog
+                action={`reopen Round ${currentRoundNumber} voting`}
+                consequence="invalidate any computed unrevealed result and allow ballot edits for the chosen duration"
+                disabled={!canControl}
+                passwordId="reopen-voting-password"
+              >
+                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="durationMinutes">
+                  Reopen duration
+                </label>
+                <select
+                  id="durationMinutes"
+                  name="durationMinutes"
+                  disabled={!canControl}
+                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                >
+                  <option value="1">1 minute</option>
+                  <option value="2">2 minutes</option>
+                  <option value="3">3 minutes</option>
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                </select>
+                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reopen-reason">
+                  Audit reason
+                </label>
+                <textarea
+                  id="reopen-reason"
+                  name="reason"
+                  required
+                  disabled={!canControl}
+                  rows={3}
+                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                />
+                <button
+                  className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                  disabled={!canControl}
+                  type="submit"
+                >
+                  Reopen Voting
+                </button>
+              </DangerousActionDialog>
+            </form>
+            <form action={resetRoundAction}>
+              <DangerousActionDialog
+                action="reset a round"
+                consequence="clear that round's draws, ballots, voting window, result snapshot, and reveal state"
+                disabled={!canControl}
+                passwordId="reset-round-password"
+              >
+                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reset-round">
+                  Round
+                </label>
+                <select
+                  id="reset-round"
+                  name="roundNumber"
+                  defaultValue={currentRoundNumber}
+                  disabled={!canControl}
+                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                >
+                  <option value="1">Round 1</option>
+                  <option value="2">Round 2</option>
+                  <option value="3">Round 3</option>
+                  <option value="4">Round 4</option>
+                </select>
+                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reset-round-reason">
+                  Audit reason
+                </label>
+                <textarea
+                  id="reset-round-reason"
+                  name="reason"
+                  required
+                  disabled={!canControl}
+                  rows={3}
+                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                />
+                <button
+                  className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                  disabled={!canControl}
+                  type="submit"
+                >
+                  Reset Round
+                </button>
+              </DangerousActionDialog>
+            </form>
+            <form action={overrideResultAction}>
+              <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+              <DangerousActionDialog
+                action={`override a Round ${currentRoundNumber} selected chart`}
+                consequence="change the committed selected chart used by stage, phones, and private export"
+                disabled={!canControl || !result}
+                passwordId="override-result-password"
+              >
+                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="resultTarget">
+                  Corrected selected chart
+                </label>
+                <select
+                  id="resultTarget"
+                  name="resultTarget"
+                  required
+                  disabled={!canControl || !result}
+                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                >
+                  {result?.sets.map((set) => (
+                    <optgroup key={set.roundSetId} label={set.displayLabel}>
+                      {set.rows.map((row) => (
+                        <option key={row.chart.id} value={`${set.setOrder}|${row.chart.id}`}>
+                          {set.displayLabel} - {row.chart.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="override-reason">
+                  Audit reason
+                </label>
+                <textarea
+                  id="override-reason"
+                  name="reason"
+                  required
+                  disabled={!canControl || !result}
+                  rows={3}
+                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                />
+                <button
+                  className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                  disabled={!canControl || !result}
+                  type="submit"
+                >
+                  Override Result
+                </button>
+              </DangerousActionDialog>
+            </form>
+          </section>
           <section className="metal-panel rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -384,6 +604,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <h2 className="mt-1 text-2xl font-black uppercase text-white">All Rounds</h2>
               </div>
               <form action={rerollFullRoundAction} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <p className="sm:col-span-3 text-xs font-bold text-ember-300">
+                  You are about to reroll a full round. This will replace both currently drawn sets for that round.
+                </p>
                 <select
                   name="roundNumber"
                   disabled={!canControl}
@@ -457,6 +680,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                             <p className="text-xs text-metal-300">{chart.artist}</p>
                           </div>
                           <form action={rerollOneChartAction} className="grid gap-2 sm:grid-cols-3">
+                            <p className="sm:col-span-3 text-xs font-bold text-ember-300">
+                              You are about to reroll this chart. This will replace only this chart in the active
+                              {` ${activeDraw.displayLabel}`} draw.
+                            </p>
                             <input type="hidden" name="roundNumber" value={set.roundNumber} />
                             <input type="hidden" name="setOrder" value={set.setOrder} />
                             <input type="hidden" name="chartId" value={chart.id} />
@@ -486,6 +713,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         </div>
                       ))}
                       <form action={rerollRoundSetAction} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                        <p className="sm:col-span-3 text-xs font-bold text-ember-300">
+                          You are about to reroll Round {set.roundNumber} - {set.displayLabel}. This will replace
+                          all currently drawn charts for this set.
+                        </p>
                         <input type="hidden" name="roundNumber" value={set.roundNumber} />
                         <input type="hidden" name="setOrder" value={set.setOrder} />
                         <input
@@ -617,11 +848,31 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Host Lock</p>
             <h2 className="mt-1 text-2xl font-black uppercase text-white">Control</h2>
             <div className="mt-4 flex flex-wrap gap-2">
-              <form action={takeHostControlAction}>
-                <button className="button-metal rounded px-4 py-2 font-bold uppercase" type="submit">
-                  Take Host Control
-                </button>
-              </form>
+              {hostSnapshot.status === "readonly" ? (
+                <form action={takeHostControlAction} className="grid gap-3">
+                  <input type="hidden" name="forceHostTakeover" value="true" />
+                  <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
+                    Another admin has an unexpired host lock. Force takeover only if that host is unavailable
+                    or explicitly handed control to you.
+                  </p>
+                  <button
+                    className="rounded border border-ember-300/40 px-4 py-2 font-bold uppercase text-ember-300"
+                    type="submit"
+                  >
+                    Force Host Takeover
+                  </button>
+                </form>
+              ) : (
+                <form action={takeHostControlAction}>
+                  <button
+                    className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                    disabled={hostSnapshot.status === "active"}
+                    type="submit"
+                  >
+                    Take Host Control
+                  </button>
+                </form>
+              )}
               <form action={releaseHostControlAction}>
                 <button
                   className="rounded border border-metal-700 px-4 py-2 font-bold uppercase text-metal-300 disabled:opacity-40"
@@ -631,6 +882,29 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Release
                 </button>
               </form>
+            </div>
+          </section>
+          <section className="metal-panel rounded-lg p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Audit</p>
+            <h2 className="mt-1 text-2xl font-black uppercase text-white">Recent Actions</h2>
+            <div className="mt-4 grid gap-2">
+              {auditRecords.length === 0 ? (
+                <p className="text-sm text-metal-300">No admin actions recorded in this server process yet.</p>
+              ) : (
+                auditRecords.map((record) => (
+                  <article key={record.id} className="rounded border border-metal-700 bg-black/25 p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-bold text-white">{record.action.replaceAll("_", " ")}</p>
+                      <p className="font-mono text-xs text-metal-300">{record.createdAt}</p>
+                    </div>
+                    <p className="mt-1 text-metal-300">{record.summary}</p>
+                    {record.reason ? (
+                      <p className="mt-1 text-xs text-ember-300">Reason: {record.reason}</p>
+                    ) : null}
+                    <p className="mt-1 text-xs text-metal-400">Session {record.sessionId.slice(0, 8)}</p>
+                  </article>
+                ))
+              )}
             </div>
           </section>
           <form action={addInactivePlayerToCurrentRoundAction}>

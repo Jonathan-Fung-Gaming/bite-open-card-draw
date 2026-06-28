@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { FINAL_CHANGE_MS, ONE_MINUTE_MS, TEN_MINUTES_MS, VotingWindowStore } from "./voting-window";
+import {
+  FINAL_CHANGE_MS,
+  ONE_MINUTE_MS,
+  TEN_MINUTES_MS,
+  VotingWindowStore,
+} from "./voting-window";
 
 const players = [
   { id: "player-1", startggUsername: "Alpha" },
@@ -157,5 +162,41 @@ describe("voting window store", () => {
 
     store.setResultsPhase(1, "results_revealed");
     expect(snapshot(store, [], 2_000).canAcceptManualBallot).toBe(false);
+  });
+
+  it("reopens closed voting for a chosen emergency duration", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+    store.closeVoting(1, 1_000);
+
+    store.reopenVoting({ roundNumber: 1, durationMinutes: 3, nowMs: 2_000 });
+    const reopened = snapshot(store, [], 2_000);
+
+    expect(reopened.status).toBe("voting_open");
+    expect(reopened.remainingMs).toBe(3 * ONE_MINUTE_MS);
+    expect(reopened.canSubmit).toBe(true);
+  });
+
+  it("returns computed results to closed when a manual ballot invalidates them", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+    store.closeVoting(1, 1_000);
+    store.setResultsPhase(1, "results_computed");
+
+    store.returnToClosedForRecompute(1, 2_000);
+
+    expect(snapshot(store, [], 2_000).status).toBe("voting_closed");
   });
 });

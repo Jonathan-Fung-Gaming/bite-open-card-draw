@@ -54,6 +54,12 @@ export class DrawStateStore {
     this.selectedSongKeys.add(songKey);
   }
 
+  unmarkSelectedSongs(songKeys: Iterable<string>) {
+    for (const songKey of songKeys) {
+      this.selectedSongKeys.delete(songKey);
+    }
+  }
+
   getActiveDraw(roundNumber: 1 | 2 | 3 | 4, setOrder: 1 | 2) {
     return this.getDrawHistory(roundNumber, setOrder).find((draw) => !draw.supersededAt) ?? null;
   }
@@ -70,6 +76,11 @@ export class DrawStateStore {
 
   canOpenVoting(roundNumber: 1 | 2 | 3 | 4) {
     return this.getRoundDraws(roundNumber).every(Boolean);
+  }
+
+  resetRound(roundNumber: 1 | 2 | 3 | 4) {
+    this.drawHistory.delete(drawKey(roundNumber, 1));
+    this.drawHistory.delete(drawKey(roundNumber, 2));
   }
 
   drawRoundSet(input: {

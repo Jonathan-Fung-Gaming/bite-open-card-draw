@@ -36,14 +36,16 @@ export function ManualBallotForm({
         <div>
           <p className="font-bold text-white">You are about to manually enter a ballot.</p>
           <p className="mt-1 text-sm text-metal-300">
-            This will save a server-side ballot for the selected eligible player.
+            This will save a server-side ballot for the selected eligible player and may change the round result.
           </p>
         </div>
       </div>
 
       {!canSubmitManualBallot ? (
         <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
-          Manual ballots are available while voting is open or after voting closes but before results are computed.
+          Manual ballots are available while voting is open or after voting closes but before result reveal starts.
+          If results were computed but not revealed, a manual ballot invalidates that computation so the host
+          must compute results again.
         </p>
       ) : null}
 
@@ -70,6 +72,7 @@ export function ManualBallotForm({
       {selectedHasExistingBallot ? (
         <div className="mt-3 rounded border border-ember-500/40 bg-ember-900/25 p-3 text-sm text-ember-300">
           <p>This player already has a submitted ballot.</p>
+          <p>Replacing it may change the round result and will be marked in the private CSV.</p>
           <p>Are you sure you want to replace it?</p>
         </div>
       ) : null}

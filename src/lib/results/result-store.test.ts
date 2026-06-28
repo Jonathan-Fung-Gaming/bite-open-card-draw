@@ -87,4 +87,32 @@ describe("result store reveal timing", () => {
 
     expect(store.advanceReveal(1, afterReveal).revealPhase).toBe("set_2_counts");
   });
+
+  it("overrides a selected chart as an emergency correction", () => {
+    const store = new ResultStore(() => 0);
+
+    const result = store.computeRound({
+      roundNumber: 1,
+      draws: [
+        draw("set-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
+        draw("set-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
+      ],
+      ballots: [ballot("p1", ["a"]), ballot("p2", ["a"])],
+      eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
+      now: "2026-06-28T00:00:00.000Z",
+    });
+
+    expect(result.sets[0].selectedChart.name).toBe("Bravo");
+
+    const corrected = store.overrideSelectedChart({
+      roundNumber: 1,
+      setOrder: 1,
+      chartId: "c",
+      now: "2026-06-28T00:01:00.000Z",
+    });
+
+    expect(corrected.sets[0].selectedChart.name).toBe("Charlie");
+    expect(corrected.sets[0].rows.find((row) => row.chart.id === "c")?.selected).toBe(true);
+    expect(corrected.sets[0].rows.find((row) => row.chart.id === "b")?.selected).toBe(false);
+  });
 });

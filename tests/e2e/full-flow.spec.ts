@@ -23,7 +23,7 @@ async function loginAndTakeHost(page: Page) {
   await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
   await page.getByRole("button", { name: "Log In" }).click();
   await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
-  await page.getByRole("button", { name: "Take Host Control" }).click();
+  await page.getByRole("button", { name: /^(Force Host Takeover|Take Host Control)$/ }).click();
   await expect(page.getByText("Voting Controls")).toBeVisible();
 }
 
@@ -121,7 +121,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expectStageRows(stagePage);
   await expectRenderedStageImage(stagePage);
 
-  await page.getByRole("button", { name: "Open Voting" }).click();
+  await page.getByRole("button", { name: "Open Voting", exact: true }).click();
   await expect(page.getByText("voting open")).toBeVisible();
   await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible({ timeout: 7000 });
   await expectReadableVotingAccess(stagePage);
@@ -208,6 +208,10 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
     .locator("form", { has: page.getByRole("button", { name: "Start Rehearsal" }) })
     .getByPlaceholder("Admin password")
     .fill(ADMIN_PASSWORD);
+  await page
+    .locator("form", { has: page.getByRole("button", { name: "Start Rehearsal" }) })
+    .getByPlaceholder("Audit reason")
+    .fill("e2e rehearsal tiebreak");
   await page.getByRole("button", { name: "Start Rehearsal" }).click();
   await expect(page.getByText("Rehearsal mode")).toBeVisible();
 
