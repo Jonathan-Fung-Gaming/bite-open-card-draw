@@ -99,8 +99,8 @@ export default function StagePage() {
           <StageAutoRefresh />
           <main className="min-h-screen">
             <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Stable final screen" />
-            <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_280px] lg:px-8">
-              <div className="grid gap-5 md:grid-cols-2">
+            <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_320px] lg:px-8">
+              <div className="grid gap-5 md:grid-cols-2" data-testid="stage-final-chart-list">
                 {result.sets.map((set, index) => (
                   <StageDrawCard key={set.roundSetId} chart={set.selectedChart} index={index + 1} />
                 ))}
@@ -130,7 +130,7 @@ export default function StagePage() {
             title={`Round ${roundNumber} Results Reveal`}
             status={revealLabel(result.revealPhase)}
           />
-          <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_280px] lg:px-8">
+          <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_320px] lg:px-8">
             <div className="grid gap-5">
               {result.revealPhase === "computed" ? (
                 <section className="metal-panel rounded-lg p-5 text-center">
@@ -142,20 +142,22 @@ export default function StagePage() {
                   </h1>
                 </section>
               ) : null}
-              {result.revealPhase === "set_1_counts" ? <ResultSetPanel set={setOne} /> : null}
+              {result.revealPhase === "set_1_counts" ? (
+                <ResultSetPanel set={setOne} serverNowMs={serverNowMs} />
+              ) : null}
               {result.revealPhase === "set_1_resolved" ? (
-                <ResultSetPanel set={setOne} showWinner />
+                <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} />
               ) : null}
               {result.revealPhase === "set_2_counts" ? (
                 <>
-                  <ResultSetPanel set={setOne} showWinner />
-                  <ResultSetPanel set={setTwo} />
+                  <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} />
+                  <ResultSetPanel set={setTwo} serverNowMs={serverNowMs} />
                 </>
               ) : null}
               {result.revealPhase === "set_2_resolved" ? (
                 <>
-                  <ResultSetPanel set={setOne} showWinner />
-                  <ResultSetPanel set={setTwo} showWinner />
+                  <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} />
+                  <ResultSetPanel set={setTwo} showWinner serverNowMs={serverNowMs} />
                 </>
               ) : null}
             </div>
@@ -188,7 +190,7 @@ export default function StagePage() {
           title={`Round ${view.roundNumber} Draw`}
           status={stageStatus(snapshot, view.bothSetsDrawn)}
         />
-        <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_280px] lg:px-8">
+        <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_320px] lg:px-8">
           <div className="grid gap-5">
             {view.sets.map(({ set, draw, revealStartsAt }) => (
               <StageSetPanel

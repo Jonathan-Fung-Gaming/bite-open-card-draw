@@ -24,6 +24,7 @@ export type ResultSetSnapshot = {
   tiebreakWinnerChartId: string | null;
   wheelSlots: DrawnChartSummary[];
   wheelSupported: boolean;
+  winnerRevealStartedAt: string | null;
 };
 
 export type RoundResultSnapshot = {
@@ -33,6 +34,7 @@ export type RoundResultSnapshot = {
   eligiblePlayers: EligiblePlayerSnapshot[];
   sets: [ResultSetSnapshot, ResultSetSnapshot];
   revealPhase: ResultRevealPhase;
+  revealPhaseStartedAt: string;
   finalRevealedAt: string | null;
 };
 
@@ -117,6 +119,7 @@ export function computeResultSet(
     tiebreakWinnerChartId: tiebreakUsed ? selectedChart.id : null,
     wheelSlots,
     wheelSupported: wheelSlots.length === 12,
+    winnerRevealStartedAt: null,
   };
 }
 
@@ -145,6 +148,7 @@ export function computeRoundResult(input: {
       computeResultSet(draws[1] as DrawRecord, input.ballots, input.randomIndex),
     ],
     revealPhase: "computed",
+    revealPhaseStartedAt: input.computedAt,
     finalRevealedAt: null,
   };
 }

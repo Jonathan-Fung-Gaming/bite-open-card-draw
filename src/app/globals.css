@@ -68,7 +68,13 @@ select {
 }
 
 .rune-wheel-track {
-  animation: rune-wheel-scroll 5s cubic-bezier(0.16, 0.84, 0.28, 1) both;
+  animation: rune-wheel-scroll var(--rune-wheel-duration, 5s) cubic-bezier(0.16, 0.84, 0.28, 1) both;
+}
+
+.qr-code-svg svg {
+  display: block;
+  height: auto;
+  width: 100%;
 }
 
 @keyframes rune-wheel-scroll {

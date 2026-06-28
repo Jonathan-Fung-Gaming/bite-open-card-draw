@@ -142,6 +142,73 @@ remains open in `docs/remediation-issue-checklist.md`.
   than instant.
 - Operational state is still in-memory until the later Supabase persistence remediation phase.
 
+## Remediation Phase 2 - Stage, QR, And Result Reveal Polish
+
+Status: complete for the Phase 2 code paths; not event-ready because real cached artwork population
+and later remediation phases remain open.
+
+### Acceptance Criteria
+
+- QR code: `QRPanel` now generates a real SVG QR code with the `qrcode` package.
+- QR target: the encoded room URL is built from `NEXT_PUBLIC_SITE_URL` plus `/room`, with a `/room`
+  fallback if the event origin is not configured.
+- Short URL: the stage QR panel shows the short event URL beneath the QR code.
+- Timer and QR readability: the projector side rail is widened and Playwright verifies QR/timer
+  bounding boxes during voting.
+- Tiebreak reveal: the selected chart row and winner text stay hidden until the 5-second reveal
+  duration completes.
+- Backend authority: `ResultStore` records `winnerRevealStartedAt` for resolved tiebreak phases and
+  blocks advancing past a tiebreak reveal before 5 seconds have elapsed.
+- Final stage stability: Playwright verifies the final stage screen has exactly two selected chart
+  cards.
+- Visual/e2e coverage: Playwright covers two 7-card stage rows, QR SVG/target/short URL, timer,
+  rendered stage image natural width, tiebreak hide/reveal behavior, and final reveal.
+
+### Changed Files
+
+- QR/public URL: `src/components/QRPanel.tsx`, `src/lib/public-url.ts`,
+  `src/lib/public-url.test.ts`, `package.json`, `package-lock.json`
+- Stage readability/test hooks: `src/app/stage/page.tsx`, `src/components/CountdownTimer.tsx`,
+  `src/components/StageDrawCard.tsx`, `src/components/StageSetPanel.tsx`, `src/app/globals.css`
+- Tiebreak reveal: `src/components/ResultSetPanel.tsx`, `src/components/RuneWheel.tsx`,
+  `src/lib/results/result-engine.ts`, `src/lib/results/result-store.ts`,
+  `src/lib/results/reveal-timing.ts`, `src/lib/results/result-store.test.ts`,
+  `src/lib/results/private-csv.test.ts`
+- E2E/docs: `tests/e2e/full-flow.spec.ts`, `docs/phase-status.md`,
+  `docs/remediation-issue-checklist.md`
+
+### Checks Run
+
+- `rtk npm run typecheck` - passed
+- `rtk npm run test -- src/lib/public-url.test.ts src/lib/results/result-store.test.ts src/lib/results/result-engine.test.ts` - passed
+- `rtk npm run test:e2e` - initially exposed an e2e wait issue around the second tiebreak panel, then passed after the helper waited for the current reveal panel
+- `rtk npm run lint` - passed
+- `rtk npm run test` - passed, 22 files / 58 tests
+- `rtk npm run build` - passed
+- Final required checks were rerun after documentation updates; see the final Phase 2 handoff.
+
+### Manual Review
+
+- Product rules: QR remains a general `/room` link; no player-specific QR or `/vote` QR target was
+  introduced.
+- Results: tiebreak winners are still chosen by the server-side result computation before animation;
+  the client only reveals the committed winner after the 5-second delay.
+- Stage UI: the voting screen keeps the large timer and QR in a readable projector side rail, while
+  the chart preview remains two horizontal 7-card rows.
+- Final reveal: the final stage path maps only the two selected charts and the e2e test asserts
+  exactly two final cards.
+- Security: no secrets or password hashes were introduced; QR URL construction uses only the public
+  `NEXT_PUBLIC_SITE_URL` value.
+
+### Risks And Assumptions
+
+- `NEXT_PUBLIC_SITE_URL` must be configured to the real event origin for phone scanning outside
+  localhost. Without it, the QR falls back to `/room`, which is useful locally but not event-ready.
+- Real cached artwork is still not populated in `public/chart-images/cache`; `RIC-020`, `RIC-021`,
+  `RIC-022`, and `RIC-028` remain open.
+- The stage polling interval is still 2000ms, so e2e waits account for lightweight refresh timing.
+- Operational state remains in-memory until the later Supabase persistence remediation phase.
+
 ## Phase 1 - Project Scaffold, Docs, And Route Skeleton
 
 Status: complete

@@ -12,6 +12,7 @@ const result: RoundResultSnapshot = {
     { id: "p2", startggUsername: "Bravo" },
   ],
   revealPhase: "final",
+  revealPhaseStartedAt: "done",
   finalRevealedAt: "done",
   sets: [
     {
@@ -52,6 +53,7 @@ const result: RoundResultSnapshot = {
       tiebreakWinnerChartId: null,
       wheelSlots: [],
       wheelSupported: false,
+      winnerRevealStartedAt: null,
     },
     {
       roundSetId: "set-2",
@@ -91,6 +93,7 @@ const result: RoundResultSnapshot = {
       tiebreakWinnerChartId: "chart-2",
       wheelSlots: [],
       wheelSupported: false,
+      winnerRevealStartedAt: "done",
     },
   ],
 };

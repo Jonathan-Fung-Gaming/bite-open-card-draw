@@ -1,18 +1,48 @@
+"use client";
+
 import clsx from "clsx";
+import { useEffect, useState } from "react";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
+import {
+  getTiebreakRevealRemainingMs,
+  isTiebreakRevealComplete,
+} from "@/lib/results/reveal-timing";
 import { RuneWheel } from "./RuneWheel";
 
 type ResultSetPanelProps = {
   set: ResultSetSnapshot;
   showWinner?: boolean;
+  serverNowMs?: number;
 };
 
 function banLabel(count: number) {
   return `${count} ${count === 1 ? "ban" : "bans"}`;
 }
 
-export function ResultSetPanel({ set, showWinner = false }: ResultSetPanelProps) {
+export function ResultSetPanel({ set, showWinner = false, serverNowMs }: ResultSetPanelProps) {
+  const [nowMs, setNowMs] = useState(serverNowMs ?? Date.now());
+  const tiebreakWinnerRevealed =
+    showWinner &&
+    set.tiebreakUsed &&
+    isTiebreakRevealComplete(set.winnerRevealStartedAt, nowMs);
+  const shouldShowSelectedState = showWinner && (!set.tiebreakUsed || tiebreakWinnerRevealed);
+  const tiebreakRemainingMs =
+    showWinner && set.tiebreakUsed
+      ? getTiebreakRevealRemainingMs(set.winnerRevealStartedAt, nowMs)
+      : 0;
+  const tiebreakRemainingSeconds = Math.ceil(tiebreakRemainingMs / 1000);
+
+  useEffect(() => {
+    if (!showWinner || !set.tiebreakUsed || tiebreakWinnerRevealed) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 250);
+
+    return () => window.clearInterval(intervalId);
+  }, [set.tiebreakUsed, set.winnerRevealStartedAt, showWinner, tiebreakWinnerRevealed]);
+
   return (
     <section className="metal-panel rounded-lg p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -36,7 +66,7 @@ export function ResultSetPanel({ set, showWinner = false }: ResultSetPanelProps)
               key={row.chart.id}
               className={clsx(
                 "grid gap-3 rounded border bg-black/25 p-3 md:grid-cols-[96px_1fr_auto]",
-                showWinner && row.selected
+                shouldShowSelectedState && row.selected
                   ? "border-ember-300 shadow-ember-tight"
                   : "border-metal-700",
               )}
@@ -67,8 +97,11 @@ export function ResultSetPanel({ set, showWinner = false }: ResultSetPanelProps)
                 <p className="rounded border border-ember-300/35 bg-ember-900/25 px-3 py-2 font-black text-white">
                   {banLabel(row.banCount)}
                 </p>
-                {showWinner && row.selected ? (
-                  <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-ember-300">
+                {shouldShowSelectedState && row.selected ? (
+                  <p
+                    className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-ember-300"
+                    data-testid="result-selected-label"
+                  >
                     Selected
                   </p>
                 ) : null}
@@ -81,15 +114,31 @@ export function ResultSetPanel({ set, showWinner = false }: ResultSetPanelProps)
         <div className="mt-4 grid gap-3">
           {set.tiebreakUsed ? (
             set.wheelSupported ? (
-              <RuneWheel slots={set.wheelSlots} winnerChartId={set.selectedChart.id} />
+              <RuneWheel
+                slots={set.wheelSlots}
+                winnerChartId={set.selectedChart.id}
+                winnerRevealed={tiebreakWinnerRevealed}
+              />
             ) : (
-              <div className="rounded border border-ember-300/35 bg-black/25 p-3">
+              <div
+                className="rounded border border-ember-300/35 bg-black/25 p-3"
+                data-testid="fallback-tiebreak-reveal"
+                data-winner-revealed={tiebreakWinnerRevealed ? "true" : "false"}
+              >
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-ember-300">
                   Fallback tiebreak reveal
                 </p>
-                <p className="mt-2 text-lg font-black text-white">{set.selectedChart.name}</p>
+                {tiebreakWinnerRevealed ? (
+                  <p className="mt-2 text-lg font-black text-white">{set.selectedChart.name}</p>
+                ) : (
+                  <p className="mt-2 text-lg font-black text-white">
+                    Backend winner sealed for reveal
+                  </p>
+                )}
                 <p className="mt-1 text-sm text-metal-300">
-                  5 or more charts tied for fewest bans.
+                  {tiebreakWinnerRevealed
+                    ? "5 or more charts tied for fewest bans."
+                    : `Revealing in ${tiebreakRemainingSeconds} seconds.`}
                 </p>
               </div>
             )

@@ -14,6 +14,8 @@ export function StageDrawCard({ chart, index }: StageDrawCardProps) {
         "stage-card relative min-h-44 overflow-hidden rounded-md border border-ember-300/25 bg-furnace-900 shadow-ember-tight",
         chart && "border-ember-300/45",
       )}
+      data-has-chart={chart ? "true" : "false"}
+      data-testid="stage-chart-card"
     >
       <div className="absolute inset-0 bg-steel-lines" />
       {chart ? (
@@ -22,6 +24,7 @@ export function StageDrawCard({ chart, index }: StageDrawCardProps) {
           src={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-55"
+          data-testid="stage-chart-image"
         />
       ) : null}
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/10" />

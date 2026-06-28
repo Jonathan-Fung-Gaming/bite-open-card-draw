@@ -8,8 +8,10 @@ import {
   computeRoundResult,
   RESULT_REVEAL_PHASES,
   type ResultRevealPhase,
+  type ResultSetSnapshot,
   type RoundResultSnapshot,
 } from "./result-engine";
+import { getTiebreakRevealRemainingMs } from "./reveal-timing";
 
 export class ResultStore {
   private results = new Map<1 | 2 | 3 | 4, RoundResultSnapshot>();
@@ -48,10 +50,15 @@ export class ResultStore {
 
   advanceReveal(roundNumber: 1 | 2 | 3 | 4, now = new Date().toISOString()) {
     const result = this.requireResult(roundNumber);
+
+    this.requireTiebreakRevealComplete(result, now);
+
     const index = RESULT_REVEAL_PHASES.indexOf(result.revealPhase);
     const nextPhase = RESULT_REVEAL_PHASES[Math.min(index + 1, RESULT_REVEAL_PHASES.length - 1)] as ResultRevealPhase;
 
     result.revealPhase = nextPhase;
+    result.revealPhaseStartedAt = now;
+    this.markWinnerRevealStarted(result, nextPhase, now);
 
     if (nextPhase === "final") {
       result.finalRevealedAt = result.finalRevealedAt ?? now;
@@ -64,12 +71,60 @@ export class ResultStore {
     const result = this.requireResult(roundNumber);
 
     result.revealPhase = phase;
+    result.revealPhaseStartedAt = now;
+    this.markWinnerRevealStarted(result, phase, now);
 
     if (phase === "final") {
       result.finalRevealedAt = result.finalRevealedAt ?? now;
     }
 
     return result;
+  }
+
+  private markWinnerRevealStarted(
+    result: RoundResultSnapshot,
+    phase: ResultRevealPhase,
+    now: string,
+  ) {
+    const set = this.getResolvedPhaseSet(result, phase);
+
+    if (set) {
+      set.winnerRevealStartedAt = set.winnerRevealStartedAt ?? now;
+    }
+  }
+
+  private requireTiebreakRevealComplete(result: RoundResultSnapshot, now: string) {
+    const set = this.getResolvedPhaseSet(result, result.revealPhase);
+
+    if (!set?.tiebreakUsed) {
+      return;
+    }
+
+    const nowMs = Date.parse(now);
+
+    if (!Number.isFinite(nowMs)) {
+      return;
+    }
+
+    const remainingMs = getTiebreakRevealRemainingMs(set.winnerRevealStartedAt, nowMs);
+
+    if (remainingMs > 0) {
+      throw new Error(
+        `Wait ${Math.ceil(remainingMs / 1000)} more seconds for the tiebreak reveal to complete.`,
+      );
+    }
+  }
+
+  private getResolvedPhaseSet(result: RoundResultSnapshot, phase: ResultRevealPhase): ResultSetSnapshot | null {
+    if (phase === "set_1_resolved") {
+      return result.sets[0];
+    }
+
+    if (phase === "set_2_resolved") {
+      return result.sets[1];
+    }
+
+    return null;
   }
 
   private requireResult(roundNumber: 1 | 2 | 3 | 4) {
