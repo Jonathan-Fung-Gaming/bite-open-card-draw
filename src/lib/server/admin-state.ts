@@ -1,4 +1,5 @@
 import "server-only";
+import { AdminAuditStore } from "@/lib/admin/audit";
 import { HostLockStore } from "@/lib/admin/host-lock";
 import { RosterStore } from "@/lib/admin/roster";
 import { DrawStateStore } from "@/lib/draw/draw-state";
@@ -9,6 +10,7 @@ import { VotingWindowStore } from "@/lib/vote/voting-window";
 
 const globalForAdminState = globalThis as typeof globalThis & {
   biteOpenAdminState?: {
+    auditStore: AdminAuditStore;
     hostLockStore: HostLockStore;
     rosterStore: RosterStore;
     drawStateStore: DrawStateStore;
@@ -22,6 +24,7 @@ const globalForAdminState = globalThis as typeof globalThis & {
 export const adminState =
   globalForAdminState.biteOpenAdminState ??
   (globalForAdminState.biteOpenAdminState = {
+    auditStore: new AdminAuditStore(),
     hostLockStore: new HostLockStore(),
     rosterStore: new RosterStore(),
     drawStateStore: new DrawStateStore(),

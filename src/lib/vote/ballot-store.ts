@@ -54,6 +54,16 @@ export class BallotStore {
     return [...this.ballots.values()].filter((ballot) => ballot.roundNumber === roundNumber);
   }
 
+  resetRound(roundNumber: 1 | 2 | 3 | 4) {
+    for (const key of this.ballots.keys()) {
+      if (key.startsWith(`${roundNumber}:`)) {
+        this.ballots.delete(key);
+      }
+    }
+
+    this.phoneStatus.delete(roundNumber);
+  }
+
   getPhoneStatus(roundNumber: 1 | 2 | 3 | 4): PhoneRoundStatus {
     return this.phoneStatus.get(roundNumber) ?? { phase: "voting_open" };
   }

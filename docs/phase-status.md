@@ -266,6 +266,73 @@ admin safety, persistence, and later remediation phases remain open.
   against stale submissions during the interval between polls.
 - Real cached artwork remains unverified and `RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028` remain open.
 
+## Remediation Phase 4 - Admin Safety And Missing Workflows
+
+Status: complete for the Phase 4 code paths; not event-ready because operational persistence and real
+cached artwork population remain open.
+
+### Acceptance Criteria
+
+- Host lock safety: unexpired host locks cannot be silently stolen; takeover now requires the
+  explicit force path and warning when another active host holds the lock.
+- Admin audit trail: host control, draw/reroll, voting, manual ballot, emergency, result correction,
+  rehearsal, round, and roster-changing server actions write in-memory audit records with session,
+  action, reason, summary, metadata, affected records, and danger flags.
+- Dangerous summaries: reroll, reset/rehearsal, manual ballot/replacement, emergency reopen,
+  reset-round, and result override forms show clear consequences before password entry.
+- Sensitive counts: admin-only live chart-by-chart counts sit behind a warning disclosure and do not
+  require a second password, while public routes still expose only safe voting status/turnout before
+  close.
+- Emergency workflows: admins can reopen closed voting for a chosen 1-10 minute duration, reset one
+  round's operational state, and override a computed selected chart through dangerous password-gated
+  actions with required audit reasons.
+- Manual ballot timing: manual ballots are allowed while voting is open or closed before reveal
+  starts; a computed-but-unrevealed result is invalidated and must be recomputed after the manual
+  ballot.
+
+### Changed Files
+
+- Admin audit and host safety: `src/lib/admin/audit.ts`, `src/lib/admin/audit.test.ts`,
+  `src/lib/admin/host-lock.ts`, `src/lib/admin/host-lock.test.ts`,
+  `src/lib/server/admin-state.ts`
+- Admin workflows/UI: `src/app/coolguy69/actions.ts`, `src/app/coolguy69/page.tsx`,
+  `src/app/coolguy69/_components/ManualBallotForm.tsx`,
+  `src/components/DangerousActionDialog.tsx`
+- Operational stores: `src/lib/vote/voting-window.ts`, `src/lib/vote/ballot-store.ts`,
+  `src/lib/draw/draw-state.ts`, `src/lib/results/result-store.ts`
+- Tests and docs: `src/lib/vote/voting-window.test.ts`,
+  `src/lib/results/result-store.test.ts`, `tests/e2e/full-flow.spec.ts`,
+  `docs/phase-status.md`, `docs/remediation-issue-checklist.md`
+
+### Checks Run
+
+- `rtk npm run typecheck` - passed
+- `rtk npm run test -- src/lib/admin/host-lock.test.ts src/lib/admin/audit.test.ts src/lib/vote/voting-window.test.ts src/lib/results/result-store.test.ts` - passed
+- `rtk npm run lint` - passed
+- `rtk npm run test` - passed, 23 files / 64 tests
+- `rtk git diff --check` - passed
+- `rtk npm run test:e2e` - passed, 2 Playwright tests
+- `rtk npm run build` - passed
+
+### Manual Review
+
+- Product rules: round/set definitions, two-set round ballots, explicit no-ban completion, least-ban
+  selection, and server-decided tiebreaks are unchanged.
+- Host lock: read-only admins see disabled tournament controls until they take the explicit force
+  path or the existing host lock expires.
+- Security: dangerous actions remain server actions requiring active host control and password
+  re-entry; public route payloads were not expanded with live chart-by-chart counts.
+- Result integrity: manual ballots after computation clear the computed result before reveal begins,
+  and post-reveal corrections use an explicit override workflow instead of mutating ballots silently.
+
+### Risks And Assumptions
+
+- The Phase 4 audit store is still in memory until the persistence remediation phase moves
+  operational state to Supabase.
+- Reset-round is intentionally emergency-only and clears current in-memory state for the selected
+  round; it does not repair already-exported CSV files outside the app.
+- Real cached artwork remains unverified and `RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028` remain open.
+
 ## Phase 1 - Project Scaffold, Docs, And Route Skeleton
 
 Status: complete

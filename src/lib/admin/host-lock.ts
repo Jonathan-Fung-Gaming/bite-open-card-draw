@@ -48,8 +48,18 @@ export class HostLockStore {
     };
   }
 
-  acquire(sessionId: string, hostToken: string, now = Date.now()) {
+  acquire(
+    sessionId: string,
+    hostToken: string,
+    now = Date.now(),
+    options: { force?: boolean } = {},
+  ) {
     const existing = this.getSnapshot(sessionId, now);
+
+    if (existing.status === "readonly" && !options.force) {
+      throw new Error("Active host lock is still unexpired. Use explicit force takeover.");
+    }
+
     const lock: HostLockRecord = {
       ownerSessionId: sessionId,
       hostTokenHash: hashHostToken(hostToken),

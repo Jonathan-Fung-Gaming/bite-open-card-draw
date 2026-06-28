@@ -3,6 +3,7 @@ import type { RosterPlayer } from "@/lib/admin/roster";
 export const TEN_MINUTES_MS = 10 * 60 * 1000;
 export const ONE_MINUTE_MS = 60 * 1000;
 export const FINAL_CHANGE_MS = 30 * 1000;
+export const MAX_REOPEN_MINUTES = 10;
 
 export type VotingRoundStatus =
   | "not_started"
@@ -267,6 +268,57 @@ export class VotingWindowStore {
     record.updatedAt = toIso(nowMs);
 
     return record;
+  }
+
+  reopenVoting(input: {
+    roundNumber: 1 | 2 | 3 | 4;
+    durationMinutes: number;
+    nowMs?: number;
+  }) {
+    const record = this.requireWindow(input.roundNumber);
+
+    if (record.status !== "voting_closed" && record.status !== "results_computed") {
+      throw new Error("Emergency reopen is allowed only after voting closes and before reveal.");
+    }
+
+    if (
+      !Number.isInteger(input.durationMinutes) ||
+      input.durationMinutes < 1 ||
+      input.durationMinutes > MAX_REOPEN_MINUTES
+    ) {
+      throw new Error(`Reopen duration must be 1-${MAX_REOPEN_MINUTES} minutes.`);
+    }
+
+    const nowMs = input.nowMs ?? this.clock();
+
+    record.status = "voting_open";
+    record.closesAt = toIso(nowMs + input.durationMinutes * ONE_MINUTE_MS);
+    record.closedAt = null;
+    record.pausedAt = null;
+    record.pausedFromStatus = null;
+    record.remainingMsWhenPaused = null;
+    record.updatedAt = toIso(nowMs);
+
+    return record;
+  }
+
+  returnToClosedForRecompute(roundNumber: 1 | 2 | 3 | 4, nowMs = this.clock()) {
+    const record = this.requireWindow(roundNumber);
+
+    if (record.status !== "results_computed") {
+      return record;
+    }
+
+    record.status = "voting_closed";
+    record.closedAt = record.closedAt ?? toIso(nowMs);
+    record.closesAt = record.closedAt;
+    record.updatedAt = toIso(nowMs);
+
+    return record;
+  }
+
+  resetRound(roundNumber: 1 | 2 | 3 | 4) {
+    this.windows.delete(roundNumber);
   }
 
   addEligiblePlayerToOpenRound(input: {

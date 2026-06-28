@@ -6,6 +6,7 @@ type DangerousActionDialogProps = {
   consequence: string;
   children?: ReactNode;
   disabled?: boolean;
+  passwordId?: string;
 };
 
 export function DangerousActionDialog({
@@ -13,6 +14,7 @@ export function DangerousActionDialog({
   consequence,
   children,
   disabled = false,
+  passwordId = "danger-password",
 }: DangerousActionDialogProps) {
   return (
     <section className="rounded-lg border border-ember-500/35 bg-ember-900/20 p-4">
@@ -23,11 +25,11 @@ export function DangerousActionDialog({
           <p className="mt-1 text-sm text-metal-300">This will {consequence}.</p>
         </div>
       </div>
-      <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="danger-password">
+      <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor={passwordId}>
         Admin password
       </label>
       <input
-        id="danger-password"
+        id={passwordId}
         name="adminPassword"
         type="password"
         required

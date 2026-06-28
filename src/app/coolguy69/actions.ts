@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHostToken } from "@/lib/admin/host-lock";
+import type { AdminSessionPayload } from "@/lib/admin/session";
 import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import { adminState, resetTournamentOperationalState } from "@/lib/server/admin-state";
 import {
@@ -34,6 +35,52 @@ function redirectWithError(message: string) {
   redirect(`/coolguy69?error=${encodeURIComponent(message)}`);
 }
 
+function getRoundNumber(formData: FormData) {
+  return Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+}
+
+function getRequiredReason(formData: FormData) {
+  const reason = getString(formData, "reason").trim();
+
+  if (!reason) {
+    throw new Error("Audit reason is required.");
+  }
+
+  return reason;
+}
+
+function audit(
+  session: AdminSessionPayload,
+  input: {
+    action: string;
+    summary: string;
+    reason?: string | null;
+    metadata?: Record<string, unknown>;
+    affectedRecords?: Array<{ type: string; id: string }>;
+    dangerous?: boolean;
+    tournamentChanging?: boolean;
+  },
+) {
+  return adminState.auditStore.record({
+    sessionId: session.sessionId,
+    ...input,
+  });
+}
+
+function selectedSongKeysForRound(roundNumber: 1 | 2 | 3 | 4) {
+  return adminState.resultStore
+    .getRoundResult(roundNumber)
+    ?.sets.map((set) => set.selectedChart.songKey) ?? [];
+}
+
+function resetRoundState(roundNumber: 1 | 2 | 3 | 4) {
+  adminState.drawStateStore.unmarkSelectedSongs(selectedSongKeysForRound(roundNumber));
+  adminState.resultStore.resetRound(roundNumber);
+  adminState.ballotStore.resetRound(roundNumber);
+  adminState.votingWindowStore.resetRound(roundNumber);
+  adminState.drawStateStore.resetRound(roundNumber);
+}
+
 export async function adminLoginAction(formData: FormData) {
   try {
     await createAdminSessionCookie(getString(formData, "password"));
@@ -49,12 +96,34 @@ export async function adminLogoutAction() {
   redirect("/coolguy69");
 }
 
-export async function takeHostControlAction() {
+export async function takeHostControlAction(formData: FormData) {
   const session = await requireAdminSession();
   const hostToken = createHostToken();
+  const force = getString(formData, "forceHostTakeover") === "true";
 
-  adminState.hostLockStore.acquire(session.sessionId, hostToken);
-  await setHostTokenCookie(hostToken);
+  try {
+    const before = adminState.hostLockStore.getSnapshot(session.sessionId);
+    const result = adminState.hostLockStore.acquire(session.sessionId, hostToken, Date.now(), {
+      force,
+    });
+
+    await setHostTokenCookie(hostToken);
+    audit(session, {
+      action: result.takeover ? "host_lock_takeover" : "host_lock_acquire",
+      summary: result.takeover
+        ? "Forced takeover of the active host lock."
+        : "Acquired host control.",
+      dangerous: result.takeover,
+      tournamentChanging: false,
+      metadata: {
+        force,
+        previousOwnerSessionId: result.takeover ? before.ownerSessionId : null,
+      },
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not take host control.");
+  }
+
   revalidatePath("/coolguy69");
 }
 
@@ -75,6 +144,11 @@ export async function releaseHostControlAction() {
     adminState.hostLockStore.release(session.sessionId, hostToken);
   }
 
+  audit(session, {
+    action: "host_lock_release",
+    summary: "Released host control.",
+    tournamentChanging: false,
+  });
   await clearHostTokenCookie();
   revalidatePath("/coolguy69");
 }
@@ -91,12 +165,17 @@ async function requireActiveHost() {
 }
 
 export async function addPlayerAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    adminState.rosterStore.createOrUpdatePlayer({
+    const player = adminState.rosterStore.createOrUpdatePlayer({
       startggUsername: getString(formData, "startggUsername"),
       active: true,
+    });
+    audit(session, {
+      action: "roster_player_add",
+      summary: `Added active player ${player.startggUsername}.`,
+      affectedRecords: [{ type: "player", id: player.id }],
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not add player.");
@@ -106,24 +185,35 @@ export async function addPlayerAction(formData: FormData) {
 }
 
 export async function bulkImportPlayersAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
   const usernames = getString(formData, "startggUsernames")
     .split(/\r?\n|,/)
     .map((value) => value.trim())
     .filter(Boolean);
 
-  adminState.rosterStore.bulkImport(usernames);
+  const result = adminState.rosterStore.bulkImport(usernames);
+  audit(session, {
+    action: "roster_bulk_import",
+    summary: `Bulk imported roster names: ${result.created} created, ${result.skipped} skipped.`,
+    metadata: result,
+  });
   revalidatePath("/coolguy69");
 }
 
 export async function setPlayerActiveStatusAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    adminState.rosterStore.setPlayerActiveStatus(
+    const player = adminState.rosterStore.setPlayerActiveStatus(
       getString(formData, "playerId"),
       getString(formData, "active") === "true",
     );
+    audit(session, {
+      action: "roster_active_status_update",
+      summary: `${player.active ? "Reactivated" : "Marked inactive"} player ${player.startggUsername}.`,
+      affectedRecords: [{ type: "player", id: player.id }],
+      metadata: { active: player.active },
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not update player.");
   }
@@ -132,15 +222,16 @@ export async function setPlayerActiveStatusAction(formData: FormData) {
 }
 
 export async function addInactivePlayerToCurrentRoundAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
-    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const roundNumber = getRoundNumber(formData);
+    const reason = getRequiredReason(formData);
     const entry = adminState.rosterStore.addPlayerToCurrentRoundEligibility({
       playerId: getString(formData, "playerId"),
       roundNumber,
-      reason: getString(formData, "reason"),
+      reason,
     });
     const player = adminState.rosterStore.getPlayer(entry.playerId);
 
@@ -153,6 +244,14 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
         },
       });
     }
+    audit(session, {
+      action: "current_round_eligibility_add",
+      summary: `Added ${player?.startggUsername ?? entry.playerId} to Round ${roundNumber} eligibility.`,
+      reason,
+      dangerous: true,
+      affectedRecords: [{ type: "player", id: entry.playerId }],
+      metadata: { roundNumber },
+    });
   } catch (error) {
     redirectWithError(
       error instanceof Error ? error.message : "Could not update round eligibility.",
@@ -163,12 +262,22 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
 }
 
 export async function drawRoundSetAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    adminState.drawStateStore.drawRoundSet({
-      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
+    const draw = adminState.drawStateStore.drawRoundSet({
+      roundNumber: getRoundNumber(formData),
       setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
+    });
+    audit(session, {
+      action: "draw_round_set",
+      summary: `Drew Round ${draw.roundNumber} - ${draw.displayLabel}.`,
+      affectedRecords: [{ type: "draw", id: draw.id }],
+      metadata: {
+        roundNumber: draw.roundNumber,
+        setOrder: draw.setOrder,
+        version: draw.version,
+      },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not draw round set.");
@@ -178,15 +287,32 @@ export async function drawRoundSetAction(formData: FormData) {
 }
 
 export async function rerollOneChartAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
-    adminState.drawStateStore.rerollOneChart({
-      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
+    const reason = getRequiredReason(formData);
+    const chartId = getString(formData, "chartId");
+    const draw = adminState.drawStateStore.rerollOneChart({
+      roundNumber: getRoundNumber(formData),
       setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
-      chartId: getString(formData, "chartId"),
-      reason: getString(formData, "reason"),
+      chartId,
+      reason,
+    });
+    audit(session, {
+      action: "reroll_one_chart",
+      summary: `Rerolled one chart in Round ${draw.roundNumber} - ${draw.displayLabel}.`,
+      reason,
+      dangerous: true,
+      affectedRecords: [
+        { type: "draw", id: draw.id },
+        { type: "chart", id: chartId },
+      ],
+      metadata: {
+        roundNumber: draw.roundNumber,
+        setOrder: draw.setOrder,
+        version: draw.version,
+      },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll chart.");
@@ -196,14 +322,27 @@ export async function rerollOneChartAction(formData: FormData) {
 }
 
 export async function rerollRoundSetAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
-    adminState.drawStateStore.rerollRoundSet({
-      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
+    const reason = getRequiredReason(formData);
+    const draw = adminState.drawStateStore.rerollRoundSet({
+      roundNumber: getRoundNumber(formData),
       setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
-      reason: getString(formData, "reason"),
+      reason,
+    });
+    audit(session, {
+      action: "reroll_round_set",
+      summary: `Rerolled Round ${draw.roundNumber} - ${draw.displayLabel}.`,
+      reason,
+      dangerous: true,
+      affectedRecords: [{ type: "draw", id: draw.id }],
+      metadata: {
+        roundNumber: draw.roundNumber,
+        setOrder: draw.setOrder,
+        version: draw.version,
+      },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll round set.");
@@ -213,13 +352,23 @@ export async function rerollRoundSetAction(formData: FormData) {
 }
 
 export async function rerollFullRoundAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
-    adminState.drawStateStore.rerollFullRound({
-      roundNumber: Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
-      reason: getString(formData, "reason"),
+    const reason = getRequiredReason(formData);
+    const roundNumber = getRoundNumber(formData);
+    const draws = adminState.drawStateStore.rerollFullRound({
+      roundNumber,
+      reason,
+    });
+    audit(session, {
+      action: "reroll_full_round",
+      summary: `Rerolled both chart sets for Round ${roundNumber}.`,
+      reason,
+      dangerous: true,
+      affectedRecords: draws.map((draw) => ({ type: "draw", id: draw.id })),
+      metadata: { roundNumber },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll full round.");
@@ -229,16 +378,24 @@ export async function rerollFullRoundAction(formData: FormData) {
 }
 
 export async function openVotingAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const roundNumber = getRoundNumber(formData);
     const snapshot = getVotingRoundSnapshot(roundNumber);
 
     adminState.votingWindowStore.openVoting({
       roundNumber,
       drawsReady: snapshot.drawnSetCount === 2,
       eligiblePlayers: snapshot.eligiblePlayers,
+    });
+    audit(session, {
+      action: "open_voting",
+      summary: `Opened voting for Round ${roundNumber}.`,
+      metadata: {
+        roundNumber,
+        eligibleCount: snapshot.eligibleCount,
+      },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not open voting.");
@@ -248,13 +405,18 @@ export async function openVotingAction(formData: FormData) {
 }
 
 export async function pauseVotingAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const roundNumber = getRoundNumber(formData);
 
     getVotingRoundSnapshot(roundNumber);
     adminState.votingWindowStore.pauseVoting(roundNumber);
+    audit(session, {
+      action: "pause_voting",
+      summary: `Paused voting for Round ${roundNumber}.`,
+      metadata: { roundNumber },
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not pause voting.");
   }
@@ -263,12 +425,17 @@ export async function pauseVotingAction(formData: FormData) {
 }
 
 export async function resumeVotingAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    adminState.votingWindowStore.resumeVoting(
-      Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
-    );
+    const roundNumber = getRoundNumber(formData);
+
+    adminState.votingWindowStore.resumeVoting(roundNumber);
+    audit(session, {
+      action: "resume_voting",
+      summary: `Resumed voting for Round ${roundNumber}.`,
+      metadata: { roundNumber },
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not resume voting.");
   }
@@ -277,13 +444,18 @@ export async function resumeVotingAction(formData: FormData) {
 }
 
 export async function closeVotingAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const roundNumber = getRoundNumber(formData);
 
     adminState.votingWindowStore.closeVoting(roundNumber);
     adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
+    audit(session, {
+      action: "close_voting",
+      summary: `Closed voting for Round ${roundNumber}.`,
+      metadata: { roundNumber },
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not close voting.");
   }
@@ -292,20 +464,24 @@ export async function closeVotingAction(formData: FormData) {
 }
 
 export async function manualBallotAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
 
-    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const roundNumber = getRoundNumber(formData);
     const snapshot = getVotingRoundSnapshot(roundNumber);
 
     if (!snapshot.canAcceptManualBallot) {
       throw new Error("Manual ballots are allowed only before results reveal.");
     }
 
-    if (adminState.resultStore.getRoundResult(roundNumber)) {
-      throw new Error("Manual ballots must be entered before results are computed.");
+    const result = adminState.resultStore.getRoundResult(roundNumber);
+
+    if (result && result.revealPhase !== "computed") {
+      throw new Error(
+        "Manual ballots are allowed before result reveal starts. Use result correction after reveal begins.",
+      );
     }
 
     const playerId = getString(formData, "playerId");
@@ -315,11 +491,7 @@ export async function manualBallotAction(formData: FormData) {
       throw new Error("Manual ballot player must be eligible for the voting window.");
     }
 
-    const reason = getString(formData, "reason").trim();
-
-    if (!reason) {
-      throw new Error("Manual ballot reason is required.");
-    }
+    const reason = getRequiredReason(formData);
 
     const existing = adminState.ballotStore.get(roundNumber, playerId);
     const replaceExisting = getString(formData, "replaceExistingBallot") === "yes";
@@ -342,7 +514,7 @@ export async function manualBallotAction(formData: FormData) {
       };
     });
 
-    adminState.ballotStore.submit(
+    const ballot = adminState.ballotStore.submit(
       {
         roundNumber,
         playerId: player.id,
@@ -359,6 +531,27 @@ export async function manualBallotAction(formData: FormData) {
       },
     );
 
+    if (result?.revealPhase === "computed") {
+      adminState.resultStore.clearRoundResult(roundNumber);
+      adminState.votingWindowStore.returnToClosedForRecompute(roundNumber);
+    }
+
+    audit(session, {
+      action: "manual_ballot",
+      summary: `${existing ? "Replaced" : "Entered"} manual ballot for ${player.startggUsername}.`,
+      reason,
+      dangerous: true,
+      affectedRecords: [
+        { type: "ballot", id: ballot.id },
+        { type: "player", id: player.id },
+      ],
+      metadata: {
+        roundNumber,
+        replacedExistingBallot: Boolean(existing),
+        manualOverride: snapshot.postCloseManualBallotsAreOverrides,
+        invalidatedComputedResult: result?.revealPhase === "computed",
+      },
+    });
     getVotingRoundSnapshot(roundNumber);
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not save manual ballot.");
@@ -368,17 +561,17 @@ export async function manualBallotAction(formData: FormData) {
 }
 
 export async function computeResultsAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const roundNumber = getRoundNumber(formData);
     const snapshot = getVotingRoundSnapshot(roundNumber);
 
     if (snapshot.status !== "voting_closed") {
       throw new Error("Voting must be closed before results are computed.");
     }
 
-    adminState.resultStore.computeRound({
+    const result = adminState.resultStore.computeRound({
       roundNumber,
       draws: getRoundDrawRecords(roundNumber),
       ballots: adminState.ballotStore.listForRound(roundNumber),
@@ -387,6 +580,12 @@ export async function computeResultsAction(formData: FormData) {
     });
     adminState.votingWindowStore.setResultsPhase(roundNumber, "results_computed");
     adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
+    audit(session, {
+      action: "compute_results",
+      summary: `Computed results for Round ${roundNumber}.`,
+      affectedRecords: [{ type: "result", id: result.id }],
+      metadata: { roundNumber },
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not compute results.");
   }
@@ -395,10 +594,10 @@ export async function computeResultsAction(formData: FormData) {
 }
 
 export async function advanceResultRevealAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    const roundNumber = Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+    const roundNumber = getRoundNumber(formData);
     const result = adminState.resultStore.advanceReveal(roundNumber);
 
     if (result.revealPhase === "final") {
@@ -421,6 +620,12 @@ export async function advanceResultRevealAction(formData: FormData) {
       adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealing");
       adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
     }
+    audit(session, {
+      action: "advance_result_reveal",
+      summary: `Advanced Round ${roundNumber} reveal to ${result.revealPhase}.`,
+      affectedRecords: [{ type: "result", id: result.id }],
+      metadata: { roundNumber, revealPhase: result.revealPhase },
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not advance result reveal.");
   }
@@ -447,12 +652,17 @@ export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
 }
 
 export async function setCurrentRoundAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    adminState.roundStateStore.setCurrentRound(
-      Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4,
-    );
+    const roundNumber = getRoundNumber(formData);
+
+    adminState.roundStateStore.setCurrentRound(roundNumber);
+    audit(session, {
+      action: "set_current_round",
+      summary: `Set current round to Round ${roundNumber}.`,
+      metadata: { roundNumber },
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not set current round.");
   }
@@ -461,10 +671,15 @@ export async function setCurrentRoundAction(formData: FormData) {
 }
 
 export async function advanceCurrentRoundAction() {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
-    adminState.roundStateStore.advanceRound();
+    const next = adminState.roundStateStore.advanceRound();
+    audit(session, {
+      action: "advance_current_round",
+      summary: `Advanced current round to Round ${next.currentRound}.`,
+      metadata: next,
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not advance round.");
   }
@@ -473,10 +688,11 @@ export async function advanceCurrentRoundAction() {
 }
 
 export async function startRehearsalModeAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    const reason = getRequiredReason(formData);
     resetTournamentOperationalState();
     adminState.roundStateStore.setCurrentRound(1);
     adminState.roundStateStore.setRehearsalMode(true);
@@ -487,6 +703,13 @@ export async function startRehearsalModeAction(formData: FormData) {
     ).forEach((startggUsername) => {
       adminState.rosterStore.createOrUpdatePlayer({ startggUsername, active: true });
     });
+    audit(session, {
+      action: "start_rehearsal_mode",
+      summary: "Started rehearsal mode and loaded the disposable rehearsal roster.",
+      reason,
+      dangerous: true,
+      metadata: { loadedPlayers: 12 },
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not start rehearsal mode.");
   }
@@ -495,13 +718,20 @@ export async function startRehearsalModeAction(formData: FormData) {
 }
 
 export async function resetRehearsalModeAction(formData: FormData) {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    const reason = getRequiredReason(formData);
     resetTournamentOperationalState();
     adminState.roundStateStore.setCurrentRound(1);
     adminState.roundStateStore.setRehearsalMode(false);
+    audit(session, {
+      action: "reset_rehearsal_mode",
+      summary: "Reset rehearsal data and returned to tournament mode.",
+      reason,
+      dangerous: true,
+    });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reset rehearsal data.");
   }
@@ -510,7 +740,7 @@ export async function resetRehearsalModeAction(formData: FormData) {
 }
 
 export async function seedRehearsalTiebreakAction() {
-  await requireActiveHost();
+  const session = await requireActiveHost();
 
   try {
     const { currentRound, rehearsalMode } = adminState.roundStateStore.getSnapshot();
@@ -576,10 +806,150 @@ export async function seedRehearsalTiebreakAction() {
         },
       );
     });
+    audit(session, {
+      action: "seed_rehearsal_tiebreak",
+      summary: `Seeded rehearsal tiebreak ballots for Round ${currentRound}.`,
+      metadata: { roundNumber: currentRound, playerCount: players.length },
+    });
   } catch (error) {
     redirectWithError(
       error instanceof Error ? error.message : "Could not seed rehearsal tiebreak.",
     );
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function reopenVotingAction(formData: FormData) {
+  const session = await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    const roundNumber = getRoundNumber(formData);
+    const reason = getRequiredReason(formData);
+    const durationMinutes = Number(getString(formData, "durationMinutes"));
+    const result = adminState.resultStore.getRoundResult(roundNumber);
+
+    if (result && result.revealPhase !== "computed") {
+      throw new Error(
+        "Emergency reopen is allowed only before result reveal starts. Use result correction after reveal begins.",
+      );
+    }
+
+    if (result?.revealPhase === "computed") {
+      adminState.resultStore.clearRoundResult(roundNumber);
+      adminState.votingWindowStore.returnToClosedForRecompute(roundNumber);
+    }
+
+    adminState.votingWindowStore.reopenVoting({
+      roundNumber,
+      durationMinutes,
+    });
+    adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "voting_open" });
+    audit(session, {
+      action: "emergency_reopen_voting",
+      summary: `Reopened Round ${roundNumber} voting for ${durationMinutes} minute(s).`,
+      reason,
+      dangerous: true,
+      metadata: {
+        roundNumber,
+        durationMinutes,
+        invalidatedComputedResult: result?.revealPhase === "computed",
+      },
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not reopen voting.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function resetRoundAction(formData: FormData) {
+  const session = await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    const roundNumber = getRoundNumber(formData);
+    const reason = getRequiredReason(formData);
+
+    resetRoundState(roundNumber);
+    audit(session, {
+      action: "reset_round",
+      summary: `Reset Round ${roundNumber} operational state.`,
+      reason,
+      dangerous: true,
+      metadata: { roundNumber },
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not reset round.");
+  }
+
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function overrideResultAction(formData: FormData) {
+  const session = await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    const roundNumber = getRoundNumber(formData);
+    const reason = getRequiredReason(formData);
+    const [setOrderText, chartId] = getString(formData, "resultTarget").split("|");
+    const setOrder = Number(setOrderText) as 1 | 2;
+    const before = adminState.resultStore.getRoundResult(roundNumber);
+
+    if (!before) {
+      throw new Error("Results must be computed before a result correction.");
+    }
+
+    const oldSelected = before.sets.find((set) => set.setOrder === setOrder)?.selectedChart;
+    const result = adminState.resultStore.overrideSelectedChart({
+      roundNumber,
+      setOrder,
+      chartId,
+    });
+    const correctedSet = result.sets.find((set) => set.setOrder === setOrder);
+
+    if (result.revealPhase === "final") {
+      if (oldSelected) {
+        adminState.drawStateStore.unmarkSelectedSongs([oldSelected.songKey]);
+      }
+
+      if (correctedSet) {
+        adminState.drawStateStore.markSelectedSong(correctedSet.selectedChart.songKey);
+      }
+
+      adminState.ballotStore.setPhoneStatus(roundNumber, {
+        phase: "revealed",
+        selectedCharts: result.sets.map((set) => ({
+          id: set.selectedChart.id,
+          name: set.selectedChart.name,
+          artist: set.selectedChart.artist,
+          displayDifficulty: set.selectedChart.displayDifficulty,
+          localImagePath: set.selectedChart.localImagePath,
+        })),
+      });
+    }
+
+    audit(session, {
+      action: "result_correction_override",
+      summary: `Overrode Round ${roundNumber} ${correctedSet?.displayLabel ?? `Set ${setOrder}`} selected chart.`,
+      reason,
+      dangerous: true,
+      affectedRecords: [
+        { type: "result", id: result.id },
+        { type: "chart", id: chartId },
+      ],
+      metadata: {
+        roundNumber,
+        setOrder,
+        oldChartId: oldSelected?.id ?? null,
+        newChartId: correctedSet?.selectedChart.id ?? chartId,
+        revealPhase: result.revealPhase,
+      },
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not override result.");
   }
 
   revalidateTournamentViews(revalidatePath);
