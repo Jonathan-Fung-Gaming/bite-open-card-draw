@@ -3,6 +3,7 @@ import { HostLockStore } from "@/lib/admin/host-lock";
 import { RosterStore } from "@/lib/admin/roster";
 import { DrawStateStore } from "@/lib/draw/draw-state";
 import { BallotStore } from "@/lib/vote/ballot-store";
+import { VotingWindowStore } from "@/lib/vote/voting-window";
 
 const globalForAdminState = globalThis as typeof globalThis & {
   biteOpenAdminState?: {
@@ -10,6 +11,7 @@ const globalForAdminState = globalThis as typeof globalThis & {
     rosterStore: RosterStore;
     drawStateStore: DrawStateStore;
     ballotStore: BallotStore;
+    votingWindowStore: VotingWindowStore;
   };
 };
 
@@ -20,4 +22,5 @@ export const adminState =
     rosterStore: new RosterStore(),
     drawStateStore: new DrawStateStore(),
     ballotStore: new BallotStore(),
+    votingWindowStore: new VotingWindowStore(),
   });

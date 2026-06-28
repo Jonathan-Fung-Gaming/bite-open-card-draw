@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  type SubmitRoundBallotOptions,
   validateRoundBallot,
   type PhoneRoundStatus,
   type RoundBallot,
@@ -15,11 +16,17 @@ export class BallotStore {
   private ballots = new Map<string, RoundBallot>();
   private phoneStatus = new Map<1 | 2 | 3 | 4, PhoneRoundStatus>();
 
-  submit(input: SubmitRoundBallotInput, draws: readonly DrawRecord[], now = new Date().toISOString()) {
+  submit(
+    input: SubmitRoundBallotInput,
+    draws: readonly DrawRecord[],
+    now = new Date().toISOString(),
+    options: SubmitRoundBallotOptions = {},
+  ) {
     validateRoundBallot(input, draws);
 
     const key = ballotKey(input.roundNumber, input.playerId);
     const existing = this.ballots.get(key);
+    const manualReason = options.manualReason?.trim() || null;
     const ballot: RoundBallot = {
       id: existing?.id ?? randomUUID(),
       roundNumber: input.roundNumber,
@@ -28,6 +35,9 @@ export class BallotStore {
       choices: input.choices,
       submittedAt: now,
       revision: (existing?.revision ?? 0) + 1,
+      source: options.source ?? "player",
+      manualReason,
+      manualOverride: options.manualOverride ?? false,
     };
 
     this.ballots.set(key, ballot);
