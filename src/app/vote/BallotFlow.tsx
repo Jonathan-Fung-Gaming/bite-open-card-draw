@@ -533,6 +533,8 @@ export function BallotFlow({
               className={`relative min-h-32 overflow-hidden rounded border bg-cover bg-center p-3 text-left ${
                 selected ? "border-ember-300 bg-ember-900/40" : "border-metal-700 bg-black/25"
               } ${index === 6 ? "col-span-2 mx-auto w-1/2 min-w-40" : ""}`}
+              data-chart-image-path={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
+              data-testid="ballot-chart-card"
               style={{
                 backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.86)), url(${
                   chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH

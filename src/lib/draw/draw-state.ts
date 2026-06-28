@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
+import {
+  overlayChartExclusionOverrides,
+  upsertChartExclusion,
+} from "@/lib/charts/exclusions";
+import { buildPoolCounts } from "@/lib/charts/importer";
 import { loadRuntimeCharts } from "@/lib/charts/runtime-catalog";
-import type { NormalizedChart } from "@/lib/charts/types";
+import { REQUIRED_CHART_POOLS, type ChartExclusion, type NormalizedChart } from "@/lib/charts/types";
 import { ROUND_SET_DEFINITIONS } from "@/lib/tournament";
 import {
   drawChartsForSet,
@@ -28,7 +33,8 @@ export type DrawRecord = {
 export type DrawStateStoreSnapshot = {
   drawHistory: DrawRecord[];
   selectedSongKeys: string[];
-  excludedChartKeys: string[];
+  excludedChartKeys?: string[];
+  chartExclusions?: ChartExclusion[];
 };
 
 function drawKey(roundNumber: 1 | 2 | 3 | 4, setOrder: 1 | 2) {
@@ -39,13 +45,17 @@ export class DrawStateStore {
   private charts: NormalizedChart[] | null = null;
   private drawHistory = new Map<string, DrawRecord[]>();
   private selectedSongKeys = new Set<string>();
-  private excludedChartKeys = new Set<string>();
+  private chartExclusions: ChartExclusion[] = [];
 
   constructor(private readonly randomIndex: RandomIndex = secureRandomIndex) {}
 
-  getCharts() {
+  private getBaseCharts() {
     this.charts ??= loadRuntimeCharts();
     return this.charts;
+  }
+
+  getCharts() {
+    return overlayChartExclusionOverrides(this.getBaseCharts(), this.chartExclusions);
   }
 
   setChartsForTest(charts: NormalizedChart[]) {
@@ -53,11 +63,57 @@ export class DrawStateStore {
   }
 
   setExcludedChartKeys(chartKeys: Iterable<string>) {
-    this.excludedChartKeys = new Set(chartKeys);
+    const updatedAt = new Date().toISOString();
+
+    this.chartExclusions = [...new Set(chartKeys)].sort().map((chartKey) => ({
+      chartKey,
+      excluded: true,
+      reason: "Imported chart exclusion key.",
+      updatedAt,
+    }));
   }
 
   getExcludedChartKeys() {
-    return [...this.excludedChartKeys].sort();
+    return this.chartExclusions
+      .filter((exclusion) => exclusion.excluded)
+      .map((exclusion) => exclusion.chartKey)
+      .sort();
+  }
+
+  getChartExclusions() {
+    return this.chartExclusions.map((exclusion) => ({ ...exclusion }));
+  }
+
+  updateChartExclusion(input: { chartKey: string; excluded: boolean; reason: string }) {
+    const chart = this.getBaseCharts().find((candidate) => candidate.chartKey === input.chartKey);
+
+    if (!chart) {
+      throw new Error("Unknown chart key.");
+    }
+
+    const previous = this.chartExclusions;
+    const next = upsertChartExclusion(
+      this.chartExclusions,
+      input.chartKey,
+      input.excluded,
+      input.reason,
+    );
+
+    this.chartExclusions = next;
+
+    if (input.excluded) {
+      const chartPool = REQUIRED_CHART_POOLS.find((pool) => pool === chart.displayDifficulty);
+      const poolCounts = buildPoolCounts(this.getCharts());
+
+      if (chartPool && poolCounts[chartPool] < 7) {
+        this.chartExclusions = previous;
+        throw new Error(
+          `Chart exclusion would leave fewer than 7 eligible charts in ${chartPool}.`,
+        );
+      }
+    }
+
+    return next.find((exclusion) => exclusion.chartKey === input.chartKey) as ChartExclusion;
   }
 
   replaceSelectedSongKeys(songKeys: Iterable<string>) {
@@ -168,7 +224,7 @@ export class DrawStateStore {
     const eligible = getEligibleChartsForSet({
       charts: this.getCharts(),
       set,
-      excludedChartKeys: new Set([...this.excludedChartKeys, ...currentChartKeys]),
+      excludedChartKeys: new Set([...this.getExcludedChartKeys(), ...currentChartKeys]),
       selectedSongKeys: this.selectedSongKeys,
       sameRoundBlockedSongKeys: blockedSongs,
     });
@@ -220,7 +276,7 @@ export class DrawStateStore {
           {
             charts: this.getCharts(),
             set,
-            excludedChartKeys: this.excludedChartKeys,
+            excludedChartKeys: new Set(this.getExcludedChartKeys()),
             selectedSongKeys: this.selectedSongKeys,
             sameRoundBlockedSongKeys: new Set(
               otherSetDraw?.charts.map((chart) => chart.songKey) ?? [],
@@ -257,6 +313,7 @@ export class DrawStateStore {
         })),
       selectedSongKeys: [...this.selectedSongKeys].sort(),
       excludedChartKeys: this.getExcludedChartKeys(),
+      chartExclusions: this.getChartExclusions(),
     };
   }
 
@@ -275,6 +332,13 @@ export class DrawStateStore {
     }
 
     this.selectedSongKeys = new Set(snapshot.selectedSongKeys);
-    this.excludedChartKeys = new Set(snapshot.excludedChartKeys);
+    this.chartExclusions =
+      snapshot.chartExclusions?.map((exclusion) => ({ ...exclusion })) ??
+      (snapshot.excludedChartKeys ?? []).map((chartKey) => ({
+        chartKey,
+        excluded: true,
+        reason: "Imported legacy chart exclusion key.",
+        updatedAt: new Date().toISOString(),
+      }));
   }
 }

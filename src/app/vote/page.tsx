@@ -76,6 +76,8 @@ export default async function VotePage() {
                   <article
                     key={chart.id}
                     className="relative min-h-40 overflow-hidden rounded border border-ember-300/30 bg-black/25 bg-cover bg-center p-4"
+                    data-chart-image-path={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
+                    data-testid="phone-final-chart-card"
                     style={{
                       backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.9)), url(${
                         chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH

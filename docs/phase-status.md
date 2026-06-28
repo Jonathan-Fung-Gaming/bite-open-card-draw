@@ -404,6 +404,82 @@ chart exclusion UI/image pipeline hardening, and final rehearsal/CI reconciliati
   for later reporting or migration hardening.
 - Real cached artwork remains unverified and `RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028` remain open.
 
+## Remediation Phase 6 - Data And Image Pipeline Hardening
+
+Status: complete for the Phase 6 app/pipeline hardening code paths; not event-ready because full
+event setup still produced 0 real cached artwork files in this environment.
+
+### Acceptance Criteria
+
+- Chart import exclusions: `rtk npm run import:charts` now reads
+  `data/generated/chart-exclusions.json` before validating required pool counts.
+- Admin chart eligibility: `/coolguy69` shows required pool counts and renders a selected pool's
+  chart exclusion/re-inclusion controls.
+- Exclusion auditability: chart exclusion changes require active host control, admin password
+  re-entry, and an audit reason; persisted snapshots store full `chartExclusions` records.
+- Pool validation: live chart exclusions are rejected when they would leave the chart's required pool
+  below 7 eligible charts.
+- Draw eligibility: live exclusions overlay runtime chart data before draw/reroll eligibility, and
+  re-inclusions can return a chart to eligibility.
+- Deployable cache support: `public/chart-images/cache` is no longer ignored, and runtime can derive
+  deterministic cache paths from source `bg_img` when deployable public cache files exist.
+- Image rendering checks: Playwright now verifies rendered artwork on `/stage`, `/vote`, `/charts`,
+  and `/results` through natural-width checks.
+- Real artwork blocker: normal and unsandboxed `rtk npm run cache:chart-images` both completed with
+  `0 cached, 639 using fallback`; `public/chart-images/cache` still had 0 real files.
+
+### Changed Files
+
+- Chart import/cache/runtime: `.gitignore`, `public/chart-images/cache/.gitkeep`,
+  `scripts/import-charts.ts`, `src/lib/charts/exclusions.ts`,
+  `src/lib/charts/runtime-catalog.ts`
+- Draw/persistence/contracts: `src/lib/draw/draw-state.ts`,
+  `src/lib/persistence/operational-state.test.ts`,
+  `src/lib/server/mutation-contracts.ts`
+- Admin/player/e2e UI: `src/app/coolguy69/actions.ts`, `src/app/coolguy69/page.tsx`,
+  `src/app/vote/BallotFlow.tsx`, `src/app/vote/page.tsx`,
+  `tests/e2e/full-flow.spec.ts`
+- Tests/docs: `src/lib/charts/importer.test.ts`, `src/lib/charts/runtime-catalog.test.ts`,
+  `src/lib/draw/draw-state.test.ts`, `src/lib/server/mutation-contracts.test.ts`,
+  `docs/deployment-readiness.md`, `docs/event-day-runbook.md`,
+  `docs/release-checklist.md`, `docs/testing-checklist.md`,
+  `docs/remediation-issue-checklist.md`, `docs/phase-status.md`
+
+### Checks Run
+
+- `rtk npm run test -- --run src/lib/charts/importer.test.ts src/lib/draw/draw-state.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/server/mutation-contracts.test.ts` - passed, 4 files / 12 tests
+- `rtk npm run import:charts` - passed, imported 4426 charts with required pool counts S16 189, S17 196, S18 189, S19 167, S20 135, S21 150, S22 97, D23 125
+- `rtk npm run cache:chart-images` - completed with 0 cached, 639 fallback
+- `rtk npm run cache:chart-images` unsandboxed - completed with 0 cached, 639 fallback
+- Real cache file count: `public/chart-images/cache` contained 0 files excluding `.gitkeep`
+- `rtk npm run lint` - passed
+- `rtk npm run typecheck` - passed
+- `rtk npm run test` - passed, 24 files / 71 tests
+- `rtk git diff --check` - passed
+- `rtk npm run build` - passed
+- `rtk npm run test:e2e` - passed, 2 Playwright tests
+
+### Manual Review
+
+- Product rules: no round/set, draw-count, ban-count, no-ban, voting-window, result, or tiebreak
+  tournament rules were changed.
+- Admin safety: chart exclusion/re-inclusion is treated as dangerous because it changes future draw
+  eligibility; it requires password re-entry and reasoned audit metadata.
+- Runtime images: missing artwork still falls back and does not block draw, stage, phone, charts, or
+  results; deterministic cache derivation only preserves non-fallback paths when public files exist.
+- UI performance: the admin chart eligibility UI renders one selected pool's forms at a time so the
+  private CSV client controls still hydrate promptly.
+
+### Risks And Assumptions
+
+- Full event setup still cannot claim non-fallback artwork: both cache attempts produced 0 real cached
+  images with `failureReason: "fetch failed"`. `RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028` remain
+  open.
+- Generated JSON under `data/generated/*.json` remains reproducible and ignored; real cache image
+  files under `public/chart-images/cache` are now deployable when populated.
+- The chart exclusion UI defaults to the current round's first pool and lets the host switch pools;
+  it intentionally avoids rendering every chart form at once.
+
 ## Phase 1 - Project Scaffold, Docs, And Route Skeleton
 
 Status: complete

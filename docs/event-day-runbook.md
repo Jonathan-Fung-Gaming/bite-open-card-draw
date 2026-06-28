@@ -15,9 +15,14 @@ Use this checklist on the event machine before players arrive and before every r
 - Run `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` on the release branch.
 - Confirm production environment variables are set in Vercel and not committed to Git.
 - Confirm Supabase migrations are applied.
-- Run `npm run import:charts` and confirm required pools have at least 7 eligible charts.
-- Run `npm run cache:chart-images` before the event, or `npm run cache:chart-images -- --fallback-only` for a local fallback manifest.
-- Confirm chart artwork is cached locally or has fallback cards.
+- Run `rtk npm run import:charts` and confirm the output prints `Imported ... charts` plus required
+  pool counts with every required pool at 7 or more.
+- Run `rtk npm run cache:chart-images` before the event. Expected output is
+  `Prepared ... image assets: N cached, M using fallback /chart-images/fallback-card.svg`; `N` must
+  be greater than 0 before claiming real cached artwork is ready.
+- If remote artwork fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only`
+  only after explicitly accepting fallback cards for rehearsal or emergency operation.
+- Confirm `public/chart-images/cache` contains real files when non-fallback artwork is required.
 - Confirm the tournament logo renders correctly.
 - Confirm the admin password hash and session secret are configured.
 - Confirm the player roster has been imported and reviewed.
@@ -79,6 +84,8 @@ Use this checklist on the event machine before players arrive and before every r
 - Log in with the shared admin password.
 - Click `Take Host Control`.
 - Confirm the host lock heartbeat is active.
+- Review `Chart Eligibility`; use exclusion/re-inclusion controls only with an admin password and an
+  audit reason, and confirm every required pool remains at 7 eligible charts or more.
 - Open `/stage` on the projector display.
 - Open `/room` and verify the QR destination works on a phone.
 

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { localImagePathForRemoteUrl } from "./image-cache";
 import { FALLBACK_CHART_IMAGE_PATH } from "./image-paths";
 import { normalizeChartRow } from "./normalize";
 import { resolveRuntimeChartImages } from "./runtime-catalog";
@@ -44,5 +45,18 @@ describe("runtime chart catalog", () => {
         projectRoot,
       )[0]?.localImagePath,
     ).toBe(FALLBACK_CHART_IMAGE_PATH);
+  });
+
+  it("derives deployed cache paths from source bg_img when generated metadata is absent", () => {
+    const projectRoot = mkdtempSync(path.join(tmpdir(), "runtime-charts-"));
+    const expectedLocalPath = localImagePathForRemoteUrl("https://example.com/runtime.png");
+    const cachedPath = path.join(projectRoot, "public", expectedLocalPath.replace(/^\/+/, ""));
+
+    mkdirSync(path.dirname(cachedPath), { recursive: true });
+    writeFileSync(cachedPath, "image");
+
+    expect(resolveRuntimeChartImages([chartWithLocalImagePath(null)], projectRoot)[0]?.localImagePath).toBe(
+      expectedLocalPath,
+    );
   });
 });

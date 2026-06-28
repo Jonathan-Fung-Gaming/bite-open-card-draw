@@ -69,14 +69,25 @@ single-process development only.
 
 1. Replace `data/source/charts.csv` only with the approved chart export.
 2. Run `rtk npm run import:charts`.
-3. Confirm required pools have at least 7 eligible charts.
-4. Run `rtk npm run cache:chart-images -- --fallback-only` locally, or `rtk npm run cache:chart-images` when remote artwork caching is desired.
-5. Review chart exclusions before drawing.
-6. Log in to `/coolguy69`.
-7. Take host control.
-8. Bulk import start.gg usernames.
-9. Mark inactive/eliminated players before opening voting.
-10. Confirm duplicate active usernames are blocked.
+3. Confirm the output says `Imported ... charts` and prints required pool counts with every
+   required pool at 7 or more. If it prints `Required pools with fewer than 7 eligible charts`,
+   stop and repair the CSV or exclusions before drawing.
+4. Run `rtk npm run cache:chart-images` for remote artwork caching. Expected success output is
+   `Prepared ... image assets: N cached, M using fallback /chart-images/fallback-card.svg`.
+   `N` must be greater than 0 before claiming real cached artwork is ready.
+5. If remote fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only` and
+   explicitly accept fallback artwork for rehearsal only. This does not close the real-image
+   remediation items.
+6. Confirm `public/chart-images/cache` contains real cached image files before relying on deployed
+   non-fallback artwork. Runtime can derive deterministic cache paths from source `bg_img` when those
+   public files exist.
+7. Log in to `/coolguy69`.
+8. Take host control.
+9. Review chart exclusions in `Chart Eligibility`; every exclusion or re-inclusion requires admin
+   password re-entry and an audit reason, and required pools must stay at 7 eligible charts or more.
+10. Bulk import start.gg usernames.
+11. Mark inactive/eliminated players before opening voting.
+12. Confirm duplicate active usernames are blocked.
 
 ## Free-Tier Notes
 

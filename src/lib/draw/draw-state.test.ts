@@ -59,4 +59,32 @@ describe("draw state store", () => {
     expect(rerolled.charts).toHaveLength(7);
     expect(new Set(rerolled.charts.map((drawn) => drawn.songKey)).size).toBe(7);
   });
+
+  it("keeps excluded charts out of draws and returns re-included charts to eligibility", () => {
+    const charts = chartsFor("16", 8, 2, "S16");
+    const store = new DrawStateStore(() => 0);
+    const [target] = charts;
+
+    store.setChartsForTest(charts);
+    store.updateChartExclusion({
+      chartKey: target?.chartKey ?? "",
+      excluded: true,
+      reason: "event exclusion",
+    });
+
+    const excludedDraw = store.drawRoundSet({ roundNumber: 1, setOrder: 1 });
+
+    expect(excludedDraw.charts.map((chart) => chart.chartKey)).not.toContain(target?.chartKey);
+
+    store.updateChartExclusion({
+      chartKey: target?.chartKey ?? "",
+      excluded: false,
+      reason: "event re-inclusion",
+    });
+    store.resetRound(1);
+
+    const reIncludedDraw = store.drawRoundSet({ roundNumber: 1, setOrder: 1 });
+
+    expect(reIncludedDraw.charts[0]?.chartKey).toBe(target?.chartKey);
+  });
 });

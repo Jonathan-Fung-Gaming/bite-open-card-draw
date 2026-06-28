@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { importChartRows, parseChartCsv } from "./importer";
+import { createFallbackChartRows, importChartRows, parseChartCsv } from "./importer";
 import { REQUIRED_CHART_POOLS } from "./types";
 
 describe("chart importer", () => {
@@ -35,6 +35,45 @@ describe("chart importer", () => {
 
     expect(charts).toHaveLength(1);
     expect(report.duplicateChartKeys).toHaveLength(1);
+  });
+
+  it("applies chart exclusions before required pool validation", () => {
+    const rows = createFallbackChartRows();
+    const { charts: baseline } = importChartRows(rows, {
+      sourcePath: "fixture.csv",
+      generatedAt: "test",
+    });
+    const target = baseline.find((chart) => chart.displayDifficulty === "S16");
+
+    expect(target).toBeDefined();
+
+    const exclusion = {
+      chartKey: target?.chartKey ?? "",
+      excluded: true,
+      reason: "event rule exclusion",
+      updatedAt: "test",
+    };
+    const { charts, report } = importChartRows(rows, {
+      sourcePath: "fixture.csv",
+      generatedAt: "test",
+      exclusions: [exclusion],
+    });
+    const excludedChart = charts.find((chart) => chart.chartKey === target?.chartKey);
+
+    expect(excludedChart?.excluded).toBe(true);
+    expect(excludedChart?.exclusionReason).toBe("event rule exclusion");
+    expect(report.poolCounts.S16).toBe(6);
+    expect(report.poolsWithTooFewCharts).toContain("S16");
+
+    const { charts: restored, report: restoredReport } = importChartRows(rows, {
+      sourcePath: "fixture.csv",
+      generatedAt: "test",
+      exclusions: [{ ...exclusion, excluded: false, reason: "event re-inclusion" }],
+    });
+
+    expect(restored.find((chart) => chart.chartKey === target?.chartKey)?.excluded).toBe(false);
+    expect(restoredReport.poolCounts.S16).toBe(7);
+    expect(restoredReport.poolsWithTooFewCharts).not.toContain("S16");
   });
 
   it("repairs source rows with unquoted commas in mirrored title fields", () => {
