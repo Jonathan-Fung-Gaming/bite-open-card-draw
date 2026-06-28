@@ -1,10 +1,13 @@
 import { ResultSetPanel, RoundHeader, StageDrawCard, StageSetPanel } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
+import { hydrateTournamentState } from "@/lib/server/persistence";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
 
 export const dynamic = "force-dynamic";
 
-export default function ChartsPage() {
+export default async function ChartsPage() {
+  await hydrateTournamentState();
+
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const result = adminState.resultStore.getRoundResult(roundNumber);
 

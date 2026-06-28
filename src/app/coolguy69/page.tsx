@@ -1,6 +1,7 @@
 import { AdminLayout, DangerousActionDialog, HostLockBadge, TournamentLogo } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { getAdminSessionFromCookies } from "@/lib/server/admin-auth";
+import { hydrateTournamentState } from "@/lib/server/persistence";
 import { ROUND_SET_DEFINITIONS } from "@/lib/tournament";
 import {
   addInactivePlayerToCurrentRoundAction,
@@ -102,6 +103,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </main>
     );
   }
+
+  await hydrateTournamentState();
 
   const hostSnapshot = adminState.hostLockStore.getSnapshot(session.sessionId);
   const players = adminState.rosterStore.listPlayers();

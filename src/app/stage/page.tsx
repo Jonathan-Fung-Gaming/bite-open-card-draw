@@ -7,6 +7,7 @@ import {
   StageSetPanel,
 } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
+import { hydrateTournamentState } from "@/lib/server/persistence";
 import { getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
 import { formatVotingTime, type VotingRoundSnapshot } from "@/lib/vote/voting-window";
@@ -83,7 +84,9 @@ function revealLabel(phase: string) {
   }
 }
 
-export default function StagePage() {
+export default async function StagePage() {
+  await hydrateTournamentState();
+
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const view = buildStageRoundView(adminState.drawStateStore, roundNumber);
   const snapshot = getVotingRoundSnapshot(roundNumber);

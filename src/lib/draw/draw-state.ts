@@ -25,6 +25,12 @@ export type DrawRecord = {
   reason: string;
 };
 
+export type DrawStateStoreSnapshot = {
+  drawHistory: DrawRecord[];
+  selectedSongKeys: string[];
+  excludedChartKeys: string[];
+};
+
 function drawKey(roundNumber: 1 | 2 | 3 | 4, setOrder: 1 | 2) {
   return `${roundNumber}:${setOrder}`;
 }
@@ -48,6 +54,14 @@ export class DrawStateStore {
 
   setExcludedChartKeys(chartKeys: Iterable<string>) {
     this.excludedChartKeys = new Set(chartKeys);
+  }
+
+  getExcludedChartKeys() {
+    return [...this.excludedChartKeys].sort();
+  }
+
+  replaceSelectedSongKeys(songKeys: Iterable<string>) {
+    this.selectedSongKeys = new Set(songKeys);
   }
 
   markSelectedSong(songKey: string) {
@@ -231,5 +245,36 @@ export class DrawStateStore {
     this.drawHistory.set(key, [...history, record]);
 
     return record;
+  }
+
+  exportSnapshot(): DrawStateStoreSnapshot {
+    return {
+      drawHistory: [...this.drawHistory.values()]
+        .flat()
+        .map((draw) => ({
+          ...draw,
+          charts: draw.charts.map((chart) => ({ ...chart })),
+        })),
+      selectedSongKeys: [...this.selectedSongKeys].sort(),
+      excludedChartKeys: this.getExcludedChartKeys(),
+    };
+  }
+
+  importSnapshot(snapshot: DrawStateStoreSnapshot) {
+    this.drawHistory = new Map();
+
+    for (const draw of snapshot.drawHistory) {
+      const key = drawKey(draw.roundNumber, draw.setOrder);
+      const history = this.drawHistory.get(key) ?? [];
+
+      history.push({
+        ...draw,
+        charts: draw.charts.map((chart) => ({ ...chart })),
+      });
+      this.drawHistory.set(key, history.sort((left, right) => left.version - right.version));
+    }
+
+    this.selectedSongKeys = new Set(snapshot.selectedSongKeys);
+    this.excludedChartKeys = new Set(snapshot.excludedChartKeys);
   }
 }

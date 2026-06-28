@@ -256,6 +256,14 @@ create table if not exists public.image_assets (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.tournament_state_snapshots (
+  id text primary key default 'primary',
+  schema_version integer not null default 1,
+  state jsonb not null,
+  updated_at timestamptz not null default now(),
+  constraint tournament_state_snapshots_singleton check (id = 'primary')
+);
+
 insert into public.rounds (round_number, display_name)
 values
   (1, 'Round 1'),
@@ -310,3 +318,4 @@ alter table public.result_rows enable row level security;
 alter table public.tiebreaks enable row level security;
 alter table public.host_locks enable row level security;
 alter table public.image_assets enable row level security;
+alter table public.tournament_state_snapshots enable row level security;

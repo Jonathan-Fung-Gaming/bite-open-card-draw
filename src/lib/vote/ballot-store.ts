@@ -12,6 +12,14 @@ function ballotKey(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
   return `${roundNumber}:${playerId}`;
 }
 
+export type BallotStoreSnapshot = {
+  ballots: RoundBallot[];
+  phoneStatus: Array<{
+    roundNumber: 1 | 2 | 3 | 4;
+    status: PhoneRoundStatus;
+  }>;
+};
+
 export class BallotStore {
   private ballots = new Map<string, RoundBallot>();
   private phoneStatus = new Map<1 | 2 | 3 | 4, PhoneRoundStatus>();
@@ -70,5 +78,53 @@ export class BallotStore {
 
   setPhoneStatus(roundNumber: 1 | 2 | 3 | 4, status: PhoneRoundStatus) {
     this.phoneStatus.set(roundNumber, status);
+  }
+
+  exportSnapshot(): BallotStoreSnapshot {
+    return {
+      ballots: [...this.ballots.values()].map((ballot) => ({
+        ...ballot,
+        choices: ballot.choices.map((choice) => ({
+          ...choice,
+          bannedChartIds: [...choice.bannedChartIds],
+        })),
+      })),
+      phoneStatus: [...this.phoneStatus.entries()].map(([roundNumber, status]) => ({
+        roundNumber,
+        status:
+          status.phase === "revealed"
+            ? {
+                ...status,
+                selectedCharts: status.selectedCharts.map((chart) => ({ ...chart })),
+              }
+            : { ...status },
+      })),
+    };
+  }
+
+  importSnapshot(snapshot: BallotStoreSnapshot) {
+    this.ballots = new Map(
+      snapshot.ballots.map((ballot) => [
+        ballotKey(ballot.roundNumber, ballot.playerId),
+        {
+          ...ballot,
+          choices: ballot.choices.map((choice) => ({
+            ...choice,
+            bannedChartIds: [...choice.bannedChartIds],
+          })),
+        },
+      ]),
+    );
+    this.phoneStatus = new Map(
+      snapshot.phoneStatus.map((entry) => [
+        entry.roundNumber,
+        entry.status.phase === "revealed"
+          ? {
+              ...entry.status,
+              selectedCharts: entry.status.selectedCharts.map((chart) => ({ ...chart })),
+            }
+          : { ...entry.status },
+      ]),
+    );
   }
 }

@@ -13,6 +13,31 @@ import {
 } from "./result-engine";
 import { getTiebreakRevealRemainingMs } from "./reveal-timing";
 
+export type ResultStoreSnapshot = {
+  results: RoundResultSnapshot[];
+};
+
+function cloneResultSet(set: ResultSetSnapshot): ResultSetSnapshot {
+  return {
+    ...set,
+    selectedChart: { ...set.selectedChart },
+    rows: set.rows.map((row) => ({
+      ...row,
+      chart: { ...row.chart },
+    })),
+    tiebreakCandidateIds: [...set.tiebreakCandidateIds],
+    wheelSlots: set.wheelSlots.map((chart) => ({ ...chart })),
+  };
+}
+
+function cloneRoundResult(result: RoundResultSnapshot): RoundResultSnapshot {
+  return {
+    ...result,
+    eligiblePlayers: result.eligiblePlayers.map((player) => ({ ...player })),
+    sets: [cloneResultSet(result.sets[0]), cloneResultSet(result.sets[1])],
+  };
+}
+
 export class ResultStore {
   private results = new Map<1 | 2 | 3 | 4, RoundResultSnapshot>();
 
@@ -174,5 +199,20 @@ export class ResultStore {
     }
 
     return result;
+  }
+
+  exportSnapshot(): ResultStoreSnapshot {
+    return {
+      results: [...this.results.values()].map(cloneRoundResult),
+    };
+  }
+
+  importSnapshot(snapshot: ResultStoreSnapshot) {
+    this.results = new Map(
+      snapshot.results.map((result) => [
+        result.roundNumber,
+        cloneRoundResult(result),
+      ]),
+    );
   }
 }

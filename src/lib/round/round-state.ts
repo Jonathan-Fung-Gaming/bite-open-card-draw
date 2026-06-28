@@ -37,4 +37,13 @@ export class RoundStateStore {
 
     return this.getSnapshot();
   }
+
+  exportSnapshot(): RoundStateSnapshot {
+    return this.getSnapshot();
+  }
+
+  importSnapshot(snapshot: RoundStateSnapshot) {
+    this.currentRound = snapshot.currentRound;
+    this.rehearsalMode = snapshot.rehearsalMode;
+  }
 }
