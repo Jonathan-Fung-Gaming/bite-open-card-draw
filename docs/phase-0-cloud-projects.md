@@ -35,7 +35,7 @@ rtk vercel project inspect bite-open-card-draw --scope jonathansminigameparty
 
 ## Supabase
 
-Status: READY FOR MANUAL SECRET STEP
+Status: PARTIAL PASS
 
 Supabase CLI access works through `npx`:
 
@@ -51,17 +51,23 @@ Current observed Supabase organization:
 
 Current observed Supabase projects:
 
+- `bite-open-card-draw` in `us-east-2`
 - `jonathans-minigame-party` in `us-east-2`
 
-No new Supabase project was created during this step because project creation requires a database password and region decision.
-
-When creating the project, do not paste the database password, service-role key, or session secret into chat or committed files.
-
-Recommended project values:
+Created/observed Supabase project shell:
 
 - Project name: `bite-open-card-draw`
-- Region: choose the region closest to the tournament venue and expected players.
-- Instance size: use the smallest suitable free-tier-conscious size unless production needs require otherwise.
+- Project ref: `gsiyqhkcgegjrvqcqioc`
+- Region: `us-east-2`
+- Status: `ACTIVE_HEALTHY`
+- Database host: `db.gsiyqhkcgegjrvqcqioc.supabase.co`
+
+Known browser-safe values have been provided outside Git:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- Supabase publishable key
+
+Do not paste the database password, service-role key, admin password, password hash, or session secret into chat or committed files.
 
 Values to save privately after project creation:
 
@@ -76,10 +82,11 @@ Do not add real values to Git. Add them to `.env.local` only after Phase 1 scaff
 
 ## Manual Phase 0 Work Remaining
 
-- Decide whether to create the Supabase project now or wait until Phase 2 database work.
-- Choose the Supabase region based on the tournament venue.
-- Create and save the Supabase database password in a private password manager.
-- Retrieve Supabase URL, anon key, and service-role key from the Supabase dashboard after project creation.
+- Save the Supabase database password in a private password manager.
+- Retrieve and privately store the Supabase service-role key from the Supabase dashboard before server-side implementation work needs it.
+- Decide whether the publishable key should be mapped to `NEXT_PUBLIC_SUPABASE_ANON_KEY` during Phase 1, or whether the app should rename the environment variable to Supabase's current publishable-key terminology.
+- Generate `ADMIN_PASSWORD_HASH` later from the real shared admin password without committing or pasting the plaintext password.
+- Generate `SESSION_SECRET` later and store it only in `.env.local` and Vercel environment variables.
 - Store production/staging environment variables in Vercel project settings later; do not commit them.
 - Link the Vercel project to the local repo after Phase 1 creates the Next.js app.
 - Create or designate a `main` branch on GitHub if you want pull requests into `main`; currently the remote only has `phase/00-setup`.

@@ -69,7 +69,7 @@
 |---|---|---|
 | Vercel project shell | PASS | Created `jonathansminigameparty/bite-open-card-draw`. |
 | Supabase account access | PASS | `npx supabase projects list` can access the account. |
-| Supabase project shell | MANUAL | Project creation requires a private database password and region decision. |
+| Supabase project shell | PASS | Observed active healthy project `bite-open-card-draw` in `us-east-2`. |
 
 ## Phase 0 Checks Run
 
