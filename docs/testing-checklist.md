@@ -11,7 +11,7 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - `npm run build`
 - `npm run import:charts`
 - `npm run cache:chart-images -- --fallback-only`
-- E2E is a placeholder until Playwright is introduced.
+- E2E uses Playwright and runs the full Round 1 smoke flow.
 
 ## Phase 1 Shell Tests
 
@@ -107,6 +107,7 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Current-round eligibility changes require password and audit reason.
 - Private CSV export includes player-level ballots, manual overrides, selected charts, and tiebreak flags.
 - Private CSV auto-downloads once after final reveal and remains available by manual button.
+- Playwright smoke test logs in as admin, takes host control, draws both sets, opens voting, submits a player ballot, closes voting, reveals results, and downloads the private CSV.
 
 ## Draw Tests
 
@@ -117,3 +118,12 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Rerolling one chart, one set, or one round preserves draw history.
 - Voting cannot open until both sets in the round are drawn.
 - Draw and reroll actions use server-side randomness and require active host control.
+
+## Phase 10 Hardening Tests
+
+- Full Round 1 integration flow preserves one final ballot per player.
+- Round 2 draw excludes songs selected in Round 1.
+- Voting after results reveal is blocked.
+- Manual overrides before result computation keep export metadata.
+- 100 eligible players with multiple edits produce 100 latest ballots.
+- Client components do not reference server-only secret environment names.

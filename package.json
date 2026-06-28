@@ -7,7 +7,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node scripts/no-e2e-yet.mjs",
+    "test:e2e": "playwright test",
+    "start": "next start",
     "build": "next build",
     "import:charts": "tsx scripts/import-charts.ts",
     "cache:chart-images": "tsx scripts/cache-chart-images.ts"
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^22.15.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

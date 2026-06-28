@@ -428,3 +428,48 @@ Status: complete
 - Current route state remains fixed to Round 1 until later round progression work.
 - Manual ballots are blocked after result computation to avoid stale committed results; a future correction/override workflow should handle post-compute changes.
 - CSV auto-download depends on browser download permissions; the manual button remains available after final reveal.
+
+## Phase 10 - Testing, Edge Cases, And Review Hardening
+
+Status: complete
+
+### Acceptance Criteria
+
+- Unit coverage: chart import, active player eligibility, duplicate active usernames, draw count, excluded/selected songs, same-round duplicate songs, ban completion, result sorting/selection, tiebreaks, and private CSV generation are covered
+- Integration coverage: full round flow, player edit/latest ballot, post-reveal voting lock, Round 2 selected-song exclusion, and 100-player/multiple-edit load-sized ballot behavior are covered
+- E2E coverage: Playwright smoke flow covers stage load, room links, admin login, host control, roster import, both set draws, player vote, close, result reveal, final screens, and private CSV download
+- Security coverage: client components are scanned for server-only secret environment names
+- Result integrity: no known issue can change a committed result without a later explicit correction workflow
+- Ballot integrity: latest valid ballot wins and submitted ballots are not lost across edits in tested flows
+- Post-reveal lock: server state blocks ballot changes after `results_revealed`
+- View-only behavior: `/charts` and `/results` expose no submit controls and only show result details after final reveal
+- Service-key safety: no client component references service-role keys, session secrets, or admin password hash names
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (18 files, 49 tests)
+- E2E: passed with `npm run test:e2e` (1 Playwright test)
+- Chart import: passed with `npm run import:charts`
+- Image fallback cache: passed with `npm run cache:chart-images -- --fallback-only`
+- Production dependency audit: passed with `npm audit --omit=dev`
+- Production build: passed with `npm run build`
+
+### Changed Files
+
+- Added Playwright dependency, config, `start` script, and full-flow e2e smoke test
+- Replaced the placeholder e2e script with `playwright test`
+- Added integration hardening tests under `src/lib/integration`
+- Added browser security-boundary test under `src/lib/server`
+- Updated README, testing checklist, and phase status
+
+### Manual Review
+
+- Product rules: the new integration tests exercise result-relevant round flow, selected-song exclusion, latest-ballot behavior, post-reveal lock, and load-sized submissions.
+- Security: the browser-boundary test guards against accidentally referencing server-only secret names from client components.
+- E2E: the Playwright smoke test uses a deterministic test-only admin hash and runtime-generated session/service placeholders, not production secrets.
+- Load: the 100-player test uses normal store submissions and multiple edits without realtime connections.
+
+### Risks And Assumptions
+
+- Playwright browser binaries must be installed locally or in CI with `npx playwright install chromium`.
+- E2E uses a test-only admin password and in-memory state on a local production Next server.
+- Full multi-round browser e2e coverage remains limited to a Round 1 smoke path; deeper round progression is still tied to later current-round work.
