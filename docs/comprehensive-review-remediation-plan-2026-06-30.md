@@ -43,21 +43,21 @@ Each phase handoff should include:
 - Manual review against `docs/product-spec.md`
 - Risks, assumptions, and any deferred items
 
-## Phase 1 - Authoritative State And Concurrency
+## Phase 1 - Authoritative State Guardrails
 
-Addresses: `CR-001`, `CR-013`, `CR-014`, `CR-018`.
+Addresses: `CR-013`, `CR-014`, `CR-018`.
 
-Fix the persistence foundation before application-level behavior changes. Replace whole-state
-delete/reinsert writes for live tournament mutations with real transactional persistence. Implement
-or remove mutation-named Supabase RPCs that currently acknowledge success without mutating state.
-Lock down public `SECURITY DEFINER` function execution. Add database-level guards for core draw
-invariants where practical.
+Fix the immediately actionable persistence guardrails before application-level behavior changes.
+Implement or remove mutation-named Supabase RPCs that currently acknowledge success without
+mutating state. Lock down public `SECURITY DEFINER` function execution. Add database-level guards
+for core draw invariants where practical.
+
+`CR-001` cross-instance row-scoped persistence is intentionally deferred to Phase 9 so it can be
+closed together with hosted Supabase rehearsal and release evidence. Phase 1 may still add local
+merge/queue guardrails, but those guardrails do not close `CR-001`.
 
 Primary work:
 
-- Replace whole-snapshot writes for player ballots, admin actions, host heartbeat, draws, results,
-  and voting transitions with transactional row-scoped mutations or locked event revisions.
-- Ensure host heartbeat updates only host-lock state and cannot roll back unrelated event data.
 - Make mutation RPCs actually insert/update authoritative rows, or rename/remove them so they are
   not mistaken for committed mutation paths.
 - Revoke public/anon/authenticated execute access from tournament-changing RPCs and grant only the
@@ -68,9 +68,6 @@ Primary work:
 
 Exit criteria:
 
-- Concurrent different-player submissions both persist.
-- Concurrent same-player edits preserve the latest valid ballot.
-- Host heartbeat racing with ballot or admin mutations does not roll state back.
 - Mutation RPC tests prove actual rows change.
 - An anon Supabase client cannot call tournament-changing RPCs.
 - Invalid direct draw inserts fail at the database boundary.
@@ -255,13 +252,17 @@ Exit criteria:
 
 ## Phase 9 - Hosted Rehearsal And Release Evidence
 
-Addresses: `CR-008`, `CR-035`.
+Addresses: `CR-001`, `CR-008`, `CR-035`.
 
 Use the hardened code against a hosted non-production Supabase event, then update release evidence.
 
 Primary work:
 
 - Apply migrations to an approved non-production hosted Supabase project.
+- Replace remaining whole-snapshot live mutation saves with transactional row-scoped mutations,
+  locked event revisions, or equivalent cross-instance database concurrency control.
+- Ensure host heartbeat updates only host-lock state and cannot roll back unrelated event data in
+  hosted Supabase operation.
 - Run the app with `TOURNAMENT_STATE_BACKEND=supabase` and a non-production
   `TOURNAMENT_EVENT_ID`.
 - Rehearse all four rounds, including forced tiebreaks, refresh/redeploy survival, host lock,
@@ -273,6 +274,10 @@ Primary work:
 Exit criteria:
 
 - Hosted Supabase rehearsal is complete and documented.
+- Concurrent different-player submissions both persist in hosted Supabase operation.
+- Concurrent same-player edits preserve the latest valid ballot in hosted Supabase operation.
+- Host heartbeat racing with ballot or admin mutations does not roll state back in hosted Supabase
+  operation.
 - Event readiness docs no longer list hosted rehearsal as an unresolved blocker.
 - Final local gates are recorded from a clean shell.
 - Remaining risks are explicit and acceptable for release.
@@ -281,7 +286,7 @@ Exit criteria:
 
 | Phase | Issues |
 |---|---|
-| 1 | `CR-001`, `CR-013`, `CR-014`, `CR-018` |
+| 1 | `CR-013`, `CR-014`, `CR-018` |
 | 2 | `CR-002`, `CR-017` |
 | 3 | `CR-003`, `CR-015`, `CR-026` |
 | 4 | `CR-004`, `CR-009`, `CR-010`, `CR-011`, `CR-012`, `CR-032` |
@@ -289,4 +294,4 @@ Exit criteria:
 | 6 | `CR-005`, `CR-006`, `CR-007`, `CR-027`, `CR-028` |
 | 7 | `CR-023`, `CR-024`, `CR-025`, `CR-033`, `CR-034` |
 | 8 | `CR-029`, `CR-030`, `CR-031` |
-| 9 | `CR-008`, `CR-035` |
+| 9 | `CR-001`, `CR-008`, `CR-035` |

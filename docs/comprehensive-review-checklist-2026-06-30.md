@@ -68,6 +68,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     same-player edits preserve latest valid ballot; host heartbeat racing with
     manual ballot or draw does not roll state back; 100 concurrent submissions
     preserve 100 latest ballots.
+  - Phase 1 progress: added baseline/current/latest snapshot merge plus an in-process
+    persistence write queue, with regression tests for concurrent different-player
+    submissions, same-player latest-ballot wins, and host heartbeat vs ballot saves.
+    Deferred to remediation Phase 9 for hosted Supabase closure; this remains unchecked until the
+    Supabase save path is a database-transactional row-scoped mutation or equivalent cross-instance
+    event revision.
 
 - [ ] CR-002 - Public voter actions expose existing live ballot choices.
   - Severity: Critical.
@@ -229,7 +235,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: draw a set, change exclusions/source data, then verify audit can
     reconstruct the original eligible pool.
 
-- [ ] CR-013 - Transactional Supabase RPCs acknowledge success without mutating state.
+- [x] CR-013 - Transactional Supabase RPCs acknowledge success without mutating state.
   - Severity: Medium.
   - Files: `supabase/migrations/20260629093000_transactional_runtime_rpc.sql:27`,
     `supabase/migrations/20260629093000_transactional_runtime_rpc.sql:201`,
@@ -243,8 +249,11 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     cannot be mistaken for persistence.
   - Suggested tests: run each RPC against local Supabase/Postgres and assert actual
     rows change; invalid ballot completion is rejected.
+  - Fixed in Phase 1 remediation: placeholder commit acknowledgements are rejected
+    by the server-side RPC wrapper, and the migration overrides mutation-named RPCs
+    so they raise until implemented as row-changing transactions.
 
-- [ ] CR-014 - Supabase draw schema does not enforce core eligibility invariants.
+- [x] CR-014 - Supabase draw schema does not enforce core eligibility invariants.
   - Severity: Medium.
   - Files: `supabase/migrations/20260628050200_initial_schema.sql:108`,
     `supabase/migrations/20260628050200_initial_schema.sql:120`,
@@ -260,6 +269,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: migration tests attempting invalid inserts should fail for wrong
     level/type, excluded chart, duplicate active draw, incomplete draw, and cross-set
     duplicate song.
+  - Fixed in Phase 1 remediation: added active-draw uniqueness, draw status checks,
+    drawn-chart pool/exclusion/same-round/prior-selected-song trigger guards, and a
+    voting-open draw-completion trigger, with schema tests for those guards.
 
 - [ ] CR-015 - Emergency reopen can unexpectedly receive another low-turnout extension.
   - Severity: Medium.
@@ -303,7 +315,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     presence claims are throttled without changing state; normal 100-player voting
     still passes.
 
-- [ ] CR-018 - Public-schema `SECURITY DEFINER` RPCs need explicit execute lockdown.
+- [x] CR-018 - Public-schema `SECURITY DEFINER` RPCs need explicit execute lockdown.
   - Severity: Medium.
   - Files: `supabase/migrations/20260629093000_transactional_runtime_rpc.sql:58`,
     `supabase/migrations/20260629093000_transactional_runtime_rpc.sql:61`,
@@ -317,6 +329,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     only to `service_role`, or move functions to a private schema.
   - Suggested tests: anon Supabase client cannot call mutation RPCs; service-role
     executor still can.
+  - Fixed in Phase 1 remediation: added explicit `REVOKE EXECUTE` from `public`,
+    `anon`, and `authenticated` and `GRANT EXECUTE` to `service_role` for each
+    normalized mutation RPC, with migration coverage in unit tests.
 
 - [ ] CR-019 - Debug operational snapshot export exposes sensitive live data.
   - Severity: Medium.
