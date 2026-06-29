@@ -22,9 +22,21 @@ function isTestLocalOriginAllowed() {
   return process.env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL === "true";
 }
 
-export function buildPublicRouteUrl(path: string, siteUrl = process.env.NEXT_PUBLIC_SITE_URL) {
+function getEffectiveSiteUrl(explicitSiteUrl?: string) {
+  if (explicitSiteUrl !== undefined) {
+    return explicitSiteUrl;
+  }
+
+  if (isTestLocalOriginAllowed()) {
+    return process.env.TOURNAMENT_TEST_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
+  }
+
+  return process.env.NEXT_PUBLIC_SITE_URL;
+}
+
+export function buildPublicRouteUrl(path: string, siteUrl?: string) {
   const routePath = path.startsWith("/") ? path : `/${path}`;
-  const trimmedSiteUrl = siteUrl?.trim().replace(/\/+$/, "");
+  const trimmedSiteUrl = getEffectiveSiteUrl(siteUrl)?.trim().replace(/\/+$/, "");
 
   if (!trimmedSiteUrl) {
     if (process.env.NODE_ENV === "production") {

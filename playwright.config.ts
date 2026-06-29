@@ -41,6 +41,7 @@ export default defineConfig({
       TOURNAMENT_STATE_BACKEND: "memory",
       TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND: "true",
       TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL: "true",
+      TOURNAMENT_TEST_PUBLIC_SITE_URL: "http://127.0.0.1:3100",
     },
   },
 });

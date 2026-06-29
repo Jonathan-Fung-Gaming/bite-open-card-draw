@@ -9,6 +9,7 @@ import {
   MemoryOperationalStateRepository,
   type OperationalStateRepository,
 } from "@/lib/persistence/repository";
+import { getTournamentEventId } from "@/lib/server/env";
 import { SupabaseOperationalStateRepository } from "@/lib/server/supabase-operational-state";
 
 export type TournamentStateBackend = "memory" | "supabase";
@@ -52,9 +53,14 @@ export function getTournamentStateBackend(): TournamentStateBackend {
 }
 
 export function getOperationalStateRepository(): OperationalStateRepository {
-  return getTournamentStateBackend() === "supabase"
-    ? new SupabaseOperationalStateRepository()
-    : getMemoryRepository();
+  const backend = getTournamentStateBackend();
+
+  if (backend === "supabase") {
+    getTournamentEventId();
+    return new SupabaseOperationalStateRepository();
+  }
+
+  return getMemoryRepository();
 }
 
 export async function hydrateTournamentState(

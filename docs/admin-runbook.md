@@ -51,6 +51,6 @@ Dangerous actions include:
 ## Persistence And Event Mode
 
 Tournament-changing actions remain server-side. For deployed or event use, set
-`TOURNAMENT_STATE_BACKEND=supabase` so the app hydrates and persists operational state through the
-Supabase snapshot repository before and after mutations. `TOURNAMENT_STATE_BACKEND=memory` is only
-for tests, local demos, or single-process development.
+`TOURNAMENT_STATE_BACKEND=supabase` and a stable `TOURNAMENT_EVENT_ID` so the app can namespace
+operational state for the active rehearsal or production event. `TOURNAMENT_STATE_BACKEND=memory` is
+only for tests, local demos, or single-process development.

@@ -1257,3 +1257,53 @@ Status: complete
 - Operational stores remain in-memory. Production event use still needs Supabase-backed persistence or an explicitly controlled single-process host.
 - GitHub Actions includes Playwright e2e and installs Chromium; if CI browser install becomes unreliable, keep e2e as a documented local rehearsal gate rather than requiring production secrets.
 - Playwright currently covers a full Round 1 smoke path; four-round validation is supported and documented as a rehearsal workflow.
+
+## Normalized Runtime Persistence Phase 1 - Event Scope And Schema
+
+Status: complete
+
+### Acceptance Criteria
+
+- `TOURNAMENT_EVENT_ID` is part of server runtime configuration and Supabase-backed runtime
+  persistence refuses to initialize when it is missing.
+- Mutable runtime tables now have an `event_id` column and nonblank event-id constraints.
+- Cross-event-colliding uniqueness now includes `event_id` for active player usernames, admin
+  sessions, draws, voting windows, eligibility, ballots, result snapshots, tiebreaks, and host
+  locks.
+- Static chart catalog, fixed rounds, fixed round sets, image assets, and the existing debug snapshot
+  table remain global for this phase.
+- Local Supabase database types now represent every core runtime table.
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (28 files, 87 tests)
+- E2E: passed with `npm run test:e2e` (2 Playwright tests)
+- Production build: passed with `npm run build`
+- Prettier check: passed for touched TypeScript and Markdown files. SQL formatting is not configured
+  because Prettier has no SQL parser in this project.
+
+### Changed Files
+
+- Added `supabase/migrations/20260629090000_event_scoped_runtime.sql`
+- Expanded `src/lib/db/database.types.ts` to cover all core tables and event-scoped columns
+- Added event-scoped schema constants and migration/type coverage tests
+- Added `TOURNAMENT_EVENT_ID` server configuration and Supabase persistence guard
+- Updated deployment/admin/event-day docs for the required event namespace
+- Added a Playwright-only public URL override so local `.env.local` event URLs cannot break e2e QR
+  assertions
+
+### Manual Review
+
+- Tournament rules: no round, draw, vote, result, tiebreak, or UI tournament behavior changed.
+- Security: `TOURNAMENT_EVENT_ID` is runtime configuration, not a browser public value or secret; the
+  service-role key, session secret, and admin password hash remain server-only.
+- Persistence: this phase prepares normalized event-scoped tables but does not yet cut runtime reads
+  or writes over from `tournament_state_snapshots`.
+
+### Risks And Assumptions
+
+- Existing Supabase projects need the new migration applied before normalized repositories can write
+  event-scoped runtime records.
+- Runtime state is still snapshot-authoritative until later normalized persistence phases replace the
+  snapshot repository.
+- Existing rows receive the migration default `local-dev`; event/rehearsal repositories must set the
+  configured `TOURNAMENT_EVENT_ID` explicitly when they are introduced.

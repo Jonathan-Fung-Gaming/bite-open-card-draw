@@ -15,7 +15,8 @@ Use this checklist on the event machine before players arrive and before every r
 - Run `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` on the release branch.
 - Confirm production environment variables are set in Vercel and not committed to Git.
 - Confirm Supabase migrations are applied.
-- Confirm `TOURNAMENT_STATE_BACKEND=supabase` is configured for deployed or event use.
+- Confirm `TOURNAMENT_STATE_BACKEND=supabase` and a stable `TOURNAMENT_EVENT_ID` are configured for
+  deployed or event use.
 - Run `rtk npm run import:charts` and confirm the output prints `Imported ... charts` plus required
   pool counts with every required pool at 7 or more.
 - Run `rtk npm run cache:chart-images` before the event. Expected output is

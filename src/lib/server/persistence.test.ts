@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAdminStateStores } from "@/lib/persistence/operational-state";
 import type { OperationalStateRepository } from "@/lib/persistence/repository";
-import { getTournamentStateBackend, withPersistedTournamentState } from "./persistence";
+import {
+  getOperationalStateRepository,
+  getTournamentStateBackend,
+  withPersistedTournamentState,
+} from "./persistence";
 
 vi.mock("server-only", () => ({}));
 
@@ -23,6 +27,17 @@ describe("server persistence safety", () => {
     expect(getTournamentStateBackend()).toBe("supabase");
   });
 
+  it("requires an event id before initializing Supabase-backed runtime persistence", () => {
+    vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
+    vi.stubEnv("TOURNAMENT_EVENT_ID", "");
+
+    expect(() => getOperationalStateRepository()).toThrow(/TOURNAMENT_EVENT_ID/);
+
+    vi.stubEnv("TOURNAMENT_EVENT_ID", "test-event");
+
+    expect(() => getOperationalStateRepository()).not.toThrow();
+  });
+
   it("restores the previous in-process state when persistence fails", async () => {
     const stores = createAdminStateStores();
     const repository: OperationalStateRepository = {
@@ -37,9 +52,13 @@ describe("server persistence safety", () => {
     stores.rosterStore.createOrUpdatePlayer({ startggUsername: "Existing", active: true });
 
     await expect(
-      withPersistedTournamentState(() => {
-        stores.rosterStore.createOrUpdatePlayer({ startggUsername: "Rolled Back", active: true });
-      }, stores, repository),
+      withPersistedTournamentState(
+        () => {
+          stores.rosterStore.createOrUpdatePlayer({ startggUsername: "Rolled Back", active: true });
+        },
+        stores,
+        repository,
+      ),
     ).rejects.toThrow("save failed");
 
     expect(stores.rosterStore.listPlayers().map((player) => player.startggUsername)).toEqual([
