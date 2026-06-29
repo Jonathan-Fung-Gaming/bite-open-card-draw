@@ -34,7 +34,8 @@ rtk npm run typecheck
 rtk npm run test
 rtk npm run test:e2e
 rtk npm run import:charts
-rtk npm run cache:chart-images -- --fallback-only
+rtk npm run cache:chart-images
+rtk npm run verify:real-chart-images
 rtk npm audit --omit=dev
 rtk npm run build
 ```
@@ -88,19 +89,21 @@ single-process development only.
 4. Run `rtk npm run cache:chart-images` for remote artwork caching. Expected success output is
    `Prepared ... image assets: N cached, M using fallback /chart-images/fallback-card.svg`.
    `N` must be greater than 0 before claiming real cached artwork is ready.
-5. If remote fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only` and
+5. Run `rtk npm run verify:real-chart-images`; it must report non-fallback cached image assets and
+   chart assignments before release closure.
+6. If remote fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only` and
    explicitly accept fallback artwork for rehearsal only. This does not close the real-image
    remediation items.
-6. Confirm `public/chart-images/cache` contains real cached image files before relying on deployed
+7. Confirm `public/chart-images/cache` contains real cached image files before relying on deployed
    non-fallback artwork. Runtime can derive deterministic cache paths from source `bg_img` when those
    public files exist.
-7. Log in to `/coolguy69`.
-8. Take host control.
-9. Review chart exclusions in `Chart Eligibility`; every exclusion or re-inclusion requires admin
+8. Log in to `/coolguy69`.
+9. Take host control.
+10. Review chart exclusions in `Chart Eligibility`; every exclusion or re-inclusion requires admin
    password re-entry and an audit reason, and required pools must stay at 7 eligible charts or more.
-10. Bulk import start.gg usernames.
-11. Mark inactive/eliminated players before opening voting.
-12. Confirm duplicate active usernames are blocked.
+11. Bulk import start.gg usernames.
+12. Mark inactive/eliminated players before opening voting.
+13. Confirm duplicate active usernames are blocked.
 
 ## Free-Tier Notes
 

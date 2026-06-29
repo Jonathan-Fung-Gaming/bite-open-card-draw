@@ -2,8 +2,8 @@
 
 ## Current Remediation Status
 
-Status: remediation phases implemented through Phase 8; not event-ready because the final closure
-gate remains blocked.
+Status: release closure work is partially complete; not event-ready because the hosted Supabase
+rehearsal portion of the final closure gate remains blocked.
 
 The app is not event-ready until every item in `docs/remediation-issue-checklist.md` is closed
 with evidence and the final closure gate in that checklist passes. The authoritative behavior
@@ -11,15 +11,97 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
-As of Remediation Phase 8, the remaining known blockers are real cached chart artwork population
-and verification (`RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028`) plus the full four-round rehearsal
-against persistent state required by the final closure gate.
+As of release closure work on 2026-06-29, real cached chart artwork population and rendering
+verification are closed (`RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028`). The remaining release
+blocker is the hosted Supabase rehearsal: an automated four-round repository-backed persistent
+rehearsal passes, but the `.env.local` Supabase URL points to a hosted `supabase.co` project and the
+app writes operational state to the fixed `primary` snapshot row, so hosted rehearsal was not run
+without explicit approval to overwrite or otherwise protect that remote state.
 
 `docs/pump_open_stage_repo_validation_checklist.md` is present in the workspace and is intentionally
 called out as a required-read project document. As of this Phase 0 remediation note, `rtk git status
 --short` reports it as untracked alongside the remediation plan and issue checklist, so these docs
 must be added to version control before release if they are not already tracked by the user's
 branch workflow.
+
+## Release Closure - 2026-06-29
+
+Status: complete for real cached artwork and automated repository-backed rehearsal coverage; not
+event-ready until an explicitly approved hosted Supabase rehearsal is completed or the hosted
+`primary` operational snapshot is protected from overwrite during rehearsal.
+
+### Acceptance Criteria
+
+- Real chart artwork: `rtk npm run cache:chart-images` runs through Node with `--use-system-ca` and
+  produced `639 cached, 0 using fallback /chart-images/fallback-card.svg`.
+- Deployable cache: `public/chart-images/cache` contains 639 real PNG files totaling 209,721,036
+  bytes.
+- Real-image gate: `rtk npm run verify:real-chart-images` verifies 639 non-fallback cached image
+  assets assigned across 4,426 charts.
+- Rendering verification: Playwright now requires rendered image paths to use `/chart-images/cache/`
+  and not `fallback-card.svg` on `/stage`, `/vote`, `/charts`, and `/results`.
+- Persistent rehearsal coverage: `persistent-tournament-flow.test.ts` now completes all four rounds
+  through the operational repository boundary, persists/restores between rounds, verifies selected
+  prior songs do not reappear, completes final reveal, and generates private CSV data for each round.
+- CSV verification: e2e still verifies private CSV auto-download after final reveal and the manual
+  `Download private ballot CSV` button; the four-round repository-backed test verifies manual
+  override markers and selected chart data in generated CSV content.
+
+### Changed Files
+
+- Cache scripts: `package.json`, `scripts/verify-real-chart-images.ts`
+- Real cached assets: `public/chart-images/cache/*.png`
+- Tests: `src/lib/integration/persistent-tournament-flow.test.ts`,
+  `tests/e2e/full-flow.spec.ts`
+- Documentation: `docs/deployment-readiness.md`, `docs/event-day-runbook.md`,
+  `docs/release-checklist.md`, `docs/release-closure-handover-2026-06-29.md`,
+  `docs/remediation-issue-checklist.md`, `docs/phase-status.md`
+
+### Checks Run
+
+- `rtk npm run cache:chart-images` - initially reproduced `0 cached, 639 using fallback` before the
+  Node CA fix; after the fix, repeated normal runs passed with `639 cached, 0 using fallback`.
+- `rtk curl.exe -I https://piugame.com/data/song_img/3f951d73d3c1c32c7d238b2ce184459d.png` -
+  returned `200 OK`, proving the source URL was reachable outside Node.
+- `rtk node -e "fetch(...)"` - reproduced Node's `UNABLE_TO_VERIFY_LEAF_SIGNATURE` cause.
+- `rtk node --use-system-ca -e "fetch(...)"` - fetched the representative image successfully.
+- `rtk npm run import:charts` - passed, imported 4,426 charts with required pool counts S16 189,
+  S17 196, S18 189, S19 167, S20 135, S21 150, S22 97, D23 125.
+- `rtk npm run verify:real-chart-images` - passed, verified 639 non-fallback cached image assets for
+  4,426 charts.
+- Cache file count check - passed, 639 real files and 209,721,036 bytes under
+  `public/chart-images/cache`.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 26 files / 76 tests.
+- `rtk npm audit --omit=dev` - passed, 0 vulnerabilities.
+- `rtk git diff --check` - passed.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+
+### Manual Review
+
+- Product rules: no round/set definitions, draw counts, ban rules, no-ban completion, voting window
+  rules, result selection, or tiebreak authority changed.
+- Artwork: fallback rendering remains available for resilience, but release closure checks now prove
+  real cached artwork exists and renders on public/player surfaces.
+- Persistence: the new four-round rehearsal uses the same operational repository snapshot boundary
+  used by the Supabase backend, but it does not write to the hosted Supabase `primary` row.
+- Security: `.env.local` was checked only for variable-name presence and public URL host; no secret
+  values were printed or committed.
+- CSV: browser e2e verifies auto/manual private CSV download for Round 1, and integration coverage
+  verifies generated CSV content across all four rounds.
+
+### Risks And Assumptions
+
+- Hosted Supabase rehearsal remains intentionally unrun. The available `.env.local` points to a
+  hosted `supabase.co` project, and the current app writes operational state to the fixed `primary`
+  snapshot row. Running the hosted rehearsal needs explicit approval or a protected rehearsal
+  snapshot strategy so real remote event state is not overwritten.
+- The real cached image files add about 200 MB of deployable public assets. Individual files are well
+  below common Git host single-file limits, but the repository and deployment artifact are larger.
+- If future environments cannot reach `piugame.com` or cannot use the system CA store, keep the
+  committed cache files in place and rerun `rtk npm run verify:real-chart-images` before release.
 
 ## Remediation Phase 0 - Align Instructions And Docs
 

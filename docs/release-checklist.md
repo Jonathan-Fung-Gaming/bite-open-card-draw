@@ -27,7 +27,8 @@ Use this checklist on the release branch before tournament use.
 - [ ] All required pools have at least 7 eligible charts.
 - [ ] Chart exclusions were reviewed.
 - [ ] `rtk npm run cache:chart-images` completed with at least 1 real cached image asset.
-- [ ] `public/chart-images/cache` contains real cached image files, or fallback artwork was explicitly accepted as a release risk.
+- [ ] `rtk npm run verify:real-chart-images` completed.
+- [ ] `public/chart-images/cache` contains real cached image files.
 - [ ] Tournament logo renders from `public/brand/tournament-logo.png`.
 - [ ] Real cached artwork rendering was verified on `/stage`, `/vote`, `/charts`, and `/results`.
 
@@ -73,7 +74,8 @@ Use this checklist on the release branch before tournament use.
 - [ ] `rtk npm run test`
 - [ ] `rtk npm run test:e2e`
 - [ ] `rtk npm run import:charts`
-- [ ] `rtk npm run cache:chart-images -- --fallback-only`
+- [ ] `rtk npm run cache:chart-images`
+- [ ] `rtk npm run verify:real-chart-images`
 - [ ] `rtk npm audit --omit=dev`
 - [ ] `rtk git diff --check`
 - [ ] `rtk npm run build`

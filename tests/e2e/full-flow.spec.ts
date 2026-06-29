@@ -13,6 +13,13 @@ function getAdminPassword() {
 }
 
 const ADMIN_PASSWORD = getAdminPassword();
+const FALLBACK_CHART_IMAGE_PATH = "/chart-images/fallback-card.svg";
+
+function expectRealCachedImagePath(source: string | null) {
+  expect(source).toBeTruthy();
+  expect(source).toContain("/chart-images/cache/");
+  expect(source).not.toContain(FALLBACK_CHART_IMAGE_PATH);
+}
 
 async function goto(page: Page, path: string) {
   await page.goto(path, { waitUntil: "domcontentloaded" });
@@ -44,12 +51,16 @@ async function expectRenderedImageElement(image: Locator) {
     .toBeGreaterThan(0);
 }
 
-async function expectRenderedStageImage(page: Page) {
-  await expectRenderedImageElement(page.getByTestId("stage-chart-image").first());
+async function expectRenderedRealStageImage(page: Page) {
+  const image = page.getByTestId("stage-chart-image").first();
+
+  await expectRenderedImageElement(image);
+  expectRealCachedImagePath(await image.getAttribute("src"));
 }
 
-async function expectRenderedBackgroundImage(locator: Locator) {
+async function expectRenderedRealBackgroundImage(locator: Locator) {
   await expect(locator).toBeVisible({ timeout: 7_000 });
+  expectRealCachedImagePath(await locator.getAttribute("data-chart-image-path"));
   await expect
     .poll(async () =>
       locator.evaluate(
@@ -160,9 +171,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: 7000,
   });
   await expectStageRows(stagePage);
-  await expectRenderedStageImage(stagePage);
+  await expectRenderedRealStageImage(stagePage);
   await expectStageRows(chartsPage);
-  await expectRenderedStageImage(chartsPage);
+  await expectRenderedRealStageImage(chartsPage);
 
   await page.getByRole("button", { name: "Open Voting", exact: true }).click();
   await expect(page.getByText("voting open")).toBeVisible();
@@ -173,7 +184,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await goto(phonePage, "/vote");
   await phonePage.getByLabel("Select your start.gg username").selectOption({ label: "Alpha" });
   await phonePage.getByRole("button", { name: "Confirm" }).click();
-  await expectRenderedBackgroundImage(phonePage.getByTestId("ballot-chart-card").first());
+  await expectRenderedRealBackgroundImage(phonePage.getByTestId("ballot-chart-card").first());
   await phonePage.getByRole("button").filter({ hasText: "S16" }).first().click();
   await phonePage.getByRole("button", { name: "Next" }).click();
   await phonePage.getByLabel("No bans for this set").check();
@@ -229,23 +240,23 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(chartsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
     timeout: 7000,
   });
-  await expectRenderedStageImage(chartsPage);
+  await expectRenderedRealStageImage(chartsPage);
   await chartsPage.close();
   await expect(phonePage.getByText("Full ban counts")).toBeVisible({ timeout: 7000 });
-  await expectRenderedBackgroundImage(phonePage.getByTestId("phone-final-chart-card").first());
+  await expectRenderedRealBackgroundImage(phonePage.getByTestId("phone-final-chart-card").first());
 
   await goto(page, "/stage");
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
   await expect(page.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card")).toHaveCount(2);
-  await expectRenderedStageImage(page);
+  await expectRenderedRealStageImage(page);
 
   await goto(page, "/charts");
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
-  await expectRenderedStageImage(page);
+  await expectRenderedRealStageImage(page);
 
   await goto(page, "/results");
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
-  await expectRenderedStageImage(page);
+  await expectRenderedRealStageImage(page);
 
   await goto(page, "/vote");
   await expect(page.getByText("Full ban counts")).toBeVisible();
@@ -278,7 +289,7 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   await page.getByRole("button", { name: "Draw Set" }).nth(0).click();
   await page.getByRole("button", { name: "Draw Set" }).nth(1).click();
   await expectStageRows(stagePage);
-  await expectRenderedStageImage(stagePage);
+  await expectRenderedRealStageImage(stagePage);
 
   await page.getByRole("button", { name: "Seed Tiebreak" }).click();
   await page.getByRole("button", { name: "Close Voting" }).click();
