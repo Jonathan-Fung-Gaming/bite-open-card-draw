@@ -1507,3 +1507,55 @@ Status: complete
   Supabase rehearsal with a non-production `TOURNAMENT_EVENT_ID` is still required before event use.
 - Active voter presence is now round-scoped for runtime reconstruction, but hosted rehearsal should
   still verify duplicate-device warnings across refresh/redeploy boundaries.
+
+## Normalized Runtime Persistence Phase 6 - Admin Sessions And Host Locks
+
+Status: complete
+
+### Acceptance Criteria
+
+- Supabase-backed admin login now writes only a SHA-256 hash of the opaque admin session token to
+  `admin_sessions`.
+- Admin session validation requires both a valid signed cookie and an active, unrevoked normalized
+  `admin_sessions` row for the configured `TOURNAMENT_EVENT_ID`.
+- Admin heartbeat refresh rotates the signed cookie, updates the stored token hash, touches
+  `last_seen_at`, and slides `expires_at` to the 10-hour inactivity window.
+- Admin logout revokes the normalized server-side session before clearing admin and host cookies.
+- Operational runtime save/load no longer deletes or creates placeholder `admin_sessions` rows;
+  session lifecycle is owned by the auth path.
+- Host locks remain persisted in normalized `host_locks` with owner session id, token hash,
+  heartbeat, expiry, and active-lock indexes for TTL lookup.
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (32 files, 107 tests)
+- Production build: passed with `npm run build`
+- E2E: passed with `npm run test:e2e` (2 Playwright tests)
+
+### Changed Files
+
+- Added `supabase/migrations/20260629110000_admin_session_host_lock_security.sql`
+- Added `src/lib/server/admin-session-store.ts`
+- Added `src/lib/server/admin-session-store.test.ts`
+- Updated `src/lib/server/admin-auth.ts` to create, validate, refresh, and revoke normalized admin
+  sessions when the runtime backend is Supabase
+- Updated `src/lib/server/normalized-operational-state.ts` so operational state replacement no
+  longer manages `admin_sessions`
+- Updated normalized cutover tests and phase docs
+
+### Manual Review
+
+- Tournament rules: no player, draw, voting, result, tiebreak, or reveal behavior changed.
+- Security: admin session database rows store token hashes only; signed cookie validation alone is no
+  longer sufficient when Supabase-backed runtime persistence is enabled.
+- Host control: the existing host-lock token hash and 15-second TTL behavior is preserved, with
+  normalized indexes added for active lock lookup.
+
+### Risks And Assumptions
+
+- Existing Supabase projects need all normalized runtime migrations through
+  `20260629110000_admin_session_host_lock_security.sql` applied before enabling the Supabase
+  backend.
+- A hosted Supabase rehearsal is still required to verify admin heartbeat, logout revocation, and
+  host-lock takeover behavior across refresh/redeploy boundaries.
+- Admin session token hash rotation means a stale pre-refresh cookie becomes invalid once a refreshed
+  cookie has been persisted for the same session id.

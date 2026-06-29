@@ -9,6 +9,10 @@ import {
   verifyAdminSessionToken,
 } from "@/lib/admin/session";
 import { verifyAdminPassword } from "@/lib/admin/password";
+import {
+  createNormalizedAdminSessionStore,
+  shouldUseNormalizedAdminSessions,
+} from "@/lib/server/admin-session-store";
 
 function getOptionalEnv(name: keyof NodeJS.ProcessEnv) {
   return process.env[name] || null;
@@ -33,8 +37,20 @@ export async function getAdminSessionFromCookies() {
 
   const cookieStore = await cookies();
   const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+  const session = verifyAdminSessionToken(token, secret);
 
-  return verifyAdminSessionToken(token, secret);
+  if (!session || !token) {
+    return null;
+  }
+
+  if (
+    shouldUseNormalizedAdminSessions() &&
+    !(await createNormalizedAdminSessionStore().validate(session, token))
+  ) {
+    return null;
+  }
+
+  return session;
 }
 
 export async function requireAdminSession() {
@@ -62,6 +78,10 @@ export async function createAdminSessionCookie(password: string) {
   const cookieStore = await cookies();
   const session = createAdminSessionToken(sessionSecret);
 
+  if (shouldUseNormalizedAdminSessions()) {
+    await createNormalizedAdminSessionStore().create(session.payload, session.token);
+  }
+
   cookieStore.set(ADMIN_SESSION_COOKIE, session.token, getCookieOptions());
 
   return session.payload;
@@ -75,14 +95,24 @@ export async function refreshAdminSessionCookie(session?: AdminSessionPayload) {
   }
 
   const cookieStore = await cookies();
+  const currentToken = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
   const currentSession =
-    session ?? verifyAdminSessionToken(cookieStore.get(ADMIN_SESSION_COOKIE)?.value, sessionSecret);
+    session ?? verifyAdminSessionToken(currentToken, sessionSecret);
 
-  if (!currentSession) {
+  if (!currentSession || !currentToken) {
     throw new Error("Admin session required.");
   }
 
   const refreshedSession = createAdminSessionToken(sessionSecret, Date.now(), currentSession.sessionId);
+
+  if (shouldUseNormalizedAdminSessions()) {
+    await createNormalizedAdminSessionStore().touch({
+      currentSession,
+      currentToken,
+      refreshedSession: refreshedSession.payload,
+      refreshedToken: refreshedSession.token,
+    });
+  }
 
   cookieStore.set(ADMIN_SESSION_COOKIE, refreshedSession.token, getCookieOptions());
 
@@ -91,6 +121,13 @@ export async function refreshAdminSessionCookie(session?: AdminSessionPayload) {
 
 export async function clearAdminCookies() {
   const cookieStore = await cookies();
+  const sessionSecret = getOptionalEnv("SESSION_SECRET");
+  const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+  const session = sessionSecret ? verifyAdminSessionToken(token, sessionSecret) : null;
+
+  if (session && token && shouldUseNormalizedAdminSessions()) {
+    await createNormalizedAdminSessionStore().revoke(session, token);
+  }
 
   cookieStore.delete(ADMIN_SESSION_COOKIE);
   cookieStore.delete(HOST_TOKEN_COOKIE);
