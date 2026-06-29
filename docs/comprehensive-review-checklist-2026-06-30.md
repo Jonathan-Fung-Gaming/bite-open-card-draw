@@ -467,7 +467,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     disable third-ban selections, disable chart bans when no-bans is checked, and
     disable no-bans while chart bans are selected.
 
-- [ ] CR-023 - `/charts` lacks explicit mobile set navigation and status.
+- [x] CR-023 - `/charts` lacks explicit mobile set navigation and status.
   - Severity: Medium.
   - Files: `src/app/charts/page.tsx:29`, `src/app/charts/page.tsx:32`.
   - Current behavior: mobile view-only stacks both sets on one page with no set
@@ -478,8 +478,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     compact status banner for voting open/closed/revealing/final.
   - Suggested tests: mobile Playwright for `/charts`: verify Set 1/Set 2 navigation,
     no vote controls, no username selector, final state shows selected charts first.
+  - Phase 7 closure: `/charts` now renders a view-only status banner and mobile
+    Set 1/Set 2 tabs with next/back controls. Desktop still shows both sets together.
+    Playwright verifies mobile tab switching, voting-open status, and absence of
+    username or submit controls.
 
-- [ ] CR-024 - Ballot chart selection needs clearer ban affordance and accessibility.
+- [x] CR-024 - Ballot chart selection needs clearer ban affordance and accessibility.
   - Severity: Medium.
   - Files: `src/app/vote/BallotFlow.tsx:346`,
     `src/app/vote/BallotFlow.tsx:595`.
@@ -492,8 +496,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     selected` counter, and feedback when the limit is reached.
   - Suggested tests: keyboard/screen-reader pass; Playwright asserts `aria-pressed`
     toggles and third selection shows feedback without changing prior selections.
+  - Phase 7 closure: vote cards now expose `aria-pressed`, visible `Ban selected`
+    state, a `0/2 bans selected` counter, and explicit limit feedback when a third
+    ban is attempted. Playwright verifies the third attempt leaves the first two
+    selections intact.
 
-- [ ] CR-025 - Ballot card text can overflow on narrow phones.
+- [x] CR-025 - Ballot card text can overflow on narrow phones.
   - Severity: Medium.
   - Files: `src/app/vote/BallotFlow.tsx:591`,
     `src/app/vote/BallotFlow.tsx:614`.
@@ -505,6 +513,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     `PublicDrawSetPanel`.
   - Suggested tests: screenshot test with long song/artist names at 360px and 390px;
     assert no text overlaps or escapes card bounds.
+  - Phase 7 closure: ballot cards now use stable minimum heights, constrained widths
+    for the centered seventh card, `min-w-0`, `break-words`, and line clamps for
+    chart names and artists. The phone e2e flow now runs at 390px width.
 
 - [x] CR-026 - `round_complete` phone state can show pre-vote copy instead of final charts.
   - Severity: Medium.
@@ -617,7 +628,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
 
 ## Low
 
-- [ ] CR-033 - Saved ballot edit flow is functional but awkward on mobile.
+- [x] CR-033 - Saved ballot edit flow is functional but awkward on mobile.
   - Severity: Low.
   - Files: `src/app/vote/BallotFlow.tsx:491`,
     `src/app/vote/BallotFlow.tsx:520`, `src/app/vote/BallotFlow.tsx:561`.
@@ -629,8 +640,11 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     and keep live timer/status visible while editing.
   - Suggested tests: mobile QA for submitted ballot edit; change each set, resubmit,
     and verify timestamp/revision updates.
+  - Phase 7 closure: saved-ballot and review screens now include direct `Edit
+    [set label]` actions that jump to the chosen set. Playwright edits S16 directly
+    from the saved screen and verifies the saved revision increments.
 
-- [ ] CR-034 - Legacy `ChartSetPanel` still encodes a non-checklist 2/4-column layout.
+- [x] CR-034 - Legacy `ChartSetPanel` still encodes a non-checklist 2/4-column layout.
   - Severity: Low.
   - Files: `src/components/ChartSetPanel.tsx:24`, `src/components/index.ts:3`.
   - Current behavior: `ChartSetPanel` is exported and uses `grid-cols-2` /
@@ -641,6 +655,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     reused for stage/phone layouts by accident.
   - Suggested tests: grep/test preventing `ChartSetPanel` from being imported into
     `/stage`, `/vote`, or `/charts` unless intentionally redesigned.
+  - Phase 7 closure: `src/components/ChartSetPanel.tsx` was removed and the barrel
+    export was deleted. Source grep no longer finds `ChartSetPanel` under `src`.
 
 - [ ] CR-035 - Debug/release docs should record final e2e retry result.
   - Severity: Low.
