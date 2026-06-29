@@ -1347,3 +1347,51 @@ Status: complete
 - Repository methods are intentionally minimal boundary primitives; transactional writes are deferred
   to Phase 3.
 - Runtime state remains snapshot-authoritative until the Phase 4 cutover.
+
+## Normalized Runtime Persistence Phase 3 - Transactional Mutations
+
+Status: complete
+
+### Acceptance Criteria
+
+- Added normalized transactional RPC entrypoints for ballot submit/edit, manual ballot override,
+  active voter presence claim/touch, host lock acquire/heartbeat/release, voting window state
+  changes, draw/reroll operations, post-vote reroll invalidation, result compute/reveal/override,
+  round reset, and admin session create/touch/logout/revoke.
+- Added `active_voter_presence` with event scope and RLS for duplicate-device/presence workflows.
+- Added ballot invalidation columns needed for post-vote reroll recovery and audit.
+- Added a server-only transactional executor that validates payloads, attaches `TOURNAMENT_EVENT_ID`,
+  and calls the mapped Supabase RPC through the service-role client.
+- Local Supabase database types now include the presence table, ballot invalidation columns, and
+  normalized RPC function signatures.
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (30 files, 99 tests)
+- Production build: passed with `npm run build`
+- E2E: passed with `npm run test:e2e` (2 Playwright tests)
+
+### Changed Files
+
+- Added `supabase/migrations/20260629093000_transactional_runtime_rpc.sql`
+- Added `src/lib/server/transactions/normalized-runtime.ts`
+- Added `src/lib/server/transactions/normalized-runtime.test.ts`
+- Updated schema constants, database types, schema tests, and player repository table coverage
+- Updated phase status
+
+### Manual Review
+
+- Tournament rules: no current runtime tournament behavior changed; existing actions still use the
+  snapshot-backed stores until cutover.
+- Security: transactional executor imports `server-only`, uses the service-role RPC boundary, and
+  does not expose service keys, admin password hashes, session secrets, or token hashes to browser
+  components.
+- Transactionality: each normalized mutation goes through a single Supabase RPC call, so the
+  database-side implementation has an atomic commit/rollback boundary for dependent records.
+
+### Risks And Assumptions
+
+- Runtime state remains snapshot-authoritative until Phase 4 replaces snapshot load/save with
+  normalized repositories and RPC calls.
+- RPC bodies currently establish the operation-specific transaction boundary and validation surface;
+  Phase 4 must connect the existing tournament logic to these boundaries before deployed Supabase
+  state is authoritative.

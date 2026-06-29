@@ -51,9 +51,16 @@ describe("Phase 2 database schema", () => {
 
   it("adds event scope to every mutable runtime table", () => {
     for (const table of EVENT_SCOPED_DATABASE_TABLES) {
-      expect(migration).toMatch(
-        new RegExp(`alter table public\\.${table}\\s+add column if not exists event_id`, "i"),
-      );
+      const addsEventColumn = new RegExp(
+        `alter table public\\.${table}\\s+add column if not exists event_id`,
+        "i",
+      ).test(migration);
+      const createsEventColumn = new RegExp(
+        `create table if not exists public\\.${table}\\s*\\([\\s\\S]*?event_id text not null`,
+        "i",
+      ).test(migration);
+
+      expect(addsEventColumn || createsEventColumn).toBe(true);
       expect(migration).toMatch(
         new RegExp(
           `constraint ${table}_event_id_not_blank check \\(length\\(trim\\(event_id\\)\\) > 0\\)`,
