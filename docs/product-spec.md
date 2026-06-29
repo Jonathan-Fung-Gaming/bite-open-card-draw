@@ -196,7 +196,7 @@ Results use ban counts only, not percentages.
 
 For each chart set:
 
-- reveal from most banned to least banned
+- reveal from least banned to most banned
 - show ban count badges and/or small bars
 - reveal non-winning ties alphabetically
 - if the least-banned chart is unique, select it

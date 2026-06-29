@@ -25,8 +25,30 @@ function getMemoryRepository() {
   );
 }
 
+function isTestMemoryBackendAllowed() {
+  return process.env.TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND === "true";
+}
+
 export function getTournamentStateBackend(): TournamentStateBackend {
-  return process.env.TOURNAMENT_STATE_BACKEND === "supabase" ? "supabase" : "memory";
+  const configuredBackend = process.env.TOURNAMENT_STATE_BACKEND;
+
+  if (configuredBackend === "supabase" || configuredBackend === "memory") {
+    if (
+      process.env.NODE_ENV === "production" &&
+      configuredBackend !== "supabase" &&
+      !isTestMemoryBackendAllowed()
+    ) {
+      throw new Error("TOURNAMENT_STATE_BACKEND=supabase is required in production.");
+    }
+
+    return configuredBackend;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("TOURNAMENT_STATE_BACKEND must be explicitly set to supabase in production.");
+  }
+
+  return "memory";
 }
 
 export function getOperationalStateRepository(): OperationalStateRepository {
@@ -59,8 +81,17 @@ export async function withPersistedTournamentState<T>(
   repository = getOperationalStateRepository(),
 ) {
   await hydrateTournamentState(stores, repository);
-  const result = await callback();
-  await persistTournamentState(stores, repository);
+  const rollbackSnapshot = createOperationalStateSnapshot(stores);
 
-  return result;
+  try {
+    const result = await callback();
+
+    await persistTournamentState(stores, repository);
+
+    return result;
+  } catch (error) {
+    restoreOperationalStateSnapshot(stores, rollbackSnapshot);
+
+    throw error;
+  }
 }

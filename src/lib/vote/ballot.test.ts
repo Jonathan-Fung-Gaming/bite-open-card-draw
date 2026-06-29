@@ -100,6 +100,33 @@ describe("ballot validation and store", () => {
     expect(store.getPhoneStatus(1).phase).toBe("revealed");
   });
 
+  it("warns when another active device has claimed the same player", () => {
+    const store = new BallotStore();
+
+    const first = store.claimVoterPresence({
+      roundNumber: 1,
+      playerId: "player-1",
+      deviceId: "device-a",
+      nowMs: 1_000,
+    });
+    const second = store.claimVoterPresence({
+      roundNumber: 1,
+      playerId: "player-1",
+      deviceId: "device-b",
+      nowMs: 2_000,
+    });
+    const afterExpiry = store.claimVoterPresence({
+      roundNumber: 1,
+      playerId: "player-1",
+      deviceId: "device-c",
+      nowMs: 200_000,
+    });
+
+    expect(first.hasOtherActiveDevice).toBe(false);
+    expect(second.hasOtherActiveDevice).toBe(true);
+    expect(afterExpiry.hasOtherActiveDevice).toBe(false);
+  });
+
   it("marks post-close manual ballots as overrides for export", () => {
     const store = new BallotStore();
     const draws = [draw("set-1", "S16", "16"), draw("set-2", "S17", "17")];
@@ -128,5 +155,38 @@ describe("ballot validation and store", () => {
     expect(ballot.manualReason).toBe("phone died");
     expect(ballot.manualOverride).toBe(true);
     expect(countBanSelections([ballot])).toBe(1);
+  });
+
+  it("invalidates round ballots with trace metadata for post-vote rerolls", () => {
+    const store = new BallotStore();
+    const draws = [draw("set-1", "S16", "16"), draw("set-2", "S17", "17")];
+    const firstChart = draws[0]?.charts[0]?.id ?? "";
+
+    const ballot = store.submit(
+      {
+        roundNumber: 1,
+        playerId: "player-3",
+        playerStartggUsername: "TracePlayer",
+        choices: [
+          { roundSetId: "set-1", displayLabel: "S16", noBans: false, bannedChartIds: [firstChart] },
+          { roundSetId: "set-2", displayLabel: "S17", noBans: true, bannedChartIds: [] },
+        ],
+      },
+      draws,
+      "submitted",
+    );
+
+    const invalidation = store.invalidateRound({
+      roundNumber: 1,
+      reason: "post-vote reroll",
+      adminSessionId: "session-a",
+      invalidatedAt: "invalidated",
+    });
+    const snapshot = store.exportSnapshot();
+
+    expect(store.listForRound(1)).toHaveLength(0);
+    expect(invalidation.ballotIds).toEqual([ballot.id]);
+    expect(invalidation.ballots[0]?.playerStartggUsername).toBe("TracePlayer");
+    expect(snapshot.ballotInvalidations?.[0]?.reason).toBe("post-vote reroll");
   });
 });

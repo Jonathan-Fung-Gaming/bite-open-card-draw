@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_TTL_SECONDS,
+  type AdminSessionPayload,
   createAdminSessionToken,
   HOST_TOKEN_COOKIE,
   verifyAdminSessionToken,
@@ -43,7 +44,7 @@ export async function requireAdminSession() {
     throw new Error("Admin session required.");
   }
 
-  return session;
+  return refreshAdminSessionCookie(session);
 }
 
 export async function createAdminSessionCookie(password: string) {
@@ -64,6 +65,28 @@ export async function createAdminSessionCookie(password: string) {
   cookieStore.set(ADMIN_SESSION_COOKIE, session.token, getCookieOptions());
 
   return session.payload;
+}
+
+export async function refreshAdminSessionCookie(session?: AdminSessionPayload) {
+  const sessionSecret = getOptionalEnv("SESSION_SECRET");
+
+  if (!sessionSecret) {
+    throw new Error("Admin auth is not configured.");
+  }
+
+  const cookieStore = await cookies();
+  const currentSession =
+    session ?? verifyAdminSessionToken(cookieStore.get(ADMIN_SESSION_COOKIE)?.value, sessionSecret);
+
+  if (!currentSession) {
+    throw new Error("Admin session required.");
+  }
+
+  const refreshedSession = createAdminSessionToken(sessionSecret, Date.now(), currentSession.sessionId);
+
+  cookieStore.set(ADMIN_SESSION_COOKIE, refreshedSession.token, getCookieOptions());
+
+  return refreshedSession.payload;
 }
 
 export async function clearAdminCookies() {

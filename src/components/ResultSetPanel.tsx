@@ -53,7 +53,7 @@ export function ResultSetPanel({ set, showWinner = false, serverNowMs }: ResultS
           <h2 className="mt-1 text-2xl font-black uppercase text-white">Ban Counts</h2>
         </div>
         <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
-          Most banned to least banned
+          Least banned to most banned
         </p>
       </div>
       <div className="mt-4 grid gap-3">
@@ -118,6 +118,8 @@ export function ResultSetPanel({ set, showWinner = false, serverNowMs }: ResultS
                 slots={set.wheelSlots}
                 winnerChartId={set.selectedChart.id}
                 winnerRevealed={tiebreakWinnerRevealed}
+                winnerRevealStartedAt={set.winnerRevealStartedAt}
+                nowMs={nowMs}
               />
             ) : (
               <div

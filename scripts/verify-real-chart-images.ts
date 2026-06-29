@@ -19,6 +19,8 @@ function fail(message: string): never {
 const generatedDir = path.resolve(process.cwd(), "data/generated");
 const assetsPath = path.join(generatedDir, "image-assets.json");
 const chartsWithImagesPath = path.join(generatedDir, "charts-with-images.json");
+const MAX_CACHE_BYTES = 250 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 1 * 1024 * 1024;
 
 if (!existsSync(assetsPath) || !existsSync(chartsWithImagesPath)) {
   fail("Missing generated chart image metadata. Run npm run import:charts and npm run cache:chart-images first.");
@@ -50,6 +52,25 @@ if (missingFiles.length > 0) {
   );
 }
 
+const fileSizes = cachedAssets.map((asset) => ({
+  asset,
+  size: statSync(publicFilePath(asset.localPath)).size,
+}));
+const totalCacheBytes = fileSizes.reduce((total, file) => total + file.size, 0);
+const oversizedFile = fileSizes.find((file) => file.size > MAX_IMAGE_BYTES);
+
+if (totalCacheBytes > MAX_CACHE_BYTES) {
+  fail(
+    `Cached chart artwork is ${(totalCacheBytes / 1024 / 1024).toFixed(1)} MB, over the ${(MAX_CACHE_BYTES / 1024 / 1024).toFixed(0)} MB budget.`,
+  );
+}
+
+if (oversizedFile) {
+  fail(
+    `${oversizedFile.asset.localPath} is ${(oversizedFile.size / 1024).toFixed(1)} KB, over the ${(MAX_IMAGE_BYTES / 1024).toFixed(0)} KB per-file budget.`,
+  );
+}
+
 const nonFallbackChartCount = charts.filter(
   (chart) => chart.localImagePath && chart.localImagePath !== FALLBACK_CHART_IMAGE_PATH,
 ).length;
@@ -60,5 +81,8 @@ if (nonFallbackChartCount === 0) {
 
 console.log(
   `Verified ${cachedAssets.length} non-fallback cached image assets for ${nonFallbackChartCount} charts.`,
+);
+console.log(
+  `Image cache budget: ${(totalCacheBytes / 1024 / 1024).toFixed(1)} MB total, largest ${(Math.max(...fileSizes.map((file) => file.size)) / 1024).toFixed(1)} KB.`,
 );
 console.log(`Sample cached artwork: ${cachedAssets[0]?.localPath}`);

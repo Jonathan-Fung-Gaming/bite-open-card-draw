@@ -1,6 +1,7 @@
-import { ResultSetPanel, RoundHeader, StageDrawCard } from "@/components";
+import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { hydrateTournamentState } from "@/lib/server/persistence";
+import { ResultsAutoRefresh } from "./ResultsAutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function ResultsPage() {
   if (!result || result.revealPhase !== "final") {
     return (
       <main className="min-h-screen">
+        <ResultsAutoRefresh />
         <RoundHeader title={`Round ${roundNumber} Results`} status="Awaiting stage reveal" />
         <section className="mx-auto max-w-3xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300">
@@ -28,16 +30,7 @@ export default async function ResultsPage() {
     <main className="min-h-screen">
       <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Results revealed" />
       <section className="mx-auto grid max-w-6xl gap-5 px-5 py-5">
-        <div className="grid gap-4 md:grid-cols-2">
-          {result.sets.map((set, index) => (
-            <StageDrawCard key={set.roundSetId} chart={set.selectedChart} index={index + 1} />
-          ))}
-        </div>
-        <div className="grid gap-5">
-          {result.sets.map((set) => (
-            <ResultSetPanel key={set.roundSetId} set={set} showWinner />
-          ))}
-        </div>
+        <PublicResultSummary result={result} />
       </section>
     </main>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 
 type PrivateCsvDownloadProps = {
   roundNumber: 1 | 2 | 3 | 4;
@@ -28,7 +28,6 @@ function downloadTextFile(filename: string, text: string) {
 export function PrivateCsvDownload({ roundNumber, enabled, autoDownloadKey, action }: PrivateCsvDownloadProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const autoStarted = useRef(false);
 
   const startDownload = useCallback(() => {
     if (!enabled || isPending) {
@@ -48,7 +47,7 @@ export function PrivateCsvDownload({ roundNumber, enabled, autoDownloadKey, acti
   }, [action, enabled, isPending, roundNumber]);
 
   useEffect(() => {
-    if (!enabled || !autoDownloadKey || autoStarted.current) {
+    if (!enabled || !autoDownloadKey) {
       return;
     }
 
@@ -58,7 +57,6 @@ export function PrivateCsvDownload({ roundNumber, enabled, autoDownloadKey, acti
       return;
     }
 
-    autoStarted.current = true;
     window.localStorage.setItem(storageKey, "done");
     startDownload();
   }, [autoDownloadKey, enabled, startDownload]);

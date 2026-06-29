@@ -8,18 +8,42 @@ type QRPanelProps = {
 };
 
 export async function QRPanel({ roomPath = "/room" }: QRPanelProps) {
-  const roomUrl = buildPublicRouteUrl(roomPath);
+  let roomUrl: string;
+  let qrSvg: string;
+
+  try {
+    roomUrl = buildPublicRouteUrl(roomPath);
+    qrSvg = await QRCode.toString(roomUrl, {
+      type: "svg",
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 320,
+      color: {
+        dark: "#080706",
+        light: "#ffffff",
+      },
+    });
+  } catch (error) {
+    return (
+      <section
+        className="metal-panel rounded-lg border border-ember-300/45 p-4"
+        data-testid="room-qr-setup-error"
+      >
+        <div className="flex items-center gap-3 text-ember-300">
+          <QrCode aria-hidden="true" className="h-6 w-6" />
+          <p className="text-xs font-semibold uppercase tracking-[0.22em]">QR setup error</p>
+        </div>
+        <p className="mt-4 text-sm font-bold text-white">
+          Configure NEXT_PUBLIC_SITE_URL to the absolute public event origin before using QR entry.
+        </p>
+        <p className="mt-2 text-xs text-metal-300">
+          {error instanceof Error ? error.message : "Could not generate the public room QR code."}
+        </p>
+      </section>
+    );
+  }
+
   const shortRoomUrl = formatShortEventUrl(roomUrl);
-  const qrSvg = await QRCode.toString(roomUrl, {
-    type: "svg",
-    errorCorrectionLevel: "M",
-    margin: 1,
-    width: 320,
-    color: {
-      dark: "#080706",
-      light: "#ffffff",
-    },
-  });
 
   return (
     <section className="metal-panel rounded-lg p-4" data-testid="room-qr-panel">

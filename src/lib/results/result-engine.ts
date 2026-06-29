@@ -56,8 +56,8 @@ export const RESULT_REVEAL_PHASES: ResultRevealPhase[] = [
 ];
 
 function sortResultRows(left: ResultChartRow, right: ResultChartRow) {
-  if (right.banCount !== left.banCount) {
-    return right.banCount - left.banCount;
+  if (left.banCount !== right.banCount) {
+    return left.banCount - right.banCount;
   }
 
   return left.chart.name.localeCompare(right.chart.name);

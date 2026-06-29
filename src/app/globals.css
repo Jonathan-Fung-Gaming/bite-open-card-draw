@@ -71,10 +71,83 @@ select {
   animation: rune-wheel-scroll var(--rune-wheel-duration, 5s) cubic-bezier(0.16, 0.84, 0.28, 1) both;
 }
 
+.rune-wheel-shell {
+  aspect-ratio: 1;
+  position: relative;
+  width: min(100%, 22rem);
+}
+
+.rune-wheel-circle {
+  border: 1px solid rgba(255, 185, 92, 0.22);
+  border-radius: 9999px;
+  height: 100%;
+  position: relative;
+  transition: transform 240ms linear;
+  width: 100%;
+}
+
+.rune-wheel-hub {
+  background:
+    radial-gradient(circle, rgba(255, 122, 26, 0.24), rgba(17, 16, 15, 0.95) 58%),
+    #11100f;
+  border: 1px solid rgba(255, 185, 92, 0.28);
+  border-radius: 9999px;
+  height: 38%;
+  left: 31%;
+  position: absolute;
+  top: 31%;
+  width: 38%;
+}
+
+.rune-wheel-pointer {
+  border-left: 0.75rem solid transparent;
+  border-right: 0.75rem solid transparent;
+  border-top: 1rem solid #ffb95c;
+  filter: drop-shadow(0 0 10px rgba(255, 122, 26, 0.45));
+  left: calc(50% - 0.75rem);
+  position: absolute;
+  top: -0.25rem;
+  z-index: 3;
+}
+
+.rune-wheel-slot {
+  height: 4.75rem;
+  left: calc(50% - 2.375rem);
+  position: absolute;
+  top: calc(50% - 2.375rem);
+  transform: rotate(var(--rune-slot-angle)) translateY(-8.25rem)
+    rotate(var(--rune-slot-counter-angle));
+  width: 4.75rem;
+}
+
+.public-chart-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.public-chart-grid > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(100%, calc((100% - 0.75rem) / 2));
+}
+
 .qr-code-svg svg {
   display: block;
   height: auto;
   width: 100%;
+}
+
+@media (min-width: 768px) {
+  .public-chart-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .public-chart-grid > :last-child:nth-child(odd) {
+    grid-column: auto;
+    justify-self: stretch;
+    width: auto;
+  }
 }
 
 @keyframes rune-wheel-scroll {

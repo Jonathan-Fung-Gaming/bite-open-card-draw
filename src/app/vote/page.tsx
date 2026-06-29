@@ -1,5 +1,4 @@
-import { RoundHeader } from "@/components";
-import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
+import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import {
@@ -57,73 +56,25 @@ export default async function VotePage() {
   }
 
   if (snapshot.status === "results_revealed") {
-    const selectedCharts =
-      result?.revealPhase === "final"
-        ? result.sets.map((set) => set.selectedChart)
-        : phoneStatus.phase === "revealed"
-          ? phoneStatus.selectedCharts
-          : [];
-
     return (
       <main className="min-h-screen">
         <VoteAutoRefresh />
         <RoundHeader title={`Round ${roundNumber} Final Charts`} status="Results revealed" />
         <section className="mx-auto max-w-4xl px-5 py-5">
-          <div className="metal-panel rounded-lg p-5">
-            {selectedCharts.length === 2 ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                {selectedCharts.map((chart) => (
-                  <article
-                    key={chart.id}
-                    className="relative min-h-40 overflow-hidden rounded border border-ember-300/30 bg-black/25 bg-cover bg-center p-4"
-                    data-chart-image-path={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
-                    data-testid="phone-final-chart-card"
-                    style={{
-                      backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.9)), url(${
-                        chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH
-                      })`,
-                    }}
-                  >
-                    <p className="relative text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
-                      {chart.displayDifficulty}
-                    </p>
-                    <h2 className="relative mt-2 text-2xl font-black uppercase text-white">
-                      {chart.name}
-                    </h2>
-                    <p className="relative mt-1 text-metal-300">{chart.artist}</p>
-                  </article>
-                ))}
-              </div>
-            ) : (
+          {result?.revealPhase === "final" ? (
+            <PublicResultSummary result={result} selectedCardTestId="phone-final-chart-card" />
+          ) : (
+            <div className="metal-panel rounded-lg p-5">
               <p className="text-metal-300">
                 Final charts will appear here after result computation stores them.
               </p>
-            )}
-            <details className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
-              <summary className="cursor-pointer font-bold uppercase text-ember-300">
-                Full ban counts
-              </summary>
-              {result?.revealPhase === "final" ? (
-                <div className="mt-3 grid gap-3">
-                  {result.sets.map((set) => (
-                    <div key={set.roundSetId}>
-                      <p className="font-bold text-white">{set.displayLabel}</p>
-                      <ol className="mt-2 grid gap-1">
-                        {set.rows.map((row) => (
-                          <li key={row.chart.id} className="flex justify-between gap-3">
-                            <span>{row.chart.name}</span>
-                            <span className="font-mono text-ember-300">{row.banCount}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2">Ban counts are available after result computation.</p>
-              )}
-            </details>
-          </div>
+              {phoneStatus.phase === "revealed" ? (
+                <p className="mt-3 text-sm text-metal-300">
+                  Phone reveal state is ready; the committed result snapshot is still loading.
+                </p>
+              ) : null}
+            </div>
+          )}
         </section>
       </main>
     );

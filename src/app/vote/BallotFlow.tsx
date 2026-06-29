@@ -6,7 +6,12 @@ import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import type { BallotSetChoice, RoundBallot } from "@/lib/vote/ballot";
 import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
-import { getExistingBallotAction, getVoteLiveStateAction, submitRoundBallotAction } from "./actions";
+import {
+  claimVoterPresenceAction,
+  getExistingBallotAction,
+  getVoteLiveStateAction,
+  submitRoundBallotAction,
+} from "./actions";
 
 type BallotFlowProps = {
   roundNumber: 1 | 2 | 3 | 4;
@@ -21,6 +26,7 @@ type BallotFlowProps = {
 };
 
 const IDENTITY_STORAGE_KEY = "bite-open-card-draw:startgg-identity:v1";
+const DEVICE_STORAGE_KEY = "bite-open-card-draw:device-id:v1";
 
 function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
   return draws.map((draw) => ({
@@ -63,6 +69,17 @@ function rememberIdentity(player: EligiblePlayerSnapshot) {
       startggUsername: player.startggUsername,
     }),
   );
+}
+
+function getDeviceId() {
+  let deviceId = window.localStorage.getItem(DEVICE_STORAGE_KEY);
+
+  if (!deviceId) {
+    deviceId = window.crypto.randomUUID();
+    window.localStorage.setItem(DEVICE_STORAGE_KEY, deviceId);
+  }
+
+  return deviceId;
 }
 
 function choicesFromBallot(draws: DrawRecord[], ballot: RoundBallot) {
@@ -116,6 +133,7 @@ export function BallotFlow({
   const [choices, setChoices] = useState(() => emptyChoices(draws));
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [presenceWarning, setPresenceWarning] = useState<string | null>(null);
   const [existingBallot, setExistingBallot] = useState<RoundBallot | null>(null);
   const [lookupPending, setLookupPending] = useState(false);
   const [liveCanSubmit, setLiveCanSubmit] = useState(initialCanSubmit);
@@ -170,6 +188,29 @@ export function BallotFlow({
       }
     },
     [draws, roundNumber],
+  );
+
+  const claimPresence = useCallback(
+    async (player: EligiblePlayerSnapshot) => {
+      try {
+        const presence = await claimVoterPresenceAction({
+          roundNumber,
+          playerId: player.id,
+          deviceId: getDeviceId(),
+        });
+
+        if (presence.hasOtherActiveDevice) {
+          setPresenceWarning(
+            `Another active device has already claimed ${player.startggUsername}. You can continue, but the latest valid submitted ballot will count.`,
+          );
+        } else {
+          setPresenceWarning(null);
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Could not claim voter presence.");
+      }
+    },
+    [roundNumber],
   );
 
   const warning = useMemo(() => {
@@ -282,6 +323,20 @@ export function BallotFlow({
     };
   }, [confirmed, draws, roundNumber, router, savedAt, selectedPlayerId]);
 
+  useEffect(() => {
+    if (!confirmed || !selectedPlayer || !liveCanSubmit) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      void claimPresence(selectedPlayer);
+    }, 30_000);
+
+    void claimPresence(selectedPlayer);
+
+    return () => window.clearInterval(interval);
+  }, [claimPresence, confirmed, liveCanSubmit, selectedPlayer]);
+
   function updateChoice(nextChoice: BallotSetChoice) {
     setChoices((current) => current.map((choice, index) => (index === step ? nextChoice : choice)));
   }
@@ -382,6 +437,7 @@ export function BallotFlow({
             setConfirmed(false);
             setSavedAt(null);
             setExistingBallot(null);
+            setPresenceWarning(null);
             setChoices(emptyChoices(draws));
             setMessage(null);
             if (playerId) {
@@ -406,12 +462,18 @@ export function BallotFlow({
             {warning}
           </p>
         ) : null}
+        {presenceWarning ? (
+          <p className="mt-3 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">
+            {presenceWarning}
+          </p>
+        ) : null}
         <button
           className="button-metal mt-5 w-full rounded px-4 py-3 font-black uppercase disabled:opacity-40"
           disabled={!selectedPlayer || lookupPending || !liveCanSubmit}
           onClick={() => {
             if (selectedPlayer) {
               rememberIdentity(selectedPlayer);
+              void claimPresence(selectedPlayer);
             }
 
             setConfirmed(true);

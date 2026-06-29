@@ -38,6 +38,9 @@ export default defineConfig({
       SUPABASE_SERVICE_ROLE_KEY: `test-only-${randomBytes(12).toString("hex")}`,
       ADMIN_PASSWORD_HASH: adminPasswordHash,
       SESSION_SECRET: randomBytes(32).toString("hex"),
+      TOURNAMENT_STATE_BACKEND: "memory",
+      TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND: "true",
+      TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL: "true",
     },
   },
 });

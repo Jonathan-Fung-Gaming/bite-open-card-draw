@@ -1,6 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import {
+  createOperationalStateSnapshot,
+  restoreOperationalStateSnapshot,
+} from "@/lib/persistence/operational-state";
 import { adminState } from "@/lib/server/admin-state";
 import { hydrateTournamentState, persistTournamentState } from "@/lib/server/persistence";
 import {
@@ -38,8 +42,34 @@ export async function getVoteLiveStateAction(roundNumber: 1 | 2 | 3 | 4, playerI
   };
 }
 
+export async function claimVoterPresenceAction(input: {
+  roundNumber: 1 | 2 | 3 | 4;
+  playerId: string;
+  deviceId: string;
+}) {
+  await hydrateTournamentState();
+
+  const snapshot = getVotingRoundSnapshot(input.roundNumber);
+  const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === input.playerId);
+
+  if (!snapshot.canSubmit) {
+    throw new Error("Voting is not open for voter presence claims.");
+  }
+
+  if (!player) {
+    throw new Error("This start.gg username is not eligible for the open voting window.");
+  }
+
+  const presence = adminState.ballotStore.claimVoterPresence(input);
+
+  await persistTournamentState();
+
+  return presence;
+}
+
 export async function submitRoundBallotAction(input: SubmitRoundBallotInput) {
   await hydrateTournamentState();
+  const rollbackSnapshot = createOperationalStateSnapshot(adminState);
 
   const snapshot = getVotingRoundSnapshot(input.roundNumber);
   const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === input.playerId);
@@ -64,7 +94,12 @@ export async function submitRoundBallotAction(input: SubmitRoundBallotInput) {
   );
 
   getVotingRoundSnapshot(input.roundNumber);
-  await persistTournamentState();
+  try {
+    await persistTournamentState();
+  } catch (error) {
+    restoreOperationalStateSnapshot(adminState, rollbackSnapshot);
+    throw error;
+  }
   revalidateTournamentViews(revalidatePath);
 
   return ballot;

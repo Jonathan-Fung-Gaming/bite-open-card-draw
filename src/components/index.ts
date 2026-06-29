@@ -4,6 +4,8 @@ export { ChartSetPanel } from "./ChartSetPanel";
 export { CountdownTimer } from "./CountdownTimer";
 export { DangerousActionDialog } from "./DangerousActionDialog";
 export { HostLockBadge } from "./HostLockBadge";
+export { PublicDrawSetPanel } from "./PublicDrawSetPanel";
+export { PublicResultSummary } from "./PublicResultSummary";
 export { QRPanel } from "./QRPanel";
 export { ResultSetPanel } from "./ResultSetPanel";
 export { RoundHeader } from "./RoundHeader";

@@ -19,12 +19,20 @@ const requiredMutationNames: MutationName[] = [
   "openVotingWindow",
   "pauseVotingWindow",
   "resumeVotingWindow",
+  "reopenVotingWindow",
   "submitBallot",
   "manualBallotOverride",
   "closeVotingWindow",
+  "resetRound",
   "computeResults",
   "commitTiebreak",
   "markResultsRevealed",
+  "advanceResultReveal",
+  "overrideResult",
+  "setCurrentRound",
+  "advanceCurrentRound",
+  "startRehearsalMode",
+  "resetRehearsalMode",
   "exportPrivateCsv",
 ];
 
@@ -41,6 +49,11 @@ describe("Phase 2 mutation contracts", () => {
       "rerollRoundSet",
       "rerollFullRound",
       "manualBallotOverride",
+      "reopenVotingWindow",
+      "resetRound",
+      "overrideResult",
+      "startRehearsalMode",
+      "resetRehearsalMode",
     ] as const) {
       const result = MUTATION_CONTRACTS[name].safeParse({});
 

@@ -435,7 +435,7 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 | Result count basis | Count submitted bans per chart. |
 | Zero-ban charts | Include charts with zero bans in results. |
 | Public pre-result stats | Show ballots submitted and total ban selections cast, but not chart counts. |
-| Reveal order | Reveal from most banned to least banned. |
+| Reveal order | Reveal from least banned to most banned. |
 | Winning criterion | Least-banned chart wins the set. |
 | Ties above minimum | List sequentially/alphabetically. |
 | Winning tie | If least-banned charts tie, use tiebreak spinner. |
@@ -448,7 +448,7 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 - Confirm no percentages appear in final results.
 - Confirm zero-ban charts are counted and displayed.
-- Confirm results sort most banned to least banned.
+- Confirm results sort least banned to most banned.
 - Confirm least-banned chart wins.
 - Confirm results resolve Set 1 and Set 2 separately.
 - Confirm final round result shows two selected charts together.

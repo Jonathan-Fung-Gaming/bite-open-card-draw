@@ -17,6 +17,7 @@ import {
   clearHostTokenCookie,
   createAdminSessionCookie,
   getHostTokenCookie,
+  refreshAdminSessionCookie,
   requireAdminSession,
   setHostTokenCookie,
   verifyDangerousActionPassword,
@@ -82,6 +83,42 @@ function resetRoundState(roundNumber: 1 | 2 | 3 | 4) {
   adminState.drawStateStore.resetRound(roundNumber);
 }
 
+function invalidateRoundVotingForReroll(
+  roundNumber: 1 | 2 | 3 | 4,
+  reason: string,
+  session: AdminSessionPayload,
+) {
+  const snapshot = getVotingRoundSnapshot(roundNumber);
+  const ballots = adminState.ballotStore.listForRound(roundNumber);
+  const result = adminState.resultStore.getRoundResult(roundNumber);
+  const votingStarted = snapshot.openedAt !== null || ballots.length > 0 || result !== null;
+
+  if (!votingStarted) {
+    return null;
+  }
+
+  if (result && result.revealPhase !== "computed") {
+    throw new Error("Rerolls after reveal starts require result correction or a full round reset.");
+  }
+
+  const invalidation = adminState.ballotStore.invalidateRound({
+    roundNumber,
+    reason,
+    adminSessionId: session.sessionId,
+    invalidatedAt: snapshot.serverNow,
+  });
+
+  adminState.resultStore.clearRoundResult(roundNumber);
+  adminState.votingWindowStore.resetRound(roundNumber);
+  adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "voting_open" });
+
+  return {
+    id: invalidation.id,
+    ballotCount: invalidation.ballotIds.length,
+    previousStatus: snapshot.status,
+  };
+}
+
 export async function adminLoginAction(formData: FormData) {
   try {
     await createAdminSessionCookie(getString(formData, "password"));
@@ -95,6 +132,10 @@ export async function adminLoginAction(formData: FormData) {
 export async function adminLogoutAction() {
   await clearAdminCookies();
   redirect("/coolguy69");
+}
+
+export async function refreshAdminSessionAction() {
+  await refreshAdminSessionCookie();
 }
 
 export async function takeHostControlAction(formData: FormData) {
@@ -354,8 +395,10 @@ export async function rerollOneChartAction(formData: FormData) {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
     const reason = getRequiredReason(formData);
     const chartId = getString(formData, "chartId");
+    const roundNumber = getRoundNumber(formData);
+    const postVoteInvalidation = invalidateRoundVotingForReroll(roundNumber, reason, session);
     const draw = adminState.drawStateStore.rerollOneChart({
-      roundNumber: getRoundNumber(formData),
+      roundNumber,
       setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
       chartId,
       reason,
@@ -373,6 +416,7 @@ export async function rerollOneChartAction(formData: FormData) {
         roundNumber: draw.roundNumber,
         setOrder: draw.setOrder,
         version: draw.version,
+        postVoteInvalidation,
       },
     });
   } catch (error) {
@@ -389,8 +433,10 @@ export async function rerollRoundSetAction(formData: FormData) {
   try {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
     const reason = getRequiredReason(formData);
+    const roundNumber = getRoundNumber(formData);
+    const postVoteInvalidation = invalidateRoundVotingForReroll(roundNumber, reason, session);
     const draw = adminState.drawStateStore.rerollRoundSet({
-      roundNumber: getRoundNumber(formData),
+      roundNumber,
       setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
       reason,
     });
@@ -404,6 +450,7 @@ export async function rerollRoundSetAction(formData: FormData) {
         roundNumber: draw.roundNumber,
         setOrder: draw.setOrder,
         version: draw.version,
+        postVoteInvalidation,
       },
     });
   } catch (error) {
@@ -421,6 +468,7 @@ export async function rerollFullRoundAction(formData: FormData) {
     await verifyDangerousActionPassword(getString(formData, "adminPassword"));
     const reason = getRequiredReason(formData);
     const roundNumber = getRoundNumber(formData);
+    const postVoteInvalidation = invalidateRoundVotingForReroll(roundNumber, reason, session);
     const draws = adminState.drawStateStore.rerollFullRound({
       roundNumber,
       reason,
@@ -431,7 +479,7 @@ export async function rerollFullRoundAction(formData: FormData) {
       reason,
       dangerous: true,
       affectedRecords: draws.map((draw) => ({ type: "draw", id: draw.id })),
-      metadata: { roundNumber },
+      metadata: { roundNumber, postVoteInvalidation },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll full round.");

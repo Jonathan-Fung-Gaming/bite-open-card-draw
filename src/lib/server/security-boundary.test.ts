@@ -11,6 +11,7 @@ const SERVER_SECRET_NAMES = [
 
 const CLIENT_ENTRYPOINTS = [
   "src/app/coolguy69/_components/AdminInactivityTimer.tsx",
+  "src/app/coolguy69/_components/AdminSessionHeartbeat.tsx",
   "src/app/coolguy69/_components/HostHeartbeat.tsx",
   "src/app/coolguy69/_components/ManualBallotForm.tsx",
   "src/app/coolguy69/_components/PrivateCsvDownload.tsx",

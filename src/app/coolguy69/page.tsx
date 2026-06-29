@@ -42,6 +42,7 @@ import {
   updateChartExclusionAction,
 } from "./actions";
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
+import { AdminSessionHeartbeat } from "./_components/AdminSessionHeartbeat";
 import { HostHeartbeat } from "./_components/HostHeartbeat";
 import { ManualBallotForm } from "./_components/ManualBallotForm";
 import { PrivateCsvDownload } from "./_components/PrivateCsvDownload";
@@ -176,6 +177,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   return (
     <AdminLayout hostStatus={hostSnapshot.status}>
+      <AdminSessionHeartbeat />
       <HostHeartbeat active={hostSnapshot.status === "active"} />
       <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
         <div className="grid gap-5">

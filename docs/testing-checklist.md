@@ -94,7 +94,7 @@ source of truth when older phase labels are stale.
 - Full ban counts are expandable after reveal completion.
 - Final reveal shows both selected charts together.
 - Result rows include zero-ban charts.
-- Result rows sort from most banned to least banned.
+- Result rows sort from least banned to most banned.
 - Least-ban charts are selected.
 - Tied least-ban charts use backend-decided tiebreaks.
 - 2-4 chart least-ban ties show a 12-slot rune wheel.

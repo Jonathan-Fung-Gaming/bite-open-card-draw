@@ -66,9 +66,9 @@ describe("result engine", () => {
     });
 
     expect(result.sets[0].rows.map((row) => [row.chart.name, row.banCount])).toEqual([
-      ["Alpha", 2],
-      ["Bravo", 1],
       ["Charlie", 0],
+      ["Bravo", 1],
+      ["Alpha", 2],
     ]);
     expect(result.sets[0].selectedChart.name).toBe("Charlie");
     expect(result.sets[0].tiebreakUsed).toBe(false);

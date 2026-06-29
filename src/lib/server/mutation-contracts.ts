@@ -90,6 +90,13 @@ export const resumeVotingWindowInputSchema = z.object({
   roundNumber: roundNumberSchema,
 });
 
+export const reopenVotingWindowInputSchema = z.object({
+  roundNumber: roundNumberSchema,
+  durationMinutes: z.number().int().min(1).max(10),
+  adminPassword: passwordSchema,
+  reason: reasonSchema,
+});
+
 export const submitBallotInputSchema = z.object({
   roundNumber: roundNumberSchema,
   playerId: uuidSchema,
@@ -114,6 +121,12 @@ export const closeVotingWindowInputSchema = z.object({
   roundNumber: roundNumberSchema,
 });
 
+export const resetRoundInputSchema = z.object({
+  roundNumber: roundNumberSchema,
+  adminPassword: passwordSchema,
+  reason: reasonSchema,
+});
+
 export const computeResultsInputSchema = z.object({
   roundNumber: roundNumberSchema,
 });
@@ -127,6 +140,31 @@ export const commitTiebreakInputSchema = z.object({
 export const markResultsRevealedInputSchema = z.object({
   roundNumber: roundNumberSchema,
 });
+
+export const advanceResultRevealInputSchema = z.object({
+  roundNumber: roundNumberSchema,
+});
+
+export const overrideResultInputSchema = z.object({
+  roundNumber: roundNumberSchema,
+  setOrder: setOrderSchema,
+  chartId: uuidSchema,
+  adminPassword: passwordSchema,
+  reason: reasonSchema,
+});
+
+export const setCurrentRoundInputSchema = z.object({
+  roundNumber: roundNumberSchema,
+});
+
+export const advanceCurrentRoundInputSchema = z.object({});
+
+export const startRehearsalModeInputSchema = z.object({
+  adminPassword: passwordSchema,
+  reason: reasonSchema,
+});
+
+export const resetRehearsalModeInputSchema = startRehearsalModeInputSchema;
 
 export const exportPrivateCsvInputSchema = z.object({
   roundNumber: roundNumberSchema.optional(),
@@ -150,12 +188,20 @@ export const MUTATION_CONTRACTS = {
   openVotingWindow: openVotingWindowInputSchema,
   pauseVotingWindow: pauseVotingWindowInputSchema,
   resumeVotingWindow: resumeVotingWindowInputSchema,
+  reopenVotingWindow: reopenVotingWindowInputSchema,
   submitBallot: submitBallotInputSchema,
   manualBallotOverride: manualBallotOverrideInputSchema,
   closeVotingWindow: closeVotingWindowInputSchema,
+  resetRound: resetRoundInputSchema,
   computeResults: computeResultsInputSchema,
   commitTiebreak: commitTiebreakInputSchema,
   markResultsRevealed: markResultsRevealedInputSchema,
+  advanceResultReveal: advanceResultRevealInputSchema,
+  overrideResult: overrideResultInputSchema,
+  setCurrentRound: setCurrentRoundInputSchema,
+  advanceCurrentRound: advanceCurrentRoundInputSchema,
+  startRehearsalMode: startRehearsalModeInputSchema,
+  resetRehearsalMode: resetRehearsalModeInputSchema,
   exportPrivateCsv: exportPrivateCsvInputSchema,
 } as const;
 
