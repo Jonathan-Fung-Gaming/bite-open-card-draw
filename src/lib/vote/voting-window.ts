@@ -112,6 +112,13 @@ function notOpenedStatus(drawnSetCount: number): VotingRoundStatus {
   return drawnSetCount < 2 ? "drawing" : "ready_to_vote";
 }
 
+function cloneVotingWindowRecord(record: VotingWindowRecord): VotingWindowRecord {
+  return {
+    ...record,
+    eligiblePlayers: record.eligiblePlayers.map((player) => ({ ...player })),
+  };
+}
+
 export function formatVotingTime(remainingMs: number) {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -274,6 +281,18 @@ export class VotingWindowStore {
     return record;
   }
 
+  advanceVoting(roundNumber: 1 | 2 | 3 | 4, submittedPlayerIds: string[], nowMs = this.clock()) {
+    const record = this.windows.get(roundNumber);
+
+    if (!record) {
+      return null;
+    }
+
+    this.advanceRecord(record, submittedPlayerIds, nowMs);
+
+    return record;
+  }
+
   reopenVoting(input: {
     roundNumber: 1 | 2 | 3 | 4;
     durationMinutes: number;
@@ -298,6 +317,8 @@ export class VotingWindowStore {
     record.status = "voting_open";
     record.closesAt = toIso(nowMs + input.durationMinutes * ONE_MINUTE_MS);
     record.closedAt = null;
+    record.extensionUsed = true;
+    record.finalWarningStartedAt = null;
     record.pausedAt = null;
     record.pausedFromStatus = null;
     record.remainingMsWhenPaused = null;
@@ -369,8 +390,11 @@ export class VotingWindowStore {
     const record = this.windows.get(input.roundNumber);
 
     if (record) {
-      this.advance(record, input.submittedPlayerIds, nowMs);
-      return this.snapshotFromRecord(record, input, nowMs);
+      const effectiveRecord = cloneVotingWindowRecord(record);
+
+      this.advanceRecord(effectiveRecord, input.submittedPlayerIds, nowMs);
+
+      return this.snapshotFromRecord(effectiveRecord, input, nowMs);
     }
 
     const eligiblePlayers = dedupePlayers(input.eligiblePlayers);
@@ -413,14 +437,14 @@ export class VotingWindowStore {
     return record;
   }
 
-  private advance(record: VotingWindowRecord, submittedPlayerIds: string[], nowMs: number) {
+  private advanceRecord(record: VotingWindowRecord, submittedPlayerIds: string[], nowMs: number) {
     if (record.status === "voting_paused" || !isPlayerSubmissionOpen(record.status)) {
       return;
     }
 
     const eligibleCount = record.eligiblePlayers.length;
     const submittedCount = countSubmittedEligible(record.eligiblePlayers, submittedPlayerIds);
-    const closesAtMs = parseIso(record.closesAt) ?? nowMs;
+    let closesAtMs = parseIso(record.closesAt) ?? nowMs;
 
     if (record.status === "voting_open" && nowMs < closesAtMs && eligibleCount > 0 && submittedCount >= eligibleCount) {
       record.status = "final_30_seconds";
@@ -435,15 +459,19 @@ export class VotingWindowStore {
     }
 
     if (record.status === "voting_open" && !record.extensionUsed && eligibleCount > 0 && submittedCount / eligibleCount < 0.75) {
+      closesAtMs += ONE_MINUTE_MS;
       record.status = "extension_1_minute";
       record.extensionUsed = true;
-      record.closesAt = toIso(nowMs + ONE_MINUTE_MS);
+      record.closesAt = toIso(closesAtMs);
       record.updatedAt = toIso(nowMs);
-      return;
+
+      if (nowMs < closesAtMs) {
+        return;
+      }
     }
 
     record.status = "voting_closed";
-    record.closedAt = record.closedAt ?? toIso(nowMs);
+    record.closedAt = record.closedAt ?? toIso(closesAtMs);
     record.closesAt = record.closedAt;
     record.updatedAt = toIso(nowMs);
   }

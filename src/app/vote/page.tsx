@@ -6,6 +6,7 @@ import {
   getSubmittedPlayerIdsForRound,
   getVotingRoundSnapshot,
 } from "@/lib/server/voting-round";
+import { shouldShowFinalPhoneResults } from "@/lib/vote/phone-view";
 import { formatVotingStatusLabel, formatVotingTime } from "@/lib/vote/voting-window";
 import { BallotFlow } from "./BallotFlow";
 import { VoteAutoRefresh } from "./VoteAutoRefresh";
@@ -21,6 +22,7 @@ export default async function VotePage() {
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(roundNumber);
   const phoneStatus = adminState.ballotStore.getPhoneStatus(roundNumber);
   const result = adminState.resultStore.getRoundResult(roundNumber);
+  const showFinalPhoneResults = shouldShowFinalPhoneResults(snapshot.status, result?.revealPhase);
 
   if (snapshot.status === "voting_paused") {
     return (
@@ -55,13 +57,16 @@ export default async function VotePage() {
     );
   }
 
-  if (snapshot.status === "results_revealed") {
+  if (snapshot.status === "results_revealed" || showFinalPhoneResults) {
     return (
       <main className="min-h-screen">
         <VoteAutoRefresh />
-        <RoundHeader title={`Round ${roundNumber} Final Charts`} status="Results revealed" />
+        <RoundHeader
+          title={`Round ${roundNumber} Final Charts`}
+          status={formatVotingStatusLabel(snapshot.status)}
+        />
         <section className="mx-auto max-w-4xl px-5 py-5">
-          {result?.revealPhase === "final" ? (
+          {result && showFinalPhoneResults ? (
             <PublicResultSummary result={result} selectedCardTestId="phone-final-chart-card" />
           ) : (
             <div className="metal-panel rounded-lg p-5">

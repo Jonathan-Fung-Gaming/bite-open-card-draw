@@ -130,27 +130,60 @@ Verification:
 
 ## Phase 3 - Voting Timer Correctness
 
-Addresses: `CR-003`, `CR-015`, `CR-026`.
+Addresses: `CR-015`, `CR-026`, and the poll-dependent portion of `CR-003`.
+
+`CR-003` database-time transactional closure is deferred to Phase 9 because the normalized runtime
+RPCs are intentionally disabled until real row-changing hosted Supabase mutations replace the
+current app-server persistence path.
 
 Make voting deadlines authoritative and independent from app-server clock skew or polling cadence.
 Fix emergency reopen and post-final phone display edge cases at the same time.
 
 Primary work:
 
-- Move open, close, extension, final-warning, pause, and resume deadline transitions to
-  database-backed transactional mutations using database time.
 - Ensure reads do not implicitly advance official state in a way that depends on polling.
+- Anchor derived close and extension transitions to persisted deadlines instead of late request
+  times.
 - Make emergency reopen windows extension-ineligible unless explicitly redesigned otherwise.
 - Render final phone results whenever the result reveal phase is final, including `round_complete`.
 
 Exit criteria:
 
-- App-server clock skew does not change voting transitions.
-- Voting closes correctly even if no public/admin page polls at the deadline.
+- Voting snapshots derive close/extension status correctly even if no public/admin page polls at
+  the deadline.
 - Pause/resume survives process restart.
 - Emergency reopen for a chosen duration closes at that duration without an extra low-turnout
   extension.
 - `round_complete` plus final result shows the two selected charts first on phones.
+
+### Phase 3 Handoff Context
+
+Status: complete for `CR-015`, `CR-026`, and the poll-dependent `CR-003` fixes. The database-time
+transactional portion of `CR-003` remains deferred to Phase 9.
+
+Implementation notes to preserve:
+
+- `VotingWindowStore.getSnapshot()` is being made pure. It derives effective status from stored
+  `closesAt` and submitted ids without mutating the persisted in-memory record.
+- Tournament-changing actions that need official timer advancement explicitly call
+  `advanceVoting()` before persisting state.
+- Low-turnout extensions are anchored to the original persisted close deadline, so a late request
+  after both the 10-minute window and extension deadline derives `voting_closed` instead of
+  starting a fresh extension from the late request time.
+- Emergency reopen marks `extensionUsed` so the chosen reopen duration closes without another
+  low-turnout extension.
+- `/vote` uses a tested final-phone helper so `round_complete` with a final result renders selected
+  charts before full ban counts.
+- True database-time, cross-instance transactional timer mutation remains part of Phase 9 hosted
+  Supabase closure.
+
+Verification:
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 36 files / 127 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 2 Playwright tests.
 
 ## Phase 4 - Draw And Result Rule Hardening
 
@@ -283,7 +316,7 @@ Exit criteria:
 
 ## Phase 9 - Hosted Rehearsal And Release Evidence
 
-Addresses: `CR-001`, `CR-008`, `CR-035`.
+Addresses: `CR-001`, `CR-003`, `CR-008`, `CR-035`.
 
 Use the hardened code against a hosted non-production Supabase event, then update release evidence.
 
@@ -292,6 +325,8 @@ Primary work:
 - Apply migrations to an approved non-production hosted Supabase project.
 - Replace remaining whole-snapshot live mutation saves with transactional row-scoped mutations,
   locked event revisions, or equivalent cross-instance database concurrency control.
+- Move official voting timer advancement to database-time transactional mutations so app-server
+  clock skew cannot affect open, close, extension, final-warning, pause, or resume decisions.
 - Ensure host heartbeat updates only host-lock state and cannot roll back unrelated event data in
   hosted Supabase operation.
 - Run the app with `TOURNAMENT_STATE_BACKEND=supabase` and a non-production
@@ -309,6 +344,7 @@ Exit criteria:
 - Concurrent same-player edits preserve the latest valid ballot in hosted Supabase operation.
 - Host heartbeat racing with ballot or admin mutations does not roll state back in hosted Supabase
   operation.
+- Voting deadline transitions use hosted database time and are transactionally persisted.
 - Event readiness docs no longer list hosted rehearsal as an unresolved blocker.
 - Final local gates are recorded from a clean shell.
 - Remaining risks are explicit and acceptable for release.
@@ -319,10 +355,10 @@ Exit criteria:
 |---|---|
 | 1 | `CR-013`, `CR-014`, `CR-018` |
 | 2 | `CR-002`, `CR-017` |
-| 3 | `CR-003`, `CR-015`, `CR-026` |
+| 3 | `CR-015`, `CR-026`; partial `CR-003` poll-dependence fix |
 | 4 | `CR-004`, `CR-009`, `CR-010`, `CR-011`, `CR-012`, `CR-032` |
 | 5 | `CR-016`, `CR-019`, `CR-020`, `CR-021`, `CR-022` |
 | 6 | `CR-005`, `CR-006`, `CR-007`, `CR-027`, `CR-028` |
 | 7 | `CR-023`, `CR-024`, `CR-025`, `CR-033`, `CR-034` |
 | 8 | `CR-029`, `CR-030`, `CR-031` |
-| 9 | `CR-001`, `CR-008`, `CR-035` |
+| 9 | `CR-001`, `CR-003`, `CR-008`, `CR-035` |

@@ -1718,3 +1718,53 @@ Status: complete.
 - Local-storage edit tokens are device/browser scoped. Clearing browser storage removes same-device
   edit authorization, but the player can still submit a replacement ballot after the duplicate
   warning.
+
+## Comprehensive Review Remediation Phase 3 - Voting Timer Correctness
+
+Status: complete for `CR-015`, `CR-026`, and the poll-dependent portion of `CR-003`; hosted
+database-time timer mutation remains deferred to remediation Phase 9.
+
+### Checklist Items Addressed
+
+- CR-015: closed. Emergency reopen now marks the window extension-used, so the selected reopen
+  duration does not receive another low-turnout extension.
+- CR-026: closed. `/vote` renders final selected charts for both `results_revealed` and
+  `round_complete` when the committed result phase is final.
+- CR-003: improved but still open. Voting snapshots no longer mutate official state during reads,
+  and deadline derivation is anchored to persisted close times. True hosted database-time
+  transactional timer mutation is moved to Phase 9 with the remaining Supabase runtime closure work.
+
+### Changed Files
+
+- Added `src/lib/vote/phone-view.ts`
+- Added `src/lib/vote/phone-view.test.ts`
+- Updated `src/lib/vote/voting-window.ts`
+- Updated `src/lib/vote/voting-window.test.ts`
+- Updated `src/app/coolguy69/actions.ts`
+- Updated `src/app/vote/actions.ts`
+- Updated `src/app/vote/page.tsx`
+- Updated remediation checklist and plan documentation
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 36 files / 127 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+
+### Manual Review
+
+- Product spec: tournament voting, draw, result selection, tiebreak, and reveal rules were not
+  changed.
+- Timer behavior: snapshots are read-only derivations; actions that mutate tournament state now
+  explicitly advance timer state before persisting where needed.
+- Phone results: final selected chart cards continue to render before full ban counts through
+  `PublicResultSummary`.
+
+### Risks And Assumptions
+
+- Official database-time timer decisions are not fully closed until Phase 9 implements real hosted
+  Supabase row-scoped/transactional mutations.
+- A late read can derive closed/extension status without persisting it; the next timer-related
+  mutation persists the advanced state.

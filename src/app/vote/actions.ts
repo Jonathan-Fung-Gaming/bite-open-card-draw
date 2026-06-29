@@ -160,6 +160,11 @@ export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInpu
     { source: "player", editTokenHash },
   );
 
+  adminState.votingWindowStore.advanceVoting(
+    input.roundNumber,
+    getSubmittedPlayerIdsForRound(input.roundNumber),
+    Date.parse(snapshot.serverNow),
+  );
   getVotingRoundSnapshot(input.roundNumber);
   try {
     await persistTournamentState();

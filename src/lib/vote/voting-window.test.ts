@@ -80,6 +80,7 @@ describe("voting window store", () => {
       nowMs: 0,
     });
 
+    store.advanceVoting(1, ["player-1", "player-2"], 5_000);
     const finalWarning = snapshot(store, ["player-1", "player-2"], 5_000, players.slice(0, 2));
 
     expect(finalWarning.status).toBe("final_30_seconds");
@@ -89,6 +90,42 @@ describe("voting window store", () => {
     const closed = snapshot(store, ["player-1", "player-2"], 5_000 + FINAL_CHANGE_MS, players.slice(0, 2));
 
     expect(closed.status).toBe("voting_closed");
+  });
+
+  it("derives deadline status without mutating snapshots", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+
+    const derived = snapshot(store, ["player-1", "player-2"], TEN_MINUTES_MS);
+    const persisted = store.exportSnapshot().windows[0];
+
+    expect(derived.status).toBe("extension_1_minute");
+    expect(persisted?.status).toBe("voting_open");
+    expect(persisted?.closesAt).toBe(new Date(TEN_MINUTES_MS).toISOString());
+  });
+
+  it("persists deadline advancement from the stored deadline instead of the request time", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+
+    store.advanceVoting(1, ["player-1", "player-2"], TEN_MINUTES_MS + ONE_MINUTE_MS + 5_000);
+
+    const persisted = store.exportSnapshot().windows[0];
+
+    expect(persisted?.status).toBe("voting_closed");
+    expect(persisted?.closedAt).toBe(new Date(TEN_MINUTES_MS + ONE_MINUTE_MS).toISOString());
   });
 
   it("pauses and resumes without losing remaining official time", () => {
@@ -113,6 +150,25 @@ describe("voting window store", () => {
 
     expect(resumed.status).toBe("voting_open");
     expect(resumed.remainingMs).toBe(8 * 60 * 1000);
+  });
+
+  it("restores paused remaining time after snapshot import", () => {
+    const first = new VotingWindowStore();
+
+    first.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+    first.pauseVoting(1, 2 * 60 * 1000);
+
+    const restored = new VotingWindowStore();
+
+    restored.importSnapshot(first.exportSnapshot());
+    restored.resumeVoting(1, 6 * 60 * 1000);
+
+    expect(snapshot(restored, [], 6 * 60 * 1000).remainingMs).toBe(8 * 60 * 1000);
   });
 
   it("adds emergency current-round eligibility to an already-open voting snapshot", () => {
@@ -181,6 +237,11 @@ describe("voting window store", () => {
     expect(reopened.status).toBe("voting_open");
     expect(reopened.remainingMs).toBe(3 * ONE_MINUTE_MS);
     expect(reopened.canSubmit).toBe(true);
+
+    const closed = snapshot(store, [], 2_000 + 3 * ONE_MINUTE_MS);
+
+    expect(closed.status).toBe("voting_closed");
+    expect(closed.extensionUsed).toBe(true);
   });
 
   it("returns computed results to closed when a manual ballot invalidates them", () => {

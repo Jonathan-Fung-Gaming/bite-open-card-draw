@@ -113,6 +113,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     server mutation with concurrency control.
   - Suggested tests: app-server clock skew; no polling at deadline; pause/resume
     across process restart; deadline enforcement from DB timestamps.
+  - Phase 3 progress: `VotingWindowStore.getSnapshot()` no longer mutates official
+    state, deadline derivation is anchored to persisted `closesAt` values, and
+    mutation paths explicitly advance/persist timer state where needed. The hosted
+    database-time transactional closure remains deferred to remediation Phase 9, so
+    this item stays unchecked until Supabase RPC/row-scoped timer mutations use
+    database time rather than app-server time.
 
 - [ ] CR-004 - Future-round selected-song blocking can be bypassed by drawing ahead.
   - Severity: High.
@@ -278,7 +284,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     drawn-chart pool/exclusion/same-round/prior-selected-song trigger guards, and a
     voting-open draw-completion trigger, with schema tests for those guards.
 
-- [ ] CR-015 - Emergency reopen can unexpectedly receive another low-turnout extension.
+- [x] CR-015 - Emergency reopen can unexpectedly receive another low-turnout extension.
   - Severity: Medium.
   - Files: `src/lib/vote/voting-window.ts:277`,
     `src/lib/vote/voting-window.ts:437`.
@@ -290,6 +296,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     extension-ineligible.
   - Suggested tests: close early, reopen for 3 minutes with turnout below 75%, verify
     it closes at 3 minutes with no extra minute.
+  - Fixed in Phase 3 remediation: emergency reopen now marks the voting window
+    extension-used, and unit coverage verifies a 3-minute reopen closes at the chosen
+    duration with no additional low-turnout extension.
 
 - [ ] CR-016 - Admin inactivity timeout is effectively a 10-hour auto-refreshed session.
   - Severity: Medium.
@@ -448,7 +457,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: screenshot test with long song/artist names at 360px and 390px;
     assert no text overlaps or escapes card bounds.
 
-- [ ] CR-026 - `round_complete` phone state can show pre-vote copy instead of final charts.
+- [x] CR-026 - `round_complete` phone state can show pre-vote copy instead of final charts.
   - Severity: Medium.
   - Files: `src/lib/vote/voting-window.ts:20`, `src/app/vote/page.tsx:58`,
     `src/app/vote/page.tsx:83`.
@@ -460,6 +469,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     and status is `results_revealed` or `round_complete`.
   - Suggested tests: route/state test for `round_complete + final result` asserting
     selected chart cards render before full counts.
+  - Fixed in Phase 3 remediation: `/vote` uses a tested final-phone helper so
+    `results_revealed` and `round_complete` both render selected final charts first
+    when the committed result reveal phase is `final`.
 
 - [ ] CR-027 - Stage rows risk poor readability at smaller projector widths.
   - Severity: Medium.

@@ -22,6 +22,7 @@ import {
 import { hydrateTournamentState, persistTournamentState } from "@/lib/server/persistence";
 import {
   getRoundDrawRecords,
+  getSubmittedPlayerIdsForRound,
   getVotingRoundSnapshot,
   revalidateTournamentViews,
 } from "@/lib/server/voting-round";
@@ -62,6 +63,13 @@ function redirectWithError(message: string) {
 
 function getRoundNumber(formData: FormData) {
   return Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+}
+
+function advanceVotingDeadline(roundNumber: 1 | 2 | 3 | 4) {
+  return adminState.votingWindowStore.advanceVoting(
+    roundNumber,
+    getSubmittedPlayerIdsForRound(roundNumber),
+  );
 }
 
 function getRequiredReason(formData: FormData) {
@@ -550,7 +558,7 @@ export async function pauseVotingAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
 
-    getVotingRoundSnapshot(roundNumber);
+    advanceVotingDeadline(roundNumber);
     adminState.votingWindowStore.pauseVoting(roundNumber);
     audit(session, {
       action: "pause_voting",
@@ -591,7 +599,12 @@ export async function closeVotingAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
 
-    adminState.votingWindowStore.closeVoting(roundNumber);
+    const advanced = advanceVotingDeadline(roundNumber);
+
+    if (advanced?.status !== "voting_closed") {
+      adminState.votingWindowStore.closeVoting(roundNumber);
+    }
+
     adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
     audit(session, {
       action: "close_voting",
@@ -613,6 +626,7 @@ export async function manualBallotAction(formData: FormData) {
     await verifyDangerousActionPassword(getAdminPassword(formData));
 
     const roundNumber = getRoundNumber(formData);
+    advanceVotingDeadline(roundNumber);
     const snapshot = getVotingRoundSnapshot(roundNumber);
 
     if (!snapshot.canAcceptManualBallot) {
@@ -710,6 +724,7 @@ export async function computeResultsAction(formData: FormData) {
 
   try {
     const roundNumber = getRoundNumber(formData);
+    advanceVotingDeadline(roundNumber);
     const snapshot = getVotingRoundSnapshot(roundNumber);
 
     if (snapshot.status !== "voting_closed") {
