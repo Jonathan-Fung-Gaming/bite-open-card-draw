@@ -623,7 +623,8 @@ export async function manualBallotAction(formData: FormData) {
       const noBans = getString(formData, `noBans:${draw.id}`) === "true";
 
       return {
-        roundSetId: draw.id,
+        drawId: draw.id,
+        roundSetId: draw.roundSetId,
         displayLabel: draw.displayLabel,
         noBans,
         bannedChartIds: noBans ? [] : getStringList(formData, `bans:${draw.id}`),
@@ -913,7 +914,8 @@ export async function seedRehearsalTiebreakAction() {
           playerId: player.id,
           playerStartggUsername: player.startggUsername,
           choices: draws.map((draw) => ({
-            roundSetId: draw.id,
+            drawId: draw.id,
+            roundSetId: draw.roundSetId,
             displayLabel: draw.displayLabel,
             noBans: false,
             bannedChartIds:

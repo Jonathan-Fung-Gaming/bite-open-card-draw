@@ -2,6 +2,7 @@ import { AdminAuditStore, type AdminAuditStoreSnapshot } from "@/lib/admin/audit
 import { HostLockStore, type HostLockStoreSnapshot } from "@/lib/admin/host-lock";
 import { RosterStore, type RosterStoreSnapshot } from "@/lib/admin/roster";
 import { DrawStateStore, type DrawStateStoreSnapshot } from "@/lib/draw/draw-state";
+import { getRoundSetDefinition } from "@/lib/draw/draw-engine";
 import { ResultStore, type ResultStoreSnapshot } from "@/lib/results/result-store";
 import { RoundStateStore, type RoundStateSnapshot } from "@/lib/round/round-state";
 import { BallotStore, type BallotStoreSnapshot } from "@/lib/vote/ballot-store";
@@ -68,24 +69,96 @@ export function restoreOperationalStateSnapshot(
   stores: AdminStateStores,
   snapshot: OperationalStateSnapshot,
 ) {
-  stores.auditStore.importSnapshot(snapshot.audit);
-  stores.hostLockStore.importSnapshot(snapshot.hostLock);
-  stores.rosterStore.importSnapshot(snapshot.roster);
-  stores.ballotStore.importSnapshot(snapshot.ballot);
-  stores.votingWindowStore.importSnapshot(snapshot.votingWindow);
-  stores.resultStore.importSnapshot(snapshot.result);
-  stores.roundStateStore.importSnapshot(snapshot.roundState);
+  const migratedSnapshot = migrateSnapshotIdentityFields(snapshot);
 
-  const selectedSongKeys = snapshot.result.results
+  stores.auditStore.importSnapshot(migratedSnapshot.audit);
+  stores.hostLockStore.importSnapshot(migratedSnapshot.hostLock);
+  stores.rosterStore.importSnapshot(migratedSnapshot.roster);
+  stores.ballotStore.importSnapshot(migratedSnapshot.ballot);
+  stores.votingWindowStore.importSnapshot(migratedSnapshot.votingWindow);
+  stores.resultStore.importSnapshot(migratedSnapshot.result);
+  stores.roundStateStore.importSnapshot(migratedSnapshot.roundState);
+
+  const selectedSongKeys = migratedSnapshot.result.results
     .filter((result) => result.revealPhase === "final")
     .flatMap((result) => result.sets.map((set) => set.selectedChart.songKey));
 
   stores.drawStateStore.importSnapshot({
-    ...snapshot.draw,
+    ...migratedSnapshot.draw,
     selectedSongKeys,
   });
 }
 
 export function cloneOperationalStateSnapshot(snapshot: OperationalStateSnapshot) {
   return JSON.parse(JSON.stringify(snapshot)) as OperationalStateSnapshot;
+}
+
+function migrateSnapshotIdentityFields(snapshot: OperationalStateSnapshot): OperationalStateSnapshot {
+  const cloned = cloneOperationalStateSnapshot(snapshot);
+  const drawsById = new Map(
+    cloned.draw.drawHistory.map((draw) => {
+      const roundSetId =
+        draw.roundSetId ?? getRoundSetDefinition(draw.roundNumber, draw.setOrder).id;
+
+      draw.roundSetId = roundSetId;
+
+      return [draw.id, { roundSetId, version: draw.version }];
+    }),
+  );
+
+  cloned.ballot.ballots = cloned.ballot.ballots.map((ballot) => ({
+    ...ballot,
+    choices: ballot.choices.map((choice) => {
+      const legacyDrawId = choice.drawId ?? choice.roundSetId;
+      const draw = drawsById.get(legacyDrawId);
+
+      return {
+        ...choice,
+        drawId: legacyDrawId,
+        roundSetId: draw?.roundSetId ?? choice.roundSetId,
+      };
+    }),
+  }));
+
+  cloned.ballot.ballotInvalidations = cloned.ballot.ballotInvalidations?.map((record) => ({
+    ...record,
+    ballots: record.ballots.map((ballot) => ({
+      ...ballot,
+      choices: ballot.choices.map((choice) => {
+        const legacyDrawId = choice.drawId ?? choice.roundSetId;
+        const draw = drawsById.get(legacyDrawId);
+
+        return {
+          ...choice,
+          drawId: legacyDrawId,
+          roundSetId: draw?.roundSetId ?? choice.roundSetId,
+        };
+      }),
+    })),
+  }));
+
+  cloned.result.results = cloned.result.results.map((result) => ({
+    ...result,
+    sets: [
+      migrateResultSetIdentity(result.sets[0], drawsById),
+      migrateResultSetIdentity(result.sets[1], drawsById),
+    ],
+  }));
+
+  return cloned;
+}
+
+function migrateResultSetIdentity<TSet extends ResultStoreSnapshot["results"][number]["sets"][number]>(
+  set: TSet,
+  drawsById: Map<string, { roundSetId: string; version: number }>,
+): TSet {
+  const legacyDrawId = set.drawId ?? set.roundSetId;
+  const draw = drawsById.get(legacyDrawId);
+
+  return {
+    ...set,
+    drawId: legacyDrawId,
+    drawVersion: set.drawVersion ?? draw?.version ?? 1,
+    roundSetId: draw?.roundSetId ?? set.roundSetId,
+  };
 }

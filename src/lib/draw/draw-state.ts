@@ -19,6 +19,7 @@ import {
 
 export type DrawRecord = {
   id: string;
+  roundSetId: string;
   roundNumber: 1 | 2 | 3 | 4;
   setOrder: 1 | 2;
   displayLabel: string;
@@ -287,6 +288,7 @@ export class DrawStateStore {
 
     const record: DrawRecord = {
       id: randomUUID(),
+      roundSetId: set.id,
       roundNumber: input.roundNumber,
       setOrder: input.setOrder,
       displayLabel: set.displayLabel,
@@ -326,6 +328,7 @@ export class DrawStateStore {
 
       history.push({
         ...draw,
+        roundSetId: draw.roundSetId ?? getRoundSetDefinition(draw.roundNumber, draw.setOrder).id,
         charts: draw.charts.map((chart) => ({ ...chart })),
       });
       this.drawHistory.set(key, history.sort((left, right) => left.version - right.version));

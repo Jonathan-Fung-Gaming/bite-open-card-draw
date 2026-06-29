@@ -62,4 +62,46 @@ describe("Phase 2 mutation contracts", () => {
       expect(String(result.error)).toContain("reason");
     }
   });
+
+  it("requires ballot choices to include active draw ids separately from static round-set ids", () => {
+    const legacyShape = MUTATION_CONTRACTS.submitBallot.safeParse({
+      roundNumber: 1,
+      playerId: "00000000-0000-4000-8000-000000000001",
+      choices: [
+        {
+          roundSetId: "00000000-0000-4000-8000-000000000101",
+          noBans: true,
+          bannedChartIds: [],
+        },
+        {
+          roundSetId: "00000000-0000-4000-8000-000000000102",
+          noBans: true,
+          bannedChartIds: [],
+        },
+      ],
+    });
+
+    const drawAwareShape = MUTATION_CONTRACTS.submitBallot.safeParse({
+      roundNumber: 1,
+      playerId: "00000000-0000-4000-8000-000000000001",
+      choices: [
+        {
+          drawId: "00000000-0000-4000-8000-000000000201",
+          roundSetId: "00000000-0000-4000-8000-000000000101",
+          noBans: true,
+          bannedChartIds: [],
+        },
+        {
+          drawId: "00000000-0000-4000-8000-000000000202",
+          roundSetId: "00000000-0000-4000-8000-000000000102",
+          noBans: true,
+          bannedChartIds: [],
+        },
+      ],
+    });
+
+    expect(legacyShape.success).toBe(false);
+    expect(String(legacyShape.error)).toContain("drawId");
+    expect(drawAwareShape.success).toBe(true);
+  });
 });

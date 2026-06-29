@@ -9,10 +9,14 @@ const CSV_COLUMNS = [
   "submitted_at",
   "last_revision_at",
   "set_1_label",
+  "set_1_draw_id",
+  "set_1_draw_version",
   "set_1_ban_1",
   "set_1_ban_2",
   "set_1_no_bans",
   "set_2_label",
+  "set_2_draw_id",
+  "set_2_draw_version",
   "set_2_ban_1",
   "set_2_ban_2",
   "set_2_no_bans",
@@ -60,8 +64,8 @@ export function generatePrivateBallotCsv(input: {
 
   for (const player of result.eligiblePlayers) {
     const ballot = ballotsByPlayer.get(player.id);
-    const setOneChoice = ballot?.choices.find((choice) => choice.roundSetId === setOne.roundSetId);
-    const setTwoChoice = ballot?.choices.find((choice) => choice.roundSetId === setTwo.roundSetId);
+    const setOneChoice = ballot?.choices.find((choice) => choice.drawId === setOne.drawId);
+    const setTwoChoice = ballot?.choices.find((choice) => choice.drawId === setTwo.drawId);
     const setOneBans = setOneChoice?.bannedChartIds.map((chartId) => chartNames.get(chartId) ?? chartId) ?? [];
     const setTwoBans = setTwoChoice?.bannedChartIds.map((chartId) => chartNames.get(chartId) ?? chartId) ?? [];
 
@@ -74,10 +78,14 @@ export function generatePrivateBallotCsv(input: {
         ballot?.submittedAt ?? "",
         ballot?.submittedAt ?? "",
         setOne.displayLabel,
+        setOne.drawId,
+        setOne.drawVersion,
         setOneBans[0] ?? "",
         setOneBans[1] ?? "",
         setOneChoice?.noBans ?? false,
         setTwo.displayLabel,
+        setTwo.drawId,
+        setTwo.drawVersion,
         setTwoBans[0] ?? "",
         setTwoBans[1] ?? "",
         setTwoChoice?.noBans ?? false,

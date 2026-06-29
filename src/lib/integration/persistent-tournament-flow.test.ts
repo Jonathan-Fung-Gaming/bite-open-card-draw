@@ -69,7 +69,8 @@ function activeDraws(stores: AdminStateStores, roundNumber: 1 | 2 | 3 | 4 = 1) {
 
 function choice(draw: DrawRecord, bannedChartIds: string[]) {
   return {
-    roundSetId: draw.id,
+    drawId: draw.id,
+    roundSetId: draw.roundSetId,
     displayLabel: draw.displayLabel,
     noBans: bannedChartIds.length === 0,
     bannedChartIds,

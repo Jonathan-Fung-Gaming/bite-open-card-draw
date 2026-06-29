@@ -1395,3 +1395,60 @@ Status: complete
 - RPC bodies currently establish the operation-specific transaction boundary and validation surface;
   Phase 4 must connect the existing tournament logic to these boundaries before deployed Supabase
   state is authoritative.
+
+## Normalized Runtime Persistence Phase 4 - Draw-Aware Ballot And Result Model Correction
+
+Status: complete
+
+### Acceptance Criteria
+
+- Added draw-level `draw_id` references to normalized `ballot_choices`, `result_rows`, and
+  `tiebreaks` persistence.
+- Preserved static `round_set_id` as the fixed `round_sets.id` reference for grouping, labels, CSV,
+  and consistency checks.
+- Added database trigger validation so ballot choices, result rows, and tiebreaks cannot mix a
+  static round set with an unrelated active draw.
+- Added validation that banned/result/tiebreak chart ids belong to `drawn_charts` for the referenced
+  `draw_id`.
+- Split runtime/domain payloads so `drawId` is the active draw attempt and `roundSetId` is the
+  static chart-set id.
+- Updated vote, admin/manual ballot, result computation, live counts, private CSV, persistence
+  snapshots, mutation contracts, and tests to use draw-aware identity.
+- Runtime cutover is still deferred; snapshot persistence remains authoritative until the next
+  phase replaces `SupabaseOperationalStateRepository` load/save with normalized reads/writes.
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (30 files, 104 tests)
+- Production build: passed with `npm run build`
+- E2E: passed with `npm run test:e2e` (2 Playwright tests)
+
+### Changed Files
+
+- Added `supabase/migrations/20260629100000_draw_aware_ballot_result_identity.sql`
+- Updated `supabase/migrations/20260628050200_initial_schema.sql`
+- Updated `src/lib/tournament.ts`, draw state, ballot validation/store consumers, result engine/store,
+  private CSV export, snapshot restore, mutation contracts, database types, schema constants, and
+  tests
+- Updated `/vote` and `/coolguy69` ballot payload construction to submit both `drawId` and
+  `roundSetId`
+- Updated `docs/normalized-runtime-persistence-plan-2026-06-29.md`
+
+### Manual Review
+
+- Tournament rules: no round, draw count, vote, no-ban, result, tiebreak, or reveal behavior changed.
+  This phase only corrected identifiers so existing behavior can be represented safely in normalized
+  persistence.
+- Security: no new browser secret exposure; the new SQL checks run at the database boundary and
+  tournament-changing mutations remain server-side.
+- Persistence: normalized ballot/result tables now have enough identity to avoid corrupting choices
+  or result rows during rerolls. Snapshot restore includes a compatibility shim for old debug
+  snapshots that stored active draw ids in `roundSetId`.
+
+### Risks And Assumptions
+
+- Existing Supabase projects need the new migration applied before normalized cutover work resumes.
+- The forward migration updates deterministic static `round_sets.id` values with `on update cascade`
+  on related normalized FKs; this is safe for normalized rows, but should still be rehearsed against
+  a non-production Supabase project before event use.
+- Initial parallel execution of `npm run build` and `npm run test:e2e` conflicted on `.next` cache
+  writes; after clearing generated `.next`, both passed sequentially.

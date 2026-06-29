@@ -9,6 +9,7 @@ import {
 function draw(setOrder: 1 | 2, createdAt: string): DrawRecord {
   return {
     id: `draw-${setOrder}`,
+    roundSetId: `static-set-${setOrder}`,
     roundNumber: 1,
     setOrder,
     displayLabel: setOrder === 1 ? "S16" : "S17",

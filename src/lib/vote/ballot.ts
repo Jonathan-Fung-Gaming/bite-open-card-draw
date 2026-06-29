@@ -1,6 +1,7 @@
 import type { DrawRecord } from "@/lib/draw/draw-state";
 
 export type BallotSetChoice = {
+  drawId: string;
   roundSetId: string;
   displayLabel: string;
   noBans: boolean;
@@ -65,24 +66,28 @@ export function validateRoundBallot(input: SubmitRoundBallotInput, draws: readon
   }
 
   const drawIds = new Set(draws.map((draw) => draw.id));
-  const choiceIds = new Set(input.choices.map((choice) => choice.roundSetId));
+  const choiceDrawIds = new Set(input.choices.map((choice) => choice.drawId));
 
   if (input.choices.length !== 2 || !input.choices.every(isSetChoiceComplete)) {
     throw new Error("Both chart sets must be completed before submitting.");
   }
 
   if (
-    choiceIds.size !== drawIds.size ||
-    [...choiceIds].some((choiceId) => !drawIds.has(choiceId))
+    choiceDrawIds.size !== drawIds.size ||
+    [...choiceDrawIds].some((choiceDrawId) => !drawIds.has(choiceDrawId))
   ) {
-    throw new Error("Ballot must include exactly one completed choice for each drawn chart set.");
+    throw new Error("Ballot must include exactly one completed choice for each active draw.");
   }
 
   for (const choice of input.choices) {
-    const draw = draws.find((candidate) => candidate.id === choice.roundSetId);
+    const draw = draws.find((candidate) => candidate.id === choice.drawId);
 
     if (!draw) {
-      throw new Error("Ballot choice references an unknown chart set.");
+      throw new Error("Ballot choice references an unknown draw.");
+    }
+
+    if (choice.roundSetId !== draw.roundSetId) {
+      throw new Error("Ballot choice static round set does not match its active draw.");
     }
 
     if (new Set(choice.bannedChartIds).size !== choice.bannedChartIds.length) {

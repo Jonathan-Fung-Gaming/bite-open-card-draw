@@ -341,6 +341,7 @@ export type Database = {
           id: Uuid;
           event_id: string;
           ballot_id: Uuid;
+          draw_id: Uuid;
           round_set_id: Uuid;
           no_bans: boolean;
           banned_chart_ids: Uuid[];
@@ -350,6 +351,7 @@ export type Database = {
         EventScopedInsert & {
           id?: Uuid;
           ballot_id: Uuid;
+          draw_id: Uuid;
           round_set_id: Uuid;
           no_bans?: boolean;
           banned_chart_ids?: Uuid[];
@@ -404,6 +406,7 @@ export type Database = {
           id: Uuid;
           event_id: string;
           result_snapshot_id: Uuid;
+          draw_id: Uuid;
           round_set_id: Uuid;
           chart_id: Uuid;
           ban_count: number;
@@ -415,6 +418,7 @@ export type Database = {
         EventScopedInsert & {
           id?: Uuid;
           result_snapshot_id: Uuid;
+          draw_id: Uuid;
           round_set_id: Uuid;
           chart_id: Uuid;
           ban_count?: number;
@@ -429,6 +433,7 @@ export type Database = {
           id: Uuid;
           event_id: string;
           result_snapshot_id: Uuid;
+          draw_id: Uuid;
           round_set_id: Uuid;
           candidate_chart_ids: Uuid[];
           winner_chart_id: Uuid;
@@ -439,6 +444,7 @@ export type Database = {
         EventScopedInsert & {
           id?: Uuid;
           result_snapshot_id: Uuid;
+          draw_id: Uuid;
           round_set_id: Uuid;
           candidate_chart_ids: Uuid[];
           winner_chart_id: Uuid;

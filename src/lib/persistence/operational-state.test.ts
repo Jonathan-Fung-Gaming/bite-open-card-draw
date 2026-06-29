@@ -66,7 +66,9 @@ function finalResult(songKey: string): RoundResultSnapshot {
     finalRevealedAt: "final",
     sets: [
       {
-        roundSetId: "draw-1",
+        drawId: "draw-1",
+        drawVersion: 1,
+        roundSetId: "static-s16",
         setOrder: 1,
         displayLabel: "S16",
         rows: [{ chart: first, banCount: 0, selected: true, tiedForFewest: false }],
@@ -81,7 +83,9 @@ function finalResult(songKey: string): RoundResultSnapshot {
         winnerRevealStartedAt: null,
       },
       {
-        roundSetId: "draw-2",
+        drawId: "draw-2",
+        drawVersion: 1,
+        roundSetId: "static-s17",
         setOrder: 2,
         displayLabel: "S17",
         rows: [{ chart: second, banCount: 0, selected: true, tiedForFewest: false }],
@@ -130,13 +134,15 @@ describe("operational state persistence", () => {
         playerStartggUsername: player.startggUsername,
         choices: [
           {
-            roundSetId: firstDraw.id,
+            drawId: firstDraw.id,
+            roundSetId: firstDraw.roundSetId,
             displayLabel: firstDraw.displayLabel,
             noBans: true,
             bannedChartIds: [],
           },
           {
-            roundSetId: secondDraw.id,
+            drawId: secondDraw.id,
+            roundSetId: secondDraw.roundSetId,
             displayLabel: secondDraw.displayLabel,
             noBans: true,
             bannedChartIds: [],

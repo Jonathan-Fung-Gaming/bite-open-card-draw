@@ -128,8 +128,8 @@ describe("normalized runtime transactional mutations", () => {
         roundNumber: 1,
         playerId: uuidA,
         choices: [
-          { roundSetId: uuidB, noBans: false, bannedChartIds: [uuidC] },
-          { roundSetId: uuidC, noBans: true, bannedChartIds: [] },
+          { drawId: uuidB, roundSetId: uuidA, noBans: false, bannedChartIds: [uuidC] },
+          { drawId: uuidC, roundSetId: uuidB, noBans: true, bannedChartIds: [] },
         ],
       },
       {
@@ -148,8 +148,8 @@ describe("normalized runtime transactional mutations", () => {
             roundNumber: 1,
             playerId: uuidA,
             choices: [
-              { roundSetId: uuidB, noBans: false, bannedChartIds: [uuidC] },
-              { roundSetId: uuidC, noBans: true, bannedChartIds: [] },
+              { drawId: uuidB, roundSetId: uuidA, noBans: false, bannedChartIds: [uuidC] },
+              { drawId: uuidC, roundSetId: uuidB, noBans: true, bannedChartIds: [] },
             ],
           },
         },

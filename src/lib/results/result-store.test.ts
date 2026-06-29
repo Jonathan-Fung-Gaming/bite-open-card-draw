@@ -21,6 +21,7 @@ function chart(id: string, name: string): DrawnChartSummary {
 function draw(id: string, setOrder: 1 | 2, displayLabel: string, charts: DrawnChartSummary[]): DrawRecord {
   return {
     id,
+    roundSetId: `static-${displayLabel.toLowerCase()}`,
     roundNumber: 1,
     setOrder,
     displayLabel,
@@ -46,8 +47,20 @@ function ballot(playerId: string, setOneBans: string[], setTwoBans: string[] = [
     manualOverride: false,
     replacedExistingBallot: false,
     choices: [
-      { roundSetId: "set-1", displayLabel: "S16", noBans: setOneBans.length === 0, bannedChartIds: setOneBans },
-      { roundSetId: "set-2", displayLabel: "S17", noBans: setTwoBans.length === 0, bannedChartIds: setTwoBans },
+      {
+        drawId: "draw-1",
+        roundSetId: "static-s16",
+        displayLabel: "S16",
+        noBans: setOneBans.length === 0,
+        bannedChartIds: setOneBans,
+      },
+      {
+        drawId: "draw-2",
+        roundSetId: "static-s17",
+        displayLabel: "S17",
+        noBans: setTwoBans.length === 0,
+        bannedChartIds: setTwoBans,
+      },
     ],
   };
 }
@@ -61,8 +74,8 @@ describe("result store reveal timing", () => {
     const result = store.computeRound({
       roundNumber: 1,
       draws: [
-        draw("set-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
-        draw("set-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
+        draw("draw-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
+        draw("draw-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
       ],
       ballots: [ballot("p1", ["c"]), ballot("p2", ["c"])],
       eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
@@ -94,8 +107,8 @@ describe("result store reveal timing", () => {
     const result = store.computeRound({
       roundNumber: 1,
       draws: [
-        draw("set-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
-        draw("set-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
+        draw("draw-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
+        draw("draw-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
       ],
       ballots: [ballot("p1", ["a"]), ballot("p2", ["a"])],
       eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],

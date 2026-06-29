@@ -274,6 +274,7 @@ on conflict (round_number) do update
 set display_name = excluded.display_name;
 
 insert into public.round_sets (
+  id,
   round_number,
   set_order,
   chart_type,
@@ -283,16 +284,17 @@ insert into public.round_sets (
   max_bans
 )
 values
-  (1, 1, 's', 16, 'S16', 7, 2),
-  (1, 2, 's', 17, 'S17', 7, 2),
-  (2, 1, 's', 18, 'S18', 7, 2),
-  (2, 2, 's', 19, 'S19', 7, 2),
-  (3, 1, 's', 20, 'S20', 7, 2),
-  (3, 2, 's', 21, 'S21', 7, 2),
-  (4, 1, 's', 22, 'S22', 7, 2),
-  (4, 2, 'd', 23, 'D23', 7, 2)
+  ('00000000-0000-4000-8000-000000000101', 1, 1, 's', 16, 'S16', 7, 2),
+  ('00000000-0000-4000-8000-000000000102', 1, 2, 's', 17, 'S17', 7, 2),
+  ('00000000-0000-4000-8000-000000000201', 2, 1, 's', 18, 'S18', 7, 2),
+  ('00000000-0000-4000-8000-000000000202', 2, 2, 's', 19, 'S19', 7, 2),
+  ('00000000-0000-4000-8000-000000000301', 3, 1, 's', 20, 'S20', 7, 2),
+  ('00000000-0000-4000-8000-000000000302', 3, 2, 's', 21, 'S21', 7, 2),
+  ('00000000-0000-4000-8000-000000000401', 4, 1, 's', 22, 'S22', 7, 2),
+  ('00000000-0000-4000-8000-000000000402', 4, 2, 'd', 23, 'D23', 7, 2)
 on conflict (round_number, set_order) do update
 set
+  id = excluded.id,
   chart_type = excluded.chart_type,
   chart_level = excluded.chart_level,
   display_label = excluded.display_label,

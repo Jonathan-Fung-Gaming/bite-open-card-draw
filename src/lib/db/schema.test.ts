@@ -33,7 +33,7 @@ describe("Phase 2 database schema", () => {
   it("seeds the locked round set configuration", () => {
     for (const seed of ROUND_SET_SEED_ROWS) {
       expect(migration).toContain(
-        `(${seed.roundNumber}, ${seed.setOrder}, '${seed.chartType}', ${seed.chartLevel}, '${seed.displayLabel}', 7, 2)`,
+        `('${seed.id}', ${seed.roundNumber}, ${seed.setOrder}, '${seed.chartType}', ${seed.chartLevel}, '${seed.displayLabel}', 7, 2)`,
       );
     }
   });
@@ -87,6 +87,29 @@ describe("Phase 2 database schema", () => {
       "result_snapshots_event_round_unique unique (event_id, round_number)",
     );
     expect(migration).toContain("host_locks_event_lock_name_unique unique (event_id, lock_name)");
+  });
+
+  it("stores draw-level identity for ballot choices, result rows, and tiebreaks", () => {
+    expect(migration).toMatch(
+      /alter table public\.ballot_choices\s+add column if not exists draw_id uuid references public\.draws\(id\)/i,
+    );
+    expect(migration).toMatch(
+      /alter table public\.result_rows\s+add column if not exists draw_id uuid references public\.draws\(id\)/i,
+    );
+    expect(migration).toMatch(
+      /alter table public\.tiebreaks\s+add column if not exists draw_id uuid references public\.draws\(id\)/i,
+    );
+    expect(migration).toContain("result_rows_event_snapshot_draw_chart_unique");
+    expect(migration).toContain("result_rows_event_snapshot_draw_reveal_unique");
+    expect(migration).toContain("tiebreaks_event_snapshot_draw_unique");
+  });
+
+  it("prevents normalized ballot and result rows from mixing static round sets with active draws", () => {
+    expect(migration).toContain("validate_draw_scoped_runtime_row");
+    expect(migration).toContain("matching_draw.round_set_id <> new.round_set_id");
+    expect(migration).toContain("ballot_choices banned_chart_ids must all belong to draw_id");
+    expect(migration).toContain("result_rows chart_id");
+    expect(migration).toContain("tiebreaks candidates and winner must all belong to draw_id");
   });
 
   it("keeps generated database types aligned with all runtime tables", () => {

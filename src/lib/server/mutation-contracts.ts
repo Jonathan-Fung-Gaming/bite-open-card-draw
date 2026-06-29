@@ -103,6 +103,7 @@ export const submitBallotInputSchema = z.object({
   choices: z
     .array(
       z.object({
+        drawId: uuidSchema,
         roundSetId: uuidSchema,
         noBans: z.boolean(),
         bannedChartIds: z.array(uuidSchema).max(2),
@@ -133,6 +134,7 @@ export const computeResultsInputSchema = z.object({
 
 export const commitTiebreakInputSchema = z.object({
   roundNumber: roundNumberSchema,
+  drawId: uuidSchema,
   roundSetId: uuidSchema,
   candidateChartIds: z.array(uuidSchema).min(2),
 });

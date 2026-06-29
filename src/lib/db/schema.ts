@@ -52,6 +52,7 @@ export const GENERATED_DATABASE_TYPE_TABLES =
   CORE_DATABASE_TABLES satisfies readonly (keyof Database["public"]["Tables"])[];
 
 export const ROUND_SET_SEED_ROWS = ROUND_SET_DEFINITIONS.map((set) => ({
+  id: set.id,
   roundNumber: set.roundNumber,
   setOrder: set.setOrder,
   chartType: set.chartType.toLowerCase() as "s" | "d",

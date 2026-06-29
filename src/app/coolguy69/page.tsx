@@ -62,7 +62,7 @@ function buildLiveCountRows(draws: ReturnType<typeof getRoundDrawRecords>, ballo
     displayLabel: draw.displayLabel,
     rows: draw.charts.map((chart) => {
       const banCount = ballots.reduce((total, ballot) => {
-        const choice = ballot.choices.find((candidate) => candidate.roundSetId === draw.id);
+        const choice = ballot.choices.find((candidate) => candidate.drawId === draw.id);
 
         return total + (choice?.bannedChartIds.includes(chart.id) ? 1 : 0);
       }, 0);

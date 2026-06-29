@@ -30,7 +30,8 @@ const DEVICE_STORAGE_KEY = "bite-open-card-draw:device-id:v1";
 
 function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
   return draws.map((draw) => ({
-    roundSetId: draw.id,
+    drawId: draw.id,
+    roundSetId: draw.roundSetId,
     displayLabel: draw.displayLabel,
     noBans: false,
     bannedChartIds: [],
@@ -84,12 +85,13 @@ function getDeviceId() {
 
 function choicesFromBallot(draws: DrawRecord[], ballot: RoundBallot) {
   return draws.map((draw) => {
-    const existing = ballot.choices.find((choice) => choice.roundSetId === draw.id);
+    const existing = ballot.choices.find((choice) => choice.drawId === draw.id);
     const chartIds = new Set(draw.charts.map((chart) => chart.id));
     const bannedChartIds = existing?.bannedChartIds.filter((chartId) => chartIds.has(chartId)) ?? [];
 
     return {
-      roundSetId: draw.id,
+      drawId: draw.id,
+      roundSetId: draw.roundSetId,
       displayLabel: draw.displayLabel,
       noBans: Boolean(existing?.noBans) && bannedChartIds.length === 0,
       bannedChartIds,
@@ -498,11 +500,11 @@ export function BallotFlow({
         <p className="mt-3 text-metal-300">Server-confirmed timestamp: {savedAt}</p>
         <div className="mt-5 grid gap-3">
           {choices.map((choice) => {
-            const draw = draws.find((candidate) => candidate.id === choice.roundSetId);
+            const draw = draws.find((candidate) => candidate.id === choice.drawId);
 
             return (
               <div
-                key={choice.roundSetId}
+                key={choice.drawId}
                 className="rounded border border-metal-700 bg-black/25 p-3"
               >
                 <p className="font-bold text-white">{choice.displayLabel}</p>
@@ -540,7 +542,7 @@ export function BallotFlow({
         <div className="mt-5 grid gap-3">
           {choices.map((choice) => (
             <div
-              key={choice.roundSetId}
+              key={choice.drawId}
               className="rounded border border-metal-700 bg-black/25 p-3"
             >
               <p className="font-bold text-white">{choice.displayLabel}</p>
@@ -548,7 +550,7 @@ export function BallotFlow({
                 {choice.noBans
                   ? "No bans for this set"
                   : describeChoice(
-                      draws.find((draw) => draw.id === choice.roundSetId),
+                      draws.find((draw) => draw.id === choice.drawId),
                       choice,
                     )}
               </p>

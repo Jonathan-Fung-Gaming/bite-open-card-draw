@@ -12,6 +12,8 @@ export type ResultChartRow = {
 };
 
 export type ResultSetSnapshot = {
+  drawId: string;
+  drawVersion: number;
   roundSetId: string;
   setOrder: 1 | 2;
   displayLabel: string;
@@ -79,7 +81,7 @@ export function computeResultSet(
   const banCounts = new Map(draw.charts.map((chart) => [chart.id, 0]));
 
   for (const ballot of ballots) {
-    const choice = ballot.choices.find((candidate) => candidate.roundSetId === draw.id);
+    const choice = ballot.choices.find((candidate) => candidate.drawId === draw.id);
 
     for (const chartId of choice?.bannedChartIds ?? []) {
       if (banCounts.has(chartId)) {
@@ -100,7 +102,9 @@ export function computeResultSet(
   const wheelSlots = buildWheelSlots(leastBannedCharts);
 
   return {
-    roundSetId: draw.id,
+    drawId: draw.id,
+    drawVersion: draw.version,
+    roundSetId: draw.roundSetId,
     setOrder: draw.setOrder,
     displayLabel: draw.displayLabel,
     rows: draw.charts

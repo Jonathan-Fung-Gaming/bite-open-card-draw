@@ -16,7 +16,9 @@ const result: RoundResultSnapshot = {
   finalRevealedAt: "done",
   sets: [
     {
-      roundSetId: "set-1",
+      drawId: "draw-1",
+      drawVersion: 1,
+      roundSetId: "static-s16",
       setOrder: 1,
       displayLabel: "S16",
       rows: [
@@ -56,7 +58,9 @@ const result: RoundResultSnapshot = {
       winnerRevealStartedAt: null,
     },
     {
-      roundSetId: "set-2",
+      drawId: "draw-2",
+      drawVersion: 3,
+      roundSetId: "static-s17",
       setOrder: 2,
       displayLabel: "S17",
       rows: [
@@ -104,8 +108,20 @@ const ballot: RoundBallot = {
   playerId: "p1",
   playerStartggUsername: "Alpha",
   choices: [
-    { roundSetId: "set-1", displayLabel: "S16", noBans: true, bannedChartIds: [] },
-    { roundSetId: "set-2", displayLabel: "S17", noBans: false, bannedChartIds: ["chart-2"] },
+    {
+      drawId: "draw-1",
+      roundSetId: "static-s16",
+      displayLabel: "S16",
+      noBans: true,
+      bannedChartIds: [],
+    },
+    {
+      drawId: "draw-2",
+      roundSetId: "static-s17",
+      displayLabel: "S17",
+      noBans: false,
+      bannedChartIds: ["chart-2"],
+    },
   ],
   submittedAt: "submitted",
   revision: 2,
@@ -121,6 +137,8 @@ describe("private CSV export", () => {
 
     expect(csv).toContain("round_number,player_startgg_username");
     expect(csv).toContain("Alpha,true,true,submitted,submitted");
+    expect(csv).toContain("S16,draw-1,1");
+    expect(csv).toContain("S17,draw-2,3,Selected Two");
     expect(csv).toContain("true,shared_admin,phone died,true,Selected One,Selected Two,false,true");
     expect(csv).toContain("Bravo,true,false");
   });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeChartRow } from "@/lib/charts/normalize";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import { BallotStore } from "./ballot-store";
-import { countBanSelections, isSetChoiceComplete } from "./ballot";
+import { countBanSelections, isSetChoiceComplete, validateRoundBallot } from "./ballot";
 
 function draw(id: string, displayLabel: string, level: string): DrawRecord {
   const charts = Array.from({ length: 7 }, (_, index) =>
@@ -22,6 +22,7 @@ function draw(id: string, displayLabel: string, level: string): DrawRecord {
 
   return {
     id,
+    roundSetId: displayLabel === "S16" ? "static-s16" : "static-s17",
     roundNumber: 1,
     setOrder: displayLabel === "S16" ? 1 : 2,
     displayLabel,
@@ -36,14 +37,32 @@ function draw(id: string, displayLabel: string, level: string): DrawRecord {
 
 describe("ballot validation and store", () => {
   it("requires either 1-2 bans or explicit no bans per set", () => {
-    expect(isSetChoiceComplete({ roundSetId: "a", displayLabel: "S16", noBans: false, bannedChartIds: [] })).toBe(
-      false,
-    );
-    expect(isSetChoiceComplete({ roundSetId: "a", displayLabel: "S16", noBans: true, bannedChartIds: [] })).toBe(
-      true,
-    );
     expect(
-      isSetChoiceComplete({ roundSetId: "a", displayLabel: "S16", noBans: false, bannedChartIds: ["1", "2"] }),
+      isSetChoiceComplete({
+        drawId: "draw-a",
+        roundSetId: "static-a",
+        displayLabel: "S16",
+        noBans: false,
+        bannedChartIds: [],
+      }),
+    ).toBe(false);
+    expect(
+      isSetChoiceComplete({
+        drawId: "draw-a",
+        roundSetId: "static-a",
+        displayLabel: "S16",
+        noBans: true,
+        bannedChartIds: [],
+      }),
+    ).toBe(true);
+    expect(
+      isSetChoiceComplete({
+        drawId: "draw-a",
+        roundSetId: "static-a",
+        displayLabel: "S16",
+        noBans: false,
+        bannedChartIds: ["1", "2"],
+      }),
     ).toBe(true);
   });
 
@@ -59,8 +78,20 @@ describe("ballot validation and store", () => {
         playerId: "player-1",
         playerStartggUsername: "PlayerOne",
         choices: [
-          { roundSetId: "set-1", displayLabel: "S16", noBans: false, bannedChartIds: [firstChart] },
-          { roundSetId: "set-2", displayLabel: "S17", noBans: false, bannedChartIds: [secondChart] },
+          {
+            drawId: draws[0]?.id ?? "",
+            roundSetId: draws[0]?.roundSetId ?? "",
+            displayLabel: "S16",
+            noBans: false,
+            bannedChartIds: [firstChart],
+          },
+          {
+            drawId: draws[1]?.id ?? "",
+            roundSetId: draws[1]?.roundSetId ?? "",
+            displayLabel: "S17",
+            noBans: false,
+            bannedChartIds: [secondChart],
+          },
         ],
       },
       draws,
@@ -72,8 +103,20 @@ describe("ballot validation and store", () => {
         playerId: "player-1",
         playerStartggUsername: "PlayerOne",
         choices: [
-          { roundSetId: "set-1", displayLabel: "S16", noBans: true, bannedChartIds: [] },
-          { roundSetId: "set-2", displayLabel: "S17", noBans: false, bannedChartIds: [secondChart] },
+          {
+            drawId: draws[0]?.id ?? "",
+            roundSetId: draws[0]?.roundSetId ?? "",
+            displayLabel: "S16",
+            noBans: true,
+            bannedChartIds: [],
+          },
+          {
+            drawId: draws[1]?.id ?? "",
+            roundSetId: draws[1]?.roundSetId ?? "",
+            displayLabel: "S17",
+            noBans: false,
+            bannedChartIds: [secondChart],
+          },
         ],
       },
       draws,
@@ -138,8 +181,20 @@ describe("ballot validation and store", () => {
         playerId: "player-2",
         playerStartggUsername: "ManualPlayer",
         choices: [
-          { roundSetId: "set-1", displayLabel: "S16", noBans: false, bannedChartIds: [firstChart] },
-          { roundSetId: "set-2", displayLabel: "S17", noBans: true, bannedChartIds: [] },
+          {
+            drawId: draws[0]?.id ?? "",
+            roundSetId: draws[0]?.roundSetId ?? "",
+            displayLabel: "S16",
+            noBans: false,
+            bannedChartIds: [firstChart],
+          },
+          {
+            drawId: draws[1]?.id ?? "",
+            roundSetId: draws[1]?.roundSetId ?? "",
+            displayLabel: "S17",
+            noBans: true,
+            bannedChartIds: [],
+          },
         ],
       },
       draws,
@@ -168,8 +223,20 @@ describe("ballot validation and store", () => {
         playerId: "player-3",
         playerStartggUsername: "TracePlayer",
         choices: [
-          { roundSetId: "set-1", displayLabel: "S16", noBans: false, bannedChartIds: [firstChart] },
-          { roundSetId: "set-2", displayLabel: "S17", noBans: true, bannedChartIds: [] },
+          {
+            drawId: draws[0]?.id ?? "",
+            roundSetId: draws[0]?.roundSetId ?? "",
+            displayLabel: "S16",
+            noBans: false,
+            bannedChartIds: [firstChart],
+          },
+          {
+            drawId: draws[1]?.id ?? "",
+            roundSetId: draws[1]?.roundSetId ?? "",
+            displayLabel: "S17",
+            noBans: true,
+            bannedChartIds: [],
+          },
         ],
       },
       draws,
@@ -188,5 +255,67 @@ describe("ballot validation and store", () => {
     expect(invalidation.ballotIds).toEqual([ballot.id]);
     expect(invalidation.ballots[0]?.playerStartggUsername).toBe("TracePlayer");
     expect(snapshot.ballotInvalidations?.[0]?.reason).toBe("post-vote reroll");
+  });
+
+  it("rejects static round-set ids when an active draw id is required", () => {
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+
+    expect(() =>
+      validateRoundBallot(
+        {
+          roundNumber: 1,
+          playerId: "player-4",
+          playerStartggUsername: "WrongIdPlayer",
+          choices: [
+            {
+              drawId: draws[0]?.roundSetId ?? "",
+              roundSetId: draws[0]?.roundSetId ?? "",
+              displayLabel: "S16",
+              noBans: true,
+              bannedChartIds: [],
+            },
+            {
+              drawId: draws[1]?.id ?? "",
+              roundSetId: draws[1]?.roundSetId ?? "",
+              displayLabel: "S17",
+              noBans: true,
+              bannedChartIds: [],
+            },
+          ],
+        },
+        draws,
+      ),
+    ).toThrow(/active draw/);
+  });
+
+  it("rejects choices whose static set does not match the active draw", () => {
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+
+    expect(() =>
+      validateRoundBallot(
+        {
+          roundNumber: 1,
+          playerId: "player-5",
+          playerStartggUsername: "MismatchPlayer",
+          choices: [
+            {
+              drawId: draws[0]?.id ?? "",
+              roundSetId: draws[1]?.roundSetId ?? "",
+              displayLabel: "S16",
+              noBans: true,
+              bannedChartIds: [],
+            },
+            {
+              drawId: draws[1]?.id ?? "",
+              roundSetId: draws[1]?.roundSetId ?? "",
+              displayLabel: "S17",
+              noBans: true,
+              bannedChartIds: [],
+            },
+          ],
+        },
+        draws,
+      ),
+    ).toThrow(/static round set/);
   });
 });

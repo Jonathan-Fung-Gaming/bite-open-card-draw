@@ -1,6 +1,7 @@
 export type ChartType = "S" | "D";
 
 export type RoundSetDefinition = {
+  id: string;
   roundNumber: 1 | 2 | 3 | 4;
   setOrder: 1 | 2;
   chartType: ChartType;
@@ -29,6 +30,7 @@ export const REQUIRED_ROUTES = [
 
 export const ROUND_SET_DEFINITIONS: readonly RoundSetDefinition[] = [
   {
+    id: "00000000-0000-4000-8000-000000000101",
     roundNumber: 1,
     setOrder: 1,
     chartType: "S",
@@ -38,6 +40,7 @@ export const ROUND_SET_DEFINITIONS: readonly RoundSetDefinition[] = [
     maxBans: 2,
   },
   {
+    id: "00000000-0000-4000-8000-000000000102",
     roundNumber: 1,
     setOrder: 2,
     chartType: "S",
@@ -47,6 +50,7 @@ export const ROUND_SET_DEFINITIONS: readonly RoundSetDefinition[] = [
     maxBans: 2,
   },
   {
+    id: "00000000-0000-4000-8000-000000000201",
     roundNumber: 2,
     setOrder: 1,
     chartType: "S",
@@ -56,6 +60,7 @@ export const ROUND_SET_DEFINITIONS: readonly RoundSetDefinition[] = [
     maxBans: 2,
   },
   {
+    id: "00000000-0000-4000-8000-000000000202",
     roundNumber: 2,
     setOrder: 2,
     chartType: "S",
@@ -65,6 +70,7 @@ export const ROUND_SET_DEFINITIONS: readonly RoundSetDefinition[] = [
     maxBans: 2,
   },
   {
+    id: "00000000-0000-4000-8000-000000000301",
     roundNumber: 3,
     setOrder: 1,
     chartType: "S",
@@ -74,6 +80,7 @@ export const ROUND_SET_DEFINITIONS: readonly RoundSetDefinition[] = [
     maxBans: 2,
   },
   {
+    id: "00000000-0000-4000-8000-000000000302",
     roundNumber: 3,
     setOrder: 2,
     chartType: "S",
@@ -83,6 +90,7 @@ export const ROUND_SET_DEFINITIONS: readonly RoundSetDefinition[] = [
     maxBans: 2,
   },
   {
+    id: "00000000-0000-4000-8000-000000000401",
     roundNumber: 4,
     setOrder: 1,
     chartType: "S",
@@ -92,6 +100,7 @@ export const ROUND_SET_DEFINITIONS: readonly RoundSetDefinition[] = [
     maxBans: 2,
   },
   {
+    id: "00000000-0000-4000-8000-000000000402",
     roundNumber: 4,
     setOrder: 2,
     chartType: "D",
