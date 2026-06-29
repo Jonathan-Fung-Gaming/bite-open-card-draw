@@ -1949,3 +1949,61 @@ Status: complete.
 - Stage layout was automatically verified at Playwright's Desktop Chrome viewport, 1280x720. The
   code is tuned for the documented 1024x768, 1280x720, and 1920x1080 targets, but only the 1280x720
   geometry is currently enforced by e2e.
+
+## Comprehensive Review Remediation Phase 7 - Phone And View-Only UX
+
+Status: complete.
+
+### Checklist Items Addressed
+
+- CR-023: closed. `/charts` now has a compact view-only status banner and mobile Set 1/Set 2 tabs
+  with next/back controls, while desktop still shows both sets side by side.
+- CR-024: closed. Vote cards now expose `aria-pressed`, visible selected state, a `0/2 bans selected`
+  counter, and third-ban feedback that preserves existing selections.
+- CR-025: closed. Phone ballot cards use stable dimensions, constrained seventh-card width,
+  `break-words`, and line clamps for chart names and artists.
+- CR-033: closed. Saved-ballot and review screens include direct `Edit [set label]` actions for each
+  set.
+- CR-034: closed. The unused legacy `ChartSetPanel` component and barrel export were removed.
+
+### Changed Files
+
+- Added `src/app/charts/ChartsSetNavigator.tsx`
+- Updated `src/app/charts/page.tsx`
+- Updated `src/app/vote/BallotFlow.tsx`
+- Removed `src/components/ChartSetPanel.tsx`
+- Updated `src/components/index.ts`
+- Updated `tests/e2e/full-flow.spec.ts`
+- Updated remediation checklist and plan documentation
+
+### Checks Run
+
+- `rtk npm run typecheck` - passed during implementation.
+- `rtk npm run lint` - passed during implementation.
+- `rtk npm run test:e2e` - initially exposed a strict locator conflict after adding `Edit S16`,
+  then passed after the set-label assertion was made exact.
+- Final `rtk npm run lint` - passed.
+- Final `rtk npm run typecheck` - passed.
+- Final `rtk npm run test` - passed, 37 files / 137 tests.
+- Final `rtk npm run build` - passed.
+- Final `rtk npm run test:e2e` - passed, 2 Playwright tests.
+
+### Manual Review
+
+- Product spec: voting still uses one round ballot covering both chart sets, each set still requires
+  1-2 bans or explicit `No bans for this set`, and view-only users still cannot submit votes or
+  affect turnout.
+- Phone UX: the seventh vote card remains centered in the two-column phone layout; selected bans are
+  visible to sighted users and exposed through `aria-pressed` for assistive tech.
+- View-only UX: `/charts` exposes chart and voting/reveal status without rendering a username
+  selector, ballot controls, or turnout-affecting actions.
+- Security: all ballot mutations still go through server actions; no browser-side tournament
+  decisions or public live chart counts were added.
+
+### Risks And Assumptions
+
+- Phase 7 has no deferred items.
+- Existing Phase 9 deferrals remain open for hosted Supabase row-scoped persistence, database-time
+  transactional timer mutation, and hosted rehearsal evidence.
+- Automated mobile coverage added here uses Chromium at 390px. Broader mobile Chromium/WebKit
+  project coverage remains part of Phase 8.

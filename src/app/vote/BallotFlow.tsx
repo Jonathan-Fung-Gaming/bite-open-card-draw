@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawRecord } from "@/lib/draw/draw-state";
@@ -184,6 +185,7 @@ export function BallotFlow({
   const [choices, setChoices] = useState(() => emptyChoices(draws));
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
   const [presenceWarning, setPresenceWarning] = useState<string | null>(null);
   const [existingBallot, setExistingBallot] = useState<PublicEditableBallot | null>(null);
   const [existingBallotLookup, setExistingBallotLookup] = useState<PublicBallotLookup | null>(null);
@@ -412,9 +414,17 @@ export function BallotFlow({
     }
 
     const exists = currentChoice.bannedChartIds.includes(chartId);
+
+    if (!exists && currentChoice.bannedChartIds.length >= 2) {
+      setSelectionMessage(`Only 2 bans can be selected for ${currentChoice.displayLabel}.`);
+      return;
+    }
+
     const bannedChartIds = exists
       ? currentChoice.bannedChartIds.filter((id) => id !== chartId)
-      : [...currentChoice.bannedChartIds, chartId].slice(0, 2);
+      : [...currentChoice.bannedChartIds, chartId];
+
+    setSelectionMessage(null);
 
     updateChoice({
       ...currentChoice,
@@ -515,6 +525,7 @@ export function BallotFlow({
             setPresenceWarning(null);
             setChoices(emptyChoices(draws));
             setMessage(null);
+            setSelectionMessage(null);
             if (playerId) {
               void loadExistingBallot(playerId, { resetWhenMissing: true });
             }
@@ -572,7 +583,7 @@ export function BallotFlow({
         </h1>
         <p className="mt-3 text-metal-300">Server-confirmed timestamp: {savedAt}</p>
         <div className="mt-5 grid gap-3">
-          {choices.map((choice) => {
+          {choices.map((choice, index) => {
             const draw = draws.find((candidate) => candidate.id === choice.drawId);
 
             return (
@@ -582,6 +593,19 @@ export function BallotFlow({
               >
                 <p className="font-bold text-white">{choice.displayLabel}</p>
                 <p className="mt-1 text-sm text-metal-300">{describeChoice(draw, choice)}</p>
+                {liveCanSubmit ? (
+                  <button
+                    className="mt-3 rounded border border-ember-300/35 px-3 py-2 text-xs font-black uppercase text-ember-300"
+                    onClick={() => {
+                      setSavedAt(null);
+                      setStep(index);
+                      setSelectionMessage(null);
+                    }}
+                    type="button"
+                  >
+                    Edit {choice.displayLabel}
+                  </button>
+                ) : null}
               </div>
             );
           })}
@@ -590,7 +614,12 @@ export function BallotFlow({
         {liveCanSubmit ? (
           <button
             className="button-metal mt-5 rounded px-4 py-3 font-black uppercase"
-            onClick={() => setSavedAt(null)}
+            onClick={() => {
+              setSavedAt(null);
+              setStep(draws.length);
+              setSelectionMessage(null);
+            }}
+            type="button"
           >
             Change vote
           </button>
@@ -613,7 +642,7 @@ export function BallotFlow({
           Round {roundNumber} Ballot
         </h1>
         <div className="mt-5 grid gap-3">
-          {choices.map((choice) => (
+          {choices.map((choice, index) => (
             <div
               key={choice.drawId}
               className="rounded border border-metal-700 bg-black/25 p-3"
@@ -627,6 +656,16 @@ export function BallotFlow({
                       choice,
                     )}
               </p>
+              <button
+                className="mt-3 rounded border border-ember-300/35 px-3 py-2 text-xs font-black uppercase text-ember-300"
+                onClick={() => {
+                  setStep(index);
+                  setSelectionMessage(null);
+                }}
+                type="button"
+              >
+                Edit {choice.displayLabel}
+              </button>
             </div>
           ))}
         </div>
@@ -656,6 +695,25 @@ export function BallotFlow({
         Step {step + 1}: Set {step + 1}
       </p>
       <h1 className="mt-2 text-3xl font-black uppercase text-white">{currentDraw?.displayLabel}</h1>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-metal-700 bg-black/25 p-3">
+        <p
+          className="text-sm font-black uppercase text-white"
+          data-testid="ban-selection-counter"
+        >
+          {currentChoice?.bannedChartIds.length ?? 0}/2 bans selected
+        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-metal-300">
+          Choose up to two charts or explicit no-bans
+        </p>
+      </div>
+      {selectionMessage ? (
+        <p
+          className="mt-3 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300"
+          data-testid="ban-limit-feedback"
+        >
+          {selectionMessage}
+        </p>
+      ) : null}
       {!liveCanSubmit ? (
         <p className="mt-4 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">
           Voting is not accepting ballot changes right now.
@@ -667,9 +725,13 @@ export function BallotFlow({
           return (
             <button
               key={chart.id}
-              className={`relative min-h-32 overflow-hidden rounded border bg-cover bg-center p-3 text-left ${
-                selected ? "border-ember-300 bg-ember-900/40" : "border-metal-700 bg-black/25"
-              } ${index === 6 ? "col-span-2 mx-auto w-1/2 min-w-40" : ""}`}
+              aria-label={`Ban ${chart.name} (${chart.displayDifficulty})`}
+              aria-pressed={selected}
+              className={clsx(
+                "relative min-h-40 min-w-0 overflow-hidden rounded border bg-cover bg-center p-3 text-left",
+                selected ? "border-ember-300 bg-ember-900/40 shadow-ember-tight" : "border-metal-700 bg-black/25",
+                index === 6 ? "col-span-2 mx-auto w-[calc((100%_-_0.75rem)/2)] min-w-40" : "",
+              )}
               data-chart-image-path={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
               data-testid="ballot-chart-card"
               style={{
@@ -681,13 +743,30 @@ export function BallotFlow({
               disabled={!liveCanSubmit}
               type="button"
             >
-              <span className="relative text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
-                {chart.displayDifficulty}
+              <span className="relative flex min-h-32 flex-col justify-between">
+                <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
+                  <span>{chart.displayDifficulty}</span>
+                  <span
+                    className={clsx(
+                      "rounded border px-2 py-1 font-black tracking-normal",
+                      selected
+                        ? "border-ember-300 bg-ember-900/45 text-white"
+                        : "border-metal-700 bg-black/35 text-metal-300",
+                    )}
+                    data-testid="ban-selected-label"
+                  >
+                    {selected ? "Ban selected" : "Tap to ban"}
+                  </span>
+                </span>
+                <span>
+                  <span className="mt-2 block break-words text-sm font-black uppercase leading-tight text-white line-clamp-3 sm:text-base">
+                    {chart.name}
+                  </span>
+                  <span className="mt-1 block break-words text-xs text-metal-300 line-clamp-2 sm:text-sm">
+                    {chart.artist}
+                  </span>
+                </span>
               </span>
-              <span className="relative mt-2 block font-black uppercase text-white">
-                {chart.name}
-              </span>
-              <span className="relative mt-1 block text-sm text-metal-300">{chart.artist}</span>
             </button>
           );
         })}
@@ -697,14 +776,18 @@ export function BallotFlow({
           type="checkbox"
           checked={currentChoice?.noBans ?? false}
           disabled={!liveCanSubmit}
-          onChange={(event) =>
-            currentChoice &&
+          onChange={(event) => {
+            if (!currentChoice) {
+              return;
+            }
+
+            setSelectionMessage(null);
             updateChoice({
               ...currentChoice,
               noBans: event.target.checked,
               bannedChartIds: [],
-            })
-          }
+            });
+          }}
         />
         No bans for this set
       </label>
@@ -712,7 +795,10 @@ export function BallotFlow({
         <button
           className="rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300 disabled:opacity-40"
           disabled={step === 0}
-          onClick={() => setStep((current) => current - 1)}
+          onClick={() => {
+            setSelectionMessage(null);
+            setStep((current) => current - 1);
+          }}
           type="button"
         >
           Back
@@ -727,7 +813,10 @@ export function BallotFlow({
               (!currentChoice.noBans && currentChoice.bannedChartIds.length >= 1)
             )
           }
-          onClick={() => setStep((current) => current + 1)}
+          onClick={() => {
+            setSelectionMessage(null);
+            setStep((current) => current + 1);
+          }}
           type="button"
         >
           {step === 1 ? "Review" : "Next"}

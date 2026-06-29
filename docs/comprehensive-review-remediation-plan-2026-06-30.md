@@ -399,6 +399,41 @@ Exit criteria:
 - Third-ban attempts give feedback without silently changing prior selections.
 - Submitted-ballot editing is direct enough to change either set without excessive backtracking.
 
+### Phase 7 Handoff Context
+
+Status: complete.
+
+Implementation notes to preserve:
+
+- `/charts` now uses `ChartsSetNavigator`, a client-side view-only navigator. Mobile users switch
+  between Set 1 and Set 2 with tabs and next/back controls; desktop still shows both sets side by
+  side through the existing `PublicDrawSetPanel` cards.
+- `/charts` includes a compact view-only status banner for awaiting draw, voting-open/final-warning/
+  extension, closed/revealing, and final states. The banner explicitly states that view-only mode
+  cannot submit votes or affect turnout.
+- `/vote` chart cards now expose `aria-pressed`, a visible `Ban selected` state, a `0/2 bans
+  selected` counter, and explicit feedback for third-ban attempts. The third-ban path returns before
+  mutating the existing two selections.
+- Ballot cards now use stable mobile dimensions, `min-w-0`, `break-words`, and line clamps for chart
+  names and artists. The centered seventh card keeps the phone two-column layout.
+- Saved-ballot and review screens now include direct `Edit [set label]` actions so users can jump
+  back to either set without walking backward through review screens.
+- The unused legacy `ChartSetPanel` source file and barrel export were removed; current stage and
+  phone layouts use their dedicated components.
+
+Verification:
+
+- `rtk npm run typecheck` - passed during implementation.
+- `rtk npm run lint` - passed during implementation.
+- `rtk npm run test:e2e` passed after adding mobile `/charts`, 390px phone ballot, third-ban, and
+  direct saved-edit assertions.
+- Full phase gates are recorded in `docs/phase-status.md`.
+
+Deferred items:
+
+- None for Phase 7. Existing Phase 9 deferrals for hosted Supabase row-scoped persistence,
+  database-time transactional timer mutation, and hosted rehearsal remain unchanged.
+
 ## Phase 8 - Test Harness, Mobile Coverage, And Load
 
 Addresses: `CR-029`, `CR-030`, `CR-031`.
