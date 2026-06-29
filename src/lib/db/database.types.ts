@@ -13,6 +13,14 @@ type EventScopedInsert = {
   event_id?: string;
 };
 
+type NormalizedRuntimeRpc = {
+  Args: {
+    p_event_id: string;
+    p_payload: Json;
+  };
+  Returns: Json;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -268,6 +276,27 @@ export type Database = {
           created_at?: Timestamp;
         }
       >;
+      active_voter_presence: TableDefinition<
+        {
+          id: Uuid;
+          event_id: string;
+          player_id: Uuid;
+          device_id: string;
+          claimed_at: Timestamp;
+          last_seen_at: Timestamp;
+          expires_at: Timestamp;
+          user_agent: string | null;
+        },
+        EventScopedInsert & {
+          id?: Uuid;
+          player_id: Uuid;
+          device_id: string;
+          claimed_at?: Timestamp;
+          last_seen_at?: Timestamp;
+          expires_at: Timestamp;
+          user_agent?: string | null;
+        }
+      >;
       ballots: TableDefinition<
         {
           id: Uuid;
@@ -282,6 +311,9 @@ export type Database = {
           override_admin_action_id: Uuid | null;
           override_reason: string | null;
           replaced_existing_ballot: boolean;
+          invalidated_at: Timestamp | null;
+          invalidated_by_admin_action_id: Uuid | null;
+          invalidation_reason: string | null;
           created_at: Timestamp;
           updated_at: Timestamp;
         },
@@ -297,6 +329,9 @@ export type Database = {
           override_admin_action_id?: Uuid | null;
           override_reason?: string | null;
           replaced_existing_ballot?: boolean;
+          invalidated_at?: Timestamp | null;
+          invalidated_by_admin_action_id?: Uuid | null;
+          invalidation_reason?: string | null;
           created_at?: Timestamp;
           updated_at?: Timestamp;
         }
@@ -473,7 +508,35 @@ export type Database = {
       >;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      normalized_submit_ballot: NormalizedRuntimeRpc;
+      normalized_manual_ballot_override: NormalizedRuntimeRpc;
+      normalized_claim_voter_presence: NormalizedRuntimeRpc;
+      normalized_touch_voter_presence: NormalizedRuntimeRpc;
+      normalized_acquire_host_lock: NormalizedRuntimeRpc;
+      normalized_heartbeat_host_lock: NormalizedRuntimeRpc;
+      normalized_release_host_lock: NormalizedRuntimeRpc;
+      normalized_open_voting_window: NormalizedRuntimeRpc;
+      normalized_pause_voting_window: NormalizedRuntimeRpc;
+      normalized_resume_voting_window: NormalizedRuntimeRpc;
+      normalized_close_voting_window: NormalizedRuntimeRpc;
+      normalized_reopen_voting_window: NormalizedRuntimeRpc;
+      normalized_advance_voting_timer: NormalizedRuntimeRpc;
+      normalized_draw_round_set: NormalizedRuntimeRpc;
+      normalized_reroll_one_chart: NormalizedRuntimeRpc;
+      normalized_reroll_round_set: NormalizedRuntimeRpc;
+      normalized_reroll_full_round: NormalizedRuntimeRpc;
+      normalized_invalidate_post_vote_reroll_ballots: NormalizedRuntimeRpc;
+      normalized_compute_results: NormalizedRuntimeRpc;
+      normalized_advance_result_reveal: NormalizedRuntimeRpc;
+      normalized_mark_results_revealed: NormalizedRuntimeRpc;
+      normalized_override_result: NormalizedRuntimeRpc;
+      normalized_reset_round: NormalizedRuntimeRpc;
+      normalized_create_admin_session: NormalizedRuntimeRpc;
+      normalized_touch_admin_session: NormalizedRuntimeRpc;
+      normalized_logout_admin_session: NormalizedRuntimeRpc;
+      normalized_revoke_admin_session: NormalizedRuntimeRpc;
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

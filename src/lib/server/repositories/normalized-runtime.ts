@@ -65,7 +65,7 @@ export abstract class EventScopedRepository<TTable extends EventScopedDatabaseTa
   }
 }
 
-const PLAYER_TABLES = ["players", "round_player_eligibility"] as const;
+const PLAYER_TABLES = ["players", "round_player_eligibility", "active_voter_presence"] as const;
 const CHART_EXCLUSION_TABLES = ["chart_exclusions"] as const;
 const DRAW_TABLES = ["draws", "drawn_charts"] as const;
 const VOTING_WINDOW_TABLES = ["voting_windows"] as const;
