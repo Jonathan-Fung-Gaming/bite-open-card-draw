@@ -626,6 +626,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 consequence="invalidate any computed unrevealed result and allow ballot edits for the chosen duration"
                 disabled={!canControl}
                 passwordId="reopen-voting-password"
+                summaryItems={[
+                  { label: "Round", fieldName: "roundNumber" },
+                  { label: "Duration", fieldName: "durationMinutes" },
+                ]}
               >
                 <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="durationMinutes">
                   Reopen duration
@@ -668,6 +672,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 consequence="clear that round's draws, ballots, voting window, result snapshot, and reveal state"
                 disabled={!canControl}
                 passwordId="reset-round-password"
+                summaryItems={[{ label: "Round", fieldName: "roundNumber" }]}
               >
                 <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reset-round">
                   Round
@@ -711,6 +716,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 consequence="change the committed selected chart used by stage, phones, and private export"
                 disabled={!canControl || !result}
                 passwordId="override-result-password"
+                summaryItems={[
+                  { label: "Round", fieldName: "roundNumber" },
+                  { label: "Chart", fieldName: "resultTarget" },
+                ]}
               >
                 <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="resultTarget">
                   Corrected selected chart
@@ -1001,7 +1010,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </button>
               </form>
             </div>
-            <DebugSnapshotDownload action={downloadDebugSnapshotAction} />
+            <DebugSnapshotDownload action={downloadDebugSnapshotAction} disabled={!canControl} />
           </section>
           <section className="metal-panel rounded-lg p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Host Lock</p>
@@ -1071,6 +1080,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               action="add an inactive player to current round eligibility"
               consequence="make that player eligible for the selected current round"
               disabled={!canControl}
+              summaryItems={[
+                { label: "Player", fieldName: "playerId" },
+                { label: "Round", fieldName: "roundNumber" },
+              ]}
             >
               <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="playerId">
                 Inactive player

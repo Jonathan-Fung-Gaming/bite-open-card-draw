@@ -317,7 +317,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     extension-used, and unit coverage verifies a 3-minute reopen closes at the chosen
     duration with no additional low-turnout extension.
 
-- [ ] CR-016 - Admin inactivity timeout is effectively a 10-hour auto-refreshed session.
+- [x] CR-016 - Admin inactivity timeout is effectively a 10-hour auto-refreshed session.
   - Severity: Medium.
   - Files: `src/lib/admin/session.ts:3`,
     `src/app/coolguy69/_components/AdminSessionHeartbeat.tsx:6`,
@@ -330,6 +330,10 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     interaction with debounce, and auto-logout/redirect when idle.
   - Suggested tests: idle tab for more than 30 minutes cannot mutate; real admin
     interaction extends expiry; passive heartbeat alone does not.
+  - Phase 5 closure: admin session TTL is 30 minutes, the admin page refreshes the
+    session only after real browser activity with debounce, the visible timer
+    redirects on expiry, and passive host-lock heartbeat validates without sliding
+    the admin session.
 
 - [x] CR-017 - Sensitive actions lack basic rate limiting.
   - Severity: Medium.
@@ -369,7 +373,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     `anon`, and `authenticated` and `GRANT EXECUTE` to `service_role` for each
     normalized mutation RPC, with migration coverage in unit tests.
 
-- [ ] CR-019 - Debug operational snapshot export exposes sensitive live data.
+- [x] CR-019 - Debug operational snapshot export exposes sensitive live data.
   - Severity: Medium.
   - Files: `src/app/coolguy69/page.tsx:1004`,
     `src/app/coolguy69/actions.ts:781`,
@@ -385,8 +389,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     explicitly needed for backup.
   - Suggested tests: debug export unavailable or password-gated in production; JSON
     redacts sensitive internals; live ballots are not exported during voting.
+  - Phase 5 closure: debug snapshot export now requires active host control and
+    dangerous-action password re-entry, is blocked while voting is active or paused,
+    and redacts host token hashes, session ids, edit-token hashes, invalidation
+    admin ids, and presence device ids.
 
-- [ ] CR-020 - Dangerous-action prompts ask for password before exact target details.
+- [x] CR-020 - Dangerous-action prompts ask for password before exact target details.
   - Severity: Medium.
   - Files: `src/components/DangerousActionDialog.tsx:24`,
     `src/components/DangerousActionDialog.tsx:28`,
@@ -400,8 +408,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     summary including selected round/player/chart/duration, then password entry.
   - Suggested tests: e2e for reopen/reset/override/current-round add verifying visible
     summary includes selected target and consequence before password submission.
+  - Phase 5 closure: the shared dangerous-action dialog now renders target fields
+    first, then an action summary with selected field values, then the password
+    prompt. Reopen, reset, override, and current-round eligibility forms provide
+    summary fields.
 
-- [ ] CR-021 - Manual ballot replacement confirmation is weak.
+- [x] CR-021 - Manual ballot replacement confirmation is weak.
   - Severity: Medium.
   - Files: `src/app/coolguy69/_components/ManualBallotForm.tsx:37`,
     `src/app/coolguy69/_components/ManualBallotForm.tsx:72`,
@@ -418,8 +430,11 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: select a player with an existing ballot; verify username-specific
     warning, submit rejected until explicit replacement confirmation, and CSV marks
     replacement.
+  - Phase 5 closure: the manual ballot form names the selected start.gg username in
+    replacement mode, requires an explicit `Replace existing ballot for [username]`
+    checkbox, and the server rejection names the player.
 
-- [ ] CR-022 - Manual ballot UI does not enforce max bans or no-bans exclusivity.
+- [x] CR-022 - Manual ballot UI does not enforce max bans or no-bans exclusivity.
   - Severity: Medium.
   - Files: `src/app/coolguy69/_components/ManualBallotForm.tsx:88`,
     `src/app/coolguy69/_components/ManualBallotForm.tsx:101`,
@@ -434,6 +449,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     no-bans is checked.
   - Suggested tests: manual ballot e2e for >2 bans rejection before submit and no-bans
     mutual exclusion.
+  - Phase 5 closure: manual ballot set controls are stateful, show a `0/2` counter,
+    disable third-ban selections, disable chart bans when no-bans is checked, and
+    disable no-bans while chart bans are selected.
 
 - [ ] CR-023 - `/charts` lacks explicit mobile set navigation and status.
   - Severity: Medium.

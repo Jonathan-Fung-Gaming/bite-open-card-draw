@@ -1,6 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
-export const ADMIN_SESSION_TTL_SECONDS = 10 * 60 * 60;
+export const ADMIN_SESSION_TTL_SECONDS = 30 * 60;
 export const ADMIN_SESSION_COOKIE = "bite_admin_session";
 export const HOST_TOKEN_COOKIE = "bite_host_token";
 

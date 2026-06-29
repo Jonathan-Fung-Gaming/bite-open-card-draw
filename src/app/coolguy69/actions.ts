@@ -31,6 +31,7 @@ import {
   clearAdminCookies,
   clearHostTokenCookie,
   createAdminSessionCookie,
+  getAdminSessionFromCookies,
   getHostTokenCookie,
   refreshAdminSessionCookie,
   requireAdminSession,
@@ -113,6 +114,22 @@ function selectedSongKeysForRound(roundNumber: 1 | 2 | 3 | 4) {
 
 function syncSelectedSongBlocks() {
   syncSelectedSongBlocksFromResultStore(adminState.drawStateStore, adminState.resultStore);
+}
+
+function assertDebugSnapshotAllowed() {
+  const activeVotingWindow = adminState.votingWindowStore
+    .exportSnapshot()
+    .windows.find((window) =>
+      ["voting_open", "voting_paused", "final_30_seconds", "extension_1_minute"].includes(
+        window.status,
+      ),
+    );
+
+  if (activeVotingWindow) {
+    throw new Error(
+      `Debug snapshot export is blocked while Round ${activeVotingWindow.roundNumber} voting is active or paused.`,
+    );
+  }
 }
 
 function resetRoundState(roundNumber: 1 | 2 | 3 | 4) {
@@ -214,8 +231,12 @@ export async function takeHostControlAction(formData: FormData) {
 }
 
 export async function refreshHostLockAction() {
-  const session = await requireAdminSession();
+  const session = await getAdminSessionFromCookies();
   const hostToken = await getHostTokenCookie();
+
+  if (!session) {
+    return;
+  }
 
   await hydrateTournamentState();
 
@@ -662,7 +683,7 @@ export async function manualBallotAction(formData: FormData) {
 
     if (existing && !replaceExisting) {
       throw new Error(
-        "This player already has a submitted ballot. Are you sure you want to replace it?",
+        `${player.startggUsername} already has a submitted ballot. Confirm replacement before saving a manual override.`,
       );
     }
 
@@ -821,13 +842,15 @@ export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
   };
 }
 
-export async function downloadDebugSnapshotAction() {
-  const session = await requireAdminSession();
+export async function downloadDebugSnapshotAction(formData: FormData) {
+  const session = await requireActiveHost();
 
-  await hydrateTournamentState();
+  await verifyDangerousActionPassword(getAdminPassword(formData));
+  assertDebugSnapshotAllowed();
   audit(session, {
     action: "debug_snapshot_export",
-    summary: "Downloaded debug operational state snapshot.",
+    summary: "Downloaded redacted debug operational state snapshot.",
+    dangerous: true,
     tournamentChanging: false,
   });
 

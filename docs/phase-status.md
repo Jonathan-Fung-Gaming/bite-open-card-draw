@@ -1824,3 +1824,60 @@ Status: complete.
   applied before relying on normalized draw audit columns.
 - Phase 4 has no deferred items. Existing Phase 9 deferrals for hosted Supabase row-scoped
   persistence and database-time transactional timer mutation remain open.
+
+## Comprehensive Review Remediation Phase 5 - Admin Security And Dangerous Actions
+
+Status: complete.
+
+### Checklist Items Addressed
+
+- CR-016: closed. Admin sessions now use a 30-minute TTL. Browser activity refreshes are
+  interaction-driven and debounced; passive host-lock heartbeat validates without sliding the admin
+  session.
+- CR-019: closed. Debug operational snapshot export now requires active host control and password
+  re-entry, is blocked during active/paused voting, and redacts session/host/edit-token/device
+  internals.
+- CR-020: closed. Shared dangerous-action prompts render target fields before a visible summary and
+  password field. Reopen/reset/override/current-round-add pass selected-target summary fields.
+- CR-021: closed. Manual ballot replacement warnings and confirmation controls name the selected
+  start.gg username, and the server-side rejection also names the player.
+- CR-022: closed. Manual ballot UI caps bans at two per set and enforces no-bans mutual exclusion
+  before submit.
+
+### Changed Files
+
+- Updated `src/lib/admin/session.ts` and `src/lib/admin/session.test.ts`
+- Updated `src/app/coolguy69/actions.ts`
+- Updated `src/app/coolguy69/page.tsx`
+- Updated `src/app/coolguy69/_components/AdminSessionHeartbeat.tsx`
+- Updated `src/app/coolguy69/_components/AdminInactivityTimer.tsx`
+- Updated `src/app/coolguy69/_components/DebugSnapshotDownload.tsx`
+- Updated `src/app/coolguy69/_components/ManualBallotForm.tsx`
+- Updated `src/components/DangerousActionDialog.tsx`
+- Updated `src/lib/persistence/debug-export.ts` and `src/lib/persistence/debug-export.test.ts`
+- Updated remediation checklist and plan documentation
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 36 files / 134 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- Additional focused regression command passed before full gates:
+  `rtk npm run test -- src/lib/admin/session.test.ts src/lib/server/admin-session-store.test.ts src/lib/persistence/debug-export.test.ts`
+
+### Manual Review
+
+- Product spec: admin route, shared password, dangerous-action password re-entry, host lock, and
+  manual ballot rules remain aligned.
+- Security: passive host heartbeat no longer extends admin sessions; debug exports are gated and
+  redacted; password re-entry remains server-verified.
+- UI: dangerous prompts now put target inputs and action summary before password entry; manual
+  ballot replacement and set completion controls match the required admin workflow more closely.
+
+### Risks And Assumptions
+
+- Debug snapshots are still an admin/host backup tool in non-production and production, but now
+  require active host control and password re-entry and are blocked during active voting.
+- Phase 5 has no deferred items.
