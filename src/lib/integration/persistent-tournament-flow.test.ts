@@ -375,7 +375,12 @@ describe("repository-backed tournament integration", () => {
         ballots: stores.ballotStore.listForRound(roundNumber),
       });
 
-      expect(csv).toContain(`round_number,player_startgg_username`);
+      expect(csv).toContain("round_number,result_id,result_computed_at");
+      expect(csv).toContain("player_startgg_username");
+      expect(csv).toContain("set_1_round_set_id,set_1_draw_id,set_1_draw_version");
+      expect(csv).toContain(result.sets[0].roundSetId);
+      expect(csv).toContain(result.sets[0].drawId);
+      expect(csv).toContain("set_1_tiebreak_candidate_ids");
       expect(csv).toContain(`round ${roundNumber} rehearsal override`);
       expect(csv).toContain("true,shared_admin");
       csvByRound.set(roundNumber, csv);

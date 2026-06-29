@@ -20,6 +20,7 @@ import {
   bulkImportPlayersAction,
   closeVotingAction,
   computeResultsAction,
+  downloadDebugSnapshotAction,
   downloadPrivateCsvAction,
   drawRoundSetAction,
   releaseHostControlAction,
@@ -43,6 +44,7 @@ import {
 } from "./actions";
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
 import { AdminSessionHeartbeat } from "./_components/AdminSessionHeartbeat";
+import { DebugSnapshotDownload } from "./_components/DebugSnapshotDownload";
 import { HostHeartbeat } from "./_components/HostHeartbeat";
 import { ManualBallotForm } from "./_components/ManualBallotForm";
 import { PrivateCsvDownload } from "./_components/PrivateCsvDownload";
@@ -999,6 +1001,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </button>
               </form>
             </div>
+            <DebugSnapshotDownload action={downloadDebugSnapshotAction} />
           </section>
           <section className="metal-panel rounded-lg p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Host Lock</p>

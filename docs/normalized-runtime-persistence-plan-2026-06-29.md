@@ -7,7 +7,7 @@ This is the working implementation plan for normalized runtime persistence.
 Goal: replace the singleton `tournament_state_snapshots` runtime with normalized Supabase tables as
 the authoritative deployed/event state, while keeping snapshots only as backup/debug export.
 
-Implementation status on 2026-06-29: Phases 1-6 are complete. Phase 7 is the next active phase.
+Implementation status on 2026-06-29: Phases 1-7 are complete. Phase 8 is the next active phase.
 
 ## 2026-06-29 Blocker And Decision
 

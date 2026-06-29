@@ -1559,3 +1559,51 @@ Status: complete
   host-lock takeover behavior across refresh/redeploy boundaries.
 - Admin session token hash rotation means a stale pre-refresh cookie becomes invalid once a refreshed
   cookie has been persisted for the same session id.
+
+## Normalized Runtime Persistence Phase 7 - Audit, Export, And Recovery
+
+Status: complete
+
+### Acceptance Criteria
+
+- Private ballot CSV now includes result id, result compute/reveal timestamps, reveal phase, final
+  reveal timestamp, ballot revision, static `round_set_id`, active `draw_id`, and draw version for
+  each set.
+- Private ballot CSV now includes tiebreak candidate ids, backend winner chart id, and winner reveal
+  start timestamp for each set.
+- Manual override markers and reasons remain in the CSV export.
+- Admin console now exposes a password-session-gated debug operational snapshot download.
+- Debug snapshot exports are labeled `debug_operational_state_snapshot` with
+  `authoritativeRuntimeSource: false` and a warning that deployed runtime authority comes from
+  normalized Supabase tables.
+- Downloading a debug snapshot records a non-tournament-changing audit action before export.
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (33 files, 108 tests)
+- Production build: passed with `npm run build`
+- E2E: passed with `npm run test:e2e` (2 Playwright tests)
+
+### Changed Files
+
+- Added `src/lib/persistence/debug-export.ts`
+- Added `src/lib/persistence/debug-export.test.ts`
+- Added `src/app/coolguy69/_components/DebugSnapshotDownload.tsx`
+- Updated private CSV generation/tests and four-round persistent rehearsal CSV assertions
+- Updated admin actions/page to provide the debug snapshot download
+- Updated phase docs
+
+### Manual Review
+
+- Tournament rules: no draw, vote, result, tiebreak, or reveal behavior changed.
+- Security: debug snapshots require an admin session, are not exposed to browser code until an admin
+  explicitly downloads them, and are labeled as non-authoritative backup/debug exports.
+- Recovery: the export preserves the existing operational snapshot shape, including audit records,
+  ballot invalidations, draw ids, static round-set ids, result/tiebreak metadata, and host state for
+  manual inspection.
+
+### Risks And Assumptions
+
+- Debug snapshot import/restore is intentionally not implemented; deployed runtime reads continue to
+  use normalized Supabase tables.
+- Hosted Supabase rehearsal remains the next required gate to validate export behavior against the
+  real remote backend and event namespace.

@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHostToken } from "@/lib/admin/host-lock";
 import type { AdminSessionPayload } from "@/lib/admin/session";
+import {
+  createOperationalDebugSnapshotExport,
+  operationalDebugSnapshotFilename,
+  serializeOperationalDebugSnapshotExport,
+} from "@/lib/persistence/debug-export";
+import { createOperationalStateSnapshot } from "@/lib/persistence/operational-state";
 import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import { adminState, resetTournamentOperationalState } from "@/lib/server/admin-state";
 import { hydrateTournamentState, persistTournamentState } from "@/lib/server/persistence";
@@ -769,6 +775,27 @@ export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
       result,
       ballots: adminState.ballotStore.listForRound(roundNumber),
     }),
+  };
+}
+
+export async function downloadDebugSnapshotAction() {
+  const session = await requireAdminSession();
+
+  await hydrateTournamentState();
+  audit(session, {
+    action: "debug_snapshot_export",
+    summary: "Downloaded debug operational state snapshot.",
+    tournamentChanging: false,
+  });
+
+  const snapshot = createOperationalStateSnapshot(adminState);
+  const exportData = createOperationalDebugSnapshotExport(snapshot);
+
+  await persistTournamentState();
+
+  return {
+    filename: operationalDebugSnapshotFilename(snapshot),
+    json: serializeOperationalDebugSnapshotExport(exportData),
   };
 }
 
