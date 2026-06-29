@@ -29,6 +29,12 @@ describe("server persistence safety", () => {
 
   it("requires an event id before initializing Supabase-backed runtime persistence", () => {
     vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3000");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://localhost:54321");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-test-key");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-test-key");
+    vi.stubEnv("ADMIN_PASSWORD_HASH", "$2a$10$test");
+    vi.stubEnv("SESSION_SECRET", "test-session-secret");
     vi.stubEnv("TOURNAMENT_EVENT_ID", "");
 
     expect(() => getOperationalStateRepository()).toThrow(/TOURNAMENT_EVENT_ID/);

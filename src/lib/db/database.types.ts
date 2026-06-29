@@ -40,6 +40,20 @@ export type Database = {
           updated_at?: Timestamp;
         }
       >;
+      event_runtime_state: TableDefinition<
+        {
+          event_id: string;
+          current_round: number;
+          rehearsal_mode: boolean;
+          updated_at: Timestamp;
+        },
+        {
+          event_id: string;
+          current_round?: number;
+          rehearsal_mode?: boolean;
+          updated_at?: Timestamp;
+        }
+      >;
       round_sets: TableDefinition<
         {
           id: Uuid;
@@ -195,6 +209,7 @@ export type Database = {
           status: string;
           eligible_pool_count: number;
           admin_action_id: Uuid | null;
+          reason: string | null;
           created_at: Timestamp;
           superseded_at: Timestamp | null;
         },
@@ -205,6 +220,7 @@ export type Database = {
           status?: string;
           eligible_pool_count?: number;
           admin_action_id?: Uuid | null;
+          reason?: string | null;
           created_at?: Timestamp;
           superseded_at?: Timestamp | null;
         }
@@ -235,10 +251,13 @@ export type Database = {
           opened_at: Timestamp | null;
           closes_at: Timestamp | null;
           paused_at: Timestamp | null;
+          paused_from_status: string | null;
           remaining_seconds_at_pause: number | null;
+          remaining_ms_when_paused: number | null;
           extension_used: boolean;
           final_warning_started_at: Timestamp | null;
           closed_at: Timestamp | null;
+          eligible_players: Json;
           created_at: Timestamp;
           updated_at: Timestamp;
         },
@@ -249,10 +268,13 @@ export type Database = {
           opened_at?: Timestamp | null;
           closes_at?: Timestamp | null;
           paused_at?: Timestamp | null;
+          paused_from_status?: string | null;
           remaining_seconds_at_pause?: number | null;
+          remaining_ms_when_paused?: number | null;
           extension_used?: boolean;
           final_warning_started_at?: Timestamp | null;
           closed_at?: Timestamp | null;
+          eligible_players?: Json;
           created_at?: Timestamp;
           updated_at?: Timestamp;
         }
@@ -265,6 +287,8 @@ export type Database = {
           player_id: Uuid;
           active_at_round_start: boolean;
           added_by_admin_action_id: Uuid | null;
+          reason: string | null;
+          added_at: Timestamp | null;
           created_at: Timestamp;
         },
         EventScopedInsert & {
@@ -273,6 +297,8 @@ export type Database = {
           player_id: Uuid;
           active_at_round_start?: boolean;
           added_by_admin_action_id?: Uuid | null;
+          reason?: string | null;
+          added_at?: Timestamp | null;
           created_at?: Timestamp;
         }
       >;
@@ -280,6 +306,7 @@ export type Database = {
         {
           id: Uuid;
           event_id: string;
+          round_number: number;
           player_id: Uuid;
           device_id: string;
           claimed_at: Timestamp;
@@ -289,6 +316,7 @@ export type Database = {
         },
         EventScopedInsert & {
           id?: Uuid;
+          round_number?: number;
           player_id: Uuid;
           device_id: string;
           claimed_at?: Timestamp;
@@ -380,6 +408,29 @@ export type Database = {
           failure_reason?: string | null;
         }
       >;
+      ballot_invalidations: TableDefinition<
+        {
+          id: Uuid;
+          event_id: string;
+          round_number: number;
+          invalidated_at: Timestamp;
+          reason: string;
+          admin_session_id: string;
+          ballot_ids: Uuid[];
+          payload: Json;
+          created_at: Timestamp;
+        },
+        EventScopedInsert & {
+          id?: Uuid;
+          round_number: number;
+          invalidated_at: Timestamp;
+          reason: string;
+          admin_session_id: string;
+          ballot_ids?: Uuid[];
+          payload?: Json;
+          created_at?: Timestamp;
+        }
+      >;
       result_snapshots: TableDefinition<
         {
           id: Uuid;
@@ -388,6 +439,10 @@ export type Database = {
           computed_at: Timestamp;
           stage_reveal_started_at: Timestamp | null;
           stage_revealed_at: Timestamp | null;
+          reveal_phase: string;
+          reveal_phase_started_at: Timestamp | null;
+          final_revealed_at: Timestamp | null;
+          eligible_players: Json;
           admin_action_id: Uuid | null;
           metadata: Json;
         },
@@ -397,6 +452,10 @@ export type Database = {
           computed_at?: Timestamp;
           stage_reveal_started_at?: Timestamp | null;
           stage_revealed_at?: Timestamp | null;
+          reveal_phase?: string;
+          reveal_phase_started_at?: Timestamp | null;
+          final_revealed_at?: Timestamp | null;
+          eligible_players?: Json;
           admin_action_id?: Uuid | null;
           metadata?: Json;
         }
@@ -440,6 +499,7 @@ export type Database = {
           decided_at: Timestamp;
           decision_source: string;
           admin_action_id: Uuid | null;
+          winner_reveal_started_at: Timestamp | null;
         },
         EventScopedInsert & {
           id?: Uuid;
@@ -451,6 +511,7 @@ export type Database = {
           decided_at?: Timestamp;
           decision_source?: string;
           admin_action_id?: Uuid | null;
+          winner_reveal_started_at?: Timestamp | null;
         }
       >;
       host_locks: TableDefinition<
@@ -459,6 +520,7 @@ export type Database = {
           event_id: string;
           lock_name: string;
           admin_session_id: Uuid | null;
+          owner_session_id: string | null;
           host_token_hash: string;
           acquired_at: Timestamp;
           heartbeat_at: Timestamp;
@@ -469,6 +531,7 @@ export type Database = {
           id?: Uuid;
           lock_name?: string;
           admin_session_id?: Uuid | null;
+          owner_session_id?: string | null;
           host_token_hash: string;
           acquired_at?: Timestamp;
           heartbeat_at?: Timestamp;

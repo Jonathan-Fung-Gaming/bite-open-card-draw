@@ -23,6 +23,7 @@ type RepositoryDependencies = {
 export type NormalizedRepositoryBoundary =
   | "players"
   | "chartExclusions"
+  | "runtimeState"
   | "draws"
   | "votingWindows"
   | "ballots"
@@ -67,9 +68,15 @@ export abstract class EventScopedRepository<TTable extends EventScopedDatabaseTa
 
 const PLAYER_TABLES = ["players", "round_player_eligibility", "active_voter_presence"] as const;
 const CHART_EXCLUSION_TABLES = ["chart_exclusions"] as const;
+const RUNTIME_STATE_TABLES = ["event_runtime_state"] as const;
 const DRAW_TABLES = ["draws", "drawn_charts"] as const;
 const VOTING_WINDOW_TABLES = ["voting_windows"] as const;
-const BALLOT_TABLES = ["ballots", "ballot_choices", "ballot_revisions"] as const;
+const BALLOT_TABLES = [
+  "ballots",
+  "ballot_choices",
+  "ballot_revisions",
+  "ballot_invalidations",
+] as const;
 const RESULT_TABLES = ["result_snapshots", "result_rows", "tiebreaks"] as const;
 const ADMIN_SESSION_TABLES = ["admin_sessions"] as const;
 const ADMIN_AUDIT_TABLES = ["admin_actions"] as const;
@@ -86,6 +93,14 @@ export class ChartExclusionRepository extends EventScopedRepository<
 > {
   constructor(dependencies?: RepositoryDependencies) {
     super({ boundary: "chartExclusions", tables: CHART_EXCLUSION_TABLES }, dependencies);
+  }
+}
+
+export class RuntimeStateRepository extends EventScopedRepository<
+  (typeof RUNTIME_STATE_TABLES)[number]
+> {
+  constructor(dependencies?: RepositoryDependencies) {
+    super({ boundary: "runtimeState", tables: RUNTIME_STATE_TABLES }, dependencies);
   }
 }
 
@@ -140,6 +155,7 @@ export class HostLockRepository extends EventScopedRepository<(typeof HOST_LOCK_
 export type NormalizedRuntimeRepositories = {
   playerRepository: PlayerRepository;
   chartExclusionRepository: ChartExclusionRepository;
+  runtimeStateRepository: RuntimeStateRepository;
   drawRepository: DrawRepository;
   votingWindowRepository: VotingWindowRepository;
   ballotRepository: BallotRepository;
@@ -160,6 +176,7 @@ export function createNormalizedRuntimeRepositories(
   return {
     playerRepository: new PlayerRepository(sharedDependencies),
     chartExclusionRepository: new ChartExclusionRepository(sharedDependencies),
+    runtimeStateRepository: new RuntimeStateRepository(sharedDependencies),
     drawRepository: new DrawRepository(sharedDependencies),
     votingWindowRepository: new VotingWindowRepository(sharedDependencies),
     ballotRepository: new BallotRepository(sharedDependencies),

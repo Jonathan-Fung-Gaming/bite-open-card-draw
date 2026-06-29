@@ -10,7 +10,7 @@ import {
   type OperationalStateRepository,
 } from "@/lib/persistence/repository";
 import { getTournamentEventId } from "@/lib/server/env";
-import { SupabaseOperationalStateRepository } from "@/lib/server/supabase-operational-state";
+import { NormalizedOperationalStateRepository } from "@/lib/server/normalized-operational-state";
 
 export type TournamentStateBackend = "memory" | "supabase";
 
@@ -57,7 +57,7 @@ export function getOperationalStateRepository(): OperationalStateRepository {
 
   if (backend === "supabase") {
     getTournamentEventId();
-    return new SupabaseOperationalStateRepository();
+    return new NormalizedOperationalStateRepository();
   }
 
   return getMemoryRepository();

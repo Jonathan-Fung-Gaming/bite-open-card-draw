@@ -6,6 +6,7 @@ export const CORE_DATABASE_TABLES = [
   "charts",
   "chart_exclusions",
   "rounds",
+  "event_runtime_state",
   "round_sets",
   "draws",
   "drawn_charts",
@@ -15,6 +16,7 @@ export const CORE_DATABASE_TABLES = [
   "ballots",
   "ballot_choices",
   "ballot_revisions",
+  "ballot_invalidations",
   "result_snapshots",
   "result_rows",
   "tiebreaks",
@@ -29,6 +31,7 @@ export type CoreDatabaseTable = (typeof CORE_DATABASE_TABLES)[number];
 
 export const EVENT_SCOPED_DATABASE_TABLES = [
   "players",
+  "event_runtime_state",
   "chart_exclusions",
   "draws",
   "drawn_charts",
@@ -38,6 +41,7 @@ export const EVENT_SCOPED_DATABASE_TABLES = [
   "ballots",
   "ballot_choices",
   "ballot_revisions",
+  "ballot_invalidations",
   "result_snapshots",
   "result_rows",
   "tiebreaks",

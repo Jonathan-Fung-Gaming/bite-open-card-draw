@@ -1452,3 +1452,58 @@ Status: complete
   a non-production Supabase project before event use.
 - Initial parallel execution of `npm run build` and `npm run test:e2e` conflicted on `.next` cache
   writes; after clearing generated `.next`, both passed sequentially.
+
+## Normalized Runtime Persistence Phase 5 - Runtime Cutover
+
+Status: complete
+
+### Acceptance Criteria
+
+- Supabase-backed operational persistence now uses normalized runtime tables instead of
+  `tournament_state_snapshots` for load/save.
+- Runtime reads reconstruct the existing operational store snapshot from normalized players, draws,
+  voting windows, ballots, results, admin sessions/actions, presence, host locks, and event runtime
+  state.
+- Runtime writes persist draw-aware ballot/result identity with both active `draw_id` and static
+  `round_set_id`.
+- Added cutover support columns/tables for event runtime state, draw reasons, eligibility reasons,
+  voting pause state, result reveal timestamps, tiebreak reveal timestamps, host lock owners, and
+  ballot invalidation audit.
+- Repository boundary coverage now includes `event_runtime_state` and `ballot_invalidations`.
+- Snapshot persistence remains available only as the old debug table; the Supabase runtime backend no
+  longer hydrates from or writes to it.
+- Production still rejects unsafe non-Supabase runtime backend configuration.
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (31 files, 105 tests)
+- Production build: passed with `npm run build`
+- E2E: passed with `npm run test:e2e` (2 Playwright tests)
+
+### Changed Files
+
+- Added `supabase/migrations/20260629103000_normalized_runtime_cutover_support.sql`
+- Added `src/lib/server/normalized-operational-state.ts`
+- Added `src/lib/server/normalized-operational-state.test.ts`
+- Updated `src/lib/server/persistence.ts` to use normalized Supabase operational persistence
+- Updated database types, schema table lists, normalized repository boundaries, and persistence
+  safety tests
+
+### Manual Review
+
+- Tournament rules: no round definitions, draw counts, ban limits, no-ban behavior, least-ban result
+  selection, tiebreak reveal timing, or final reveal behavior changed.
+- Security: normalized persistence imports `server-only`, uses the service-role Supabase client only
+  on the server, and does not expose service keys, password hashes, session secrets, or token hashes
+  to browser code.
+- Persistence: the new round-trip test proves normalized save/load does not touch
+  `tournament_state_snapshots` and preserves draw-aware ballot/result identity across reconstruction.
+
+### Risks And Assumptions
+
+- Existing Supabase projects need all normalized runtime migrations through
+  `20260629103000_normalized_runtime_cutover_support.sql` applied before enabling
+  `TOURNAMENT_STATE_BACKEND=supabase`.
+- The phase was validated with an in-memory Supabase-shaped client and local app gates; a hosted
+  Supabase rehearsal with a non-production `TOURNAMENT_EVENT_ID` is still required before event use.
+- Active voter presence is now round-scoped for runtime reconstruction, but hosted rehearsal should
+  still verify duplicate-device warnings across refresh/redeploy boundaries.
