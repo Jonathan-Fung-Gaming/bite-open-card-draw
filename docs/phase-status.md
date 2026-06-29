@@ -1307,3 +1307,43 @@ Status: complete
   snapshot repository.
 - Existing rows receive the migration default `local-dev`; event/rehearsal repositories must set the
   configured `TOURNAMENT_EVENT_ID` explicitly when they are introduced.
+
+## Normalized Runtime Persistence Phase 2 - Repository Boundaries
+
+Status: complete
+
+### Acceptance Criteria
+
+- Added server-only repository classes for players, chart exclusions, draws, voting windows, ballots,
+  results, admin sessions, admin audit, and host locks.
+- Repository boundaries share a configured event id and service-role Supabase client dependency.
+- Every mutable event-scoped runtime table is assigned to exactly one repository boundary.
+- Repository scoped selects attach `event_id` before returning a query boundary.
+- Existing in-memory stores remain available for tests and local fake runs; runtime cutover is still
+  deferred to later phases.
+- Lint: passed with `npm run lint`
+- Typecheck: passed with `npm run typecheck`
+- Unit/integration tests: passed with `npm run test` (29 files, 92 tests)
+- Production build: passed with `npm run build`
+- E2E: passed with `npm run test:e2e` (2 Playwright tests)
+
+### Changed Files
+
+- Added `src/lib/server/repositories/normalized-runtime.ts`
+- Added `src/lib/server/repositories/normalized-runtime.test.ts`
+- Updated phase status
+
+### Manual Review
+
+- Tournament rules: no player, draw, voting, result, tiebreak, or admin UI behavior changed.
+- Security: repositories import `server-only`, use the service-role client only inside server code,
+  and carry event ids without exposing service keys, password hashes, session secrets, or token
+  hashes to browser components.
+- Persistence: this phase creates the repository boundary layer only; no runtime reads or writes have
+  been cut over from snapshots yet.
+
+### Risks And Assumptions
+
+- Repository methods are intentionally minimal boundary primitives; transactional writes are deferred
+  to Phase 3.
+- Runtime state remains snapshot-authoritative until the Phase 4 cutover.
