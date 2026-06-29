@@ -76,7 +76,6 @@ const EVENT_TABLE_DELETE_ORDER: TableName[] = [
   "chart_exclusions",
   "admin_actions",
   "players",
-  "admin_sessions",
   "event_runtime_state",
 ];
 
@@ -407,7 +406,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       })),
     );
 
-    await this.saveAdminSessions(snapshot);
     await this.insertMany(
       "admin_actions",
       snapshot.audit.records.map((record) => ({
@@ -515,34 +513,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     }
 
     await this.upsertMany("charts", [...rows.values()]);
-  }
-
-  private async saveAdminSessions(snapshot: OperationalStateSnapshot) {
-    const sessionIds = new Set<string>();
-
-    for (const record of snapshot.audit.records) {
-      if (isUuid(record.sessionId)) {
-        sessionIds.add(record.sessionId);
-      }
-    }
-
-    const hostOwnerSessionId = snapshot.hostLock.lock?.ownerSessionId;
-
-    if (isUuid(hostOwnerSessionId)) {
-      sessionIds.add(hostOwnerSessionId);
-    }
-
-    await this.insertMany(
-      "admin_sessions",
-      [...sessionIds].map((sessionId) => ({
-        id: sessionId,
-        event_id: this.eventId,
-        session_token_hash: `normalized-placeholder-${sessionId}`,
-        created_at: snapshot.savedAt,
-        last_seen_at: snapshot.savedAt,
-        expires_at: "9999-12-31T23:59:59.000Z",
-      })),
-    );
   }
 
   private async saveChartExclusions(snapshot: OperationalStateSnapshot) {

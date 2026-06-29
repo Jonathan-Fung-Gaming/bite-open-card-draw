@@ -158,6 +158,7 @@ describe("normalized operational state repository", () => {
     await repository.save(createOperationalStateSnapshot(stores, "2026-06-29T00:03:00.000Z"));
 
     expect(supabase.touchedTables).not.toContain("tournament_state_snapshots");
+    expect(supabase.touchedTables).not.toContain("admin_sessions");
     expect(supabase.rows.get("ballot_choices")?.[0]).toMatchObject({
       draw_id: firstDraw.id,
       round_set_id: firstDraw.roundSetId,
