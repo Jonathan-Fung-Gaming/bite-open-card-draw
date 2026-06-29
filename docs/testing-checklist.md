@@ -148,3 +148,17 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - GitHub Actions CI runs stable quality gates on pull requests and `main`.
 - Event-day runbook includes before-event, before-round, during-voting, after-close, and website-failure flows.
 - Final local checks match CI gates plus e2e, import, fallback cache, audit, and production build.
+
+## Remediation Phase 7 Test And CI Repair
+
+- Repository-backed integration tests persist and restore roster, host lock, draws, voting windows,
+  ballots, and results through the operational repository boundary.
+- 100-player load-sized ballot tests persist and restore latest ballot revisions through the
+  repository boundary.
+- CI workflow tests verify the workflow uses stable local gates and does not reference production
+  secrets.
+- Secret hygiene tests verify `.env` and `.env.local` are ignored and untracked.
+- Playwright e2e is expected to run in CI with generated test-only auth material from
+  `playwright.config.ts`, not production credentials.
+- CI uses fallback image cache generation; real non-fallback chart artwork remains an event setup
+  gate outside CI until upstream image fetching succeeds.

@@ -480,6 +480,63 @@ event setup still produced 0 real cached artwork files in this environment.
 - The chart exclusion UI defaults to the current round's first pool and lets the host switch pools;
   it intentionally avoids rendering every chart form at once.
 
+## Remediation Phase 7 - Test And CI Repair
+
+Status: complete for the Phase 7 test and CI reliability scope; not event-ready because remaining
+remediation rows still include real cached artwork population and `/charts` live-refresh coverage.
+
+### Acceptance Criteria
+
+- Repository-backed integration: added a persistent tournament flow test that saves/restores through
+  the operational repository boundary between roster/host-lock setup, draws, voting, ballot submit,
+  result computation, and result reveal.
+- Persistent load coverage: added a 100-player load-sized path that submits and edits every ballot,
+  persists through the repository, restores, and verifies one latest revision-2 ballot per player.
+- CI stability: added workflow tests that enforce the current GitHub Actions quality gates and block
+  production secret references in `.github/workflows/ci.yml`.
+- Secret hygiene: added a test proving `.env` and `.env.local` remain ignored and untracked while
+  `.env.example` is allowed.
+- CI/local parity: CI continues to run install, Playwright browser install, lint, typecheck, tests,
+  chart import, fallback image cache, production audit, build, and e2e.
+
+### Changed Files
+
+- Added `src/lib/integration/persistent-tournament-flow.test.ts`
+- Added `src/lib/server/ci-workflow.test.ts`
+- Updated `docs/remediation-issue-checklist.md`
+- Updated `docs/testing-checklist.md`
+- Updated `docs/phase-status.md`
+
+### Checks Run
+
+- `rtk npm run test -- --run src/lib/integration/persistent-tournament-flow.test.ts src/lib/server/ci-workflow.test.ts` - passed, 2 files / 4 tests
+- `rtk npm run test` - passed, 26 files / 75 tests
+- `rtk npm run import:charts` - passed, imported 4426 charts with all required pools at 7+
+- `rtk npm run cache:chart-images -- --fallback-only` - passed, 639 fallback assets
+- `rtk npm run lint` - passed
+- `rtk npm run typecheck` - passed
+- `rtk git diff --check` - passed
+- `rtk npm run build` - passed
+- `rtk npm run test:e2e` - passed, 2 Playwright tests
+
+### Manual Review
+
+- Product rules: new tests exercise existing flows and do not change tournament behavior.
+- Persistence: repository-backed tests use the same operational snapshot abstraction selected by the
+  Supabase backend, without requiring production Supabase secrets in CI.
+- CI security: workflow tests reject `secrets.` and production secret env names in CI configuration;
+  Playwright generates test-only admin/session/service values at runtime.
+- Load: the 100-player path uses normal ballot submission and replacement semantics and restores the
+  persisted latest revisions before asserting final state.
+
+### Risks And Assumptions
+
+- Phase 7 does not run against a live Supabase project in CI; it verifies the repository/snapshot
+  boundary used by both memory and Supabase persistence without production credentials.
+- CI intentionally runs fallback image cache generation. Real non-fallback artwork remains an event
+  setup blocker until `rtk npm run cache:chart-images` can produce cached assets.
+- `/charts` live-refresh coverage remains open in `RIC-094`.
+
 ## Phase 1 - Project Scaffold, Docs, And Route Skeleton
 
 Status: complete
