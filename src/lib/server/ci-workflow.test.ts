@@ -13,7 +13,7 @@ describe("CI and secret hygiene", () => {
 
     for (const command of [
       "npm ci",
-      "npx playwright install --with-deps chromium",
+      "npx playwright install --with-deps chromium webkit",
       "npm run lint",
       "npm run typecheck",
       "npm run test",

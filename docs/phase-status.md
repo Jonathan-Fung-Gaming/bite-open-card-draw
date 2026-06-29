@@ -2007,3 +2007,74 @@ Status: complete.
   transactional timer mutation, and hosted rehearsal evidence.
 - Automated mobile coverage added here uses Chromium at 390px. Broader mobile Chromium/WebKit
   project coverage remains part of Phase 8.
+
+## Comprehensive Review Remediation Phase 8 - Test Harness, Mobile Coverage, And Load
+
+Status: complete.
+
+### Checklist Items Addressed
+
+- CR-029: closed. The Playwright wrapper now selects a free port, sets matching public URL env,
+  builds once before Playwright starts, and starts only the already-built app in Playwright's
+  web server.
+- CR-030: closed. Default e2e coverage now includes desktop Chromium, mobile Chromium, and mobile
+  WebKit projects with route and phone-layout checks.
+- CR-031: closed. `npm run test:load` now runs a Playwright/API hybrid 100-player rehearsal with
+  stage, admin, room, charts, and results routes active and final private CSV verification.
+
+### Changed Files
+
+- Added `scripts/run-playwright.mjs`
+- Added `playwright.env.ts`
+- Added `playwright.load.config.ts`
+- Added `src/app/api/e2e/load-ballot/route.ts`
+- Added `tests/e2e/mobile-routes.spec.ts`
+- Added `tests/load/load-rehearsal.spec.ts`
+- Updated `package.json`
+- Updated `playwright.config.ts`
+- Updated `.github/workflows/ci.yml`
+- Updated `src/lib/server/ci-workflow.test.ts`
+- Updated `tests/e2e/full-flow.spec.ts`
+- Updated remediation checklist and plan documentation
+
+### Checks Run
+
+- Final `rtk npm run lint` - passed.
+- Final `rtk npm run typecheck` - passed.
+- Final `rtk npm run test` - passed, 37 files / 137 tests.
+- Final `rtk npm run build` - passed.
+- Final `rtk npm run test:e2e` - passed, 4 Playwright tests across desktop Chromium, mobile
+  Chromium, and mobile WebKit.
+- Final `rtk npm run test:load` - passed, 1 Playwright load test with 100 player submissions and
+  edits plus final private CSV verification.
+- `rtk npm run test:e2e` - initially exposed the mobile WebKit admin-host setup issue, then passed
+  after WebKit was scoped to public/player phone routes and Chromium handled setup. Final passing
+  run: 4 Playwright tests.
+- `rtk npm run test:load` - initially exposed the impractical runtime of 200 browser-only mobile
+  ballot interactions and a reveal-timing assumption, then passed after switching ballot load to a
+  gated HTTP route and waiting through reveal timing. Final passing run: 1 load Playwright test,
+  100 player submissions and edits, final CSV verified.
+
+### Manual Review
+
+- Product spec: tournament rules, ballot completion rules, backend result/tiebreak authority, and
+  final CSV contents were not changed. The load helper submits normal server-side player ballots
+  for the open round and then edits them before reveal.
+- Test harness: e2e no longer hard-codes port 3100, and Playwright no longer builds inside the
+  server command. Single-worker execution is intentional because the memory backend is shared by
+  the e2e server process.
+- Mobile UI: mobile Chromium performs setup and verifies a real phone ballot; mobile WebKit covers
+  public/player phone routes, view-only boundaries, no horizontal overflow, and the centered seventh
+  card against the same open-voting state.
+- Security: `/api/e2e/load-ballot` returns 404 unless the explicit memory test backend env is set.
+  No production Supabase, service-role, admin hash, or session secret values are exposed to browser
+  code or workflow config.
+
+### Risks And Assumptions
+
+- The WebKit project intentionally does not drive `/coolguy69` host controls. Admin/host operation
+  remains covered by desktop Chromium and should be manually rehearsed in the real host browser
+  during Phase 9.
+- The 100-player load rehearsal is local memory-backend HTTP coverage, not hosted Supabase
+  concurrency proof. Hosted row-scoped persistence, database-time timer mutation, and hosted
+  rehearsal evidence remain Phase 9 work.
