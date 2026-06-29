@@ -72,7 +72,7 @@ function readMigrations() {
 function createMockRpcClient(
   calls: RpcCall[],
   response: { data: Json | null; error: { message: string } | null } = {
-    data: { committed: true },
+    data: { committed: true, rows_changed: 1 },
     error: null,
   },
 ): MockRpcClient {
@@ -138,7 +138,7 @@ describe("normalized runtime transactional mutations", () => {
       },
     );
 
-    expect(result).toEqual({ committed: true });
+    expect(result).toEqual({ committed: true, rows_changed: 1 });
     expect(calls).toEqual([
       {
         functionName: "normalized_submit_ballot",
@@ -202,5 +202,47 @@ describe("normalized runtime transactional mutations", () => {
         },
       ),
     ).rejects.toThrow(/adminSessionLogout failed: transaction failed/);
+  });
+
+  it("rejects placeholder commit acknowledgements that do not prove rows changed", async () => {
+    await expect(
+      executeNormalizedTransactionalMutation(
+        "submitBallot",
+        {
+          roundNumber: 1,
+          playerId: uuidA,
+          choices: [
+            { drawId: uuidB, roundSetId: uuidA, noBans: false, bannedChartIds: [uuidC] },
+            { drawId: uuidC, roundSetId: uuidB, noBans: true, bannedChartIds: [] },
+          ],
+        },
+        {
+          eventId: "event-a",
+          supabase: createMockRpcClient([], {
+            data: { committed: true },
+            error: null,
+          }),
+        },
+      ),
+    ).rejects.toThrow(/placeholder commit acknowledgement/);
+  });
+
+  it("locks down tournament-changing RPC execute privileges", () => {
+    const migrations = readMigrations();
+
+    for (const rpcName of Object.values(NORMALIZED_RUNTIME_RPC_NAMES)) {
+      expect(migrations).toMatch(
+        new RegExp(
+          `revoke execute on function public\\.${rpcName}\\s*\\(text, jsonb\\) from public, anon, authenticated`,
+          "i",
+        ),
+      );
+      expect(migrations).toMatch(
+        new RegExp(
+          `grant execute on function public\\.${rpcName}\\s*\\(text, jsonb\\) to service_role`,
+          "i",
+        ),
+      );
+    }
   });
 });

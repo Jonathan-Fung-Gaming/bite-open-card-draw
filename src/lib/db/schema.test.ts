@@ -112,6 +112,17 @@ describe("Phase 2 database schema", () => {
     expect(migration).toContain("tiebreaks candidates and winner must all belong to draw_id");
   });
 
+  it("guards core draw invariants at the database boundary", () => {
+    expect(migration).toContain("draws_one_active_per_event_set");
+    expect(migration).toContain("where status = 'active' and superseded_at is null");
+    expect(migration).toContain("validate_drawn_chart_invariants");
+    expect(migration).toContain("excluded chart % cannot be drawn");
+    expect(migration).toContain("same-round duplicate song % cannot be drawn twice");
+    expect(migration).toContain("selected in an earlier round and cannot be drawn");
+    expect(migration).toContain("validate_voting_window_draw_completion");
+    expect(migration).toContain("exactly 7 drawn charts");
+  });
+
   it("keeps generated database types aligned with all runtime tables", () => {
     expect([...GENERATED_DATABASE_TYPE_TABLES].sort()).toEqual([...CORE_DATABASE_TABLES].sort());
   });

@@ -154,6 +154,16 @@ function createRpcClient() {
   return createServiceRoleSupabaseClient() as unknown as RpcClient;
 }
 
+function isPlaceholderCommitAck(data: Json | null) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return false;
+  }
+
+  const record = data as Record<string, unknown>;
+
+  return record.committed === true && !("rows_changed" in record) && !("changed_rows" in record);
+}
+
 export async function executeNormalizedTransactionalMutation<
   TName extends NormalizedTransactionalMutationName,
 >(
@@ -172,6 +182,12 @@ export async function executeNormalizedTransactionalMutation<
 
   if (error) {
     throw new Error(`Normalized runtime mutation ${name} failed: ${error.message}`);
+  }
+
+  if (isPlaceholderCommitAck(data)) {
+    throw new Error(
+      `Normalized runtime mutation ${name} returned a placeholder commit acknowledgement without row changes.`,
+    );
   }
 
   return data;

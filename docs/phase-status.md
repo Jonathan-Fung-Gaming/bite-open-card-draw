@@ -1607,3 +1607,62 @@ Status: complete
   use normalized Supabase tables.
 - Hosted Supabase rehearsal remains the next required gate to validate export behavior against the
   real remote backend and event namespace.
+
+## Comprehensive Review Remediation Phase 1 - Authoritative State And Concurrency
+
+Status: complete with `CR-001` explicitly deferred to remediation Phase 9.
+
+### Checklist Items Addressed
+
+- CR-013: closed. Placeholder mutation RPC acknowledgements now fail the server-side wrapper unless
+  row-change evidence is returned, and the migration overrides mutation-named RPC bodies so they
+  raise instead of reporting false commits.
+- CR-014: closed. Added database guards for active draw uniqueness, draw status, drawn chart
+  pool/exclusion/same-round/prior-selected-song rules, and voting-open draw completion.
+- CR-018: closed. Added explicit `REVOKE EXECUTE` from `public`, `anon`, and `authenticated`, with
+  `GRANT EXECUTE` only to `service_role`, for each normalized mutation RPC.
+- CR-001: improved but still open; moved to remediation Phase 9. Persistence now merges baseline/current/latest snapshots and
+  serializes in-process saves, with regression tests for concurrent different-player ballots,
+  same-player latest-ballot wins, and host-heartbeat/ballot races. The Supabase save path still
+  needs a cross-instance database transaction, row-scoped mutation, or optimistic event revision
+  before this item is closed.
+
+### Changed Files
+
+- Added `src/lib/persistence/merge.ts`
+- Added `supabase/migrations/20260630010000_phase1_rpc_lockdown_and_draw_guards.sql`
+- Updated `src/lib/server/persistence.ts`
+- Updated `src/lib/server/persistence.test.ts`
+- Updated `src/lib/server/transactions/normalized-runtime.ts`
+- Updated `src/lib/server/transactions/normalized-runtime.test.ts`
+- Updated `src/lib/db/schema.test.ts`
+- Updated `docs/comprehensive-review-checklist-2026-06-30.md`
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 33 files / 115 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+  - Note: one attempted parallel `build` + `test:e2e` run hit a `.next` rename race while
+    Playwright was also building/starting the app. Rerunning the gates sequentially passed.
+
+### Manual Review
+
+- Product spec: no tournament rule, route, voting, draw, result, tiebreak, admin, or visual behavior
+  was intentionally changed.
+- Security: public and authenticated clients are explicitly revoked from normalized mutation RPCs;
+  service-role execution remains server-side only.
+- Persistence: app-instance races are covered by merge and queue tests, but hosted Supabase
+  multi-instance writes still need a database-transactional closeout before event readiness.
+
+### Risks And Assumptions
+
+- Existing Supabase projects need the new Phase 1 remediation migration applied after the prior
+  normalized runtime migrations.
+- The new RPC override intentionally disables mutation-named RPCs until they are implemented as real
+  row-changing transactions; current application actions continue through the existing persistence
+  path.
+- The draw guard migration is statically covered by tests but still needs hosted Supabase rehearsal
+  before treating the database boundary as event-verified.
