@@ -10,6 +10,7 @@ describe("operational debug snapshot export", () => {
   it("labels snapshot exports as non-authoritative backup/debug data", () => {
     const stores = createAdminStateStores();
 
+    stores.hostLockStore.acquire("session-a", "host-token-a", 0);
     stores.auditStore.record({
       sessionId: "session-a",
       action: "debug_snapshot_export",
@@ -25,9 +26,13 @@ describe("operational debug snapshot export", () => {
     const serialized = serializeOperationalDebugSnapshotExport(exportData);
 
     expect(exportData.authoritativeRuntimeSource).toBe(false);
+    expect(exportData.snapshot.hostLock.lock?.ownerSessionId).toBe("[redacted]");
+    expect(exportData.snapshot.hostLock.lock?.hostTokenHash).toBe("[redacted]");
+    expect(exportData.snapshot.audit.records[0]?.sessionId).toBe("[redacted]");
     expect(exportData.warning).toContain("normalized Supabase tables");
     expect(serialized).toContain('"exportType": "debug_operational_state_snapshot"');
     expect(serialized).toContain('"action": "debug_snapshot_export"');
+    expect(serialized).not.toContain("session-a");
     expect(operationalDebugSnapshotFilename(snapshot)).toBe(
       "operational-debug-snapshot-2026-06-29T00-01-00-000Z.json",
     );

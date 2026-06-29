@@ -275,6 +275,39 @@ Exit criteria:
 - Manual ballot replacement warnings name the player and require explicit confirmation.
 - Manual ballot UI rejects invalid ban combinations before submit.
 
+### Phase 5 Handoff Context
+
+Status: complete.
+
+Implementation notes to preserve:
+
+- Admin session TTL is now 30 minutes. `AdminSessionHeartbeat` no longer performs a passive
+  interval refresh; it refreshes only after real browser activity with a 60-second debounce.
+- Host-lock heartbeat now validates the current admin session through `getAdminSessionFromCookies`
+  and does not call the cookie-refreshing `requireAdminSession()` path.
+- `AdminInactivityTimer` redirects back to `/coolguy69` when the displayed session reaches zero.
+- Debug operational snapshot download now requires active host control plus dangerous-action
+  password re-entry, blocks while any round is actively voting or paused, and exports a redacted
+  snapshot. Redactions cover host token hashes, admin session ids, ballot edit-token hashes,
+  invalidation admin ids, and voter presence device ids.
+- `DangerousActionDialog` is now a client component that renders target fields first, then an
+  action summary, then the password field. Reopen voting, reset round, override result, and
+  current-round eligibility add forms pass summary fields for selected targets.
+- Manual ballot replacement copy names the selected start.gg username, requires an explicit
+  replacement checkbox for existing ballots, and the server-side replacement error names the player.
+- Manual ballot set controls now cap chart bans at two and keep no-bans mutually exclusive with
+  chart bans before submit.
+
+Verification:
+
+- Focused regression command passed:
+  `rtk npm run test -- src/lib/admin/session.test.ts src/lib/server/admin-session-store.test.ts src/lib/persistence/debug-export.test.ts`
+- Full phase gates are recorded in `docs/phase-status.md`.
+
+Deferred items:
+
+- None for Phase 5.
+
 ## Phase 6 - Stage And Results Visual UX
 
 Addresses: `CR-005`, `CR-006`, `CR-007`, `CR-027`, `CR-028`.

@@ -19,6 +19,14 @@ export function AdminInactivityTimer({ expiresAt }: AdminInactivityTimerProps) {
     return () => window.clearInterval(interval);
   }, [expiresAt]);
 
+  useEffect(() => {
+    if (remainingSeconds > 0) {
+      return;
+    }
+
+    window.location.assign("/coolguy69");
+  }, [remainingSeconds]);
+
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = String(remainingSeconds % 60).padStart(2, "0");
 
