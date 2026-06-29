@@ -456,6 +456,53 @@ Exit criteria:
 - Load rehearsal submits and edits 100 player ballots while stage/admin/spectator routes are active.
 - Final CSV verification passes under load.
 
+### Phase 8 Handoff Context
+
+Status: complete.
+
+Implementation notes to preserve:
+
+- `npm run test:e2e` now uses `scripts/run-playwright.mjs`. The wrapper chooses a free
+  `127.0.0.1` port unless `E2E_PORT` is supplied, sets matching public URL test env, builds the
+  Next app once, then lets Playwright start only `next start`. This avoids the previous build/start
+  coupling in Playwright's `webServer.command` and removes hard-coded port 3100 from QR assertions.
+- `playwright.config.ts` is single-worker because the default e2e server uses one shared memory
+  tournament state. The default projects are `desktop-chromium`, `mobile-chromium`, and
+  `mobile-webkit`.
+- `tests/e2e/mobile-routes.spec.ts` verifies `/room`, `/charts`, `/vote`, and `/results`, no
+  horizontal overflow, the centered seventh phone ballot card, the view-only no-submit boundary,
+  and a real mobile ballot submission. Mobile Chromium performs the admin setup/open-voting step;
+  mobile WebKit then covers public/player phone routes against that state so WebKit does not depend
+  on the admin host-console server-action path.
+- `.github/workflows/ci.yml` now installs both Chromium and WebKit because the default e2e suite
+  includes a WebKit project.
+- `npm run test:load` uses `playwright.load.config.ts`. It keeps `/coolguy69`, `/stage`, `/room`,
+  `/charts`, and `/results` pages open, bulk-imports 100 players through the admin UI, posts each
+  player's first submission and edit through `/api/e2e/load-ballot`, waits through result reveal
+  timing, downloads the private CSV, and verifies all 100 players plus selected-chart columns.
+- `/api/e2e/load-ballot` is a test-only HTTP route. It returns 404 unless
+  `TOURNAMENT_STATE_BACKEND=memory` and `TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND=true`; when enabled it
+  uses server-side ballot validation, voting advancement, and persistence/rollback logic.
+
+Verification:
+
+- `rtk npm run typecheck` - passed during implementation.
+- `rtk npm run lint` - passed during implementation.
+- `rtk npm run test:e2e` - passed, 4 Playwright tests across desktop Chromium, mobile Chromium, and
+  mobile WebKit.
+- `rtk npm run test:load` - passed, 100 player submissions and edits with final private CSV
+  verification.
+- `rtk npm run test` - passed, 37 files / 137 tests.
+- `rtk npm run build` - passed.
+- Full final gates are recorded in `docs/phase-status.md`.
+
+Deferred items:
+
+- None for Phase 8. Existing Phase 9 deferrals for hosted Supabase row-scoped persistence,
+  database-time transactional timer mutation, and hosted Supabase rehearsal remain unchanged.
+- Phase 9 hosted rehearsal should still include the real host/admin browser path, all four rounds,
+  hosted Supabase concurrency, and final release evidence.
+
 ## Phase 9 - Hosted Rehearsal And Release Evidence
 
 Addresses: `CR-001`, `CR-003`, `CR-008`, `CR-035`.

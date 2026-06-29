@@ -572,7 +572,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     removed from the stable final stage screen, and Playwright verifies exactly two
     final cards with large card heights.
 
-- [ ] CR-029 - E2E harness has shown flakiness around build/start and port reuse.
+- [x] CR-029 - E2E harness has shown flakiness around build/start and port reuse.
   - Severity: Medium.
   - Files: `playwright.config.ts:29`, `tests/e2e/full-flow.spec.ts:271`,
     `tests/e2e/full-flow.spec.ts:292`.
@@ -585,8 +585,13 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     stage/draw status before image assertions.
   - Suggested tests: keep full-flow and tiebreak tests; add retry-free assertion that
     `/stage` receives both drawn sets after reset/draw.
+  - Phase 8 closure: `npm run test:e2e` now runs through `scripts/run-playwright.mjs`,
+    which chooses a free local port, sets matching public URL test env, builds once before
+    Playwright starts, and leaves Playwright's web server command responsible only for
+    `next start`. The config runs single-worker against shared memory state, and the smoke
+    assertions now derive QR targets from the active base URL instead of hard-coding port 3100.
 
-- [ ] CR-030 - Browser/mobile UI coverage does not match the validation checklist.
+- [x] CR-030 - Browser/mobile UI coverage does not match the validation checklist.
   - Severity: Medium.
   - Files: `playwright.config.ts:23`.
   - Current behavior: Playwright only runs Desktop Chrome.
@@ -596,8 +601,13 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     manual blockers if CI cannot run them.
   - Suggested tests: `/vote` mobile layout, 7th-card centering, no text overlap,
     ballot flow, `/room`, `/charts`, `/results`, and 1920x1080 stage viewport.
+  - Phase 8 closure: Playwright now runs `desktop-chromium`, `mobile-chromium`, and
+    `mobile-webkit` projects. `tests/e2e/mobile-routes.spec.ts` covers `/room`, `/charts`,
+    `/vote`, and `/results`, verifies the two-column phone ballot with centered seventh card
+    and no horizontal overflow, and confirms view-only pages do not expose username or submit
+    controls. CI installs both Chromium and WebKit browsers.
 
-- [ ] CR-031 - Load coverage is store-level, not event-like.
+- [x] CR-031 - Load coverage is store-level, not event-like.
   - Severity: Medium.
   - Files: `src/lib/integration/tournament-flow.test.ts:198`,
     `src/lib/integration/persistent-tournament-flow.test.ts:214`.
@@ -609,6 +619,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     that exercises actual routes/server actions.
   - Suggested tests: 100 players submit/edit, `/stage` polling, `/coolguy69` host
     open, `/charts` spectators, and final CSV verification under load.
+  - Phase 8 closure: `npm run test:load` runs `playwright.load.config.ts` against a
+    Playwright/API hybrid rehearsal. The test opens admin, stage, room, charts, and results
+    browser pages, bulk-imports 100 eligible players through `/coolguy69`, submits and edits
+    every ballot through a gated HTTP route using server-side ballot validation/persistence,
+    advances reveal timing, downloads the private CSV, and verifies all 100 players and selected
+    chart columns are present.
 
 - [x] CR-032 - Source docs still conflict on result reveal order.
   - Severity: Medium.

@@ -89,6 +89,8 @@ async function expectRenderedRealBackgroundImage(locator: Locator) {
 async function expectReadableVotingAccess(page: Page) {
   const qrLink = page.getByTestId("room-qr-link");
   const qrCode = page.getByTestId("room-qr-code");
+  const roomUrl = new URL("/room", page.url()).toString();
+  const shortRoomUrl = `${new URL(roomUrl).host}/room`;
   const votingBandBox = await page.getByTestId("stage-voting-band").boundingBox();
   const chartRowsBox = await page.getByTestId("stage-chart-rows").boundingBox();
   const qrBox = await qrLink.boundingBox();
@@ -96,9 +98,9 @@ async function expectReadableVotingAccess(page: Page) {
   const qrPathCount = await qrCode.locator("svg path").count();
 
   await expect(qrLink).toBeVisible();
-  await expect(qrLink).toHaveAttribute("data-qr-target", "http://127.0.0.1:3100/room");
+  await expect(qrLink).toHaveAttribute("data-qr-target", roomUrl);
   await expect(qrCode.locator("svg")).toBeVisible();
-  await expect(page.getByTestId("room-short-url")).toHaveText("127.0.0.1:3100/room");
+  await expect(page.getByTestId("room-short-url")).toHaveText(shortRoomUrl);
   await expect(page.getByTestId("stage-countdown-display")).toHaveText(/\d{2}:\d{2}/);
   expect(qrPathCount).toBeGreaterThan(0);
   expect(qrBox).not.toBeNull();
