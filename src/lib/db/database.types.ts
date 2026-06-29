@@ -335,6 +335,7 @@ export type Database = {
           submitted_at: Timestamp | null;
           last_revision_at: Timestamp | null;
           latest_revision_number: number;
+          edit_token_hash: string | null;
           manual_override: boolean;
           override_admin_action_id: Uuid | null;
           override_reason: string | null;
@@ -353,6 +354,7 @@ export type Database = {
           submitted_at?: Timestamp | null;
           last_revision_at?: Timestamp | null;
           latest_revision_number?: number;
+          edit_token_hash?: string | null;
           manual_override?: boolean;
           override_admin_action_id?: Uuid | null;
           override_reason?: string | null;

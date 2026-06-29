@@ -97,6 +97,37 @@ Exit criteria:
 - Latest valid submitted ballot still wins.
 - Repeated wrong passwords or excessive public mutations are throttled without changing state.
 
+### Phase 2 Handoff Context
+
+Status: complete.
+
+Implementation notes:
+
+- Public ballot lookup and live polling now return `PublicBallotLookup` metadata. The `choices`
+  array is present only when the caller's device-scoped edit token matches the server-stored
+  `editTokenHash`.
+- Browser edit tokens are stored in local storage by round/player. The original device can reload
+  and edit saved choices; a second device receives only duplicate metadata and can replace the
+  latest ballot with its own token.
+- Player submissions rotate the stored edit-token hash. Manual admin ballots intentionally clear
+  the public edit token hash because they are privileged server-side corrections.
+- `edit_token_hash` was added to normalized ballot persistence so same-device edit authorization
+  survives normalized repository save/load.
+- Added process-local fixed-window throttles for admin login, dangerous password re-entry, voter
+  presence claims, and ballot submits/edits. This is deliberately basic abuse protection, not a
+  distributed WAF; hosted multi-instance/global throttling can be revisited with the Phase 9 hosted
+  rehearsal if needed.
+- Added string length caps at server-action boundaries for admin passwords, audit reasons,
+  usernames, device ids, edit tokens, and large free-text form fields.
+
+Verification:
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 35 files / 122 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+
 ## Phase 3 - Voting Timer Correctness
 
 Addresses: `CR-003`, `CR-015`, `CR-026`.

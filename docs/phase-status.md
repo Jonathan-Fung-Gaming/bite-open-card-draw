@@ -1666,3 +1666,55 @@ Status: complete with `CR-001` explicitly deferred to remediation Phase 9.
   path.
 - The draw guard migration is statically covered by tests but still needs hosted Supabase rehearsal
   before treating the database boundary as event-verified.
+
+## Comprehensive Review Remediation Phase 2 - Ballot Privacy And Public Mutation Safety
+
+Status: complete.
+
+### Checklist Items Addressed
+
+- CR-002: closed. Public ballot lookup and live polling no longer return another player's `choices`
+  unless the caller presents the matching device-scoped edit token. Duplicate-name warnings still
+  work from existence/revision metadata, and second devices can submit replacements without reading
+  the prior ballot.
+- CR-017: closed. Added basic fixed-window throttling for admin login, dangerous password re-entry,
+  voter presence claims, and public ballot submissions/edits, plus action-boundary length caps for
+  sensitive free-text and identifier inputs.
+
+### Changed Files
+
+- Added `src/lib/vote/ballot-privacy.ts`
+- Added `src/lib/vote/ballot-privacy.test.ts`
+- Added `src/lib/server/rate-limit.ts`
+- Added `src/lib/server/rate-limit.test.ts`
+- Added `src/lib/server/input-limits.ts`
+- Added `supabase/migrations/20260630020000_ballot_edit_token_hash.sql`
+- Updated `src/app/vote/actions.ts`
+- Updated `src/app/vote/BallotFlow.tsx`
+- Updated `src/app/coolguy69/actions.ts`
+- Updated `src/lib/server/admin-auth.ts`
+- Updated ballot, DB type, normalized persistence, schema, and phase documentation files
+
+### Checks Run
+
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 35 files / 122 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+
+### Manual Review
+
+- Product spec: no tournament rules, round structure, draw logic, result selection, or reveal order
+  changed.
+- Security: browser clients receive only public ballot metadata unless a private device token
+  authorizes editing; stored edit tokens are hashed and stripped from public responses.
+- Voting behavior: latest valid submitted ballot still replaces prior same-player revisions.
+
+### Risks And Assumptions
+
+- The rate limiter is process-local. It provides basic abuse protection for this runtime but is not
+  a cross-instance/global throttle.
+- Local-storage edit tokens are device/browser scoped. Clearing browser storage removes same-device
+  edit authorization, but the player can still submit a replacement ballot after the duplicate
+  warning.

@@ -75,7 +75,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     Supabase save path is a database-transactional row-scoped mutation or equivalent cross-instance
     event revision.
 
-- [ ] CR-002 - Public voter actions expose existing live ballot choices.
+- [x] CR-002 - Public voter actions expose existing live ballot choices.
   - Severity: Critical.
   - Files: `src/app/vote/actions.ts:19`, `src/app/vote/actions.ts:25`,
     `src/app/vote/actions.ts:40`, `src/app/vote/BallotFlow.tsx:169`,
@@ -91,6 +91,11 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: public action cannot retrieve another player's `choices`;
     duplicate-name warning still appears; original device can edit via token; phones
     do not expose chart-by-chart choices before reveal.
+  - Fixed in Phase 2 remediation: public ballot lookup and polling now return
+    existence/revision/warning metadata unless the caller presents the device-scoped
+    edit token whose hash is stored server-side. Same-device reloads hydrate choices
+    through that token, while second devices can submit a replacement ballot without
+    viewing prior choices.
 
 ## High
 
@@ -300,7 +305,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: idle tab for more than 30 minutes cannot mutate; real admin
     interaction extends expiry; passive heartbeat alone does not.
 
-- [ ] CR-017 - Sensitive actions lack basic rate limiting.
+- [x] CR-017 - Sensitive actions lack basic rate limiting.
   - Severity: Medium.
   - Files: `src/app/coolguy69/actions.ts:128`,
     `src/lib/server/admin-auth.ts:154`, `src/app/vote/actions.ts:45`,
@@ -314,6 +319,11 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: repeated wrong passwords are blocked; excessive ballot edits or
     presence claims are throttled without changing state; normal 100-player voting
     still passes.
+  - Fixed in Phase 2 remediation: added process-local fixed-window throttles for
+    admin login, dangerous password re-entry, voter presence claims, and public
+    ballot submissions/edits. Added action-boundary string length caps for admin
+    passwords, audit reasons, usernames, device ids, edit tokens, and bulk free-text
+    form fields.
 
 - [x] CR-018 - Public-schema `SECURITY DEFINER` RPCs need explicit execute lockdown.
   - Severity: Medium.

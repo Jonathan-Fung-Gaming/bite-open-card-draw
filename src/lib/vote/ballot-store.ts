@@ -67,6 +67,7 @@ export class BallotStore {
       choices: input.choices,
       submittedAt: now,
       revision: (existing?.revision ?? 0) + 1,
+      editTokenHash: options.editTokenHash ?? null,
       source: options.source ?? "player",
       manualReason,
       manualOverride: options.manualOverride ?? false,

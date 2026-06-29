@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_TTL_SECONDS,
@@ -9,6 +9,8 @@ import {
   verifyAdminSessionToken,
 } from "@/lib/admin/session";
 import { verifyAdminPassword } from "@/lib/admin/password";
+import { ADMIN_PASSWORD_MAX_LENGTH, assertMaxStringLength } from "@/lib/server/input-limits";
+import { assertRateLimit } from "@/lib/server/rate-limit";
 import {
   createNormalizedAdminSessionStore,
   shouldUseNormalizedAdminSessions,
@@ -26,6 +28,18 @@ function getCookieOptions(maxAge = ADMIN_SESSION_TTL_SECONDS) {
     path: "/",
     maxAge,
   };
+}
+
+async function getRequestRateLimitKey(scope: string) {
+  try {
+    const headerStore = await headers();
+    const forwardedFor = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim();
+    const realIp = headerStore.get("x-real-ip")?.trim();
+
+    return `${scope}:${forwardedFor || realIp || "unknown"}`;
+  } catch {
+    return `${scope}:unknown`;
+  }
 }
 
 export async function getAdminSessionFromCookies() {
@@ -64,6 +78,14 @@ export async function requireAdminSession() {
 }
 
 export async function createAdminSessionCookie(password: string) {
+  assertMaxStringLength(password, "Admin password", ADMIN_PASSWORD_MAX_LENGTH);
+  assertRateLimit({
+    key: await getRequestRateLimitKey("admin-login"),
+    limit: 12,
+    windowMs: 5 * 60 * 1000,
+    message: "Too many admin login attempts. Try again shortly.",
+  });
+
   const adminPasswordHash = getOptionalEnv("ADMIN_PASSWORD_HASH");
   const sessionSecret = getOptionalEnv("SESSION_SECRET");
 
@@ -152,6 +174,14 @@ export async function clearHostTokenCookie() {
 }
 
 export async function verifyDangerousActionPassword(password: string) {
+  assertMaxStringLength(password, "Admin password", ADMIN_PASSWORD_MAX_LENGTH);
+  assertRateLimit({
+    key: await getRequestRateLimitKey("dangerous-admin-password"),
+    limit: 30,
+    windowMs: 5 * 60 * 1000,
+    message: "Too many dangerous action password attempts. Try again shortly.",
+  });
+
   const adminPasswordHash = getOptionalEnv("ADMIN_PASSWORD_HASH");
 
   if (!adminPasswordHash) {

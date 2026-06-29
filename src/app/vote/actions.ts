@@ -6,7 +6,9 @@ import {
   restoreOperationalStateSnapshot,
 } from "@/lib/persistence/operational-state";
 import { adminState } from "@/lib/server/admin-state";
+import { assertMaxStringLength, DEVICE_ID_MAX_LENGTH } from "@/lib/server/input-limits";
 import { hydrateTournamentState, persistTournamentState } from "@/lib/server/persistence";
+import { assertRateLimit } from "@/lib/server/rate-limit";
 import {
   getRoundDrawRecords,
   getSubmittedPlayerIdsForRound,
@@ -14,15 +16,60 @@ import {
   revalidateTournamentViews,
 } from "@/lib/server/voting-round";
 import type { SubmitRoundBallotInput } from "@/lib/vote/ballot";
+import {
+  BALLOT_EDIT_TOKEN_MAX_LENGTH,
+  buildPublicBallotLookup,
+  hashBallotEditToken,
+  toPublicEditableBallot,
+} from "@/lib/vote/ballot-privacy";
 import { formatVotingStatusLabel, formatVotingTime } from "@/lib/vote/voting-window";
 
-export async function getExistingBallotAction(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
-  await hydrateTournamentState();
+type PublicSubmitRoundBallotInput = Omit<SubmitRoundBallotInput, "playerStartggUsername"> & {
+  playerStartggUsername?: string;
+  deviceId: string;
+  editToken: string;
+};
 
-  return adminState.ballotStore.get(roundNumber, playerId);
+function assertPublicIdentifierLengths(input: { playerId: string; deviceId?: string; editToken?: string }) {
+  if (!input.playerId.trim()) {
+    throw new Error("Player id is required.");
+  }
+
+  assertMaxStringLength(input.playerId, "Player id", 200);
+
+  if (input.deviceId !== undefined) {
+    if (!input.deviceId.trim()) {
+      throw new Error("Device id is required.");
+    }
+
+    assertMaxStringLength(input.deviceId, "Device id", DEVICE_ID_MAX_LENGTH);
+  }
+
+  if (input.editToken !== undefined) {
+    assertMaxStringLength(input.editToken, "Ballot edit token", BALLOT_EDIT_TOKEN_MAX_LENGTH);
+  }
 }
 
-export async function getVoteLiveStateAction(roundNumber: 1 | 2 | 3 | 4, playerId?: string) {
+export async function getExistingBallotAction(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  editToken?: string,
+) {
+  assertPublicIdentifierLengths({ playerId, editToken });
+  await hydrateTournamentState();
+
+  return buildPublicBallotLookup(adminState.ballotStore.get(roundNumber, playerId), editToken);
+}
+
+export async function getVoteLiveStateAction(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId?: string,
+  editToken?: string,
+) {
+  if (playerId) {
+    assertPublicIdentifierLengths({ playerId, editToken });
+  }
+
   await hydrateTournamentState();
 
   const snapshot = getVotingRoundSnapshot(roundNumber);
@@ -37,7 +84,9 @@ export async function getVoteLiveStateAction(roundNumber: 1 | 2 | 3 | 4, playerI
     turnoutText: `Ballots submitted: ${snapshot.submittedCount} / ${snapshot.eligibleCount}`,
     eligiblePlayerIds: snapshot.eligiblePlayers.map((player) => player.id),
     submittedPlayerIds,
-    existingBallot: playerId ? adminState.ballotStore.get(roundNumber, playerId) : null,
+    existingBallotLookup: playerId
+      ? buildPublicBallotLookup(adminState.ballotStore.get(roundNumber, playerId), editToken)
+      : null,
     resultPhase: result?.revealPhase ?? null,
   };
 }
@@ -47,6 +96,14 @@ export async function claimVoterPresenceAction(input: {
   playerId: string;
   deviceId: string;
 }) {
+  assertPublicIdentifierLengths(input);
+  assertRateLimit({
+    key: `voter-presence:${input.roundNumber}:${input.playerId}:${input.deviceId}`,
+    limit: 12,
+    windowMs: 60_000,
+    message: "Too many voter presence claims. Try again shortly.",
+  });
+
   await hydrateTournamentState();
 
   const snapshot = getVotingRoundSnapshot(input.roundNumber);
@@ -67,7 +124,17 @@ export async function claimVoterPresenceAction(input: {
   return presence;
 }
 
-export async function submitRoundBallotAction(input: SubmitRoundBallotInput) {
+export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInput) {
+  assertPublicIdentifierLengths(input);
+  assertRateLimit({
+    key: `ballot-submit:${input.roundNumber}:${input.playerId}:${input.deviceId}`,
+    limit: 10,
+    windowMs: 60_000,
+    message: "Too many ballot changes. Try again shortly.",
+  });
+
+  const editTokenHash = hashBallotEditToken(input.editToken);
+
   await hydrateTournamentState();
   const rollbackSnapshot = createOperationalStateSnapshot(adminState);
 
@@ -90,7 +157,7 @@ export async function submitRoundBallotAction(input: SubmitRoundBallotInput) {
     },
     draws,
     snapshot.serverNow,
-    { source: "player" },
+    { source: "player", editTokenHash },
   );
 
   getVotingRoundSnapshot(input.roundNumber);
@@ -102,5 +169,5 @@ export async function submitRoundBallotAction(input: SubmitRoundBallotInput) {
   }
   revalidateTournamentViews(revalidatePath);
 
-  return ballot;
+  return toPublicEditableBallot(ballot);
 }

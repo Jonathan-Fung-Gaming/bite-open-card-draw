@@ -12,6 +12,13 @@ import {
 import { createOperationalStateSnapshot } from "@/lib/persistence/operational-state";
 import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import { adminState, resetTournamentOperationalState } from "@/lib/server/admin-state";
+import {
+  ADMIN_PASSWORD_MAX_LENGTH,
+  AUDIT_REASON_MAX_LENGTH,
+  FORM_TEXT_MAX_LENGTH,
+  STARTGG_USERNAME_MAX_LENGTH,
+  assertMaxStringLength,
+} from "@/lib/server/input-limits";
 import { hydrateTournamentState, persistTournamentState } from "@/lib/server/persistence";
 import {
   getRoundDrawRecords,
@@ -29,14 +36,24 @@ import {
   verifyDangerousActionPassword,
 } from "@/lib/server/admin-auth";
 
-function getString(formData: FormData, name: string) {
+function getString(formData: FormData, name: string, maxLength = FORM_TEXT_MAX_LENGTH) {
   const value = formData.get(name);
 
-  return typeof value === "string" ? value : "";
+  const text = typeof value === "string" ? value : "";
+  assertMaxStringLength(text, name, maxLength);
+
+  return text;
 }
 
-function getStringList(formData: FormData, name: string) {
-  return formData.getAll(name).filter((value): value is string => typeof value === "string");
+function getStringList(formData: FormData, name: string, maxLength = FORM_TEXT_MAX_LENGTH) {
+  return formData
+    .getAll(name)
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => {
+      assertMaxStringLength(value, name, maxLength);
+
+      return value;
+    });
 }
 
 function redirectWithError(message: string) {
@@ -48,13 +65,17 @@ function getRoundNumber(formData: FormData) {
 }
 
 function getRequiredReason(formData: FormData) {
-  const reason = getString(formData, "reason").trim();
+  const reason = getString(formData, "reason", AUDIT_REASON_MAX_LENGTH).trim();
 
   if (!reason) {
     throw new Error("Audit reason is required.");
   }
 
   return reason;
+}
+
+function getAdminPassword(formData: FormData) {
+  return getString(formData, "adminPassword", ADMIN_PASSWORD_MAX_LENGTH);
 }
 
 function audit(
@@ -127,7 +148,7 @@ function invalidateRoundVotingForReroll(
 
 export async function adminLoginAction(formData: FormData) {
   try {
-    await createAdminSessionCookie(getString(formData, "password"));
+    await createAdminSessionCookie(getString(formData, "password", ADMIN_PASSWORD_MAX_LENGTH));
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Admin login failed.");
   }
@@ -227,7 +248,7 @@ export async function addPlayerAction(formData: FormData) {
 
   try {
     const player = adminState.rosterStore.createOrUpdatePlayer({
-      startggUsername: getString(formData, "startggUsername"),
+      startggUsername: getString(formData, "startggUsername", STARTGG_USERNAME_MAX_LENGTH),
       active: true,
     });
     audit(session, {
@@ -245,7 +266,7 @@ export async function addPlayerAction(formData: FormData) {
 
 export async function bulkImportPlayersAction(formData: FormData) {
   const session = await requireActiveHost();
-  const usernames = getString(formData, "startggUsernames")
+  const usernames = getString(formData, "startggUsernames", FORM_TEXT_MAX_LENGTH)
     .split(/\r?\n|,/)
     .map((value) => value.trim())
     .filter(Boolean);
@@ -286,7 +307,7 @@ export async function updateChartExclusionAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const chartKey = getString(formData, "chartKey");
     const excluded = getString(formData, "excluded") === "true";
     const reason = getRequiredReason(formData);
@@ -331,7 +352,7 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
     const entry = adminState.rosterStore.addPlayerToCurrentRoundEligibility({
@@ -398,7 +419,7 @@ export async function rerollOneChartAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const chartId = getString(formData, "chartId");
     const roundNumber = getRoundNumber(formData);
@@ -437,7 +458,7 @@ export async function rerollRoundSetAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const roundNumber = getRoundNumber(formData);
     const postVoteInvalidation = invalidateRoundVotingForReroll(roundNumber, reason, session);
@@ -471,7 +492,7 @@ export async function rerollFullRoundAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const roundNumber = getRoundNumber(formData);
     const postVoteInvalidation = invalidateRoundVotingForReroll(roundNumber, reason, session);
@@ -589,7 +610,7 @@ export async function manualBallotAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
 
     const roundNumber = getRoundNumber(formData);
     const snapshot = getVotingRoundSnapshot(roundNumber);
@@ -841,7 +862,7 @@ export async function startRehearsalModeAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     resetTournamentOperationalState();
     adminState.roundStateStore.setCurrentRound(1);
@@ -872,7 +893,7 @@ export async function resetRehearsalModeAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     resetTournamentOperationalState();
     adminState.roundStateStore.setCurrentRound(1);
@@ -978,7 +999,7 @@ export async function reopenVotingAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
     const durationMinutes = Number(getString(formData, "durationMinutes"));
@@ -1023,7 +1044,7 @@ export async function resetRoundAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
 
@@ -1047,7 +1068,7 @@ export async function overrideResultAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
-    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    await verifyDangerousActionPassword(getAdminPassword(formData));
     const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
     const [setOrderText, chartId] = getString(formData, "resultTarget").split("|");

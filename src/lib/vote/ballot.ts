@@ -16,10 +16,21 @@ export type RoundBallot = {
   choices: BallotSetChoice[];
   submittedAt: string;
   revision: number;
+  editTokenHash?: string | null;
   source: "player" | "manual_admin";
   manualReason: string | null;
   manualOverride: boolean;
   replacedExistingBallot: boolean;
+};
+
+export type PublicEditableBallot = Omit<RoundBallot, "editTokenHash">;
+
+export type PublicBallotLookup = {
+  exists: boolean;
+  revision: number | null;
+  canEdit: boolean;
+  warning: string | null;
+  ballot: PublicEditableBallot | null;
 };
 
 export type PhoneRoundStatus =
@@ -52,6 +63,7 @@ export type SubmitRoundBallotOptions = {
   manualReason?: string;
   manualOverride?: boolean;
   replacedExistingBallot?: boolean;
+  editTokenHash?: string | null;
 };
 
 export function isSetChoiceComplete(choice: BallotSetChoice) {

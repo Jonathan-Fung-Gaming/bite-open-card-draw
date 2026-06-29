@@ -139,6 +139,7 @@ describe("normalized operational state repository", () => {
       },
       [firstDraw, secondDraw],
       "2026-06-29T00:01:00.000Z",
+      { editTokenHash: "hash-from-phone" },
     );
     stores.ballotStore.claimVoterPresence({
       roundNumber: 3,
@@ -163,6 +164,9 @@ describe("normalized operational state repository", () => {
       draw_id: firstDraw.id,
       round_set_id: firstDraw.roundSetId,
     });
+    expect(supabase.rows.get("ballots")?.[0]).toMatchObject({
+      edit_token_hash: "hash-from-phone",
+    });
     expect(supabase.rows.get("result_rows")?.some((row) => row.draw_id === firstDraw.id)).toBe(
       true,
     );
@@ -185,6 +189,7 @@ describe("normalized operational state repository", () => {
       drawId: firstDraw.id,
       roundSetId: firstDraw.roundSetId,
     });
+    expect(restored?.ballot.ballots[0]?.editTokenHash).toBe("hash-from-phone");
     expect(restored?.result.results[0]?.sets[0]).toMatchObject({
       drawId: firstDraw.id,
       roundSetId: firstDraw.roundSetId,

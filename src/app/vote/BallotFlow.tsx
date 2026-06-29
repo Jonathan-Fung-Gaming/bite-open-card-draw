@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawRecord } from "@/lib/draw/draw-state";
-import type { BallotSetChoice, RoundBallot } from "@/lib/vote/ballot";
+import type { BallotSetChoice, PublicBallotLookup, PublicEditableBallot } from "@/lib/vote/ballot";
 import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
 import {
   claimVoterPresenceAction,
@@ -27,6 +27,7 @@ type BallotFlowProps = {
 
 const IDENTITY_STORAGE_KEY = "bite-open-card-draw:startgg-identity:v1";
 const DEVICE_STORAGE_KEY = "bite-open-card-draw:device-id:v1";
+const EDIT_TOKEN_STORAGE_KEY = "bite-open-card-draw:ballot-edit-tokens:v1";
 
 function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
   return draws.map((draw) => ({
@@ -83,7 +84,55 @@ function getDeviceId() {
   return deviceId;
 }
 
-function choicesFromBallot(draws: DrawRecord[], ballot: RoundBallot) {
+function editTokenKey(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
+  return `${roundNumber}:${playerId}`;
+}
+
+function readStoredEditTokens() {
+  try {
+    const raw = window.localStorage.getItem(EDIT_TOKEN_STORAGE_KEY);
+
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredEditTokens(tokens: Record<string, string>) {
+  window.localStorage.setItem(EDIT_TOKEN_STORAGE_KEY, JSON.stringify(tokens));
+}
+
+function readBallotEditToken(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
+  return readStoredEditTokens()[editTokenKey(roundNumber, playerId)] ?? null;
+}
+
+function getBallotEditToken(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
+  const key = editTokenKey(roundNumber, playerId);
+  const tokens = readStoredEditTokens();
+  const existing = tokens[key];
+
+  if (existing) {
+    return existing;
+  }
+
+  const token = window.crypto.randomUUID();
+  writeStoredEditTokens({
+    ...tokens,
+    [key]: token,
+  });
+
+  return token;
+}
+
+function choicesFromBallot(draws: DrawRecord[], ballot: PublicEditableBallot) {
   return draws.map((draw) => {
     const existing = ballot.choices.find((choice) => choice.drawId === draw.id);
     const chartIds = new Set(draw.charts.map((chart) => chart.id));
@@ -136,7 +185,8 @@ export function BallotFlow({
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [presenceWarning, setPresenceWarning] = useState<string | null>(null);
-  const [existingBallot, setExistingBallot] = useState<RoundBallot | null>(null);
+  const [existingBallot, setExistingBallot] = useState<PublicEditableBallot | null>(null);
+  const [existingBallotLookup, setExistingBallotLookup] = useState<PublicBallotLookup | null>(null);
   const [lookupPending, setLookupPending] = useState(false);
   const [liveCanSubmit, setLiveCanSubmit] = useState(initialCanSubmit);
   const [liveStatusLabel, setLiveStatusLabel] = useState(statusLabel);
@@ -149,7 +199,7 @@ export function BallotFlow({
   const refreshRequestedRef = useRef(false);
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null;
   const alreadySubmitted =
-    liveSubmittedPlayerIds.includes(selectedPlayerId) || existingBallot !== null;
+    liveSubmittedPlayerIds.includes(selectedPlayerId) || existingBallotLookup?.exists === true;
   const currentDraw = draws[step];
   const currentChoice = choices[step];
   const canSubmit = choices.every(
@@ -166,8 +216,14 @@ export function BallotFlow({
       setLookupPending(true);
 
       try {
-        const ballot = await getExistingBallotAction(roundNumber, playerId);
+        const lookup = await getExistingBallotAction(
+          roundNumber,
+          playerId,
+          getBallotEditToken(roundNumber, playerId),
+        );
+        const ballot = lookup.ballot;
 
+        setExistingBallotLookup(lookup);
         setExistingBallot(ballot);
 
         if (ballot) {
@@ -178,7 +234,7 @@ export function BallotFlow({
           if (options.autoConfirmExisting) {
             setConfirmed(true);
           }
-        } else if (options.resetWhenMissing) {
+        } else if (options.resetWhenMissing || lookup.exists) {
           setChoices(emptyChoices(draws));
           setSavedAt(null);
           setMessage(null);
@@ -220,12 +276,12 @@ export function BallotFlow({
       return null;
     }
 
-    if (existingBallot) {
+    if (existingBallotLookup?.canEdit && existingBallot) {
       return `A ballot already exists for this start.gg username from ${existingBallot.submittedAt}. Only continue if you are ${selectedPlayer.startggUsername}. A second phone can replace the prior ballot; the latest valid submitted ballot will count.`;
     }
 
     return `A ballot already exists for this start.gg username. Only continue if you are ${selectedPlayer.startggUsername}. A second phone can replace the prior ballot; the latest valid submitted ballot will count.`;
-  }, [alreadySubmitted, existingBallot, selectedPlayer]);
+  }, [alreadySubmitted, existingBallot, existingBallotLookup, selectedPlayer]);
 
   useEffect(() => {
     setLiveCanSubmit(initialCanSubmit);
@@ -273,7 +329,11 @@ export function BallotFlow({
 
     async function poll() {
       try {
-        const state = await getVoteLiveStateAction(roundNumber, selectedPlayerId || undefined);
+        const state = await getVoteLiveStateAction(
+          roundNumber,
+          selectedPlayerId || undefined,
+          selectedPlayerId ? readBallotEditToken(roundNumber, selectedPlayerId) ?? undefined : undefined,
+        );
 
         if (cancelled) {
           return;
@@ -292,12 +352,15 @@ export function BallotFlow({
           router.refresh();
         }
 
-        if (state.existingBallot) {
-          setExistingBallot(state.existingBallot);
+        if (state.existingBallotLookup) {
+          const ballot = state.existingBallotLookup.ballot;
 
-          if (savedAt || !confirmed) {
-            setChoices(choicesFromBallot(draws, state.existingBallot));
-            setSavedAt(state.existingBallot.submittedAt);
+          setExistingBallotLookup(state.existingBallotLookup);
+          setExistingBallot(ballot);
+
+          if (ballot && (savedAt || !confirmed)) {
+            setChoices(choicesFromBallot(draws, ballot));
+            setSavedAt(ballot.submittedAt);
           }
         }
 
@@ -375,11 +438,20 @@ export function BallotFlow({
           roundNumber,
           playerId: selectedPlayer.id,
           playerStartggUsername: selectedPlayer.startggUsername,
+          deviceId: getDeviceId(),
+          editToken: getBallotEditToken(roundNumber, selectedPlayer.id),
           choices,
         });
 
         rememberIdentity(selectedPlayer);
         setExistingBallot(ballot);
+        setExistingBallotLookup({
+          exists: true,
+          revision: ballot.revision,
+          canEdit: true,
+          warning: null,
+          ballot,
+        });
         setSavedAt(ballot.submittedAt);
         setMessage(`Saved revision ${ballot.revision}.`);
         setLiveSubmittedPlayerIds((current) =>
@@ -439,6 +511,7 @@ export function BallotFlow({
             setConfirmed(false);
             setSavedAt(null);
             setExistingBallot(null);
+            setExistingBallotLookup(null);
             setPresenceWarning(null);
             setChoices(emptyChoices(draws));
             setMessage(null);

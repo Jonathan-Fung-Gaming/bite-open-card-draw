@@ -128,6 +128,41 @@ describe("ballot validation and store", () => {
     expect(store.get(1, "player-1")?.submittedAt).toBe("second");
   });
 
+  it("rotates player edit token hashes and clears them for manual admin ballots", () => {
+    const store = new BallotStore();
+    const draws = [draw("set-1", "S16", "16"), draw("set-2", "S17", "17")];
+    const input = {
+      roundNumber: 1 as const,
+      playerId: "player-token",
+      playerStartggUsername: "TokenPlayer",
+      choices: [
+        {
+          drawId: draws[0]?.id ?? "",
+          roundSetId: draws[0]?.roundSetId ?? "",
+          displayLabel: "S16",
+          noBans: true,
+          bannedChartIds: [],
+        },
+        {
+          drawId: draws[1]?.id ?? "",
+          roundSetId: draws[1]?.roundSetId ?? "",
+          displayLabel: "S17",
+          noBans: true,
+          bannedChartIds: [],
+        },
+      ],
+    };
+
+    const first = store.submit(input, draws, "first", { editTokenHash: "hash-a" });
+    const second = store.submit(input, draws, "second", { editTokenHash: "hash-b" });
+    const manual = store.submit(input, draws, "manual", { source: "manual_admin" });
+
+    expect(first.editTokenHash).toBe("hash-a");
+    expect(second.editTokenHash).toBe("hash-b");
+    expect(manual.editTokenHash).toBeNull();
+    expect(store.get(1, "player-token")?.editTokenHash).toBeNull();
+  });
+
   it("exposes phone status for closed and revealed states", () => {
     const store = new BallotStore();
 

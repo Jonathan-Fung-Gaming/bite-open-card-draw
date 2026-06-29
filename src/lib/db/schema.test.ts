@@ -112,6 +112,11 @@ describe("Phase 2 database schema", () => {
     expect(migration).toContain("tiebreaks candidates and winner must all belong to draw_id");
   });
 
+  it("stores public ballot edit tokens only as server-side hashes", () => {
+    expect(migration).toMatch(/alter table public\.ballots\s+add column if not exists edit_token_hash text/i);
+    expect(migration).toContain("Never expose to browser clients");
+  });
+
   it("guards core draw invariants at the database boundary", () => {
     expect(migration).toContain("draws_one_active_per_event_set");
     expect(migration).toContain("where status = 'active' and superseded_at is null");
