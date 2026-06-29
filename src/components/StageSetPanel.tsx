@@ -65,22 +65,22 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
 
   return (
     <section
-      className="metal-panel rounded-lg p-4"
+      className="metal-panel rounded-lg p-2 2xl:p-4"
       data-set-order={set.setOrder}
       data-testid="stage-set-row"
     >
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2 2xl:mb-4 2xl:gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
             Set {set.setOrder} / {set.drawCount} charts
           </p>
-          <h2 className="mt-1 text-3xl font-black uppercase text-white">
+          <h2 className="mt-1 text-lg font-black uppercase text-white lg:text-xl 2xl:text-3xl">
             Round {set.roundNumber} - {set.displayLabel}
           </h2>
         </div>
-        <p className="text-sm text-metal-300">{status}</p>
+        <p className="text-xs text-metal-300 2xl:text-sm">{status}</p>
       </div>
-      <div className="grid grid-cols-7 gap-3" data-testid="stage-set-card-row">
+      <div className="grid grid-cols-7 gap-1 lg:gap-2 2xl:gap-3" data-testid="stage-set-card-row">
         {cards.map((chart, index) => (
           <StageDrawCard
             key={`stage-${set.roundNumber}-${set.setOrder}-${index}`}

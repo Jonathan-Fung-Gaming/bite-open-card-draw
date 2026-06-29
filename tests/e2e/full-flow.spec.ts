@@ -89,6 +89,8 @@ async function expectRenderedRealBackgroundImage(locator: Locator) {
 async function expectReadableVotingAccess(page: Page) {
   const qrLink = page.getByTestId("room-qr-link");
   const qrCode = page.getByTestId("room-qr-code");
+  const votingBandBox = await page.getByTestId("stage-voting-band").boundingBox();
+  const chartRowsBox = await page.getByTestId("stage-chart-rows").boundingBox();
   const qrBox = await qrLink.boundingBox();
   const timerBox = await page.getByTestId("stage-countdown-display").boundingBox();
   const qrPathCount = await qrCode.locator("svg path").count();
@@ -99,10 +101,30 @@ async function expectReadableVotingAccess(page: Page) {
   await expect(page.getByTestId("room-short-url")).toHaveText("127.0.0.1:3100/room");
   await expect(page.getByTestId("stage-countdown-display")).toHaveText(/\d{2}:\d{2}/);
   expect(qrPathCount).toBeGreaterThan(0);
-  expect(qrBox?.width).toBeGreaterThan(180);
-  expect(qrBox?.height).toBeGreaterThan(180);
+  expect(qrBox).not.toBeNull();
+  expect(timerBox).not.toBeNull();
+  expect(votingBandBox).not.toBeNull();
+  expect(chartRowsBox).not.toBeNull();
+  expect(qrBox!.width).toBeGreaterThan(140);
+  expect(qrBox!.height).toBeGreaterThan(140);
   expect(timerBox?.width).toBeGreaterThan(160);
-  expect(timerBox?.height).toBeGreaterThan(60);
+  expect(timerBox?.height).toBeGreaterThanOrEqual(60);
+  expect(qrBox!.x).toBeGreaterThan(timerBox!.x + timerBox!.width - 8);
+  expect(votingBandBox!.y + votingBandBox!.height).toBeLessThanOrEqual(chartRowsBox!.y);
+  expect(qrBox!.y).toBeLessThan(chartRowsBox!.y);
+  expect(timerBox!.y).toBeLessThan(chartRowsBox!.y);
+}
+
+async function expectNoStageVerticalScroll(page: Page) {
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () =>
+          Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) -
+          window.innerHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(4);
 }
 
 async function waitForVisibleTiebreakReveal(page: Page, expectedPanelCount: number) {
@@ -179,6 +201,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(page.getByText("voting open")).toBeVisible();
   await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible({ timeout: 7000 });
   await expectReadableVotingAccess(stagePage);
+  await expectNoStageVerticalScroll(stagePage);
 
   const phonePage = await page.context().newPage();
   await goto(phonePage, "/vote");
@@ -221,8 +244,11 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await page.getByRole("button", { name: "Next Reveal Step" }).click();
   await waitForVisibleTiebreakReveal(stagePage, 1);
   await page.getByRole("button", { name: "Next Reveal Step" }).click();
+  await expect(stagePage.locator("header").getByText("Set 2 counts")).toBeVisible({ timeout: 7000 });
+  await expectNoStageVerticalScroll(stagePage);
   await page.getByRole("button", { name: "Next Reveal Step" }).click();
-  await waitForVisibleTiebreakReveal(stagePage, 2);
+  await waitForVisibleTiebreakReveal(stagePage, 1);
+  await expectNoStageVerticalScroll(stagePage);
   const privateCsvDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Next Reveal Step" }).click();
   const privateCsvDownload = await privateCsvDownloadPromise;
@@ -247,7 +273,10 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await goto(page, "/stage");
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
-  await expect(page.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card")).toHaveCount(2);
+  const finalStageCards = page.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card");
+  await expect(finalStageCards).toHaveCount(2);
+  expect((await finalStageCards.first().boundingBox())?.height).toBeGreaterThan(300);
+  expect((await finalStageCards.nth(1).boundingBox())?.height).toBeGreaterThan(300);
   await expectRenderedRealStageImage(page);
 
   await goto(page, "/charts");
@@ -302,6 +331,8 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute("data-winner-revealed", "false", {
     timeout: 7_000,
   });
+  await expect(stagePage.getByTestId("rune-wheel-slot")).toHaveCount(12);
+  await expect(stagePage.getByTestId("rune-wheel")).not.toContainText("Sealed rune");
   await expect(stagePage.getByTestId("rune-wheel-status")).toHaveText(
     "Backend winner sealed. Reveal in progress.",
   );

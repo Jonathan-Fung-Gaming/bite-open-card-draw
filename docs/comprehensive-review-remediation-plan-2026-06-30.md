@@ -335,6 +335,45 @@ Exit criteria:
 - Rune wheel has 12 visible slots and lands on the committed winner after five seconds.
 - Final stage screen shows exactly two large selected charts with set labels.
 
+### Phase 6 Handoff Context
+
+Status: complete.
+
+Implementation notes to preserve:
+
+- `/stage` voting now uses a top voting band instead of a right sidebar. The large countdown timer is
+  left of a compact QR/short-URL panel, and the two horizontal seven-card chart rows render below
+  that band.
+- Stage-only compact variants were added for `RoundHeader`, `TournamentLogo`, `CountdownTimer`, and
+  `QRPanel`. Standard stage chart cards are shorter below `2xl` so 1280x720 projectors can keep the
+  voting band and both seven-card rows on-screen, while final reveal cards use the new featured
+  variant.
+- Result reveal uses compact stage result rows. During Set 2 reveal phases, Set 1 collapses to a
+  selected-chart summary instead of keeping the full seven-row result panel on-screen.
+- In stage mode, resolved result details place the tiebreak/unique-winner panel beside the count rows
+  so the active set remains readable without vertical scroll at the Playwright stage viewport.
+- Rune-wheel slots now show chart names during the sealed animation, and wheel rotation is computed
+  so the pointer lands on a slot for the backend-committed winner. The helper is isolated in
+  `src/components/rune-wheel-rotation.ts` for unit coverage.
+- The final stage result screen removes the QR/sidebar and shows exactly two large selected chart
+  cards with set labels and selected chart difficulty.
+
+Verification:
+
+- Focused regression command passed:
+  `rtk npm run test -- src/components/rune-wheel-rotation.test.ts`
+- `rtk npm run test` passed, 37 files / 137 tests.
+- `rtk npm run test:e2e` initially exposed voting-stage overflow and stale two-panel tiebreak
+  assumptions, then passed after compact stage layout tuning and collapsed Set 1 result summary
+  assertions. GitHub Actions later reproduced an Ubuntu-only 11px voting-stage overflow; standard
+  stage chart cards were trimmed below `2xl`, and local e2e passed again.
+- Full phase gates are recorded in `docs/phase-status.md`.
+
+Deferred items:
+
+- None for Phase 6. Existing Phase 9 deferrals for hosted Supabase row-scoped persistence,
+  database-time transactional timer mutation, and hosted rehearsal remain unchanged.
+
 ## Phase 7 - Phone And View-Only UX
 
 Addresses: `CR-023`, `CR-024`, `CR-025`, `CR-033`, `CR-034`.

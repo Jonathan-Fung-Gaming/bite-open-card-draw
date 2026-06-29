@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { QrCode } from "lucide-react";
 import QRCode from "qrcode";
+import clsx from "clsx";
 import { buildPublicRouteUrl, formatShortEventUrl } from "@/lib/public-url";
 
 type QRPanelProps = {
   roomPath?: string;
+  compact?: boolean;
 };
 
-export async function QRPanel({ roomPath = "/room" }: QRPanelProps) {
+export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelProps) {
   let roomUrl: string;
   let qrSvg: string;
 
@@ -46,14 +48,17 @@ export async function QRPanel({ roomPath = "/room" }: QRPanelProps) {
   const shortRoomUrl = formatShortEventUrl(roomUrl);
 
   return (
-    <section className="metal-panel rounded-lg p-4" data-testid="room-qr-panel">
+    <section className={clsx("metal-panel rounded-lg", compact ? "p-3" : "p-4")} data-testid="room-qr-panel">
       <div className="flex items-center gap-3 text-ember-300">
-        <QrCode aria-hidden="true" className="h-6 w-6" />
+        <QrCode aria-hidden="true" className={compact ? "h-5 w-5" : "h-6 w-6"} />
         <p className="text-xs font-semibold uppercase tracking-[0.22em]">Scan to vote or view charts</p>
       </div>
       <Link
         href={roomPath}
-        className="mt-4 flex aspect-square w-full max-w-72 items-center justify-center rounded-md border border-ember-300/25 bg-white p-3 text-furnace-950 shadow-ember-tight"
+        className={clsx(
+          "flex aspect-square w-full items-center justify-center rounded-md border border-ember-300/25 bg-white text-furnace-950 shadow-ember-tight",
+          compact ? "mt-3 max-w-36 p-2" : "mt-4 max-w-72 p-3",
+        )}
         data-qr-target={roomUrl}
         data-testid="room-qr-link"
       >
@@ -66,7 +71,10 @@ export async function QRPanel({ roomPath = "/room" }: QRPanelProps) {
         />
       </Link>
       <p
-        className="mt-3 break-words text-center font-mono text-base font-black text-white"
+        className={clsx(
+          "break-words text-center font-mono font-black text-white",
+          compact ? "mt-2 text-sm" : "mt-3 text-base",
+        )}
         data-testid="room-short-url"
       >
         {shortRoomUrl}

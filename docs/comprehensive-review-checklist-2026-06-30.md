@@ -141,7 +141,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     eligibility, clearing/reopening/recomputing removes stale blocks, overrides
     resync corrected winners, and restore derives blocks from computed results.
 
-- [ ] CR-005 - Stage QR/timer placement does not match the validation checklist.
+- [x] CR-005 - Stage QR/timer placement does not match the validation checklist.
   - Severity: High.
   - Files: `src/app/stage/page.tsx:196`, `src/app/stage/page.tsx:208`,
     `src/components/CountdownTimer.tsx:31`, `src/components/QRPanel.tsx:49`.
@@ -154,8 +154,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: Playwright screenshots at 1920x1080 and 1280x720 asserting QR
     target is `/room`, short URL is visible, QR is right of timer, and both are above
     chart rows.
+  - Phase 6 closure: `/stage` voting now uses a top voting band with a compact
+    projector header, large timer on the left, compact QR/short URL on the right,
+    and the two chart rows below. Playwright verifies the `/room` target, short URL,
+    QR geometry to the right of the timer, and both above the chart rows.
 
-- [ ] CR-006 - Stage result reveal can overflow projector view.
+- [x] CR-006 - Stage result reveal can overflow projector view.
   - Severity: High.
   - Files: `src/app/stage/page.tsx:154`, `src/app/stage/page.tsx:160`,
     `src/components/ResultSetPanel.tsx:47`, `src/components/ResultSetPanel.tsx:59`.
@@ -167,8 +171,13 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     revealing Set 2, or redesign reveal into a projector-fit layout.
   - Suggested tests: screenshots at 1920x1080 and 1280x720; assert no vertical
     scrolling is needed and the active set's seven rows are visible.
+  - Phase 6 closure: Set 2 reveal phases now collapse Set 1 to a compact selected
+    chart summary and render active result rows in a compact projector grid. Tiebreak
+    detail sits beside the row grid in stage mode. Playwright verifies no vertical
+    scrolling at the default 1280x720 stage viewport for voting and Set 2 reveal
+    phases.
 
-- [ ] CR-007 - Rune wheel is not a visible selector aligned to the backend winner.
+- [x] CR-007 - Rune wheel is not a visible selector aligned to the backend winner.
   - Severity: High.
   - Files: `src/components/RuneWheel.tsx:35`, `src/components/RuneWheel.tsx:38`,
     `src/components/RuneWheel.tsx:54`, `src/components/RuneWheel.tsx:72`.
@@ -182,6 +191,11 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     slot, then highlight selected chart after 5 seconds.
   - Suggested tests: unit test 2/3/4-way slot sequences; e2e test that 12 visible
     slots exist and pointer-selected slot matches committed winner after 5 seconds.
+  - Phase 6 closure: rune-wheel slots now show chart labels during the sealed
+    animation, compact stage wheels remain visible, and final rotation is computed
+    from the committed winner slot. Unit coverage proves the pointer lands on the
+    committed winner slot for 12-slot and seven-chart wheels; Playwright verifies 12
+    visible slots and no `Sealed rune` placeholder during the tiebreak reveal.
 
 - [ ] CR-008 - Hosted Supabase rehearsal remains an event-readiness blocker.
   - Severity: High.
@@ -508,7 +522,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     `results_revealed` and `round_complete` both render selected final charts first
     when the committed result reveal phase is `final`.
 
-- [ ] CR-027 - Stage rows risk poor readability at smaller projector widths.
+- [x] CR-027 - Stage rows risk poor readability at smaller projector widths.
   - Severity: Medium.
   - Files: `src/app/stage/page.tsx:196`,
     `src/components/StageSetPanel.tsx:83`,
@@ -523,8 +537,13 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     16:9 layout.
   - Suggested tests: screenshots at 1024x768, 1280x720, and 1920x1080; verify titles,
     set labels, QR, and timer remain readable.
+  - Phase 6 closure: the voting sidebar was removed, the stage header/timer/QR have
+    compact projector variants, and standard stage chart cards use shorter heights
+    below 1536px while preserving larger 2xl cards. Playwright verifies the 1280x720
+    stage viewport does not vertically scroll during voting and still shows two
+    horizontal seven-card rows.
 
-- [ ] CR-028 - Final two-chart reveal is visually undersized.
+- [x] CR-028 - Final two-chart reveal is visually undersized.
   - Severity: Medium.
   - Files: `src/app/stage/page.tsx:103`, `src/app/stage/page.tsx:106`,
     `src/components/StageDrawCard.tsx:14`.
@@ -537,6 +556,10 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     reveal.
   - Suggested tests: screenshot asserts exactly two final cards are large/readable
     and set labels/difficulties are visible.
+  - Phase 6 closure: final `/stage` results now use a dedicated two-column selected
+    chart layout with set labels and featured chart cards. The final QR/sidebar was
+    removed from the stable final stage screen, and Playwright verifies exactly two
+    final cards with large card heights.
 
 - [ ] CR-029 - E2E harness has shown flakiness around build/start and port reuse.
   - Severity: Medium.

@@ -10,6 +10,7 @@ import { adminState } from "@/lib/server/admin-state";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import { getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
+import type { ResultSetSnapshot } from "@/lib/results/result-engine";
 import { formatVotingTime, type VotingRoundSnapshot } from "@/lib/vote/voting-window";
 import { StageAutoRefresh } from "./StageAutoRefresh";
 
@@ -84,6 +85,27 @@ function revealLabel(phase: string) {
   }
 }
 
+function StageResolvedSetSummary({ set }: { set: ResultSetSnapshot }) {
+  return (
+    <section className="metal-panel rounded-lg p-3" data-testid="stage-resolved-set-summary">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+            Set {set.setOrder} resolved
+          </p>
+          <h2 className="mt-1 text-xl font-black uppercase text-white">{set.displayLabel}</h2>
+        </div>
+        <p className="rounded border border-ember-300/35 bg-ember-900/25 px-3 py-2 text-xs font-black uppercase text-ember-300">
+          Selected
+        </p>
+      </div>
+      <div className="max-w-sm">
+        <StageDrawCard chart={set.selectedChart} index={set.setOrder} />
+      </div>
+    </section>
+  );
+}
+
 export default async function StagePage() {
   await hydrateTournamentState();
 
@@ -101,24 +123,23 @@ export default async function StagePage() {
         <>
           <StageAutoRefresh />
           <main className="min-h-screen">
-            <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Stable final screen" />
-            <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_320px] lg:px-8">
-              <div className="grid gap-5 md:grid-cols-2" data-testid="stage-final-chart-list">
+            <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Stable final screen" compact />
+            <section className="px-5 py-5 lg:px-8">
+              <div className="grid min-h-[calc(100vh-220px)] gap-6 md:grid-cols-2" data-testid="stage-final-chart-list">
                 {result.sets.map((set, index) => (
-                  <StageDrawCard key={set.roundSetId} chart={set.selectedChart} index={index + 1} />
+                  <section key={set.roundSetId} className="grid content-stretch gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-black uppercase tracking-[0.2em] text-ember-300">
+                        Set {set.setOrder} - {set.displayLabel}
+                      </p>
+                      <p className="font-mono text-sm font-black text-metal-300">
+                        {set.selectedChart.displayDifficulty}
+                      </p>
+                    </div>
+                    <StageDrawCard chart={set.selectedChart} index={index + 1} variant="featured" />
+                  </section>
                 ))}
               </div>
-              <aside className="grid content-start gap-5">
-                <div className="metal-panel rounded-lg p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                    Selected
-                  </p>
-                  <p className="mt-2 text-sm text-metal-300">
-                    Final two charts are visible on stage.
-                  </p>
-                </div>
-                <QRPanel />
-              </aside>
             </section>
           </main>
         </>
@@ -132,8 +153,21 @@ export default async function StagePage() {
           <RoundHeader
             title={`Round ${roundNumber} Results Reveal`}
             status={revealLabel(result.revealPhase)}
+            compact
           />
-          <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_320px] lg:px-8">
+          <section className="grid gap-4 px-5 py-4 lg:px-8">
+            <div className="metal-panel rounded-lg p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                Reveal Order
+              </p>
+              <ol className="mt-2 flex flex-wrap gap-3 text-sm text-metal-300">
+                <li>Set 1 counts</li>
+                <li>Set 1 selected</li>
+                <li>Set 2 counts</li>
+                <li>Set 2 selected</li>
+                <li>Final two charts</li>
+              </ol>
+            </div>
             <div className="grid gap-5">
               {result.revealPhase === "computed" ? (
                 <section className="metal-panel rounded-lg p-5 text-center">
@@ -146,39 +180,24 @@ export default async function StagePage() {
                 </section>
               ) : null}
               {result.revealPhase === "set_1_counts" ? (
-                <ResultSetPanel set={setOne} serverNowMs={serverNowMs} />
+                <ResultSetPanel set={setOne} serverNowMs={serverNowMs} stageMode />
               ) : null}
               {result.revealPhase === "set_1_resolved" ? (
-                <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} />
+                <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} stageMode />
               ) : null}
               {result.revealPhase === "set_2_counts" ? (
-                <>
-                  <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} />
-                  <ResultSetPanel set={setTwo} serverNowMs={serverNowMs} />
-                </>
+                <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_1fr]">
+                  <StageResolvedSetSummary set={setOne} />
+                  <ResultSetPanel set={setTwo} serverNowMs={serverNowMs} stageMode />
+                </div>
               ) : null}
               {result.revealPhase === "set_2_resolved" ? (
-                <>
-                  <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} />
-                  <ResultSetPanel set={setTwo} showWinner serverNowMs={serverNowMs} />
-                </>
+                <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_1fr]">
+                  <StageResolvedSetSummary set={setOne} />
+                  <ResultSetPanel set={setTwo} showWinner serverNowMs={serverNowMs} stageMode />
+                </div>
               ) : null}
             </div>
-            <aside className="grid content-start gap-5">
-              <div className="metal-panel rounded-lg p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Reveal Order
-                </p>
-                <ol className="mt-3 grid gap-2 text-sm text-metal-300">
-                  <li>Set 1 counts</li>
-                  <li>Set 1 selected</li>
-                  <li>Set 2 counts</li>
-                  <li>Set 2 selected</li>
-                  <li>Final two charts</li>
-                </ol>
-              </div>
-              <QRPanel />
-            </aside>
           </section>
         </main>
       </>
@@ -192,9 +211,24 @@ export default async function StagePage() {
         <RoundHeader
           title={`Round ${view.roundNumber} Draw`}
           status={stageStatus(snapshot, view.bothSetsDrawn)}
+          compact
         />
-        <section className="grid gap-5 px-5 py-5 lg:grid-cols-[1fr_320px] lg:px-8">
-          <div className="grid gap-5">
+        <section className="grid gap-3 px-5 py-3 lg:px-8">
+          <div
+            className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] xl:grid-cols-[minmax(0,1fr)_320px]"
+            data-testid="stage-voting-band"
+          >
+            <CountdownTimer
+              label={view.bothSetsDrawn ? "Voting Window" : "Draw Status"}
+              minutes={view.bothSetsDrawn ? formatVotingTime(snapshot.remainingMs) : "--:--"}
+              targetTime={snapshot.canSubmit ? snapshot.closesAt : null}
+              paused={snapshot.status === "voting_paused"}
+              caption={stageTimerCaption(snapshot, view.bothSetsDrawn)}
+              compact
+            />
+            <QRPanel compact />
+          </div>
+          <div className="grid gap-3" data-testid="stage-chart-rows">
             {view.sets.map(({ set, draw, revealStartsAt }) => (
               <StageSetPanel
                 key={set.displayLabel}
@@ -205,16 +239,6 @@ export default async function StagePage() {
               />
             ))}
           </div>
-          <aside className="grid content-start gap-5">
-            <CountdownTimer
-              label={view.bothSetsDrawn ? "Voting Window" : "Draw Status"}
-              minutes={view.bothSetsDrawn ? formatVotingTime(snapshot.remainingMs) : "--:--"}
-              targetTime={snapshot.canSubmit ? snapshot.closesAt : null}
-              paused={snapshot.status === "voting_paused"}
-              caption={stageTimerCaption(snapshot, view.bothSetsDrawn)}
-            />
-            <QRPanel />
-          </aside>
         </section>
       </main>
     </>

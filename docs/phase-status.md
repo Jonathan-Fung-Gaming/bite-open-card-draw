@@ -1881,3 +1881,71 @@ Status: complete.
 - Debug snapshots are still an admin/host backup tool in non-production and production, but now
   require active host control and password re-entry and are blocked during active voting.
 - Phase 5 has no deferred items.
+
+## Comprehensive Review Remediation Phase 6 - Stage And Results Visual UX
+
+Status: complete.
+
+### Checklist Items Addressed
+
+- CR-005: closed. `/stage` voting now uses a top voting band with a large countdown timer on the
+  left and compact QR/short URL on the right, above the two chart rows.
+- CR-006: closed. Set 2 result reveal phases collapse Set 1 into a selected-chart summary, and
+  stage-mode result panels use compact rows with reveal details beside the active count grid.
+- CR-007: closed. Rune-wheel slots show chart names during the sealed animation, and the final
+  rotation lands a slot for the backend-committed winner under the pointer.
+- CR-027: closed. Stage-only compact header, timer, QR, and chart-card sizing keep voting display
+  readable at the default 1280x720 projector viewport while retaining larger 2xl cards.
+- CR-028: closed. Final `/stage` results now use a dedicated two-card selected-chart layout with set
+  labels and featured chart cards.
+
+### Changed Files
+
+- Added `src/components/rune-wheel-rotation.ts`
+- Added `src/components/rune-wheel-rotation.test.ts`
+- Updated `src/app/stage/page.tsx`
+- Updated `src/app/globals.css`
+- Updated `src/components/CountdownTimer.tsx`
+- Updated `src/components/QRPanel.tsx`
+- Updated `src/components/ResultSetPanel.tsx`
+- Updated `src/components/RoundHeader.tsx`
+- Updated `src/components/RuneWheel.tsx`
+- Updated `src/components/StageDrawCard.tsx`
+- Updated `src/components/StageSetPanel.tsx`
+- Updated `src/components/TournamentLogo.tsx`
+- Updated `tests/e2e/full-flow.spec.ts`
+- Updated remediation checklist and plan documentation
+
+### Checks Run
+
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test -- src/components/rune-wheel-rotation.test.ts` - passed, 1 file / 3 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run test` - passed, 37 files / 137 tests.
+- `rtk npm run test:e2e` - initially exposed voting-stage overflow and an obsolete two-visible-wheel
+  assertion, then passed after layout tuning and test update. GitHub Actions later reproduced an
+  Ubuntu-only 11px voting-stage overflow, fixed by trimming standard stage card height below `2xl`;
+  local e2e passed again after that fix.
+- `rtk npm run build` - passed.
+- Final `rtk npm run test:e2e` after the CI-height fix passed, 2 Playwright tests.
+
+### Manual Review
+
+- Product spec: no round structure, voting, ban, result-selection, or tiebreak authority rules were
+  changed. The final stage screen still shows exactly two selected charts for the round.
+- Stage UI: QR still targets `/room`, short URL remains visible, the voting display remains two
+  horizontal seven-card rows, and public screens still avoid live chart-by-chart counts during
+  voting.
+- Results: the rune wheel remains a reveal of the already committed backend winner; client rotation
+  now aligns the visual pointer to a winner slot but does not choose the winner.
+- Security: no secrets, password hashes, service keys, or tournament-changing client mutations were
+  introduced.
+
+### Risks And Assumptions
+
+- Phase 6 has no deferred items.
+- Existing Phase 9 deferrals remain open for hosted Supabase row-scoped persistence, database-time
+  transactional timer mutation, and hosted rehearsal evidence.
+- Stage layout was automatically verified at Playwright's Desktop Chrome viewport, 1280x720. The
+  code is tuned for the documented 1024x768, 1280x720, and 1920x1080 targets, but only the 1280x720
+  geometry is currently enforced by e2e.

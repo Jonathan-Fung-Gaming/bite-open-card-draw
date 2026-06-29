@@ -74,7 +74,15 @@ select {
 .rune-wheel-shell {
   aspect-ratio: 1;
   position: relative;
+  --rune-slot-radius: -8.25rem;
+  --rune-slot-size: 4.75rem;
   width: min(100%, 22rem);
+}
+
+.rune-wheel-shell-compact {
+  --rune-slot-radius: -4.65rem;
+  --rune-slot-size: 2.75rem;
+  width: min(100%, 12rem);
 }
 
 .rune-wheel-circle {
@@ -111,13 +119,13 @@ select {
 }
 
 .rune-wheel-slot {
-  height: 4.75rem;
-  left: calc(50% - 2.375rem);
+  height: var(--rune-slot-size);
+  left: calc(50% - (var(--rune-slot-size) / 2));
   position: absolute;
-  top: calc(50% - 2.375rem);
-  transform: rotate(var(--rune-slot-angle)) translateY(-8.25rem)
+  top: calc(50% - (var(--rune-slot-size) / 2));
+  transform: rotate(var(--rune-slot-angle)) translateY(var(--rune-slot-radius))
     rotate(var(--rune-slot-counter-angle));
-  width: 4.75rem;
+  width: var(--rune-slot-size);
 }
 
 .public-chart-grid {
