@@ -32,6 +32,8 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Required pools have at least 7 eligible charts.
 - Exclusions and re-inclusions change eligibility.
 - Image cache planning deduplicates remote artwork and falls back safely.
+- Runtime derives deployed `/chart-images/cache/...` paths from source `bg_img` when generated
+  image metadata is absent but public cache files exist.
 
 ## Product Rule Tests
 
@@ -104,6 +106,8 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 - Other admin browsers are read-only without host control.
 - Roster import and active/inactive player controls work.
 - Duplicate active start.gg usernames are blocked.
+- Chart exclusion and re-inclusion controls require admin password plus audit reason.
+- Chart exclusion controls block changes that would leave a required pool below 7 eligible charts.
 - Current-round eligibility changes require password and audit reason.
 - Private CSV export includes player-level ballots, manual overrides, selected charts, and tiebreak flags.
 - Private CSV auto-downloads once after final reveal and remains available by manual button.
@@ -113,6 +117,7 @@ This checklist is a Phase 1 baseline. It should be expanded as automated tests a
 
 - Each set draws exactly 7 unique charts.
 - Excluded charts are not drawn.
+- Re-included charts can return to draw eligibility.
 - Selected songs from prior rounds are not drawn.
 - The same song is not drawn in both sets of the same round.
 - Rerolling one chart, one set, or one round preserves draw history.

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { localImagePathForRemoteUrl } from "./image-cache";
 import { importChartRows, parseChartCsv } from "./importer";
 import { FALLBACK_CHART_IMAGE_PATH } from "./image-paths";
 import type { NormalizedChart } from "./types";
@@ -26,6 +27,17 @@ export function resolveRuntimeChartImages(
       publicAssetExists(chart.localImagePath, projectRoot)
     ) {
       return chart;
+    }
+
+    if (chart.sourceBgImg) {
+      const deterministicCachePath = localImagePathForRemoteUrl(chart.sourceBgImg);
+
+      if (publicAssetExists(deterministicCachePath, projectRoot)) {
+        return {
+          ...chart,
+          localImagePath: deterministicCachePath,
+        };
+      }
     }
 
     return {

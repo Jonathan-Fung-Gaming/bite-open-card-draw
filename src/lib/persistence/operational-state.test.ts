@@ -198,4 +198,29 @@ describe("operational state persistence", () => {
       "persisted-selected-song",
     ]);
   });
+
+  it("restores chart exclusion reasons from persisted draw state", async () => {
+    const repository = new MemoryOperationalStateRepository();
+    const first = createAdminStateStores();
+    const [target] = chartsFor("16", 8, 50, "S16");
+
+    first.drawStateStore.setChartsForTest(chartsFor("16", 8, 50, "S16"));
+    first.drawStateStore.updateChartExclusion({
+      chartKey: target?.chartKey ?? "",
+      excluded: true,
+      reason: "event rule exclusion",
+    });
+    await repository.save(createOperationalStateSnapshot(first, "saved"));
+
+    const recreated = createAdminStateStores();
+    await restoreFromRepository(recreated, repository);
+
+    expect(recreated.drawStateStore.getChartExclusions()).toEqual([
+      expect.objectContaining({
+        chartKey: target?.chartKey,
+        excluded: true,
+        reason: "event rule exclusion",
+      }),
+    ]);
+  });
 });

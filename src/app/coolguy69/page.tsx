@@ -1,7 +1,14 @@
 import { AdminLayout, DangerousActionDialog, HostLockBadge, TournamentLogo } from "@/components";
+import { buildPoolCounts } from "@/lib/charts/importer";
+import { REQUIRED_CHART_POOLS, type NormalizedChart } from "@/lib/charts/types";
 import { adminState } from "@/lib/server/admin-state";
 import { getAdminSessionFromCookies } from "@/lib/server/admin-auth";
 import { hydrateTournamentState } from "@/lib/server/persistence";
+import {
+  getRoundDrawRecords,
+  getSubmittedPlayerIdsForRound,
+  getVotingRoundSnapshot,
+} from "@/lib/server/voting-round";
 import { ROUND_SET_DEFINITIONS } from "@/lib/tournament";
 import {
   addInactivePlayerToCurrentRoundAction,
@@ -32,17 +39,18 @@ import {
   setCurrentRoundAction,
   startRehearsalModeAction,
   takeHostControlAction,
+  updateChartExclusionAction,
 } from "./actions";
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
 import { HostHeartbeat } from "./_components/HostHeartbeat";
 import { ManualBallotForm } from "./_components/ManualBallotForm";
 import { PrivateCsvDownload } from "./_components/PrivateCsvDownload";
-import { getRoundDrawRecords, getSubmittedPlayerIdsForRound, getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import type { RoundBallot } from "@/lib/vote/ballot";
 import { formatVotingTime } from "@/lib/vote/voting-window";
 
 type AdminPageProps = {
   searchParams?: Promise<{
+    chartPool?: string;
     error?: string;
   }>;
 };
@@ -65,6 +73,43 @@ function buildLiveCountRows(draws: ReturnType<typeof getRoundDrawRecords>, ballo
       };
     }),
   }));
+}
+
+function buildChartPoolRows(charts: NormalizedChart[]) {
+  const poolCounts = buildPoolCounts(charts);
+
+  return REQUIRED_CHART_POOLS.map((pool) => {
+    const poolCharts = charts
+      .filter((chart) => chart.displayDifficulty === pool && chart.tournamentScope)
+      .sort(
+        (left, right) =>
+          Number(left.excluded) - Number(right.excluded) ||
+          left.name.localeCompare(right.name) ||
+          left.artist.localeCompare(right.artist),
+      );
+    const excludedCount = poolCharts.filter((chart) => chart.excluded).length;
+
+    return {
+      pool,
+      eligibleCount: poolCounts[pool],
+      totalCount: poolCharts.length,
+      excludedCount,
+      valid: poolCounts[pool] >= 7,
+      charts: poolCharts,
+    };
+  });
+}
+
+function resolveSelectedChartPool(value: string | undefined, fallbackRoundNumber: 1 | 2 | 3 | 4) {
+  if (REQUIRED_CHART_POOLS.includes(value as (typeof REQUIRED_CHART_POOLS)[number])) {
+    return value as (typeof REQUIRED_CHART_POOLS)[number];
+  }
+
+  return (
+    ROUND_SET_DEFINITIONS.find(
+      (set) => set.roundNumber === fallbackRoundNumber && set.setOrder === 1,
+    )?.displayLabel ?? REQUIRED_CHART_POOLS[0]
+  );
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -113,6 +158,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const canControl = hostSnapshot.status === "active";
   const roundSnapshot = adminState.roundStateStore.getSnapshot();
   const currentRoundNumber = roundSnapshot.currentRound;
+  const selectedChartPool = resolveSelectedChartPool(params?.chartPool, currentRoundNumber);
   const votingSnapshot = getVotingRoundSnapshot(currentRoundNumber);
   const currentRoundDraws = getRoundDrawRecords(currentRoundNumber);
   const currentRoundBallots = adminState.ballotStore.listForRound(currentRoundNumber);
@@ -125,6 +171,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     activeDraw: adminState.drawStateStore.getActiveDraw(set.roundNumber, set.setOrder),
     historyCount: adminState.drawStateStore.getDrawHistory(set.roundNumber, set.setOrder).length,
   }));
+  const chartPoolRows = buildChartPoolRows(adminState.drawStateStore.getCharts());
+  const selectedChartPoolRow = chartPoolRows.find((row) => row.pool === selectedChartPool);
 
   return (
     <AdminLayout hostStatus={hostSnapshot.status}>
@@ -292,6 +340,109 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
               ))}
             </div>
+          </section>
+          <section className="metal-panel rounded-lg p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Chart Eligibility
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">Required Pools</h2>
+              </div>
+              <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                7 eligible required
+              </p>
+            </div>
+            <div className="mt-4 grid gap-2 md:grid-cols-4">
+              {chartPoolRows.map((row) => (
+                <div
+                  key={row.pool}
+                  className={`rounded border bg-black/25 p-3 ${
+                    row.valid ? "border-metal-700" : "border-ember-300/45"
+                  }`}
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
+                    {row.pool}
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-white">{row.eligibleCount}</p>
+                  <p className="mt-1 text-xs text-metal-300">
+                    {row.excludedCount} excluded / {row.totalCount} total
+                  </p>
+                </div>
+              ))}
+            </div>
+            {!canControl ? (
+              <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
+                Take host control to change chart eligibility.
+              </p>
+            ) : null}
+            <form className="mt-4 flex flex-wrap gap-2" method="get">
+              <select
+                name="chartPool"
+                defaultValue={selectedChartPool}
+                className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+              >
+                {chartPoolRows.map((row) => (
+                  <option key={row.pool} value={row.pool}>
+                    {row.pool} - {row.eligibleCount} eligible
+                  </option>
+                ))}
+              </select>
+              <button className="button-metal rounded px-3 py-2 text-xs font-bold uppercase" type="submit">
+                Review Pool
+              </button>
+            </form>
+            <details className="mt-4 rounded border border-metal-700 bg-black/20 p-3" open>
+              <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
+                {selectedChartPoolRow?.pool} - {selectedChartPoolRow?.eligibleCount} eligible
+              </summary>
+              <div className="mt-3 grid gap-2">
+                {selectedChartPoolRow?.charts.map((chart) => (
+                  <form
+                    key={chart.chartKey}
+                    action={updateChartExclusionAction}
+                    className="grid gap-2 rounded border border-metal-700 bg-black/25 p-3 text-sm xl:grid-cols-[minmax(0,1fr)_160px_220px_auto]"
+                    data-testid="admin-chart-exclusion-row"
+                  >
+                    <input type="hidden" name="chartKey" value={chart.chartKey} />
+                    <input type="hidden" name="excluded" value={chart.excluded ? "false" : "true"} />
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-white">{chart.name}</p>
+                      <p className="truncate text-xs text-metal-300">{chart.artist}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.14em] text-metal-400">
+                        {chart.excluded
+                          ? `Excluded: ${chart.exclusionReason ?? "No reason stored"}`
+                          : "Eligible"}
+                      </p>
+                    </div>
+                    <input
+                      name="adminPassword"
+                      type="password"
+                      required
+                      disabled={!canControl}
+                      placeholder="Admin password"
+                      className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                    <input
+                      name="reason"
+                      required
+                      disabled={!canControl}
+                      placeholder={chart.excluded ? "Re-include reason" : "Exclusion reason"}
+                      className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                    <button
+                      className={`rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40 ${
+                        chart.excluded ? "button-metal" : "border border-ember-300/40 text-ember-300"
+                      }`}
+                      disabled={!canControl}
+                      type="submit"
+                    >
+                      {chart.excluded ? "Re-include" : "Exclude"}
+                    </button>
+                  </form>
+                ))}
+              </div>
+            </details>
           </section>
           <section className="metal-panel rounded-lg p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">

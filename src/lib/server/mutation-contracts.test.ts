@@ -36,6 +36,7 @@ describe("Phase 2 mutation contracts", () => {
   it("requires dangerous actions to include password and reason fields", () => {
     for (const name of [
       "addPlayerToCurrentRoundEligibility",
+      "updateChartExclusion",
       "rerollOneChart",
       "rerollRoundSet",
       "rerollFullRound",

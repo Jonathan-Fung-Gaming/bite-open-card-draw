@@ -235,6 +235,51 @@ export async function setPlayerActiveStatusAction(formData: FormData) {
   revalidatePath("/coolguy69");
 }
 
+export async function updateChartExclusionAction(formData: FormData) {
+  const session = await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getString(formData, "adminPassword"));
+    const chartKey = getString(formData, "chartKey");
+    const excluded = getString(formData, "excluded") === "true";
+    const reason = getRequiredReason(formData);
+    const before = adminState.drawStateStore
+      .getCharts()
+      .find((chart) => chart.chartKey === chartKey);
+
+    if (!before) {
+      throw new Error("Unknown chart key.");
+    }
+
+    const exclusion = adminState.drawStateStore.updateChartExclusion({
+      chartKey,
+      excluded,
+      reason,
+    });
+
+    audit(session, {
+      action: excluded ? "chart_exclusion_add" : "chart_exclusion_remove",
+      summary: `${excluded ? "Excluded" : "Re-included"} ${before.displayDifficulty} chart ${before.name}.`,
+      reason,
+      dangerous: true,
+      affectedRecords: [{ type: "chart", id: before.id }],
+      metadata: {
+        chartKey,
+        displayDifficulty: before.displayDifficulty,
+        excluded: exclusion.excluded,
+        updatedAt: exclusion.updatedAt,
+      },
+    });
+  } catch (error) {
+    redirectWithError(
+      error instanceof Error ? error.message : "Could not update chart exclusion.",
+    );
+  }
+
+  await persistTournamentState();
+  revalidateTournamentViews(revalidatePath);
+}
+
 export async function addInactivePlayerToCurrentRoundAction(formData: FormData) {
   const session = await requireActiveHost();
 

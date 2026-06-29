@@ -27,8 +27,9 @@ export const importChartsInputSchema = z.object({
 });
 
 export const updateChartExclusionInputSchema = z.object({
-  chartId: uuidSchema,
+  chartKey: z.string().trim().min(1),
   excluded: z.boolean(),
+  adminPassword: passwordSchema,
   reason: reasonSchema,
 });
 

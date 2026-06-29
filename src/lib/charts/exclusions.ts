@@ -44,6 +44,27 @@ export function applyChartExclusions(
   });
 }
 
+export function overlayChartExclusionOverrides(
+  charts: readonly NormalizedChart[],
+  exclusions: readonly ChartExclusion[],
+): NormalizedChart[] {
+  const overrides = new Map(exclusions.map((exclusion) => [exclusion.chartKey, exclusion]));
+
+  return charts.map((chart) => {
+    const override = overrides.get(chart.chartKey);
+
+    if (!override) {
+      return chart;
+    }
+
+    return {
+      ...chart,
+      excluded: override.excluded,
+      exclusionReason: override.excluded ? override.reason : null,
+    };
+  });
+}
+
 export function getEligibleTournamentCharts(charts: readonly NormalizedChart[]) {
   return charts.filter((chart) => chart.tournamentScope && !chart.excluded);
 }
