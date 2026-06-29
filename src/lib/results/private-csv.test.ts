@@ -135,11 +135,13 @@ describe("private CSV export", () => {
   it("includes player ballots, manual overrides, selected charts, and tiebreak flags", () => {
     const csv = generatePrivateBallotCsv({ result, ballots: [ballot] });
 
-    expect(csv).toContain("round_number,player_startgg_username");
-    expect(csv).toContain("Alpha,true,true,submitted,submitted");
-    expect(csv).toContain("S16,draw-1,1");
-    expect(csv).toContain("S17,draw-2,3,Selected Two");
-    expect(csv).toContain("true,shared_admin,phone died,true,Selected One,Selected Two,false,true");
+    expect(csv).toContain("round_number,result_id,result_computed_at");
+    expect(csv).toContain("result,now,final,done,done,Alpha,true,true,submitted,submitted,2");
+    expect(csv).toContain("S16,static-s16,draw-1,1");
+    expect(csv).toContain("S17,static-s17,draw-2,3,Selected Two");
+    expect(csv).toContain(
+      "true,shared_admin,phone died,true,Selected One,Selected Two,false,,,,true,chart-2|chart-3,chart-2,done",
+    );
     expect(csv).toContain("Bravo,true,false");
   });
 });
