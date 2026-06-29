@@ -1,12 +1,19 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { CORE_DATABASE_TABLES, ROUND_SET_SEED_ROWS } from "./schema";
+import {
+  CORE_DATABASE_TABLES,
+  EVENT_SCOPED_DATABASE_TABLES,
+  GENERATED_DATABASE_TYPE_TABLES,
+  ROUND_SET_SEED_ROWS,
+} from "./schema";
 
-const migration = readFileSync(
-  path.join(process.cwd(), "supabase/migrations/20260628050200_initial_schema.sql"),
-  "utf8",
-);
+const migrationsDirectory = path.join(process.cwd(), "supabase/migrations");
+const migration = readdirSync(migrationsDirectory)
+  .filter((fileName) => fileName.endsWith(".sql"))
+  .sort()
+  .map((fileName) => readFileSync(path.join(migrationsDirectory, fileName), "utf8"))
+  .join("\n");
 
 describe("Phase 2 database schema", () => {
   it("creates the required core tables", () => {
@@ -17,7 +24,9 @@ describe("Phase 2 database schema", () => {
 
   it("enables row level security on every core table", () => {
     for (const table of CORE_DATABASE_TABLES) {
-      expect(migration).toMatch(new RegExp(`alter table public\\.${table} enable row level security`, "i"));
+      expect(migration).toMatch(
+        new RegExp(`alter table public\\.${table} enable row level security`, "i"),
+      );
     }
   });
 
@@ -30,12 +39,50 @@ describe("Phase 2 database schema", () => {
   });
 
   it("prevents duplicate active start.gg usernames at the database boundary", () => {
-    expect(migration).toContain("players_active_username_unique");
+    expect(migration).toContain("players_active_event_username_unique");
+    expect(migration).toContain("on public.players (event_id, startgg_username_normalized)");
     expect(migration).toContain("where active = true");
   });
 
   it("requires completed per-set ballot choices", () => {
     expect(migration).toContain("ballot_choices_completion_check");
     expect(migration).toContain("cardinality(banned_chart_ids) between 1 and 2");
+  });
+
+  it("adds event scope to every mutable runtime table", () => {
+    for (const table of EVENT_SCOPED_DATABASE_TABLES) {
+      expect(migration).toMatch(
+        new RegExp(`alter table public\\.${table}\\s+add column if not exists event_id`, "i"),
+      );
+      expect(migration).toMatch(
+        new RegExp(
+          `constraint ${table}_event_id_not_blank check \\(length\\(trim\\(event_id\\)\\) > 0\\)`,
+          "i",
+        ),
+      );
+    }
+  });
+
+  it("uses event-scoped unique constraints for data that can collide across event runs", () => {
+    expect(migration).toContain(
+      "admin_sessions_event_token_hash_unique unique (event_id, session_token_hash)",
+    );
+    expect(migration).toContain(
+      "draws_event_round_set_version_unique unique (event_id, round_set_id, draw_version)",
+    );
+    expect(migration).toContain(
+      "voting_windows_event_round_unique unique (event_id, round_number)",
+    );
+    expect(migration).toContain(
+      "ballots_event_round_player_unique unique (event_id, round_number, player_id)",
+    );
+    expect(migration).toContain(
+      "result_snapshots_event_round_unique unique (event_id, round_number)",
+    );
+    expect(migration).toContain("host_locks_event_lock_name_unique unique (event_id, lock_name)");
+  });
+
+  it("keeps generated database types aligned with all runtime tables", () => {
+    expect([...GENERATED_DATABASE_TYPE_TABLES].sort()).toEqual([...CORE_DATABASE_TABLES].sort());
   });
 });

@@ -7,6 +7,7 @@ type ServerEnv = {
   supabaseServiceRoleKey: string;
   adminPasswordHash: string;
   sessionSecret: string;
+  tournamentEventId: string;
 };
 
 function requireEnv(name: keyof NodeJS.ProcessEnv) {
@@ -27,5 +28,16 @@ export function getServerEnv(): ServerEnv {
     supabaseServiceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
     adminPasswordHash: requireEnv("ADMIN_PASSWORD_HASH"),
     sessionSecret: requireEnv("SESSION_SECRET"),
+    tournamentEventId: requireEnv("TOURNAMENT_EVENT_ID"),
   };
+}
+
+export function getTournamentEventId() {
+  const eventId = process.env.TOURNAMENT_EVENT_ID?.trim();
+
+  if (!eventId) {
+    throw new Error("Missing required server environment variable: TOURNAMENT_EVENT_ID");
+  }
+
+  return eventId;
 }

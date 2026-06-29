@@ -19,6 +19,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 ADMIN_PASSWORD_HASH
 SESSION_SECRET
+TOURNAMENT_EVENT_ID=<event-or-rehearsal-id>
 TOURNAMENT_STATE_BACKEND=supabase
 ```
 
@@ -51,6 +52,8 @@ rtk npx playwright install chromium
 Do not use the release for tournament operation until:
 
 - `TOURNAMENT_STATE_BACKEND=supabase` is configured for the deployed environment.
+- `TOURNAMENT_EVENT_ID` is configured to a stable nonblank event namespace, using a separate value
+  for rehearsal and production.
 - `rtk npm run cache:chart-images` produces at least one non-fallback cached artwork file and
   `public/chart-images/cache` or the chosen controlled storage has real files.
 - A complete four-round rehearsal has been run against persistent state.
@@ -74,10 +77,10 @@ Then verify:
 rtk npm run test
 ```
 
-For event or deployed use, set `TOURNAMENT_STATE_BACKEND=supabase`. In that mode the app hydrates
-operational tournament state from Supabase before server reads and persists it after successful
-tournament-changing actions. Leaving `TOURNAMENT_STATE_BACKEND=memory` is for tests, local demos, or
-single-process development only.
+For event or deployed use, set `TOURNAMENT_STATE_BACKEND=supabase` and a nonblank
+`TOURNAMENT_EVENT_ID`. The event id namespaces mutable runtime records so rehearsals and production
+do not collide in normalized Supabase tables. Leaving `TOURNAMENT_STATE_BACKEND=memory` is for tests,
+local demos, or single-process development only.
 
 ## Data Setup Workflow
 
@@ -100,7 +103,7 @@ single-process development only.
 8. Log in to `/coolguy69`.
 9. Take host control.
 10. Review chart exclusions in `Chart Eligibility`; every exclusion or re-inclusion requires admin
-   password re-entry and an audit reason, and required pools must stay at 7 eligible charts or more.
+    password re-entry and an audit reason, and required pools must stay at 7 eligible charts or more.
 11. Bulk import start.gg usernames.
 12. Mark inactive/eliminated players before opening voting.
 13. Confirm duplicate active usernames are blocked.
