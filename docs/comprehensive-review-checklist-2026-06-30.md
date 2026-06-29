@@ -74,6 +74,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     Deferred to remediation Phase 9 for hosted Supabase closure; this remains unchecked until the
     Supabase save path is a database-transactional row-scoped mutation or equivalent cross-instance
     event revision.
+  - Phase 9 blocker: no hosted Supabase write rehearsal or transactional row-scoped mutation cutover
+    was run because an approved non-production project/ref and `TOURNAMENT_EVENT_ID` have not been
+    provided in this session.
 
 - [x] CR-002 - Public voter actions expose existing live ballot choices.
   - Severity: Critical.
@@ -119,6 +122,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     database-time transactional closure remains deferred to remediation Phase 9, so
     this item stays unchecked until Supabase RPC/row-scoped timer mutations use
     database time rather than app-server time.
+  - Phase 9 blocker: database-time transactional timer closure still requires hosted Supabase
+    mutation work and rehearsal against an approved non-production event namespace.
 
 - [x] CR-004 - Future-round selected-song blocking can be bypassed by drawing ahead.
   - Severity: High.
@@ -210,6 +215,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: four full rounds against hosted Supabase, including
     refresh/redeploy survival for draws, voting windows, ballots, results, admin
     sessions, host locks, CSV download, and QR.
+  - Phase 9 blocker: hosted rehearsal was not run because the repo does not contain a Supabase
+    config and `.env.local` may contain secrets. Explicit approval, target project/ref, and a
+    disposable `TOURNAMENT_EVENT_ID` are required before writing to hosted Supabase.
 
 ## Medium
 
@@ -674,7 +682,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Phase 7 closure: `src/components/ChartSetPanel.tsx` was removed and the barrel
     export was deleted. Source grep no longer finds `ChartSetPanel` under `src`.
 
-- [ ] CR-035 - Debug/release docs should record final e2e retry result.
+- [x] CR-035 - Debug/release docs should record final e2e retry result.
   - Severity: Low.
   - Files: `docs/phase-status.md`, `docs/release-checklist.md`.
   - Current behavior: this review observed an initial e2e port conflict followed by
@@ -684,3 +692,6 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested fix: after addressing e2e harness reliability, record the clean final
     gate run and note whether the transient failure has been eliminated.
   - Suggested tests: run final gates from a clean shell with no prior dev server.
+  - Phase 9 closure: Phase 8's final clean gate evidence is recorded in `docs/phase-status.md`.
+    `rtk npm run test:e2e` now chooses a free port and passed retry-free with 4 Playwright tests;
+    `rtk npm run test:load` also passed with the 100-player rehearsal and final CSV verification.

@@ -2,17 +2,17 @@
 
 ## Current Baseline
 
-- `main` is merged through Normalized Runtime Persistence Phase 7.
-- Local gates passed after Phase 7: lint, typecheck, unit/integration tests, production build, and
-  Playwright e2e.
+- `main` is merged through Comprehensive Review Remediation Phase 8.
+- Local gates passed after Phase 8: lint, typecheck, unit/integration tests, production build,
+  Playwright e2e, and the 100-player Playwright/API load rehearsal.
 - Runtime authority is now normalized Supabase persistence when
   `TOURNAMENT_STATE_BACKEND=supabase`; debug snapshots are backup/debug exports only.
 
 ## Remaining Work
 
-### 1. Phase 8 Automated Coverage Audit
+### 1. Hosted Transactional Persistence Audit
 
-- [ ] Map existing tests against every Phase 8 required automated gate in
+- [ ] Map existing tests against every hosted transactional persistence gate in
   `docs/normalized-runtime-persistence-plan-2026-06-29.md`.
 - [ ] Add or tighten coverage for concurrent ballot submissions so all ballots survive.
 - [ ] Add or tighten coverage that persistence failure keeps the previous confirmed ballot valid.
@@ -34,6 +34,7 @@ Do not run this against a real event namespace or production data.
 
 - [ ] Get explicit approval before writing to any hosted Supabase project.
 - [ ] Choose a non-production `TOURNAMENT_EVENT_ID` for rehearsal.
+- [ ] Confirm the target Supabase project/ref and environment are non-production.
 - [ ] Apply all migrations through the latest normalized runtime migration.
 - [ ] Configure rehearsal env with `TOURNAMENT_STATE_BACKEND=supabase`.
 - [ ] Run a complete four-round hosted rehearsal.
@@ -45,9 +46,9 @@ Do not run this against a real event namespace or production data.
 
 ### 3. Release Documentation Reconciliation
 
-- [ ] Update stale release-status wording that still describes the old fixed `primary` snapshot row
+- [x] Update stale release-status wording that still describes the old fixed `primary` snapshot row
   as the hosted rehearsal blocker.
-- [ ] Record Phase 8 evidence in `docs/phase-status.md`.
+- [x] Record Phase 8 evidence in `docs/phase-status.md`.
 - [ ] Record hosted rehearsal evidence in `docs/remediation-issue-checklist.md`.
 - [ ] Update `docs/release-checklist.md` with the final hosted rehearsal result.
 - [ ] Update event-day/runbook notes if the hosted rehearsal exposes any operational changes.
@@ -60,6 +61,7 @@ Do not run this against a real event namespace or production data.
   - `rtk npm run test`
   - `rtk npm run build`
   - `rtk npm run test:e2e`
+  - `rtk npm run test:load`
 - [ ] Confirm no secrets, service-role keys, password hashes, session secrets, Vercel tokens, or
   plaintext admin passwords are committed.
 - [ ] Confirm the repository is clean and `main` is current after the final PR merge.

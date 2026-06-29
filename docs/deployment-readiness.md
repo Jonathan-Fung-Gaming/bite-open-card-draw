@@ -34,6 +34,7 @@ rtk npm run lint
 rtk npm run typecheck
 rtk npm run test
 rtk npm run test:e2e
+rtk npm run test:load
 rtk npm run import:charts
 rtk npm run cache:chart-images
 rtk npm run verify:real-chart-images
@@ -44,7 +45,7 @@ rtk npm run build
 Playwright requires a local browser install:
 
 ```bash
-rtk npx playwright install chromium
+rtk npx playwright install chromium webkit
 ```
 
 ## Release Blockers To Clear
@@ -56,7 +57,9 @@ Do not use the release for tournament operation until:
   for rehearsal and production.
 - `rtk npm run cache:chart-images` produces at least one non-fallback cached artwork file and
   `public/chart-images/cache` or the chosen controlled storage has real files.
-- A complete four-round rehearsal has been run against persistent state.
+- A complete four-round rehearsal has been run against hosted Supabase persistent state with an
+  explicitly approved non-production `TOURNAMENT_EVENT_ID`. The local `rtk npm run test:load`
+  rehearsal is useful load evidence but does not replace hosted Supabase rehearsal.
 - Private CSV auto-download and the manual admin CSV download have both been verified after a final
   reveal.
 - `docs/remediation-issue-checklist.md` has every row checked with evidence and its final closure

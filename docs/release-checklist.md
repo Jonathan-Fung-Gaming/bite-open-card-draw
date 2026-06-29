@@ -2,6 +2,15 @@
 
 Use this checklist on the release branch before tournament use.
 
+## Current Automated Evidence
+
+- [x] Phase 8 clean e2e evidence recorded: `rtk npm run test:e2e` passed retry-free with 4
+      Playwright tests after the free-port harness change.
+- [x] Phase 8 load evidence recorded: `rtk npm run test:load` passed with 100 player submissions
+      and edits plus final private CSV verification.
+- [ ] Hosted Supabase rehearsal evidence recorded with `TOURNAMENT_STATE_BACKEND=supabase` and a
+      non-production `TOURNAMENT_EVENT_ID`.
+
 ## Remediation Gate
 
 - [ ] `docs/remediation-plan-2026-06-28.md` has been reviewed for the current release.
@@ -62,7 +71,8 @@ Use this checklist on the release branch before tournament use.
 
 - [ ] Result reveal sequence was tested.
 - [ ] Rune-wheel tiebreak reveal was tested in rehearsal.
-- [ ] Full four-round rehearsal completed against persistent state.
+- [ ] Full four-round rehearsal completed against hosted Supabase persistent state with an approved
+      non-production `TOURNAMENT_EVENT_ID`.
 - [ ] Private CSV auto-download was tested.
 - [ ] Manual `Download private ballot CSV` was tested.
 - [ ] CSV file location was confirmed.
@@ -73,6 +83,7 @@ Use this checklist on the release branch before tournament use.
 - [ ] `rtk npm run typecheck`
 - [ ] `rtk npm run test`
 - [ ] `rtk npm run test:e2e`
+- [ ] `rtk npm run test:load`
 - [ ] `rtk npm run import:charts`
 - [ ] `rtk npm run cache:chart-images`
 - [ ] `rtk npm run verify:real-chart-images`

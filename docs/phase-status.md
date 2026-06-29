@@ -11,12 +11,11 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
-As of release closure work on 2026-06-29, real cached chart artwork population and rendering
-verification are closed (`RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028`). The remaining release
-blocker is the hosted Supabase rehearsal: an automated four-round repository-backed persistent
-rehearsal passes, but the `.env.local` Supabase URL points to a hosted `supabase.co` project and the
-app writes operational state to the fixed `primary` snapshot row, so hosted rehearsal was not run
-without explicit approval to overwrite or otherwise protect that remote state.
+As of Phase 9 blocker triage on 2026-06-30, real cached chart artwork population and rendering
+verification are closed (`RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028`), and Phase 8 local e2e/load
+gates are clean. The remaining release blocker is the hosted Supabase rehearsal: the runtime now
+uses normalized event-scoped Supabase tables, but hosted rehearsal was not run without explicit
+approval for a non-production project/ref and disposable `TOURNAMENT_EVENT_ID`.
 
 `docs/pump_open_stage_repo_validation_checklist.md` is present in the workspace and is intentionally
 called out as a required-read project document. As of this Phase 0 remediation note, `rtk git status
@@ -27,8 +26,8 @@ branch workflow.
 ## Release Closure - 2026-06-29
 
 Status: complete for real cached artwork and automated repository-backed rehearsal coverage; not
-event-ready until an explicitly approved hosted Supabase rehearsal is completed or the hosted
-`primary` operational snapshot is protected from overwrite during rehearsal.
+event-ready until an explicitly approved hosted Supabase rehearsal is completed with a
+non-production `TOURNAMENT_EVENT_ID`.
 
 ### Acceptance Criteria
 
@@ -85,8 +84,8 @@ event-ready until an explicitly approved hosted Supabase rehearsal is completed 
   rules, result selection, or tiebreak authority changed.
 - Artwork: fallback rendering remains available for resilience, but release closure checks now prove
   real cached artwork exists and renders on public/player surfaces.
-- Persistence: the new four-round rehearsal uses the same operational repository snapshot boundary
-  used by the Supabase backend, but it does not write to the hosted Supabase `primary` row.
+- Persistence: the four-round repository-backed rehearsal uses the operational repository boundary
+  shared with the Supabase backend, but it does not write to hosted Supabase.
 - Security: `.env.local` was checked only for variable-name presence and public URL host; no secret
   values were printed or committed.
 - CSV: browser e2e verifies auto/manual private CSV download for Round 1, and integration coverage
@@ -94,10 +93,9 @@ event-ready until an explicitly approved hosted Supabase rehearsal is completed 
 
 ### Risks And Assumptions
 
-- Hosted Supabase rehearsal remains intentionally unrun. The available `.env.local` points to a
-  hosted `supabase.co` project, and the current app writes operational state to the fixed `primary`
-  snapshot row. Running the hosted rehearsal needs explicit approval or a protected rehearsal
-  snapshot strategy so real remote event state is not overwritten.
+- Hosted Supabase rehearsal remains intentionally unrun. Running it needs explicit approval, a
+  confirmed non-production Supabase project/ref, and a disposable `TOURNAMENT_EVENT_ID` so real
+  remote event state is not overwritten.
 - The real cached image files add about 200 MB of deployable public assets. Individual files are well
   below common Git host single-file limits, but the repository and deployment artifact are larger.
 - If future environments cannot reach `piugame.com` or cannot use the system CA store, keep the
@@ -2078,3 +2076,49 @@ Status: complete.
 - The 100-player load rehearsal is local memory-backend HTTP coverage, not hosted Supabase
   concurrency proof. Hosted row-scoped persistence, database-time timer mutation, and hosted
   rehearsal evidence remain Phase 9 work.
+
+## Comprehensive Review Remediation Phase 9 - Hosted Rehearsal And Release Evidence
+
+Status: blocked pending explicit hosted Supabase approval and target details.
+
+### Checklist Items Triage
+
+- CR-035: closed. Final clean Phase 8 gate evidence is now recorded in this file and in
+  `docs/comprehensive-review-checklist-2026-06-30.md`; the previous e2e port-conflict risk is
+  addressed by the free-port Playwright wrapper.
+- CR-001: still open. Local merge/queue and load rehearsal guardrails exist, but hosted Supabase
+  row-scoped transactional persistence or equivalent event-revision locking has not been proven.
+- CR-003: still open. Local timer mutation paths are improved, but hosted database-time
+  transactional deadline advancement has not been implemented/proven against Supabase.
+- CR-008: still open. Hosted Supabase rehearsal was not run because this session does not have
+  explicit approval to write to a hosted project, a confirmed non-production project/ref, or a
+  disposable `TOURNAMENT_EVENT_ID`.
+
+### Context Preserved
+
+- `.env.local` exists and may contain secrets, so it was not read or printed.
+- The repository has Supabase migrations but no `supabase/config.toml` and no npm Supabase helper
+  scripts. Hosted migration/rehearsal work needs an approved project/ref and CLI workflow.
+- Phase 9 hosted rehearsal must use `TOURNAMENT_STATE_BACKEND=supabase` and a non-production
+  `TOURNAMENT_EVENT_ID`, then run all four rounds including forced tiebreaks, refresh/redeploy
+  survival, host lock, admin sessions, manual ballot override, QR, `/stage`, `/vote`, `/charts`,
+  `/results`, and private CSV auto/manual download.
+- Phase 8 local evidence remains useful but is not a substitute for hosted Supabase concurrency:
+  `rtk npm run test:e2e` passed with 4 Playwright tests and `rtk npm run test:load` passed with
+  100 player submissions/edits plus final CSV verification.
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 37 files / 137 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 4 Playwright tests.
+- `rtk npm run test:load` - passed, 1 Playwright load test with 100 player submissions/edits and
+  final private CSV verification.
+- `rtk git diff --check` - passed before gates.
+
+### Deferred Items
+
+- Complete `CR-001`, `CR-003`, and `CR-008` after explicit hosted Supabase approval and target
+  details are provided.

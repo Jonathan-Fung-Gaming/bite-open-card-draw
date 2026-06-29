@@ -538,6 +538,33 @@ Exit criteria:
 - Final local gates are recorded from a clean shell.
 - Remaining risks are explicit and acceptable for release.
 
+### Phase 9 Current Blocker Context
+
+Status: blocked pending explicit hosted Supabase approval and target details.
+
+What is complete locally:
+
+- `CR-035` is closed by the Phase 8 evidence now recorded in `docs/phase-status.md`: final clean
+  `rtk npm run test:e2e` passed retry-free with 4 Playwright tests, and `rtk npm run test:load`
+  passed with 100 player submissions/edits plus final CSV verification.
+- Release/deployment docs now describe the current normalized event-scoped Supabase blocker instead
+  of the old fixed `primary` snapshot-row blocker.
+
+What remains blocked:
+
+- `CR-001`, `CR-003`, and `CR-008` require an approved hosted non-production Supabase target and a
+  disposable `TOURNAMENT_EVENT_ID` before any write rehearsal can be run.
+- `.env.local` may contain secrets and was not read. The repo also has no `supabase/config.toml` or
+  npm Supabase helper scripts, so hosted migration/rehearsal commands need explicit project/ref
+  details and approval before execution.
+
+Required next approval/context:
+
+- Confirm the hosted Supabase project/ref is non-production.
+- Confirm the disposable `TOURNAMENT_EVENT_ID`.
+- Approve applying migrations and running the full four-round hosted rehearsal with
+  `TOURNAMENT_STATE_BACKEND=supabase`.
+
 ## Issue Coverage Summary
 
 | Phase | Issues |

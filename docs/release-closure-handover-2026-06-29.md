@@ -153,10 +153,10 @@ Run these before the PR is merged:
   `/stage`, `/vote`, `/charts`, and `/results`.
 - An automated four-round repository-backed persistent rehearsal test now completes all rounds and
   verifies private CSV content after final reveal.
-- A hosted Supabase rehearsal was not run in this pass because `.env.local` points to a hosted
-  `supabase.co` project and the app writes to the fixed `primary` operational snapshot row. Do not
-  treat the app as event-ready until that hosted rehearsal is explicitly approved and completed, or
-  the remote state is protected from overwrite during rehearsal.
+- A hosted Supabase rehearsal was not run in this pass. The runtime now uses normalized
+  event-scoped Supabase tables, but the app still must not be treated as event-ready until hosted
+  rehearsal is explicitly approved and completed against a non-production project/ref and disposable
+  `TOURNAMENT_EVENT_ID`.
 
 ## Risks And Assumptions
 

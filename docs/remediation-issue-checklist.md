@@ -186,5 +186,7 @@ The remediation plan is complete only when:
 As of release closure work on 2026-06-29, the real cached artwork items (`RIC-020`, `RIC-021`,
 `RIC-022`, and `RIC-028`) are closed with evidence, and an automated four-round repository-backed
 persistent rehearsal plus CSV generation test passes. The final event-readiness gate is still blocked
-until an explicitly approved hosted Supabase rehearsal is completed or the hosted `primary`
-operational snapshot is otherwise protected from being overwritten during rehearsal.
+until an explicitly approved hosted Supabase rehearsal is completed with
+`TOURNAMENT_STATE_BACKEND=supabase` and a non-production `TOURNAMENT_EVENT_ID`. The current
+runtime uses normalized event-scoped tables rather than the old fixed `primary` snapshot row, but
+hosted rehearsal is still required before event readiness can be claimed.
