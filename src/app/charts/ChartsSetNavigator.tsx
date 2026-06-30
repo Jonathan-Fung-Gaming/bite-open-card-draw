@@ -107,15 +107,15 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
           onClick={() => setActiveIndex((current) => Math.max(0, current - 1))}
           type="button"
         >
-          Back
+          Previous chart set
         </button>
         <button
-          className="button-metal rounded px-4 py-3 font-black uppercase disabled:opacity-40"
+          className="rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300 disabled:opacity-40"
           disabled={!hydrated || !activeSet || boundedActiveIndex === sets.length - 1}
           onClick={() => setActiveIndex((current) => Math.min(sets.length - 1, current + 1))}
           type="button"
         >
-          Next
+          Next chart set
         </button>
       </div>
     </section>

@@ -248,13 +248,13 @@ export async function refreshHostLockAction() {
   const hostToken = await getHostTokenCookie();
 
   if (!session || !hostToken) {
-    return;
+    return false;
   }
 
-  await withPersistedHostLockState(async () => {
+  return withPersistedHostLockState(async () => {
     const nowMs = await getAuthoritativeNowMs();
 
-    adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs);
+    return adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs);
   });
 }
 

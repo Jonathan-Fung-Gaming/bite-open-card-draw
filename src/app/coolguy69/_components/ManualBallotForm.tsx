@@ -26,6 +26,15 @@ function emptySelections(draws: DrawRecord[]) {
   ) as Record<string, ManualSetSelection>;
 }
 
+function selectionIsComplete(selection: ManualSetSelection) {
+  return (
+    (selection.noBans && selection.bannedChartIds.length === 0) ||
+    (!selection.noBans &&
+      selection.bannedChartIds.length >= 1 &&
+      selection.bannedChartIds.length <= 2)
+  );
+}
+
 export function ManualBallotForm({
   action,
   roundNumber,
@@ -41,13 +50,15 @@ export function ManualBallotForm({
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null;
   const selectedUsername = selectedPlayer?.startggUsername ?? "selected player";
   const selectedHasExistingBallot = existingPlayerIds.includes(selectedPlayerId);
+  const getSelection = (drawId: string) =>
+    setSelections[drawId] ?? { bannedChartIds: [], noBans: false };
+  const allSetsComplete =
+    draws.length === 2 && draws.every((draw) => selectionIsComplete(getSelection(draw.id)));
+  const saveDisabled = disabled || !selectedPlayer || !allSetsComplete;
 
   useEffect(() => {
     setSetSelections(emptySelections(draws));
   }, [draws]);
-
-  const getSelection = (drawId: string) =>
-    setSelections[drawId] ?? { bannedChartIds: [], noBans: false };
 
   const setChartBan = (drawId: string, chartId: string, checked: boolean) => {
     setSetSelections((current) => {
@@ -99,16 +110,17 @@ export function ManualBallotForm({
               : "You are about to manually enter a ballot."}
           </p>
           <p className="mt-1 text-sm text-metal-300">
-            This will save a server-side ballot for the selected eligible player and may change the round result.
+            This will save a server-side ballot for the selected eligible player and may change the
+            round result.
           </p>
         </div>
       </div>
 
       {!canSubmitManualBallot ? (
         <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
-          Manual ballots are available while voting is open or after voting closes but before result reveal starts.
-          If results were computed but not revealed, a manual ballot invalidates that computation so the host
-          must compute results again.
+          Manual ballots are available while voting is open or after voting closes but before result
+          reveal starts. If results were computed but not revealed, a manual ballot invalidates that
+          computation so the host must compute results again.
         </p>
       ) : null}
 
@@ -143,15 +155,29 @@ export function ManualBallotForm({
       <div className="mt-4 grid gap-4">
         {draws.map((draw, drawIndex) => {
           const selection = getSelection(draw.id);
+          const complete = selectionIsComplete(selection);
 
           return (
-            <fieldset key={draw.id} className="rounded border border-metal-700 bg-black/20 p-3" disabled={disabled}>
+            <fieldset
+              key={draw.id}
+              className="rounded border border-metal-700 bg-black/20 p-3"
+              disabled={disabled}
+            >
               <legend className="px-1 text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
                 Set {drawIndex + 1} choices - {draw.displayLabel}
               </legend>
-              <p className="mt-1 text-xs text-metal-300">Select 1-2 bans or choose no bans for this set.</p>
+              <p className="mt-1 text-xs text-metal-300">
+                Select 1-2 bans or choose no bans for this set.
+              </p>
               <p className="mt-2 text-xs font-bold uppercase tracking-[0.14em] text-ember-300">
                 {selection.bannedChartIds.length}/2 bans selected
+              </p>
+              <p
+                className={`mt-1 text-xs font-bold uppercase tracking-[0.14em] ${
+                  complete ? "text-white" : "text-metal-300"
+                }`}
+              >
+                {complete ? "Set complete" : "Incomplete: choose 1-2 bans or no bans"}
               </p>
               <div className="mt-3 grid gap-2">
                 {draw.charts.map((chart) => {
@@ -176,7 +202,9 @@ export function ManualBallotForm({
                       />
                       <span>
                         <span className="font-bold text-white">{chart.name}</span>
-                        <span className="ml-2 text-xs uppercase text-ember-300">{chart.displayDifficulty}</span>
+                        <span className="ml-2 text-xs uppercase text-ember-300">
+                          {chart.displayDifficulty}
+                        </span>
                       </span>
                     </label>
                   );
@@ -235,7 +263,16 @@ export function ManualBallotForm({
         className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
       />
 
-      <button className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40" disabled={disabled}>
+      {!allSetsComplete ? (
+        <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
+          Complete both sets with 1-2 bans or explicit no-bans before saving a manual ballot.
+        </p>
+      ) : null}
+
+      <button
+        className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+        disabled={saveDisabled}
+      >
         Save Manual Ballot
       </button>
     </form>

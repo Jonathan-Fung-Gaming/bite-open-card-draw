@@ -23,6 +23,15 @@ export function AdminLayout({ children, hostStatus = "inactive" }: AdminLayoutPr
           </div>
           <HostLockBadge status={hostStatus} />
         </header>
+        {hostStatus === "readonly" ? (
+          <section className="rounded-lg border border-metal-500/40 bg-black/35 p-4 text-sm text-metal-300">
+            <p className="font-bold uppercase tracking-[0.14em] text-white">Read-only admin</p>
+            <p className="mt-2">
+              Another admin browser currently has host control. Tournament-changing controls stay
+              disabled here until you take over from the Host Lock section.
+            </p>
+          </section>
+        ) : null}
         {children}
       </div>
     </main>

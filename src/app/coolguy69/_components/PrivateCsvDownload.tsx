@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 type PrivateCsvDownloadProps = {
   roundNumber: 1 | 2 | 3 | 4;
@@ -25,26 +25,40 @@ function downloadTextFile(filename: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
-export function PrivateCsvDownload({ roundNumber, enabled, autoDownloadKey, action }: PrivateCsvDownloadProps) {
+export function PrivateCsvDownload({
+  roundNumber,
+  enabled,
+  autoDownloadKey,
+  action,
+}: PrivateCsvDownloadProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const autoAttemptedKeyRef = useRef<string | null>(null);
 
-  const startDownload = useCallback(() => {
-    if (!enabled || isPending) {
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const result = await action(roundNumber);
-
-        downloadTextFile(result.filename, result.csv);
-        setMessage(`Downloaded ${result.filename}.`);
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Private CSV download failed.");
+  const startDownload = useCallback(
+    (onSuccess?: () => void) => {
+      if (!enabled || isPending) {
+        return;
       }
-    });
-  }, [action, enabled, isPending, roundNumber]);
+
+      startTransition(async () => {
+        try {
+          const result = await action(roundNumber);
+
+          downloadTextFile(result.filename, result.csv);
+          onSuccess?.();
+          setMessage(`Downloaded ${result.filename}.`);
+        } catch (error) {
+          setMessage(
+            error instanceof Error
+              ? `${error.message} Refresh or use the manual download button to retry.`
+              : "Private CSV download failed. Refresh or use the manual download button to retry.",
+          );
+        }
+      });
+    },
+    [action, enabled, isPending, roundNumber],
+  );
 
   useEffect(() => {
     if (!enabled || !autoDownloadKey) {
@@ -57,8 +71,12 @@ export function PrivateCsvDownload({ roundNumber, enabled, autoDownloadKey, acti
       return;
     }
 
-    window.localStorage.setItem(storageKey, "done");
-    startDownload();
+    if (autoAttemptedKeyRef.current === autoDownloadKey) {
+      return;
+    }
+
+    autoAttemptedKeyRef.current = autoDownloadKey;
+    startDownload(() => window.localStorage.setItem(storageKey, "done"));
   }, [autoDownloadKey, enabled, startDownload]);
 
   return (
@@ -66,12 +84,21 @@ export function PrivateCsvDownload({ roundNumber, enabled, autoDownloadKey, acti
       <button
         className="button-metal w-full rounded px-4 py-2 text-sm font-bold uppercase disabled:opacity-40"
         disabled={!enabled || isPending}
-        onClick={startDownload}
+        onClick={() => startDownload()}
         type="button"
       >
         Download private ballot CSV
       </button>
-      {message ? <p className="mt-2 text-xs text-metal-300">{message}</p> : null}
+      {!enabled ? (
+        <p className="mt-2 text-xs text-metal-300">
+          Available after the final two-chart reveal finishes on stage.
+        </p>
+      ) : null}
+      {message ? (
+        <p className="mt-2 text-xs text-metal-300" role="status">
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

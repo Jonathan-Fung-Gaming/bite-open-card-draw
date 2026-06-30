@@ -161,7 +161,11 @@ async function expectAdminRevealPhase(page: Page, phase: string) {
 }
 
 async function advanceRevealAndWaitForAdminPhase(page: Page, phase: string) {
-  await page.getByRole("button", { name: "Next Reveal Step" }).click();
+  await page
+    .getByRole("button", {
+      name: /Advance to Set 1 counts|Reveal Set 1 selected chart|Advance to Set 2 counts|Reveal Set 2 selected chart|Show final charts/,
+    })
+    .click();
   await expectAdminRevealPhase(page, phase);
 }
 
@@ -196,9 +200,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await page.getByRole("button", { name: "Draw Set" }).nth(0).click();
   await expect(page.getByText(/Version 1/).first()).toBeVisible();
   await expect(stagePage.getByText(/Version 1 \/ (Revealing|Pool)/)).toBeVisible({ timeout: 7000 });
-  await expect(chartsPage.getByText(/Version 1 \/ (Revealing|Pool)/)).toBeVisible({
-    timeout: 7000,
-  });
+  await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({ timeout: 7000 });
 
   const firstChartRerollForm = page
     .locator("form")
@@ -211,9 +213,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   });
   await expect(page.getByText(/Version 2/).first()).toBeVisible();
   await expect(stagePage.getByText(/Version 2 \/ (Revealing|Pool)/)).toBeVisible({ timeout: 7000 });
-  await expect(chartsPage.getByText(/Version 2 \/ (Revealing|Pool)/)).toBeVisible({
-    timeout: 7000,
-  });
+  await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({ timeout: 7000 });
 
   await page.getByRole("button", { name: "Draw Set" }).nth(1).click();
   await expect(page.getByText("ready to vote")).toBeVisible();
@@ -403,7 +403,7 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   await expect(page.getByText("results computed")).toBeVisible();
   await expectAdminRevealPhase(page, "computed");
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
-  await page.getByRole("button", { name: "Next Reveal Step" }).click();
+  await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
 
   await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute(
     "data-winner-revealed",

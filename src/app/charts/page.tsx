@@ -9,6 +9,7 @@ import {
   formatVotingTime,
   type VotingRoundSnapshot,
 } from "@/lib/vote/voting-window";
+import { shouldShowFinalPhoneResults } from "@/lib/vote/phone-view";
 import { ChartsAutoRefresh } from "./ChartsAutoRefresh";
 import { ChartsSetNavigator } from "./ChartsSetNavigator";
 
@@ -64,8 +65,9 @@ export default async function ChartsPage() {
   const nowMs = await getAuthoritativeNowMs();
   const result = adminState.resultStore.getRoundResult(roundNumber);
   const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
+  const showFinalResults = shouldShowFinalPhoneResults(snapshot.status, result?.revealPhase);
 
-  if (result?.revealPhase === "final") {
+  if (showFinalResults && result) {
     return (
       <main className="min-h-screen">
         <ChartsAutoRefresh />
