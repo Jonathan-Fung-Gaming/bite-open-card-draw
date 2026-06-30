@@ -44,7 +44,7 @@ Phone layout is different and should remain:
 [1] [2]
 [3] [4]
 [5] [6]
-   [7]
+  [7]
 ```
 
 Codex should specifically search for old/stale stage-layout language or implementation that still uses:
@@ -60,22 +60,22 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 1. Tournament structure decisions
 
-| Area | Final decision |
-|---|---|
-| Tournament format | One tournament, not separate divisions. |
-| Number of rounds | 4 rounds. |
-| Chart sets per round | Each round has 2 chart sets. |
-| Round 1 | S16 and S17. |
-| Round 2 | S18 and S19. |
-| Round 3 | S20 and S21. |
-| Round 4 | S22 and D23. |
-| Charts drawn per set | 7 charts per set. |
-| Charts selected per round | 2 charts total, 1 from each chart set. |
-| What players play | After voting, players play the 2 selected charts for that round. |
-| Final round reveal | The final stage reveal should end by showing the 2 selected charts together. |
-| Terminology | Use “chart set,” not “division,” for S16, S17, etc. |
-| Expected player load | Up to 100 eligible players may use the site at once. |
-| Project type | Hobby/volunteer website. Free-tier-conscious design is acceptable. |
+| Area                      | Final decision                                                               |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| Tournament format         | One tournament, not separate divisions.                                      |
+| Number of rounds          | 4 rounds.                                                                    |
+| Chart sets per round      | Each round has 2 chart sets.                                                 |
+| Round 1                   | S16 and S17.                                                                 |
+| Round 2                   | S18 and S19.                                                                 |
+| Round 3                   | S20 and S21.                                                                 |
+| Round 4                   | S22 and D23.                                                                 |
+| Charts drawn per set      | 7 charts per set.                                                            |
+| Charts selected per round | 2 charts total, 1 from each chart set.                                       |
+| What players play         | After voting, players play the 2 selected charts for that round.             |
+| Final round reveal        | The final stage reveal should end by showing the 2 selected charts together. |
+| Terminology               | Use “chart set,” not “division,” for S16, S17, etc.                          |
+| Expected player load      | Up to 100 eligible players may use the site at once.                         |
+| Project type              | Hobby/volunteer website. Free-tier-conscious design is acceptable.           |
 
 ## Validation checks
 
@@ -94,29 +94,29 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 2. Voting-window decisions
 
-| Area | Final decision |
-|---|---|
-| Voting window scope | One 10-minute voting window covers both chart sets in the round. |
-| Voting starts when | Voting starts only after both chart sets have been drawn. |
-| Voting page flow | Players complete Set 1, then Set 2, then review and submit. |
-| Back navigation | Players can go back and forth between Set 1 and Set 2 before submitting. |
-| Skip behavior | There should be no vague “skip” option. |
-| Required completion | Players must complete both chart sets before final submission. |
-| Bans per set | Players may ban up to 2 charts per chart set. |
-| Zero bans | Zero bans are allowed only through an explicit `No bans for this set` choice. |
-| Partial ballots | Partial round ballots are not allowed. Both sets must be completed. |
-| Submit behavior | One final Submit button submits the whole round ballot. |
-| Edit behavior | Players may edit their submitted ballot until voting closes. |
-| Save failure behavior | If a save fails, the prior server-saved ballot remains valid. |
-| Deadline authority | Server/database time is authoritative, not the phone clock. |
-| Early close | If every eligible player submits, show a 30-second final-change warning, then close automatically. |
-| Final-change warning | Players may still edit during the 30-second warning. |
-| Low turnout rule | If turnout is below 75% when the timer expires, extend by 1 minute once. |
-| Low turnout after extension | After the 1-minute extension, close regardless of turnout. |
-| Pause behavior | Host pause freezes both the timer and voting/editing. |
-| Resume behavior | Host resume continues the countdown and allows voting/editing again. |
-| Emergency reopen | Admin can reopen voting in an emergency with password confirmation and a chosen reopen duration. |
-| Zero ballots | If zero ballots happen, use a spinner among all 7 charts for each chart set separately. |
+| Area                        | Final decision                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------------------------- |
+| Voting window scope         | One 10-minute voting window covers both chart sets in the round.                                   |
+| Voting starts when          | Voting starts only after both chart sets have been drawn.                                          |
+| Voting page flow            | Players complete Set 1, then Set 2, then review and submit.                                        |
+| Back navigation             | Players can go back and forth between Set 1 and Set 2 before submitting.                           |
+| Skip behavior               | There should be no vague “skip” option.                                                            |
+| Required completion         | Players must complete both chart sets before final submission.                                     |
+| Bans per set                | Players may ban up to 2 charts per chart set.                                                      |
+| Zero bans                   | Zero bans are allowed only through an explicit `No bans for this set` choice.                      |
+| Partial ballots             | Partial round ballots are not allowed. Both sets must be completed.                                |
+| Submit behavior             | One final Submit button submits the whole round ballot.                                            |
+| Edit behavior               | Players may edit their submitted ballot until voting closes.                                       |
+| Save failure behavior       | If a save fails, the prior server-saved ballot remains valid.                                      |
+| Deadline authority          | Server/database time is authoritative, not the phone clock.                                        |
+| Early close                 | If every eligible player submits, show a 30-second final-change warning, then close automatically. |
+| Final-change warning        | Players may still edit during the 30-second warning.                                               |
+| Low turnout rule            | If turnout is below 75% when the timer expires, extend by 1 minute once.                           |
+| Low turnout after extension | After the 1-minute extension, close regardless of turnout.                                         |
+| Pause behavior              | Host pause freezes both the timer and voting/editing.                                              |
+| Resume behavior             | Host resume continues the countdown and allows voting/editing again.                               |
+| Emergency reopen            | Admin can reopen voting in an emergency with password confirmation and a chosen reopen duration.   |
+| Zero ballots                | If zero ballots happen, use a spinner among all 7 charts for each chart set separately.            |
 
 ## Validation checks
 
@@ -136,22 +136,22 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 3. Player identity decisions
 
-| Area | Final decision |
-|---|---|
-| Player identity label | The selector should say `Select your start.gg username`. |
-| Username source | Players are listed by start.gg username. |
-| Name confirmation | After selecting a name, show `Are you sure you are voting as [start.gg username]?` |
-| Credential codes | Do not use player credential codes. |
-| Badge QR login | Do not use badge-specific QR codes. |
-| General QR | The QR code points to a general room link. |
-| Player verification | Name-only selection with confirmation. |
-| Duplicate usernames | Duplicate active start.gg usernames are not allowed. |
-| Remembered identity | After the first round, the player’s selected username should be remembered on that device. |
-| Wrong-name correction | A player can change their name before their first submitted ballot; after that, admin reset is preferred. |
+| Area                   | Final decision                                                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Player identity label  | The selector should say `Select your start.gg username`.                                                          |
+| Username source        | Players are listed by start.gg username.                                                                          |
+| Name confirmation      | After selecting a name, show `Are you sure you are voting as [start.gg username]?`                                |
+| Credential codes       | Do not use player credential codes.                                                                               |
+| Badge QR login         | Do not use badge-specific QR codes.                                                                               |
+| General QR             | The QR code points to a general room link.                                                                        |
+| Player verification    | Name-only selection with confirmation.                                                                            |
+| Duplicate usernames    | Duplicate active start.gg usernames are not allowed.                                                              |
+| Remembered identity    | After the first round, the player’s selected username should be remembered on that device.                        |
+| Wrong-name correction  | A player can change their name before their first submitted ballot; after that, admin reset is preferred.         |
 | Second device behavior | If the same username opens on another phone, show a warning and allow the latest valid submitted ballot to count. |
-| Event-only identity | Identity/session only needs to last for the event. |
-| Inactive players | Inactive/eliminated players should not appear in the voting dropdown. |
-| Reactivating players | Admin must be able to reactivate/add back inactive players if they were removed by mistake. |
+| Event-only identity    | Identity/session only needs to last for the event.                                                                |
+| Inactive players       | Inactive/eliminated players should not appear in the voting dropdown.                                             |
+| Reactivating players   | Admin must be able to reactivate/add back inactive players if they were removed by mistake.                       |
 
 ## Validation checks
 
@@ -168,15 +168,15 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 4. Spectator and room-link decisions
 
-| Area | Final decision |
-|---|---|
-| QR destination | QR points to `/room`, a general room landing page. |
-| Room options | `/room` should show `I am a player voting` and `View charts only`. |
-| Spectator mode | Spectators can use `View charts only`. |
+| Area                  | Final decision                                                                                      |
+| --------------------- | --------------------------------------------------------------------------------------------------- |
+| QR destination        | QR points to `/room`, a general room landing page.                                                  |
+| Room options          | `/room` should show `I am a player voting` and `View charts only`.                                  |
+| Spectator mode        | Spectators can use `View charts only`.                                                              |
 | Spectator permissions | Spectators can see charts but cannot vote, select a username, affect turnout, or affect ban counts. |
-| View-only navigation | View-only users can move between both chart sets. |
-| No skip for voters | Voters should not have a skip step; they must complete both sets. |
-| Chart visibility | Spectators may see both chart sets once they are drawn. |
+| View-only navigation  | View-only users can move between both chart sets.                                                   |
+| No skip for voters    | Voters should not have a skip step; they must complete both sets.                                   |
+| Chart visibility      | Spectators may see both chart sets once they are drawn.                                             |
 
 ## Validation checks
 
@@ -191,19 +191,19 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 5. Roster decisions
 
-| Area | Final decision |
-|---|---|
-| Initial roster | Admin manually inputs the initial roster. |
-| Roster input method | Support copy/paste names line by line. Bulk paste/import is useful. |
-| Roster basis | Roster entries are start.gg usernames. |
-| Eliminations | Players are eliminated between rounds by marking them inactive. |
-| Deletion behavior | Do not hard-delete eliminated players; keep them inactive/eliminated. |
-| Active voting dropdown | Only active eligible players appear in the voting dropdown. |
-| Admin roster view | Admin can still see inactive/eliminated players. |
-| Restore mistake | Admin can add back/reactivate an inactive player if there was an error. |
-| Active-round eligibility | When voting opens, snapshot the active eligible roster for that round. |
-| Routine roster changes | Routine roster changes after voting opens should apply to future rounds, not silently change the active round. |
-| Emergency current-round add | Admin can add a player back to the current round eligibility with password confirmation. |
+| Area                        | Final decision                                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Initial roster              | Admin manually inputs the initial roster.                                                                      |
+| Roster input method         | Support copy/paste names line by line. Bulk paste/import is useful.                                            |
+| Roster basis                | Roster entries are start.gg usernames.                                                                         |
+| Eliminations                | Players are eliminated between rounds by marking them inactive.                                                |
+| Deletion behavior           | Do not hard-delete eliminated players; keep them inactive/eliminated.                                          |
+| Active voting dropdown      | Only active eligible players appear in the voting dropdown.                                                    |
+| Admin roster view           | Admin can still see inactive/eliminated players.                                                               |
+| Restore mistake             | Admin can add back/reactivate an inactive player if there was an error.                                        |
+| Active-round eligibility    | When voting opens, snapshot the active eligible roster for that round.                                         |
+| Routine roster changes      | Routine roster changes after voting opens should apply to future rounds, not silently change the active round. |
+| Emergency current-round add | Admin can add a player back to the current round eligibility with password confirmation.                       |
 
 ## Validation checks
 
@@ -218,23 +218,23 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 6. Chart-pool and data decisions
 
-| Area | Final decision |
-|---|---|
-| Chart source | Use the uploaded chart CSV. |
-| CSV columns | `name`, `name_kr`, `artist`, `label`, `type`, `level`, `bg_img`. |
-| Required pools | S16, S17, S18, S19, S20, S21, S22, D23. |
-| Pool size | Uploaded CSV has enough charts for all required pools. |
-| Eligible by default | Matching charts are eligible by default. |
-| Pre-event exclusions | Admin can pre-exclude charts before the event. |
-| Exclusion reason | Chart exclusions should store a reason. |
-| Chart removal | Use versioned exclusion/soft removal, not destructive deletion. |
-| Pool snapshot | The eligible pool should be snapshotted before a draw. |
-| Chart image source | Use `bg_img` from the CSV as the source image URL. |
-| Image hosting | Cache/download chart images locally before the event. |
-| Missing images | Missing art should use a fallback card, not break the draw. |
-| Tournament logo | Use the uploaded tournament logo in the app. |
-| Song identity | Normalize song identity using name/artist. |
-| Chart identity | Normalize chart identity using song + artist + type + level. |
+| Area                 | Final decision                                                   |
+| -------------------- | ---------------------------------------------------------------- |
+| Chart source         | Use the uploaded chart CSV.                                      |
+| CSV columns          | `name`, `name_kr`, `artist`, `label`, `type`, `level`, `bg_img`. |
+| Required pools       | S16, S17, S18, S19, S20, S21, S22, D23.                          |
+| Pool size            | Uploaded CSV has enough charts for all required pools.           |
+| Eligible by default  | Matching charts are eligible by default.                         |
+| Pre-event exclusions | Admin can pre-exclude charts before the event.                   |
+| Exclusion reason     | Chart exclusions should store a reason.                          |
+| Chart removal        | Use versioned exclusion/soft removal, not destructive deletion.  |
+| Pool snapshot        | The eligible pool should be snapshotted before a draw.           |
+| Chart image source   | Use `bg_img` from the CSV as the source image URL.               |
+| Image hosting        | Cache/download chart images locally before the event.            |
+| Missing images       | Missing art should use a fallback card, not break the draw.      |
+| Tournament logo      | Use the uploaded tournament logo in the app.                     |
+| Song identity        | Normalize song identity using name/artist.                       |
+| Chart identity       | Normalize chart identity using song + artist + type + level.     |
 
 ## Validation checks
 
@@ -250,16 +250,16 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 7. Repeat and eligibility decisions
 
-| Area | Final decision |
-|---|---|
-| Future-round repeat rule | Selected songs are blocked from future rounds. |
+| Area                         | Final decision                                                                                |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| Future-round repeat rule     | Selected songs are blocked from future rounds.                                                |
 | Drawn-but-not-selected songs | Drawn songs that are not selected may appear in a later round unless blocked by another rule. |
-| Same-round duplicate song | Do not draw the same song in both chart sets of the same round. |
-| Same chart duplicate | A set cannot draw the same chart twice. |
-| Excluded charts | Excluded charts cannot be drawn. |
-| Selected prior songs | Songs selected in prior rounds cannot be drawn later. |
-| One invalid chart | If one drawn chart is invalid, replace only that invalid chart where possible. |
-| Reroll history | Rerolls should preserve prior draw history. |
+| Same-round duplicate song    | Do not draw the same song in both chart sets of the same round.                               |
+| Same chart duplicate         | A set cannot draw the same chart twice.                                                       |
+| Excluded charts              | Excluded charts cannot be drawn.                                                              |
+| Selected prior songs         | Songs selected in prior rounds cannot be drawn later.                                         |
+| One invalid chart            | If one drawn chart is invalid, replace only that invalid chart where possible.                |
+| Reroll history               | Rerolls should preserve prior draw history.                                                   |
 
 ## Validation checks
 
@@ -273,21 +273,21 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 8. Draw decisions
 
-| Area | Final decision |
-|---|---|
-| Draw authority | Backend/server decides the draw. |
-| Browser randomness | Do not use browser randomness for tournament decisions. |
-| Draw animation | Animation only reveals an already-decided draw. |
-| Charts per set | Exactly 7 unique charts per set. |
-| Draw order | Store draw order for reveal animation. |
-| Set reveal order | Reveal all 7 charts from Set 1, then all 7 charts from Set 2. |
-| Voting precondition | Voting cannot open until both sets have exactly 7 drawn charts. |
-| Reroll allowed | Rerolling is allowed. |
-| Reroll confirmation | Rerolling requires an “Are you sure?”-style dangerous action prompt. |
-| Reroll password | Rerolling requires admin password re-entry. |
-| Reroll types | Support rerolling one chart, one set, or the full round. |
-| Post-vote reroll | Rerolling after voting opens is dangerous and should pause/clear/invalidate affected voting state with strong warnings. |
-| Audit | Draws and rerolls should be auditable. |
+| Area                | Final decision                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Draw authority      | Backend/server decides the draw.                                                                                        |
+| Browser randomness  | Do not use browser randomness for tournament decisions.                                                                 |
+| Draw animation      | Animation only reveals an already-decided draw.                                                                         |
+| Charts per set      | Exactly 7 unique charts per set.                                                                                        |
+| Draw order          | Store draw order for reveal animation.                                                                                  |
+| Set reveal order    | Reveal all 7 charts from Set 1, then all 7 charts from Set 2.                                                           |
+| Voting precondition | Voting cannot open until both sets have exactly 7 drawn charts.                                                         |
+| Reroll allowed      | Rerolling is allowed.                                                                                                   |
+| Reroll confirmation | Rerolling requires an “Are you sure?”-style dangerous action prompt.                                                    |
+| Reroll password     | Rerolling requires admin password re-entry.                                                                             |
+| Reroll types        | Support rerolling one chart, one set, or the full round.                                                                |
+| Post-vote reroll    | Rerolling after voting opens is dangerous and should pause/clear/invalidate affected voting state with strong warnings. |
+| Audit               | Draws and rerolls should be auditable.                                                                                  |
 
 ## Validation checks
 
@@ -301,20 +301,20 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 # 9. Stage-display decisions
 
-| Area | Final decision |
-|---|---|
-| Stage route | Use a separate stage route, such as `/stage`. |
-| Stage purpose | Projector/stage visualizer. |
-| Stage includes | Logo, round, set labels, chart cards, voting status, timer, QR code. |
-| Stage chart preview | **Two rows of 7 charts.** |
-| Stage top row | First chart set, e.g. S16. |
-| Stage bottom row | Second chart set, e.g. S17. |
-| Stage preview correction | Do **not** use compact 4+3 layout for the stage preview after both sets are drawn. |
-| Stage reveal correction | Prefer revealing Set 1 into the top 7-card row and Set 2 into the bottom 7-card row. |
-| Stage labels | Each row should clearly show its chart set label. |
-| Final stage screen | Final screen shows the 2 selected charts together. |
-| Stage refresh | Refreshing the stage should reconstruct the current state from the backend. |
-| Stage standby | Failure/reconnect state should be themed rather than blank. |
+| Area                     | Final decision                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| Stage route              | Use a separate stage route, such as `/stage`.                                        |
+| Stage purpose            | Projector/stage visualizer.                                                          |
+| Stage includes           | Logo, round, set labels, chart cards, voting status, timer, QR code.                 |
+| Stage chart preview      | **Two rows of 7 charts.**                                                            |
+| Stage top row            | First chart set, e.g. S16.                                                           |
+| Stage bottom row         | Second chart set, e.g. S17.                                                          |
+| Stage preview correction | Do **not** use compact 4+3 layout for the stage preview after both sets are drawn.   |
+| Stage reveal correction  | Prefer revealing Set 1 into the top 7-card row and Set 2 into the bottom 7-card row. |
+| Stage labels             | Each row should clearly show its chart set label.                                    |
+| Final stage screen       | Final screen shows the 2 selected charts together.                                   |
+| Stage refresh            | Refreshing the stage should reconstruct the current state from the backend.          |
+| Stage standby            | Failure/reconnect state should be themed rather than blank.                          |
 
 ## Required correction text for Codex
 
@@ -356,17 +356,17 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 # 10. Phone-layout decisions
 
-| Area | Final decision |
-|---|---|
-| Phone chart layout | Two columns. |
-| Phone 7th card | The 7th card should be centered in the last row. |
-| Phone set flow | Step 1: first chart set; Step 2: second chart set; Step 3: review/submit. |
-| Phone navigation | Players can go next/back between sets before final submission. |
-| Phone saved ballot | Show saved choices and timestamp after submission. |
-| Phone editing | Show `Change vote` until voting closes. |
-| Phone after close | Before stage reveal finishes, show that results are being revealed on stage. |
-| Phone after reveal | Show the two selected charts first, then expandable full ban counts. |
-| Phone result spoiler | Do not spoil full results on phones before the stage reveal finishes. |
+| Area                 | Final decision                                                               |
+| -------------------- | ---------------------------------------------------------------------------- |
+| Phone chart layout   | Two columns.                                                                 |
+| Phone 7th card       | The 7th card should be centered in the last row.                             |
+| Phone set flow       | Step 1: first chart set; Step 2: second chart set; Step 3: review/submit.    |
+| Phone navigation     | Players can go next/back between sets before final submission.               |
+| Phone saved ballot   | Show saved choices and timestamp after submission.                           |
+| Phone editing        | Show `Change vote` until voting closes.                                      |
+| Phone after close    | Before stage reveal finishes, show that results are being revealed on stage. |
+| Phone after reveal   | Show the two selected charts first, then expandable full ban counts.         |
+| Phone result spoiler | Do not spoil full results on phones before the stage reveal finishes.        |
 
 ## Validation checks
 
@@ -379,21 +379,21 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 # 11. Visual-theme decisions
 
-| Area | Final decision |
-|---|---|
-| Theme direction | Doom-inspired original theme, not direct DOOM asset usage. |
-| Primary visual concept | Infernal industrial terminal / rune-metal style. |
-| Colors | Black/dark metal with orange and red glow. |
-| Violence level | Stylized heat, chains, sparks, metal; no graphic gore. |
-| Card back | Original mechanical plate with abstract/rune glyph. |
-| Reveal style | Dramatic one-at-a-time chart reveal. |
-| Reveal speed | Configurable, default around 1.5–2 seconds per chart. |
-| Official assets | Do not use official DOOM assets unless permission exists. |
-| Tournament logo | Include uploaded tournament logo. |
-| Reduced-motion UI | Do not include a reduced-motion option in the UI. |
-| Motion caution | Still avoid extreme strobing or unreadable flashing. |
-| Audio | Use original/licensed audio cues only, with mute control if audio is included. |
-| Winner highlight | Highlight selected chart dramatically, such as pale energy, chain break, or enlarged card. |
+| Area                   | Final decision                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| Theme direction        | Doom-inspired original theme, not direct DOOM asset usage.                                 |
+| Primary visual concept | Infernal industrial terminal / rune-metal style.                                           |
+| Colors                 | Black/dark metal with orange and red glow.                                                 |
+| Violence level         | Stylized heat, chains, sparks, metal; no graphic gore.                                     |
+| Card back              | Original mechanical plate with abstract/rune glyph.                                        |
+| Reveal style           | Dramatic one-at-a-time chart reveal.                                                       |
+| Reveal speed           | Configurable, default around 1.5–2 seconds per chart.                                      |
+| Official assets        | Do not use official DOOM assets unless permission exists.                                  |
+| Tournament logo        | Include uploaded tournament logo.                                                          |
+| Reduced-motion UI      | Do not include a reduced-motion option in the UI.                                          |
+| Motion caution         | Still avoid extreme strobing or unreadable flashing.                                       |
+| Audio                  | Use original/licensed audio cues only, with mute control if audio is included.             |
+| Winner highlight       | Highlight selected chart dramatically, such as pale energy, chain break, or enlarged card. |
 
 ## Validation checks
 
@@ -406,16 +406,16 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 # 12. QR and timer decisions
 
-| Area | Final decision |
-|---|---|
-| QR target | QR points to the general room link, not a player-specific link. |
-| QR route | `/room`. |
-| QR placement | Above the cards and to the right of the large timer. |
-| QR label | Make clear it is for voting or viewing charts. |
-| QR fallback | Show a short URL beneath the QR. |
-| Timer style | Large, prominent timer with themed frame. |
-| Timer placement | Timer should be large and visually dominant during voting. |
-| Timer authority | Timer display is visual; backend deadline is authoritative. |
+| Area            | Final decision                                                  |
+| --------------- | --------------------------------------------------------------- |
+| QR target       | QR points to the general room link, not a player-specific link. |
+| QR route        | `/room`.                                                        |
+| QR placement    | Above the cards and to the right of the large timer.            |
+| QR label        | Make clear it is for voting or viewing charts.                  |
+| QR fallback     | Show a short URL beneath the QR.                                |
+| Timer style     | Large, prominent timer with themed frame.                       |
+| Timer placement | Timer should be large and visually dominant during voting.      |
+| Timer authority | Timer display is visual; backend deadline is authoritative.     |
 
 ## Validation checks
 
@@ -428,21 +428,21 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 # 13. Result-computation decisions
 
-| Area | Final decision |
-|---|---|
-| Result metric | Ban counts only. |
-| Percentages | Do not show percentages. |
-| Result count basis | Count submitted bans per chart. |
-| Zero-ban charts | Include charts with zero bans in results. |
+| Area                    | Final decision                                                              |
+| ----------------------- | --------------------------------------------------------------------------- |
+| Result metric           | Ban counts only.                                                            |
+| Percentages             | Do not show percentages.                                                    |
+| Result count basis      | Count submitted bans per chart.                                             |
+| Zero-ban charts         | Include charts with zero bans in results.                                   |
 | Public pre-result stats | Show ballots submitted and total ban selections cast, but not chart counts. |
-| Reveal order | Reveal from least banned to most banned. |
-| Winning criterion | Least-banned chart wins the set. |
-| Ties above minimum | List sequentially/alphabetically. |
-| Winning tie | If least-banned charts tie, use tiebreak spinner. |
-| Results per set | Resolve one chart set, then the other. |
-| Final round result | Show both selected charts together after both sets are resolved. |
-| Phone result display | Selected charts first, expandable full counts after stage reveal. |
-| Public results route | Results may be visible after stage reveal. |
+| Reveal order            | Reveal from least banned to most banned.                                    |
+| Winning criterion       | Least-banned chart wins the set.                                            |
+| Ties above minimum      | List sequentially/alphabetically.                                           |
+| Winning tie             | If least-banned charts tie, use tiebreak spinner.                           |
+| Results per set         | Resolve one chart set, then the other.                                      |
+| Final round result      | Show both selected charts together after both sets are resolved.            |
+| Phone result display    | Selected charts first, expandable full counts after stage reveal.           |
+| Public results route    | Results may be visible after stage reveal.                                  |
 
 ## Validation checks
 
@@ -457,20 +457,20 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 # 14. Tiebreak decisions
 
-| Area | Final decision |
-|---|---|
-| Tiebreak trigger | Only ties for the least-banned chart. |
-| Tiebreak per set | Tiebreaks run separately for each chart set. |
-| Tiebreak authority | Backend decides winner before animation. |
-| Spinner role | Spinner only reveals the pre-decided winner. |
-| Spinner duration | 5 seconds. |
-| Spinner style | Circular rune selector. |
-| Wheel slots | 12-slot rune-style wheel. |
-| 2-way tie | Alternate the two chart names around the 12 slots. |
-| 3-way tie | Cycle the three chart names around the 12 slots. |
-| 4-way tie | Repeat the four chart names around the 12 slots. |
-| 5+ tie | Extremely unlikely; do not build special dramatic handling. Use a simple safe fallback if it occurs. |
-| Non-minimum tie | No spinner; list alphabetically. |
+| Area               | Final decision                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------- |
+| Tiebreak trigger   | Only ties for the least-banned chart.                                                                |
+| Tiebreak per set   | Tiebreaks run separately for each chart set.                                                         |
+| Tiebreak authority | Backend decides winner before animation.                                                             |
+| Spinner role       | Spinner only reveals the pre-decided winner.                                                         |
+| Spinner duration   | 5 seconds.                                                                                           |
+| Spinner style      | Circular rune selector.                                                                              |
+| Wheel slots        | 12-slot rune-style wheel.                                                                            |
+| 2-way tie          | Alternate the two chart names around the 12 slots.                                                   |
+| 3-way tie          | Cycle the three chart names around the 12 slots.                                                     |
+| 4-way tie          | Repeat the four chart names around the 12 slots.                                                     |
+| 5+ tie             | Extremely unlikely; do not build special dramatic handling. Use a simple safe fallback if it occurs. |
+| Non-minimum tie    | No spinner; list alphabetically.                                                                     |
 
 ## Validation checks
 
@@ -485,22 +485,22 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 # 15. Admin-route decisions
 
-| Area | Final decision |
-|---|---|
-| Admin route | `/coolguy69`. |
-| Route configurability | Hard-code `/coolguy69`. |
-| Admin access | Shared password only. |
-| Admin roles | No role permissioning; one admin role. |
-| MFA | Not required. |
-| Hidden route | Secret/unlinked route plus password. |
-| Admin session | Use an admin session after password entry. |
-| Password storage | Store password hash, not plaintext password. |
-| Admin inactivity | Include inactivity timer. |
-| Inactivity duration | 30 minutes is the recommended default. |
-| Host lock | Include host lock. |
-| Host takeover | Allow takeover if heartbeat expires or with warning. |
-| Multiple admin screens | Only active host can operate controls; others are read-only/standby. |
-| Active host determination | `Take Host Control` button plus heartbeat. |
+| Area                      | Final decision                                                       |
+| ------------------------- | -------------------------------------------------------------------- |
+| Admin route               | `/coolguy69`.                                                        |
+| Route configurability     | Hard-code `/coolguy69`.                                              |
+| Admin access              | Shared password only.                                                |
+| Admin roles               | No role permissioning; one admin role.                               |
+| MFA                       | Not required.                                                        |
+| Hidden route              | Secret/unlinked route plus password.                                 |
+| Admin session             | Use an admin session after password entry.                           |
+| Password storage          | Store password hash, not plaintext password.                         |
+| Admin inactivity          | Include inactivity timer.                                            |
+| Inactivity duration       | 30 minutes is the recommended default.                               |
+| Host lock                 | Include host lock.                                                   |
+| Host takeover             | Allow takeover if heartbeat expires or with warning.                 |
+| Multiple admin screens    | Only active host can operate controls; others are read-only/standby. |
+| Active host determination | `Take Host Control` button plus heartbeat.                           |
 
 ## Validation checks
 
@@ -515,22 +515,22 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 # 16. Dangerous admin-action decisions
 
-| Area | Final decision |
-|---|---|
-| Dangerous actions | Actions that can change tournament state/result require password confirmation. |
-| Password prompt | Prompt must summarize exactly what is about to happen. |
-| Prompt content | Include action and consequence. |
-| Second admin | Not required. |
-| Typed reason | Use reasons for audit-sensitive actions where helpful. |
-| Reroll | Dangerous. |
-| Replace chart | Dangerous. |
-| Reopen voting | Dangerous. |
-| Manual ballot | Dangerous. |
-| Override existing ballot | Dangerous. |
-| Add inactive player to current round | Dangerous. |
-| Reset round | Dangerous. |
-| Override selected result | Dangerous/emergency only. |
-| Live counts | Sensitive but not destructive; warning button only, no password required. |
+| Area                                 | Final decision                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------ |
+| Dangerous actions                    | Actions that can change tournament state/result require password confirmation. |
+| Password prompt                      | Prompt must summarize exactly what is about to happen.                         |
+| Prompt content                       | Include action and consequence.                                                |
+| Second admin                         | Not required.                                                                  |
+| Typed reason                         | Use reasons for audit-sensitive actions where helpful.                         |
+| Reroll                               | Dangerous.                                                                     |
+| Replace chart                        | Dangerous.                                                                     |
+| Reopen voting                        | Dangerous.                                                                     |
+| Manual ballot                        | Dangerous.                                                                     |
+| Override existing ballot             | Dangerous.                                                                     |
+| Add inactive player to current round | Dangerous.                                                                     |
+| Reset round                          | Dangerous.                                                                     |
+| Override selected result             | Dangerous/emergency only.                                                      |
+| Live counts                          | Sensitive but not destructive; warning button only, no password required.      |
 
 ## Validation checks
 
@@ -551,15 +551,15 @@ Enter the admin password to continue.
 
 # 17. Admin live-count decisions
 
-| Area | Final decision |
-|---|---|
-| Public live chart counts | Not visible. |
-| Admin live chart counts | Available through `/coolguy69`. |
-| Live-count visibility | Hidden by default behind a `Show live counts` warning button. |
-| Extra password for live counts | No extra password required. |
-| Warning purpose | Prevent accidental projection or stream exposure. |
-| Turnout visible publicly | Ballots submitted and total ban selections cast may be shown. |
-| Vote choices visible to admin | Admin can inspect as needed for manual/audit functions, but normal public screens do not show choices. |
+| Area                           | Final decision                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Public live chart counts       | Not visible.                                                                                           |
+| Admin live chart counts        | Available through `/coolguy69`.                                                                        |
+| Live-count visibility          | Hidden by default behind a `Show live counts` warning button.                                          |
+| Extra password for live counts | No extra password required.                                                                            |
+| Warning purpose                | Prevent accidental projection or stream exposure.                                                      |
+| Turnout visible publicly       | Ballots submitted and total ban selections cast may be shown.                                          |
+| Vote choices visible to admin  | Admin can inspect as needed for manual/audit functions, but normal public screens do not show choices. |
 
 ## Validation checks
 
@@ -572,17 +572,17 @@ Enter the admin password to continue.
 
 # 18. Manual ballot and override decisions
 
-| Area | Final decision |
-|---|---|
-| Manual ballot support | Admin can manually submit or override a ballot if something breaks. |
-| Manual ballot timing | Allowed while voting is open. |
-| Post-close manual ballot | Allowed after close but before results reveal. |
-| After-reveal override | Not a normal action; should be treated as a correction workflow. |
-| Existing ballot check | UI must automatically check if the player already has a ballot. |
-| Existing ballot warning | If one exists, ask for confirmation before replacing. |
-| Manual ballot fields | Player, Set 1 choices, Set 2 choices, reason, replace-existing confirmation. |
-| Manual override export | Manual overrides must be marked in the private CSV. |
-| Password | Manual ballot/override requires admin password. |
+| Area                     | Final decision                                                               |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| Manual ballot support    | Admin can manually submit or override a ballot if something breaks.          |
+| Manual ballot timing     | Allowed while voting is open.                                                |
+| Post-close manual ballot | Allowed after close but before results reveal.                               |
+| After-reveal override    | Not a normal action; should be treated as a correction workflow.             |
+| Existing ballot check    | UI must automatically check if the player already has a ballot.              |
+| Existing ballot warning  | If one exists, ask for confirmation before replacing.                        |
+| Manual ballot fields     | Player, Set 1 choices, Set 2 choices, reason, replace-existing confirmation. |
+| Manual override export   | Manual overrides must be marked in the private CSV.                          |
+| Password                 | Manual ballot/override requires admin password.                              |
 
 ## Validation checks
 
@@ -596,18 +596,18 @@ Enter the admin password to continue.
 
 # 19. Export decisions
 
-| Area | Final decision |
-|---|---|
-| Export type | Admin/private ballot export. |
-| Public export | Not needed. Not intended to be publicly shareable. |
-| Export format | CSV. |
-| Export timing | After each round. |
-| Saved location | Saved to the host computer through browser download. |
-| Auto-download | Auto-download once after final reveal. |
-| Manual download | Also include manual re-download button. |
-| Export contents | Player-level ballot data, selected charts, timestamps, manual override markers. |
-| Export privacy | Treat as private/admin-only. |
-| Rerolls in export | Rerolls should be stored/auditable and included or traceable in admin data. |
+| Area              | Final decision                                                                  |
+| ----------------- | ------------------------------------------------------------------------------- |
+| Export type       | Admin/private ballot export.                                                    |
+| Public export     | Not needed. Not intended to be publicly shareable.                              |
+| Export format     | CSV.                                                                            |
+| Export timing     | After each round.                                                               |
+| Saved location    | Saved to the host computer through browser download.                            |
+| Auto-download     | Auto-download once after final reveal.                                          |
+| Manual download   | Also include manual re-download button.                                         |
+| Export contents   | Player-level ballot data, selected charts, timestamps, manual override markers. |
+| Export privacy    | Treat as private/admin-only.                                                    |
+| Rerolls in export | Rerolls should be stored/auditable and included or traceable in admin data.     |
 
 ## Suggested private CSV content
 
@@ -646,13 +646,13 @@ set_2_tiebreak_used
 
 # 20. Routes and page-separation decisions
 
-| Route | Final purpose |
-|---|---|
-| `/stage` | Public/projector stage display. |
-| `/room` | General QR landing page. |
-| `/vote` | Player voting flow. |
-| `/charts` | View-only chart display. |
-| `/results` | Post-reveal results page. |
+| Route        | Final purpose                          |
+| ------------ | -------------------------------------- |
+| `/stage`     | Public/projector stage display.        |
+| `/room`      | General QR landing page.               |
+| `/vote`      | Player voting flow.                    |
+| `/charts`    | View-only chart display.               |
+| `/results`   | Post-reveal results page.              |
 | `/coolguy69` | Password-protected admin/host console. |
 
 ## Validation checks
@@ -666,26 +666,26 @@ set_2_tiebreak_used
 
 # 21. Technical architecture decisions
 
-| Area | Final decision |
-|---|---|
-| Hosting | Vercel. |
-| Database | Supabase Postgres. |
-| Framework | Next.js with TypeScript. |
-| Mutations | Server-side API routes/server actions for tournament-changing operations. |
-| Authoritative state | Database/server state, not browser state. |
-| Service key | Never expose service-role key to browser code. |
-| Draw randomness | Server-side randomness only. |
-| Tiebreak randomness | Server-side randomness only. |
-| Realtime usage | Stage/admin can use Realtime; player phones should use normal requests/light polling. |
-| Free-tier-conscious | Avoid unnecessary always-on phone Realtime connections. |
-| Deadline source | Server/database time. |
-| Offline ballots | Do not accept offline/local queued ballots. |
-| Failure fallback | Pause and fix the website. |
-| Browser support | Recent iOS Safari, Android Chrome, and stage Chrome. |
-| Rate limiting | Use basic rate-limiting for sensitive actions where practical. |
-| Monitoring | Basic health/status for admin is useful. |
-| Image storage | Locally cached chart images or controlled storage. |
-| Backup/export | Private CSV exports after rounds; source CSV and logo archived. |
+| Area                | Final decision                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| Hosting             | Vercel.                                                                               |
+| Database            | Supabase Postgres.                                                                    |
+| Framework           | Next.js with TypeScript.                                                              |
+| Mutations           | Server-side API routes/server actions for tournament-changing operations.             |
+| Authoritative state | Database/server state, not browser state.                                             |
+| Service key         | Never expose service-role key to browser code.                                        |
+| Draw randomness     | Server-side randomness only.                                                          |
+| Tiebreak randomness | Server-side randomness only.                                                          |
+| Realtime usage      | Stage/admin can use Realtime; player phones should use normal requests/light polling. |
+| Free-tier-conscious | Avoid unnecessary always-on phone Realtime connections.                               |
+| Deadline source     | Server/database time.                                                                 |
+| Offline ballots     | Do not accept offline/local queued ballots.                                           |
+| Failure fallback    | Pause and fix the website.                                                            |
+| Browser support     | Recent iOS Safari, Android Chrome, and stage Chrome.                                  |
+| Rate limiting       | Use basic rate-limiting for sensitive actions where practical.                        |
+| Monitoring          | Basic health/status for admin is useful.                                              |
+| Image storage       | Locally cached chart images or controlled storage.                                    |
+| Backup/export       | Private CSV exports after rounds; source CSV and logo archived.                       |
 
 ## Validation checks
 
@@ -700,17 +700,17 @@ set_2_tiebreak_used
 
 # 22. Environment and deployment decisions
 
-| Area | Final decision |
-|---|---|
-| Public availability | Site can be technically public but not announced before the event. |
-| Full-site password gate | Not required. |
-| Admin route privacy | `/coolguy69` is hidden/unlinked and password-protected. |
-| Hosting plan | Free/hobby-friendly setup is acceptable for this volunteer use case. |
-| Development environment | Local development is still needed. |
-| Staging environment | Not required as a separate public staging site. |
-| Production site | Main deployed site for event use. |
-| Venue fallback | If the website fails, pause and fix it. |
-| Load test | Test with at least 100 eligible players and some spectators/view-only users. |
+| Area                    | Final decision                                                               |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| Public availability     | Site can be technically public but not announced before the event.           |
+| Full-site password gate | Not required.                                                                |
+| Admin route privacy     | `/coolguy69` is hidden/unlinked and password-protected.                      |
+| Hosting plan            | Free/hobby-friendly setup is acceptable for this volunteer use case.         |
+| Development environment | Local development is still needed.                                           |
+| Staging environment     | Not required as a separate public staging site.                              |
+| Production site         | Main deployed site for event use.                                            |
+| Venue fallback          | If the website fails, pause and fix it.                                      |
+| Load test               | Test with at least 100 eligible players and some spectators/view-only users. |
 
 ## Validation checks
 
@@ -723,18 +723,18 @@ set_2_tiebreak_used
 
 # 23. Codex/process decisions
 
-| Area | Final decision |
-|---|---|
-| Codex execution | Codex should receive the execution plan and execute one phase at a time automatically. |
-| Phase 0 | Phase 0 manual setup guide exists separately. |
-| Execution plan | Phase 1 onward plan excludes Phase 0 manual setup. |
-| GitHub Actions | Do not create GitHub Actions workflow until the final phase. |
-| CI workflow timing | `.github/workflows/*` should be deferred to Phase 12. |
-| Subagents | Use subagents/parallel Codex threads for implementation, testing, rules review, security review, and UI review. |
-| Acceptance gates | Each phase should pass its acceptance criteria before moving forward. |
-| Project instructions | Use `AGENTS.md` as the Codex source-of-truth instruction file. |
-| Source docs | Product spec and implementation plan should be kept in `/docs`. |
-| Secrets | `.env.example` only in repo; real secrets stay out of Git. |
+| Area                 | Final decision                                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Codex execution      | Codex should receive the execution plan and execute one phase at a time automatically.                          |
+| Phase 0              | Phase 0 manual setup guide exists separately.                                                                   |
+| Execution plan       | Phase 1 onward plan excludes Phase 0 manual setup.                                                              |
+| GitHub Actions       | Do not create GitHub Actions workflow until the final phase.                                                    |
+| CI workflow timing   | `.github/workflows/*` should be deferred to Phase 12.                                                           |
+| Subagents            | Use subagents/parallel Codex threads for implementation, testing, rules review, security review, and UI review. |
+| Acceptance gates     | Each phase should pass its acceptance criteria before moving forward.                                           |
+| Project instructions | Use `AGENTS.md` as the Codex source-of-truth instruction file.                                                  |
+| Source docs          | Product spec and implementation plan should be kept in `/docs`.                                                 |
+| Secrets              | `.env.example` only in repo; real secrets stay out of Git.                                                      |
 
 ## Validation checks
 
@@ -763,15 +763,15 @@ When Codex validates the repo, it should produce a report like this:
 
 ## Highest-priority checks
 
-| Check | Status | Notes |
-|---|---|---|
-| Stage preview is two rows of 7 charts | PASS/FAIL | ... |
-| QR points to /room | PASS/FAIL | ... |
-| One 10-minute voting window per round | PASS/FAIL | ... |
-| Players must complete both sets | PASS/FAIL | ... |
-| No percentages in results | PASS/FAIL | ... |
-| Server decides draw/tiebreak | PASS/FAIL | ... |
-| GitHub Actions deferred to final phase | PASS/FAIL | ... |
+| Check                                  | Status    | Notes |
+| -------------------------------------- | --------- | ----- |
+| Stage preview is two rows of 7 charts  | PASS/FAIL | ...   |
+| QR points to /room                     | PASS/FAIL | ...   |
+| One 10-minute voting window per round  | PASS/FAIL | ...   |
+| Players must complete both sets        | PASS/FAIL | ...   |
+| No percentages in results              | PASS/FAIL | ...   |
+| Server decides draw/tiebreak           | PASS/FAIL | ...   |
+| GitHub Actions deferred to final phase | PASS/FAIL | ...   |
 
 ## Detailed findings
 

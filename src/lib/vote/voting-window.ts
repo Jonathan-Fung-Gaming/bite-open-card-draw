@@ -94,10 +94,15 @@ function dedupePlayers(players: EligiblePlayerSnapshot[]) {
     });
   }
 
-  return [...byId.values()].sort((left, right) => left.startggUsername.localeCompare(right.startggUsername));
+  return [...byId.values()].sort((left, right) =>
+    left.startggUsername.localeCompare(right.startggUsername),
+  );
 }
 
-function countSubmittedEligible(eligiblePlayers: EligiblePlayerSnapshot[], submittedPlayerIds: string[]) {
+function countSubmittedEligible(
+  eligiblePlayers: EligiblePlayerSnapshot[],
+  submittedPlayerIds: string[],
+) {
   const eligibleIds = new Set(eligiblePlayers.map((player) => player.id));
   const submittedIds = new Set(submittedPlayerIds);
 
@@ -124,7 +129,7 @@ export function formatVotingTime(remainingMs: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
 
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
 
 export function formatVotingStatusLabel(status: VotingRoundStatus) {
@@ -157,7 +162,9 @@ export function formatVotingStatusLabel(status: VotingRoundStatus) {
 }
 
 export function isPlayerSubmissionOpen(status: VotingRoundStatus) {
-  return status === "voting_open" || status === "final_30_seconds" || status === "extension_1_minute";
+  return (
+    status === "voting_open" || status === "final_30_seconds" || status === "extension_1_minute"
+  );
 }
 
 export function isManualBallotAllowed(status: VotingRoundStatus) {
@@ -244,7 +251,11 @@ export class VotingWindowStore {
   resumeVoting(roundNumber: 1 | 2 | 3 | 4, nowMs = this.clock()) {
     const record = this.requireWindow(roundNumber);
 
-    if (record.status !== "voting_paused" || !record.pausedFromStatus || record.remainingMsWhenPaused === null) {
+    if (
+      record.status !== "voting_paused" ||
+      !record.pausedFromStatus ||
+      record.remainingMsWhenPaused === null
+    ) {
       throw new Error("Voting is not paused.");
     }
 
@@ -293,11 +304,7 @@ export class VotingWindowStore {
     return record;
   }
 
-  reopenVoting(input: {
-    roundNumber: 1 | 2 | 3 | 4;
-    durationMinutes: number;
-    nowMs?: number;
-  }) {
+  reopenVoting(input: { roundNumber: 1 | 2 | 3 | 4; durationMinutes: number; nowMs?: number }) {
     const record = this.requireWindow(input.roundNumber);
 
     if (record.status !== "voting_closed" && record.status !== "results_computed") {
@@ -357,10 +364,7 @@ export class VotingWindowStore {
       return null;
     }
 
-    if (
-      record.status === "results_revealed" ||
-      record.status === "round_complete"
-    ) {
+    if (record.status === "results_revealed" || record.status === "round_complete") {
       throw new Error("Current-round eligibility cannot change after results reveal.");
     }
 
@@ -372,7 +376,10 @@ export class VotingWindowStore {
     return record;
   }
 
-  setResultsPhase(roundNumber: 1 | 2 | 3 | 4, status: Extract<VotingRoundStatus, `results_${string}`>) {
+  setResultsPhase(
+    roundNumber: 1 | 2 | 3 | 4,
+    status: Extract<VotingRoundStatus, `results_${string}`>,
+  ) {
     const record = this.requireWindow(roundNumber);
 
     if (record.status !== "voting_closed" && !record.status.startsWith("results_")) {
@@ -446,7 +453,12 @@ export class VotingWindowStore {
     const submittedCount = countSubmittedEligible(record.eligiblePlayers, submittedPlayerIds);
     let closesAtMs = parseIso(record.closesAt) ?? nowMs;
 
-    if (record.status === "voting_open" && nowMs < closesAtMs && eligibleCount > 0 && submittedCount >= eligibleCount) {
+    if (
+      record.status === "voting_open" &&
+      nowMs < closesAtMs &&
+      eligibleCount > 0 &&
+      submittedCount >= eligibleCount
+    ) {
       record.status = "final_30_seconds";
       record.finalWarningStartedAt = toIso(nowMs);
       record.closesAt = toIso(nowMs + FINAL_CHANGE_MS);
@@ -458,7 +470,12 @@ export class VotingWindowStore {
       return;
     }
 
-    if (record.status === "voting_open" && !record.extensionUsed && eligibleCount > 0 && submittedCount / eligibleCount < 0.75) {
+    if (
+      record.status === "voting_open" &&
+      !record.extensionUsed &&
+      eligibleCount > 0 &&
+      submittedCount / eligibleCount < 0.75
+    ) {
       closesAtMs += ONE_MINUTE_MS;
       record.status = "extension_1_minute";
       record.extensionUsed = true;
@@ -496,7 +513,8 @@ export class VotingWindowStore {
       eligiblePlayers: [...record.eligiblePlayers],
       eligibleCount: record.eligiblePlayers.length,
       submittedCount,
-      turnoutRatio: record.eligiblePlayers.length === 0 ? 0 : submittedCount / record.eligiblePlayers.length,
+      turnoutRatio:
+        record.eligiblePlayers.length === 0 ? 0 : submittedCount / record.eligiblePlayers.length,
       banSelectionsCast: input.banSelectionsCast ?? 0,
       openedAt: record.openedAt,
       closesAt: record.closesAt,

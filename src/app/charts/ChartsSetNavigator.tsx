@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { PublicDrawSetPanel } from "@/components";
 import type { DrawRecord } from "@/lib/draw/draw-state";
@@ -18,16 +18,36 @@ type ChartsSetNavigatorProps = {
   };
 };
 
+const ACTIVE_SET_STORAGE_KEY = "bite-open-card-draw:view-only-active-set";
+
 export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const activeSet = sets[activeIndex];
+  const [hydrated, setHydrated] = useState(false);
+  const maxActiveIndex = Math.max(sets.length - 1, 0);
+  const boundedActiveIndex = Math.min(Math.max(activeIndex, 0), maxActiveIndex);
+  const activeSet = sets[boundedActiveIndex];
+
+  useEffect(() => {
+    const storedIndex = Number(window.sessionStorage.getItem(ACTIVE_SET_STORAGE_KEY));
+
+    if (Number.isInteger(storedIndex) && storedIndex >= 0 && storedIndex <= maxActiveIndex) {
+      setActiveIndex(storedIndex);
+    }
+
+    setHydrated(true);
+  }, [maxActiveIndex]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    window.sessionStorage.setItem(ACTIVE_SET_STORAGE_KEY, String(boundedActiveIndex));
+  }, [boundedActiveIndex, hydrated]);
 
   return (
     <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
-      <div
-        className="metal-panel rounded-lg p-4"
-        data-testid="view-only-status"
-      >
+      <div className="metal-panel rounded-lg p-4" data-testid="view-only-status">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -49,13 +69,14 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
           <button
             key={set.displayLabel}
             aria-controls={`view-only-set-${set.setOrder}`}
-            aria-selected={activeIndex === index}
+            aria-selected={boundedActiveIndex === index}
             className={clsx(
               "rounded border px-3 py-3 text-sm font-black uppercase",
-              activeIndex === index
+              boundedActiveIndex === index
                 ? "border-ember-300 bg-ember-900/35 text-white"
                 : "border-metal-700 bg-black/25 text-metal-300",
             )}
+            disabled={!hydrated}
             onClick={() => setActiveIndex(index)}
             role="tab"
             type="button"
@@ -70,7 +91,7 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
         {sets.map(({ set, draw }, index) => (
           <div
             key={set.displayLabel}
-            className={clsx(index === activeIndex ? "block" : "hidden", "md:block")}
+            className={clsx(index === boundedActiveIndex ? "block" : "hidden", "md:block")}
             id={`view-only-set-${set.setOrder}`}
             role="tabpanel"
           >
@@ -82,7 +103,7 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
       <div className="grid grid-cols-2 gap-3 md:hidden">
         <button
           className="rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300 disabled:opacity-40"
-          disabled={activeIndex === 0}
+          disabled={!hydrated || boundedActiveIndex === 0}
           onClick={() => setActiveIndex((current) => Math.max(0, current - 1))}
           type="button"
         >
@@ -90,7 +111,7 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
         </button>
         <button
           className="button-metal rounded px-4 py-3 font-black uppercase disabled:opacity-40"
-          disabled={!activeSet || activeIndex === sets.length - 1}
+          disabled={!hydrated || !activeSet || boundedActiveIndex === sets.length - 1}
           onClick={() => setActiveIndex((current) => Math.min(sets.length - 1, current + 1))}
           type="button"
         >

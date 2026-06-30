@@ -1,5 +1,6 @@
 import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
+import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import {
   getRoundDrawRecords,
@@ -17,7 +18,8 @@ export default async function VotePage() {
   await hydrateTournamentState();
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
-  const snapshot = getVotingRoundSnapshot(roundNumber);
+  const nowMs = await getAuthoritativeNowMs();
+  const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
   const draws = getRoundDrawRecords(roundNumber);
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(roundNumber);
   const phoneStatus = adminState.ballotStore.getPhoneStatus(roundNumber);

@@ -100,7 +100,9 @@ function readStoredEditTokens() {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
 
     return Object.fromEntries(
-      Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
     );
   } catch {
     return {};
@@ -135,9 +137,10 @@ function getBallotEditToken(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
 
 function choicesFromBallot(draws: DrawRecord[], ballot: PublicEditableBallot) {
   return draws.map((draw) => {
-    const existing = ballot.choices.find((choice) => choice.drawId === draw.id);
+    const existing = ballot.choices.find((choice) => choice?.drawId === draw.id);
     const chartIds = new Set(draw.charts.map((chart) => chart.id));
-    const bannedChartIds = existing?.bannedChartIds.filter((chartId) => chartIds.has(chartId)) ?? [];
+    const bannedChartIds =
+      existing?.bannedChartIds.filter((chartId) => chartIds.has(chartId)) ?? [];
 
     return {
       drawId: draw.id,
@@ -190,6 +193,7 @@ export function BallotFlow({
   const [existingBallot, setExistingBallot] = useState<PublicEditableBallot | null>(null);
   const [existingBallotLookup, setExistingBallotLookup] = useState<PublicBallotLookup | null>(null);
   const [lookupPending, setLookupPending] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [liveCanSubmit, setLiveCanSubmit] = useState(initialCanSubmit);
   const [liveStatusLabel, setLiveStatusLabel] = useState(statusLabel);
   const [liveTimerText, setLiveTimerText] = useState(timerText);
@@ -209,6 +213,10 @@ export function BallotFlow({
       (choice.noBans && choice.bannedChartIds.length === 0) ||
       (!choice.noBans && choice.bannedChartIds.length >= 1 && choice.bannedChartIds.length <= 2),
   );
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const loadExistingBallot = useCallback(
     async (
@@ -334,7 +342,9 @@ export function BallotFlow({
         const state = await getVoteLiveStateAction(
           roundNumber,
           selectedPlayerId || undefined,
-          selectedPlayerId ? readBallotEditToken(roundNumber, selectedPlayerId) ?? undefined : undefined,
+          selectedPlayerId
+            ? (readBallotEditToken(roundNumber, selectedPlayerId) ?? undefined)
+            : undefined,
         );
 
         if (cancelled) {
@@ -368,12 +378,16 @@ export function BallotFlow({
 
         if (!state.canSubmit && !refreshRequestedRef.current) {
           refreshRequestedRef.current = true;
-          setMessage("Voting state changed. Ballot changes are disabled while this phone refreshes.");
+          setMessage(
+            "Voting state changed. Ballot changes are disabled while this phone refreshes.",
+          );
           router.refresh();
         }
       } catch {
         if (!cancelled) {
-          setMessage("Could not refresh voting status. Server validation still protects submissions.");
+          setMessage(
+            "Could not refresh voting status. Server validation still protects submissions.",
+          );
         }
       }
     }
@@ -513,6 +527,7 @@ export function BallotFlow({
         <select
           id="startgg-username"
           className="mt-3 w-full rounded border border-metal-700 bg-black/35 px-3 py-3 text-white"
+          disabled={!hydrated}
           value={selectedPlayerId}
           onChange={(event) => {
             const playerId = event.target.value;
@@ -555,7 +570,7 @@ export function BallotFlow({
         ) : null}
         <button
           className="button-metal mt-5 w-full rounded px-4 py-3 font-black uppercase disabled:opacity-40"
-          disabled={!selectedPlayer || lookupPending || !liveCanSubmit}
+          disabled={!hydrated || !selectedPlayer || lookupPending || !liveCanSubmit}
           onClick={() => {
             if (selectedPlayer) {
               rememberIdentity(selectedPlayer);
@@ -587,10 +602,7 @@ export function BallotFlow({
             const draw = draws.find((candidate) => candidate.id === choice.drawId);
 
             return (
-              <div
-                key={choice.drawId}
-                className="rounded border border-metal-700 bg-black/25 p-3"
-              >
+              <div key={choice.drawId} className="rounded border border-metal-700 bg-black/25 p-3">
                 <p className="font-bold text-white">{choice.displayLabel}</p>
                 <p className="mt-1 text-sm text-metal-300">{describeChoice(draw, choice)}</p>
                 {liveCanSubmit ? (
@@ -643,10 +655,7 @@ export function BallotFlow({
         </h1>
         <div className="mt-5 grid gap-3">
           {choices.map((choice, index) => (
-            <div
-              key={choice.drawId}
-              className="rounded border border-metal-700 bg-black/25 p-3"
-            >
+            <div key={choice.drawId} className="rounded border border-metal-700 bg-black/25 p-3">
               <p className="font-bold text-white">{choice.displayLabel}</p>
               <p className="mt-1 text-sm text-metal-300">
                 {choice.noBans
@@ -696,10 +705,7 @@ export function BallotFlow({
       </p>
       <h1 className="mt-2 text-3xl font-black uppercase text-white">{currentDraw?.displayLabel}</h1>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-metal-700 bg-black/25 p-3">
-        <p
-          className="text-sm font-black uppercase text-white"
-          data-testid="ban-selection-counter"
-        >
+        <p className="text-sm font-black uppercase text-white" data-testid="ban-selection-counter">
           {currentChoice?.bannedChartIds.length ?? 0}/2 bans selected
         </p>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-metal-300">
@@ -729,7 +735,9 @@ export function BallotFlow({
               aria-pressed={selected}
               className={clsx(
                 "relative min-h-40 min-w-0 overflow-hidden rounded border bg-cover bg-center p-3 text-left",
-                selected ? "border-ember-300 bg-ember-900/40 shadow-ember-tight" : "border-metal-700 bg-black/25",
+                selected
+                  ? "border-ember-300 bg-ember-900/40 shadow-ember-tight"
+                  : "border-metal-700 bg-black/25",
                 index === 6 ? "col-span-2 mx-auto w-[calc((100%_-_0.75rem)/2)] min-w-40" : "",
               )}
               data-chart-image-path={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}

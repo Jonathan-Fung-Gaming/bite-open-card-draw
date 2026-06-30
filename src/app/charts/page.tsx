@@ -1,9 +1,14 @@
 import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
+import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import { getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
-import { formatVotingStatusLabel, formatVotingTime, type VotingRoundSnapshot } from "@/lib/vote/voting-window";
+import {
+  formatVotingStatusLabel,
+  formatVotingTime,
+  type VotingRoundSnapshot,
+} from "@/lib/vote/voting-window";
 import { ChartsAutoRefresh } from "./ChartsAutoRefresh";
 import { ChartsSetNavigator } from "./ChartsSetNavigator";
 
@@ -13,15 +18,21 @@ function chartsStatus(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean) {
   if (!bothSetsDrawn) {
     return {
       label: "Awaiting host draw",
-      detail: "Charts will appear here after the host draws both sets. This view cannot submit votes.",
+      detail:
+        "Charts will appear here after the host draws both sets. This view cannot submit votes.",
       timerText: null,
     };
   }
 
-  if (snapshot.status === "voting_open" || snapshot.status === "final_30_seconds" || snapshot.status === "extension_1_minute") {
+  if (
+    snapshot.status === "voting_open" ||
+    snapshot.status === "final_30_seconds" ||
+    snapshot.status === "extension_1_minute"
+  ) {
     return {
       label: formatVotingStatusLabel(snapshot.status),
-      detail: "View-only mode. Use this page to inspect charts without selecting a username or affecting turnout.",
+      detail:
+        "View-only mode. Use this page to inspect charts without selecting a username or affecting turnout.",
       timerText: formatVotingTime(snapshot.remainingMs),
     };
   }
@@ -33,7 +44,8 @@ function chartsStatus(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean) {
   ) {
     return {
       label: "Results being revealed",
-      detail: "Voting is closed. Results are being revealed on stage before final charts appear here.",
+      detail:
+        "Voting is closed. Results are being revealed on stage before final charts appear here.",
       timerText: null,
     };
   }
@@ -49,8 +61,9 @@ export default async function ChartsPage() {
   await hydrateTournamentState();
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
+  const nowMs = await getAuthoritativeNowMs();
   const result = adminState.resultStore.getRoundResult(roundNumber);
-  const snapshot = getVotingRoundSnapshot(roundNumber);
+  const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
 
   if (result?.revealPhase === "final") {
     return (

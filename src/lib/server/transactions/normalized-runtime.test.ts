@@ -79,7 +79,7 @@ function createMockRpcClient(
   return {
     async rpc(functionName, args) {
       calls.push({
-        functionName,
+        functionName: functionName as RpcFunctionName,
         args,
       });
 

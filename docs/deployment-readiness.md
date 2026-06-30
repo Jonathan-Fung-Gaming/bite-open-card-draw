@@ -3,7 +3,8 @@
 ## Required Services
 
 - Vercel project linked to this repository.
-- Supabase project with the Phase 2 migration applied.
+- Supabase project with migrations applied through
+  `20260630041000_normalized_submit_ballot_rpc.sql`.
 - Production environment variables configured in Vercel project settings only.
 
 Do not commit `.env`, `.env.local`, Supabase service-role keys, Vercel tokens, session secrets, or plaintext admin passwords.
@@ -53,19 +54,40 @@ rtk npx playwright install chromium webkit
 Do not use the release for tournament operation until:
 
 - `TOURNAMENT_STATE_BACKEND=supabase` is configured for the deployed environment.
-- `TOURNAMENT_EVENT_ID` is configured to a stable nonblank event namespace, using a separate value
-  for rehearsal and production.
+- `TOURNAMENT_EVENT_ID` is configured to a stable nonblank event namespace. Do not use any Phase 9
+  rehearsal id, including `phase9-e2e-2026-06-30-prod-23`,
+  `phase9-load-2026-06-30-prod-07`, or `phase9-fourround-2026-06-30-prod-05`, for the real
+  tournament.
 - `rtk npm run cache:chart-images` produces at least one non-fallback cached artwork file and
   `public/chart-images/cache` or the chosen controlled storage has real files.
-- A complete four-round rehearsal has been run against hosted Supabase persistent state with an
-  explicitly approved non-production `TOURNAMENT_EVENT_ID`. The local `rtk npm run test:load`
-  rehearsal is useful load evidence but does not replace hosted Supabase rehearsal.
+- Rehearsal mode has been reset or a clean production event namespace has been selected before real
+  tournament operation.
 - Private CSV auto-download and the manual admin CSV download have both been verified after a final
   reveal.
 - `docs/remediation-issue-checklist.md` has every row checked with evidence and its final closure
   gate passes.
 
+## Phase 9 Hosted Evidence
+
+Hosted Supabase rehearsal is no longer an unresolved release blocker as of 2026-06-30.
+
+- Production Supabase was used by explicit exception because no spare project remained. The accepted
+  risk is that global migrations were applied to the existing production project.
+- `rtk npx supabase db lint --linked` passed with no schema errors.
+- `rtk npx supabase migration list --linked` showed remote migration `20260630041000`.
+- Hosted `rtk npm run test:e2e` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
+  `phase9-e2e-2026-06-30-prod-23`.
+- Hosted `rtk npm run test:load` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
+  `phase9-load-2026-06-30-prod-07`.
+- Hosted `rtk npm run test:phase9` passed a four-round rehearsal with event id
+  `phase9-fourround-2026-06-30-prod-05`.
+- The Vercel non-root route failure reported with digest `2042555441` was resolved by configuring
+  the production runtime environment variables and redeploying.
+
 ## Supabase Setup
+
+For a step-by-step hosted rehearsal walkthrough, use
+`docs/phase-9-hosted-supabase-manual-guide.md`.
 
 Apply migrations before event use:
 

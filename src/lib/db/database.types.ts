@@ -549,6 +549,20 @@ export type Database = {
           released_at?: Timestamp | null;
         }
       >;
+      event_persistence_locks: TableDefinition<
+        {
+          event_id: string;
+          lock_token: string;
+          locked_until: Timestamp;
+          updated_at: Timestamp;
+        },
+        {
+          event_id: string;
+          lock_token: string;
+          locked_until: Timestamp;
+          updated_at?: Timestamp;
+        }
+      >;
       image_assets: TableDefinition<
         {
           id: Uuid;
@@ -615,6 +629,25 @@ export type Database = {
       normalized_touch_admin_session: NormalizedRuntimeRpc;
       normalized_logout_admin_session: NormalizedRuntimeRpc;
       normalized_revoke_admin_session: NormalizedRuntimeRpc;
+      normalized_database_time: {
+        Args: Record<string, never>;
+        Returns: Timestamp;
+      };
+      normalized_acquire_event_persistence_lock: {
+        Args: {
+          p_event_id: string;
+          p_lock_token: string;
+          p_locked_until: Timestamp;
+        };
+        Returns: boolean;
+      };
+      normalized_release_event_persistence_lock: {
+        Args: {
+          p_event_id: string;
+          p_lock_token: string;
+        };
+        Returns: boolean;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

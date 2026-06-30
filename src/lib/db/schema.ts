@@ -23,6 +23,7 @@ export const CORE_DATABASE_TABLES = [
   "admin_sessions",
   "admin_actions",
   "host_locks",
+  "event_persistence_locks",
   "image_assets",
   "tournament_state_snapshots",
 ] as const;
@@ -48,6 +49,7 @@ export const EVENT_SCOPED_DATABASE_TABLES = [
   "admin_sessions",
   "admin_actions",
   "host_locks",
+  "event_persistence_locks",
 ] as const satisfies readonly CoreDatabaseTable[];
 
 export type EventScopedDatabaseTable = (typeof EVENT_SCOPED_DATABASE_TABLES)[number];

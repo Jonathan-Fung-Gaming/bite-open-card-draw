@@ -29,9 +29,7 @@ export function ResultSetPanel({
 }: ResultSetPanelProps) {
   const [nowMs, setNowMs] = useState(serverNowMs ?? Date.now());
   const tiebreakWinnerRevealed =
-    showWinner &&
-    set.tiebreakUsed &&
-    isTiebreakRevealComplete(set.winnerRevealStartedAt, nowMs);
+    showWinner && set.tiebreakUsed && isTiebreakRevealComplete(set.winnerRevealStartedAt, nowMs);
   const shouldShowSelectedState = showWinner && (!set.tiebreakUsed || tiebreakWinnerRevealed);
   const tiebreakRemainingMs =
     showWinner && set.tiebreakUsed
@@ -83,14 +81,21 @@ export function ResultSetPanel({
   ) : null;
 
   useEffect(() => {
-    if (!showWinner || !set.tiebreakUsed || tiebreakWinnerRevealed) {
+    const baseNowMs = serverNowMs ?? Date.now();
+
+    setNowMs(baseNowMs);
+
+    if (!showWinner || !set.tiebreakUsed) {
       return undefined;
     }
 
-    const intervalId = window.setInterval(() => setNowMs(Date.now()), 250);
+    const basePerformanceMs = window.performance.now();
+    const intervalId = window.setInterval(() => {
+      setNowMs(baseNowMs + window.performance.now() - basePerformanceMs);
+    }, 250);
 
     return () => window.clearInterval(intervalId);
-  }, [set.tiebreakUsed, set.winnerRevealStartedAt, showWinner, tiebreakWinnerRevealed]);
+  }, [serverNowMs, set.tiebreakUsed, set.winnerRevealStartedAt, showWinner]);
 
   return (
     <section className={clsx("metal-panel rounded-lg", stageMode ? "p-2" : "p-4")}>
@@ -99,7 +104,12 @@ export function ResultSetPanel({
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
             Set {set.setOrder} - {set.displayLabel}
           </p>
-          <h2 className={clsx("mt-1 font-black uppercase text-white", stageMode ? "text-lg" : "text-2xl")}>
+          <h2
+            className={clsx(
+              "mt-1 font-black uppercase text-white",
+              stageMode ? "text-lg" : "text-2xl",
+            )}
+          >
             Ban Counts
           </h2>
         </div>
@@ -119,85 +129,90 @@ export function ResultSetPanel({
         )}
       >
         <div className={clsx("grid", stageMode ? "gap-2 lg:grid-cols-2" : "gap-3")}>
-        {set.rows.map((row, index) => {
-          const barWidth =
-            set.maxBanCount > 0 ? `${(row.banCount / set.maxBanCount) * 100}%` : "0%";
+          {set.rows.map((row, index) => {
+            const barWidth =
+              set.maxBanCount > 0 ? `${(row.banCount / set.maxBanCount) * 100}%` : "0%";
 
-          return (
-            <article
-              key={row.chart.id}
-              className={clsx(
-                "grid rounded border bg-black/25",
-                stageMode
-                  ? "gap-2 p-1.5 md:grid-cols-[48px_1fr_auto]"
-                  : "gap-3 p-3 md:grid-cols-[96px_1fr_auto]",
-                shouldShowSelectedState && row.selected
-                  ? "border-ember-300 shadow-ember-tight"
-                  : "border-metal-700",
-              )}
-            >
-              <div
+            return (
+              <article
+                key={row.chart.id}
                 className={clsx(
-                  "relative overflow-hidden rounded border border-ember-300/15 bg-furnace-900",
-                  stageMode ? "h-12" : "h-24",
+                  "grid rounded border bg-black/25",
+                  stageMode
+                    ? "gap-2 p-1.5 md:grid-cols-[48px_1fr_auto]"
+                    : "gap-3 p-3 md:grid-cols-[96px_1fr_auto]",
+                  shouldShowSelectedState && row.selected
+                    ? "border-ember-300 shadow-ember-tight"
+                    : "border-metal-700",
                 )}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={row.chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
-                  alt=""
-                  className="h-full w-full object-cover opacity-65"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                <p className="absolute bottom-2 left-2 font-mono text-xs font-black text-ember-300">
-                  {String(index + 1).padStart(2, "0")}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
-                  {row.chart.displayDifficulty}
-                </p>
-                <h3
-                  className={clsx(
-                    "mt-1 line-clamp-2 font-black uppercase text-white",
-                    stageMode ? "text-sm leading-tight" : "text-xl",
-                  )}
-                >
-                  {row.chart.name}
-                </h3>
-                <p className={clsx("mt-1 line-clamp-1 text-metal-300", stageMode ? "text-xs" : "text-sm")}>
-                  {row.chart.artist}
-                </p>
                 <div
                   className={clsx(
-                    "overflow-hidden rounded bg-metal-900",
-                    stageMode ? "mt-1 h-1.5" : "mt-3 h-2",
+                    "relative overflow-hidden rounded border border-ember-300/15 bg-furnace-900",
+                    stageMode ? "h-12" : "h-24",
                   )}
                 >
-                  <div className="h-full rounded bg-ember-500" style={{ width: barWidth }} />
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3 md:block md:text-right">
-                <p
-                  className={clsx(
-                    "rounded border border-ember-300/35 bg-ember-900/25 font-black text-white",
-                    stageMode ? "px-2 py-1 text-sm" : "px-3 py-2",
-                  )}
-                >
-                  {banLabel(row.banCount)}
-                </p>
-                {shouldShowSelectedState && row.selected ? (
-                  <p
-                    className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-ember-300"
-                    data-testid="result-selected-label"
-                  >
-                    Selected
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={row.chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
+                    alt=""
+                    className="h-full w-full object-cover opacity-65"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                  <p className="absolute bottom-2 left-2 font-mono text-xs font-black text-ember-300">
+                    {String(index + 1).padStart(2, "0")}
                   </p>
-                ) : null}
-              </div>
-            </article>
-          );
-        })}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
+                    {row.chart.displayDifficulty}
+                  </p>
+                  <h3
+                    className={clsx(
+                      "mt-1 line-clamp-2 font-black uppercase text-white",
+                      stageMode ? "text-sm leading-tight" : "text-xl",
+                    )}
+                  >
+                    {row.chart.name}
+                  </h3>
+                  <p
+                    className={clsx(
+                      "mt-1 line-clamp-1 text-metal-300",
+                      stageMode ? "text-xs" : "text-sm",
+                    )}
+                  >
+                    {row.chart.artist}
+                  </p>
+                  <div
+                    className={clsx(
+                      "overflow-hidden rounded bg-metal-900",
+                      stageMode ? "mt-1 h-1.5" : "mt-3 h-2",
+                    )}
+                  >
+                    <div className="h-full rounded bg-ember-500" style={{ width: barWidth }} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 md:block md:text-right">
+                  <p
+                    className={clsx(
+                      "rounded border border-ember-300/35 bg-ember-900/25 font-black text-white",
+                      stageMode ? "px-2 py-1 text-sm" : "px-3 py-2",
+                    )}
+                  >
+                    {banLabel(row.banCount)}
+                  </p>
+                  {shouldShowSelectedState && row.selected ? (
+                    <p
+                      className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-ember-300"
+                      data-testid="result-selected-label"
+                    >
+                      Selected
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
         </div>
         {showWinner ? <div className="grid content-start gap-2">{revealPanel}</div> : null}
       </div>

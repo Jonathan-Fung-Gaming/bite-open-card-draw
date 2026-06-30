@@ -507,18 +507,20 @@ Deferred items:
 
 Addresses: `CR-001`, `CR-003`, `CR-008`, `CR-035`.
 
-Use the hardened code against a hosted non-production Supabase event, then update release evidence.
+Use the hardened code against a hosted Supabase event, then update release evidence. Prefer a
+non-production project; production may be used only as an explicit exception with the migration and
+event-data risk recorded.
 
 Primary work:
 
-- Apply migrations to an approved non-production hosted Supabase project.
+- Apply migrations to an approved hosted Supabase project.
 - Replace remaining whole-snapshot live mutation saves with transactional row-scoped mutations,
   locked event revisions, or equivalent cross-instance database concurrency control.
 - Move official voting timer advancement to database-time transactional mutations so app-server
   clock skew cannot affect open, close, extension, final-warning, pause, or resume decisions.
 - Ensure host heartbeat updates only host-lock state and cannot roll back unrelated event data in
   hosted Supabase operation.
-- Run the app with `TOURNAMENT_STATE_BACKEND=supabase` and a non-production
+- Run the app with `TOURNAMENT_STATE_BACKEND=supabase` and a disposable
   `TOURNAMENT_EVENT_ID`.
 - Rehearse all four rounds, including forced tiebreaks, refresh/redeploy survival, host lock,
   admin sessions, manual ballot override, CSV download, QR, `/stage`, `/vote`, `/charts`, and
@@ -538,32 +540,54 @@ Exit criteria:
 - Final local gates are recorded from a clean shell.
 - Remaining risks are explicit and acceptable for release.
 
-### Phase 9 Current Blocker Context
+### Phase 9 Handoff Context
 
-Status: blocked pending explicit hosted Supabase approval and target details.
+Status: complete.
 
-What is complete locally:
+Implementation notes to preserve:
 
-- `CR-035` is closed by the Phase 8 evidence now recorded in `docs/phase-status.md`: final clean
-  `rtk npm run test:e2e` passed retry-free with 4 Playwright tests, and `rtk npm run test:load`
-  passed with 100 player submissions/edits plus final CSV verification.
-- Release/deployment docs now describe the current normalized event-scoped Supabase blocker instead
-  of the old fixed `primary` snapshot-row blocker.
+- Production Supabase was used by explicit user-approved exception because no spare project remained.
+  The accepted risk is that global migrations were applied to the existing production project.
+- Migration `20260630041000_normalized_submit_ballot_rpc.sql` adds the real
+  `normalized_submit_ballot` service-role RPC. It validates event, round, player, voting window,
+  choices, draws, and duplicate chart constraints; upserts the ballot; replaces choices; inserts a
+  revision; and uses `normalized_database_time()`.
+- Migration `20260630040000_event_persistence_lock_and_db_time.sql` adds the hosted database-time
+  RPC and event lock helpers used by normalized persistence.
+- Supabase-backed player ballot submission/editing now uses the normalized ballot RPC instead of a
+  whole-snapshot save path.
+- Admin voting mutations now run through queued hydrate/mutate/persist helpers so the hosted close,
+  compute, reveal, and manual-ballot paths are persisted from a fresh baseline.
+- Host-lock heartbeat persists only host-lock state through its own queued path, preventing the
+  heartbeat/admin-voting race that caused hosted close-voting failures.
+- The reported Vercel route failure with digest `2042555441` was traced to missing production
+  runtime environment configuration; setting the production variables and redeploying restored
+  non-root route rendering.
 
-What remains blocked:
+Verification:
 
-- `CR-001`, `CR-003`, and `CR-008` require an approved hosted non-production Supabase target and a
-  disposable `TOURNAMENT_EVENT_ID` before any write rehearsal can be run.
-- `.env.local` may contain secrets and was not read. The repo also has no `supabase/config.toml` or
-  npm Supabase helper scripts, so hosted migration/rehearsal commands need explicit project/ref
-  details and approval before execution.
+- `rtk npx supabase db lint --linked` - passed, no schema errors found.
+- `rtk npx supabase migration list --linked` - passed and showed remote migration
+  `20260630041000`.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 37 files / 143 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 4 Playwright tests.
+- `rtk npm run test:load` - passed, 1 Playwright load test with 100 player submissions/edits and
+  final private CSV verification.
+- Hosted `rtk npm run test:e2e` with event id `phase9-e2e-2026-06-30-prod-23` - passed, 4
+  Playwright tests.
+- Hosted `rtk npm run test:load` with event id `phase9-load-2026-06-30-prod-07` - passed, 1 load
+  Playwright test.
+- Hosted `rtk npm run test:phase9` with event id `phase9-fourround-2026-06-30-prod-05` - passed, 1
+  four-round rehearsal test in about 6.3 minutes.
 
-Required next approval/context:
+Risks and follow-up:
 
-- Confirm the hosted Supabase project/ref is non-production.
-- Confirm the disposable `TOURNAMENT_EVENT_ID`.
-- Approve applying migrations and running the full four-round hosted rehearsal with
-  `TOURNAMENT_STATE_BACKEND=supabase`.
+- Do not reuse the Phase 9 rehearsal event ids for the real tournament.
+- Reset rehearsal mode and configure a clean production `TOURNAMENT_EVENT_ID` before event use.
+- Re-run final release gates after any new code, data, or deployment configuration changes.
 
 ## Issue Coverage Summary
 

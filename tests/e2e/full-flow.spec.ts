@@ -14,6 +14,7 @@ function getAdminPassword() {
 
 const ADMIN_PASSWORD = getAdminPassword();
 const FALLBACK_CHART_IMAGE_PATH = "/chart-images/fallback-card.svg";
+const HOSTED_REFRESH_TIMEOUT_MS = 15_000;
 
 function expectRealCachedImagePath(source: string | null) {
   expect(source).toBeTruthy();
@@ -130,20 +131,37 @@ async function expectNoStageVerticalScroll(page: Page) {
 }
 
 async function waitForVisibleTiebreakReveal(page: Page, expectedPanelCount: number) {
-  const tiebreakPanels = page.getByTestId("rune-wheel").or(page.getByTestId("fallback-tiebreak-reveal"));
+  const tiebreakPanels = page
+    .getByTestId("rune-wheel")
+    .or(page.getByTestId("fallback-tiebreak-reveal"));
   const tiebreakReveal = tiebreakPanels.nth(expectedPanelCount - 1);
 
-  await expect(tiebreakPanels).toHaveCount(expectedPanelCount, { timeout: 7_000 });
-  await expect(tiebreakReveal).toHaveAttribute("data-winner-revealed", "true", {
-    timeout: 8_000,
+  await expect(tiebreakPanels).toHaveCount(expectedPanelCount, {
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+  await expect(tiebreakReveal).toHaveAttribute("data-winner-revealed", "true", {
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+}
+
+async function expectAdminRevealPhase(page: Page, phase: string) {
+  await expect(
+    page
+      .locator("section", { hasText: "Result Reveal Controls" })
+      .getByText(phase, { exact: true }),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+}
+
+async function advanceRevealAndWaitForAdminPhase(page: Page, phase: string) {
+  await page.getByRole("button", { name: "Next Reveal Step" }).click();
+  await expectAdminRevealPhase(page, phase);
 }
 
 test("full round smoke flow reaches final reveal and downloads private CSV", async ({
   page,
   browser,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
 
   await goto(page, "/stage");
   await expect(page.getByText("Round 1 Draw")).toBeVisible();
@@ -265,7 +283,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await duplicatePhonePage.goto(new URL("/vote", page.url()).toString(), {
     waitUntil: "domcontentloaded",
   });
-  await duplicatePhonePage.getByLabel("Select your start.gg username").selectOption({ label: "Alpha" });
+  await duplicatePhonePage
+    .getByLabel("Select your start.gg username")
+    .selectOption({ label: "Alpha" });
   await expect(
     duplicatePhonePage.getByText("A ballot already exists for this start.gg username"),
   ).toBeVisible({ timeout: 7000 });
@@ -277,18 +297,21 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(phonePage.getByText("Results are being revealed on stage.")).toBeVisible();
   await page.getByRole("button", { name: "Compute Results" }).click();
   await expect(page.getByText("results computed")).toBeVisible();
+  await expectAdminRevealPhase(page, "computed");
 
-  await page.getByRole("button", { name: "Next Reveal Step" }).click();
-  await page.getByRole("button", { name: "Next Reveal Step" }).click();
+  await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
+  await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
   await waitForVisibleTiebreakReveal(stagePage, 1);
-  await page.getByRole("button", { name: "Next Reveal Step" }).click();
-  await expect(stagePage.locator("header").getByText("Set 2 counts")).toBeVisible({ timeout: 7000 });
+  await advanceRevealAndWaitForAdminPhase(page, "set 2 counts");
+  await expect(stagePage.locator("header").getByText("Set 2 counts")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await expectNoStageVerticalScroll(stagePage);
-  await page.getByRole("button", { name: "Next Reveal Step" }).click();
+  await advanceRevealAndWaitForAdminPhase(page, "set 2 resolved");
   await waitForVisibleTiebreakReveal(stagePage, 1);
   await expectNoStageVerticalScroll(stagePage);
   const privateCsvDownloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Next Reveal Step" }).click();
+  await advanceRevealAndWaitForAdminPhase(page, "final");
   const privateCsvDownload = await privateCsvDownloadPromise;
 
   expect(privateCsvDownload.suggestedFilename()).toBe("round-1-private-ballots.csv");
@@ -311,7 +334,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await goto(page, "/stage");
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
-  const finalStageCards = page.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card");
+  const finalStageCards = page
+    .getByTestId("stage-final-chart-list")
+    .getByTestId("stage-chart-card");
   await expect(finalStageCards).toHaveCount(2);
   expect((await finalStageCards.first().boundingBox())?.height).toBeGreaterThan(300);
   expect((await finalStageCards.nth(1).boundingBox())?.height).toBeGreaterThan(300);
@@ -363,12 +388,17 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   await expect(page.getByText("voting closed")).toBeVisible();
   await page.getByRole("button", { name: "Compute Results" }).click();
   await expect(page.getByText("results computed")).toBeVisible();
-  await page.getByRole("button", { name: "Next Reveal Step" }).click();
+  await expectAdminRevealPhase(page, "computed");
+  await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
   await page.getByRole("button", { name: "Next Reveal Step" }).click();
 
-  await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute("data-winner-revealed", "false", {
-    timeout: 7_000,
-  });
+  await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute(
+    "data-winner-revealed",
+    "false",
+    {
+      timeout: 7_000,
+    },
+  );
   await expect(stagePage.getByTestId("rune-wheel-slot")).toHaveCount(12);
   await expect(stagePage.getByTestId("rune-wheel")).not.toContainText("Sealed rune");
   await expect(stagePage.getByTestId("rune-wheel-status")).toHaveText(
@@ -376,9 +406,15 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   );
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
 
-  await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute("data-winner-revealed", "true", {
-    timeout: 8_000,
-  });
-  await expect(stagePage.getByTestId("rune-wheel-status")).toContainText("Backend winner revealed:");
+  await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute(
+    "data-winner-revealed",
+    "true",
+    {
+      timeout: 8_000,
+    },
+  );
+  await expect(stagePage.getByTestId("rune-wheel-status")).toContainText(
+    "Backend winner revealed:",
+  );
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(1);
 });

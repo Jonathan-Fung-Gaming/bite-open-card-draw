@@ -8,8 +8,16 @@ Use this checklist on the release branch before tournament use.
       Playwright tests after the free-port harness change.
 - [x] Phase 8 load evidence recorded: `rtk npm run test:load` passed with 100 player submissions
       and edits plus final private CSV verification.
-- [ ] Hosted Supabase rehearsal evidence recorded with `TOURNAMENT_STATE_BACKEND=supabase` and a
-      non-production `TOURNAMENT_EVENT_ID`.
+- [x] Hosted Supabase rehearsal evidence recorded with `TOURNAMENT_STATE_BACKEND=supabase` and a
+      disposable `TOURNAMENT_EVENT_ID`. Production Supabase was used by explicit exception because
+      no spare project remained; global migration risk was accepted and recorded.
+- [x] Phase 9 hosted four-round evidence recorded: `rtk npm run test:phase9` passed with event id
+      `phase9-fourround-2026-06-30-prod-05`.
+- [x] Phase 9 hosted load evidence recorded: `rtk npm run test:load` passed with
+      `TOURNAMENT_STATE_BACKEND=supabase` and event id `phase9-load-2026-06-30-prod-07`.
+
+Use `docs/phase-9-hosted-supabase-manual-guide.md` for the beginner-friendly hosted rehearsal
+workflow.
 
 ## Remediation Gate
 
@@ -27,6 +35,9 @@ Use this checklist on the release branch before tournament use.
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel and not committed.
 - [ ] `ADMIN_PASSWORD_HASH` is set in Vercel.
 - [ ] `SESSION_SECRET` is set in Vercel.
+- [ ] `TOURNAMENT_STATE_BACKEND=supabase` is set in Vercel.
+- [ ] `TOURNAMENT_EVENT_ID` is set in Vercel to the real event namespace, not a Phase 9 rehearsal
+      id.
 - [ ] No `.env` or `.env.local` file is committed.
 
 ## Data
@@ -69,12 +80,12 @@ Use this checklist on the release branch before tournament use.
 
 ## Results And Export
 
-- [ ] Result reveal sequence was tested.
-- [ ] Rune-wheel tiebreak reveal was tested in rehearsal.
-- [ ] Full four-round rehearsal completed against hosted Supabase persistent state with an approved
-      non-production `TOURNAMENT_EVENT_ID`.
+- [x] Result reveal sequence was tested.
+- [x] Rune-wheel tiebreak reveal was tested in rehearsal.
+- [x] Full four-round rehearsal completed against hosted Supabase persistent state with an approved
+      disposable `TOURNAMENT_EVENT_ID`.
 - [ ] Private CSV auto-download was tested.
-- [ ] Manual `Download private ballot CSV` was tested.
+- [x] Manual `Download private ballot CSV` was tested.
 - [ ] CSV file location was confirmed.
 
 ## Final Checks

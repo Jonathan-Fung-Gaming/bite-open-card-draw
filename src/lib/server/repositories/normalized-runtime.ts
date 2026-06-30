@@ -80,7 +80,7 @@ const BALLOT_TABLES = [
 const RESULT_TABLES = ["result_snapshots", "result_rows", "tiebreaks"] as const;
 const ADMIN_SESSION_TABLES = ["admin_sessions"] as const;
 const ADMIN_AUDIT_TABLES = ["admin_actions"] as const;
-const HOST_LOCK_TABLES = ["host_locks"] as const;
+const HOST_LOCK_TABLES = ["host_locks", "event_persistence_locks"] as const;
 
 export class PlayerRepository extends EventScopedRepository<(typeof PLAYER_TABLES)[number]> {
   constructor(dependencies?: RepositoryDependencies) {

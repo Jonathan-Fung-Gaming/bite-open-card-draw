@@ -15,7 +15,7 @@ export function getCurrentEligiblePlayers(roundNumber: 1 | 2 | 3 | 4) {
   }));
 }
 
-export function getVotingRoundSnapshot(roundNumber: 1 | 2 | 3 | 4) {
+export function getVotingRoundSnapshot(roundNumber: 1 | 2 | 3 | 4, nowMs?: number) {
   const draws = getRoundDrawRecords(roundNumber);
   const ballots = adminState.ballotStore.listForRound(roundNumber);
 
@@ -25,6 +25,7 @@ export function getVotingRoundSnapshot(roundNumber: 1 | 2 | 3 | 4) {
     eligiblePlayers: getCurrentEligiblePlayers(roundNumber),
     submittedPlayerIds: ballots.map((ballot) => ballot.playerId),
     banSelectionsCast: countBanSelections(ballots),
+    nowMs,
   });
 }
 

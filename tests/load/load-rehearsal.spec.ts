@@ -14,6 +14,7 @@ function getAdminPassword() {
 const ADMIN_PASSWORD = getAdminPassword();
 const PLAYER_COUNT = 100;
 const LOAD_CONCURRENCY = Number(process.env.E2E_LOAD_CONCURRENCY ?? 6);
+const HOSTED_REFRESH_TIMEOUT_MS = 15_000;
 
 function playerName(index: number) {
   return `Load Player ${String(index + 1).padStart(3, "0")}`;
@@ -67,32 +68,34 @@ async function submitAndEditBallot(
   }
 }
 
-async function submitLoadChunk(
-  request: APIRequestContext,
-  baseURL: string,
-  players: string[],
-) {
+async function submitLoadChunk(request: APIRequestContext, baseURL: string, players: string[]) {
   await Promise.all(players.map((player) => submitAndEditBallot(request, baseURL, player)));
 }
 
+async function expectAdminRevealPhase(page: Page, phase: string) {
+  await expect(
+    page
+      .locator("section", { hasText: "Result Reveal Controls" })
+      .getByText(phase, { exact: true }),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+}
+
+async function advanceRevealAndWaitForAdminPhase(page: Page, phase: string) {
+  const nextButton = page.getByRole("button", { name: "Next Reveal Step" });
+
+  await expect(nextButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await nextButton.click();
+  await expectAdminRevealPhase(page, phase);
+}
+
 async function advanceToFinalReveal(page: Page) {
-  const finalPhase = page
-    .locator("section", { hasText: "Result Reveal Controls" })
-    .getByText("final", { exact: true });
-
-  for (let step = 0; step < 8; step += 1) {
-    if ((await finalPhase.count()) > 0 && (await finalPhase.isVisible())) {
-      return;
-    }
-
-    const nextButton = page.getByRole("button", { name: "Next Reveal Step" });
-    await expect(nextButton).toBeEnabled();
-    await nextButton.click();
-    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
-    await page.waitForTimeout(5_500);
-  }
-
-  await expect(finalPhase).toBeVisible();
+  await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
+  await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
+  await page.waitForTimeout(6_000);
+  await advanceRevealAndWaitForAdminPhase(page, "set 2 counts");
+  await advanceRevealAndWaitForAdminPhase(page, "set 2 resolved");
+  await page.waitForTimeout(6_000);
+  await advanceRevealAndWaitForAdminPhase(page, "final");
 }
 
 test("100-player browser rehearsal submits, edits, and exports final CSV", async ({
@@ -137,7 +140,9 @@ test("100-player browser rehearsal submits, edits, and exports final CSV", async
 
     if ((index + chunk.length) % 25 === 0 || index + chunk.length === players.length) {
       await stagePage.reload({ waitUntil: "domcontentloaded" });
-      await expect(stagePage.locator("header").getByText(/Voting open|Final 30 seconds/)).toBeVisible();
+      await expect(
+        stagePage.locator("header").getByText(/Voting open|Final 30 seconds/),
+      ).toBeVisible();
     }
   }
 

@@ -4,6 +4,7 @@ import {
   ONE_MINUTE_MS,
   TEN_MINUTES_MS,
   VotingWindowStore,
+  formatVotingTime,
 } from "./voting-window";
 
 const players = [
@@ -30,6 +31,12 @@ function snapshot(
 }
 
 describe("voting window store", () => {
+  it("formats countdowns as fixed-width MM:SS", () => {
+    expect(formatVotingTime(9 * 60 * 1000 + 55 * 1000)).toBe("09:55");
+    expect(formatVotingTime(TEN_MINUTES_MS)).toBe("10:00");
+    expect(formatVotingTime(0)).toBe("00:00");
+  });
+
   it("opens one 10-minute window from server time after both sets are drawn", () => {
     const store = new VotingWindowStore(() => 1_000);
 
@@ -87,7 +94,12 @@ describe("voting window store", () => {
     expect(finalWarning.remainingMs).toBe(FINAL_CHANGE_MS);
     expect(finalWarning.canSubmit).toBe(true);
 
-    const closed = snapshot(store, ["player-1", "player-2"], 5_000 + FINAL_CHANGE_MS, players.slice(0, 2));
+    const closed = snapshot(
+      store,
+      ["player-1", "player-2"],
+      5_000 + FINAL_CHANGE_MS,
+      players.slice(0, 2),
+    );
 
     expect(closed.status).toBe("voting_closed");
   });

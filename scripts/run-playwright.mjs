@@ -1,5 +1,8 @@
 import { spawnSync } from "node:child_process";
 import net from "node:net";
+import nextEnv from "@next/env";
+
+const { loadEnvConfig } = nextEnv;
 
 async function findOpenPort() {
   return new Promise((resolve, reject) => {
@@ -48,12 +51,14 @@ function sanitizeEnv(env) {
 }
 
 const requestedArgs = process.argv.slice(2);
+loadEnvConfig(process.cwd());
 const e2ePort = process.env.E2E_PORT || (await findOpenPort());
 const e2eBaseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
 const env = sanitizeEnv({
   ...process.env,
+  NODE_ENV: "production",
   E2E_PORT: e2ePort,
   E2E_BASE_URL: e2eBaseURL,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || e2eBaseURL,

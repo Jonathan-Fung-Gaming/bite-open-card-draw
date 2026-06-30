@@ -3,6 +3,7 @@ import { buildPoolCounts } from "@/lib/charts/importer";
 import { REQUIRED_CHART_POOLS, type NormalizedChart } from "@/lib/charts/types";
 import { adminState } from "@/lib/server/admin-state";
 import { getAdminSessionFromCookies } from "@/lib/server/admin-auth";
+import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import {
   getRoundDrawRecords,
@@ -45,6 +46,7 @@ import {
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
 import { AdminSessionHeartbeat } from "./_components/AdminSessionHeartbeat";
 import { DebugSnapshotDownload } from "./_components/DebugSnapshotDownload";
+import { AdminActionButton } from "./_components/AdminActionButton";
 import { HostHeartbeat } from "./_components/HostHeartbeat";
 import { ManualBallotForm } from "./_components/ManualBallotForm";
 import { PrivateCsvDownload } from "./_components/PrivateCsvDownload";
@@ -64,7 +66,7 @@ function buildLiveCountRows(draws: ReturnType<typeof getRoundDrawRecords>, ballo
     displayLabel: draw.displayLabel,
     rows: draw.charts.map((chart) => {
       const banCount = ballots.reduce((total, ballot) => {
-        const choice = ballot.choices.find((candidate) => candidate.drawId === draw.id);
+        const choice = ballot.choices.find((candidate) => candidate?.drawId === draw.id);
 
         return total + (choice?.bannedChartIds.includes(chart.id) ? 1 : 0);
       }, 0);
@@ -126,7 +128,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <section className="w-full max-w-md">
           <TournamentLogo priority className="mx-auto mb-8" />
           <form action={adminLoginAction} className="metal-panel rounded-lg p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Admin Console</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+              Admin Console
+            </p>
             <h1 className="mt-2 text-3xl font-black uppercase text-white">coolguy69</h1>
             {error ? (
               <p className="mt-4 rounded border border-ember-500/40 bg-ember-900/25 p-3 text-sm text-ember-300">
@@ -143,7 +147,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               required
               className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-3 text-white"
             />
-            <button className="button-metal mt-5 w-full rounded px-4 py-3 font-black uppercase" type="submit">
+            <button
+              className="button-metal mt-5 w-full rounded px-4 py-3 font-black uppercase"
+              type="submit"
+            >
               Log In
             </button>
           </form>
@@ -154,7 +161,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   await hydrateTournamentState();
 
-  const hostSnapshot = adminState.hostLockStore.getSnapshot(session.sessionId);
+  const nowMs = await getAuthoritativeNowMs();
+  const hostSnapshot = adminState.hostLockStore.getSnapshot(session.sessionId, nowMs);
   const players = adminState.rosterStore.listPlayers();
   const inactivePlayers = players.filter((player) => !player.active);
   const activeCount = adminState.rosterStore.getActivePlayerCount();
@@ -162,7 +170,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const roundSnapshot = adminState.roundStateStore.getSnapshot();
   const currentRoundNumber = roundSnapshot.currentRound;
   const selectedChartPool = resolveSelectedChartPool(params?.chartPool, currentRoundNumber);
-  const votingSnapshot = getVotingRoundSnapshot(currentRoundNumber);
+  const votingSnapshot = getVotingRoundSnapshot(currentRoundNumber, nowMs);
   const currentRoundDraws = getRoundDrawRecords(currentRoundNumber);
   const currentRoundBallots = adminState.ballotStore.listForRound(currentRoundNumber);
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(currentRoundNumber);
@@ -204,8 +212,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
             {roundSnapshot.rehearsalMode ? (
               <p className="mt-4 rounded border border-ember-300/25 bg-ember-900/15 p-3 text-sm text-ember-300">
-                Rehearsal mode uses disposable in-memory data. Reset rehearsal data before switching back to
-                tournament operation.
+                Rehearsal mode uses disposable in-memory data. Reset rehearsal data before switching
+                back to tournament operation.
               </p>
             ) : null}
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -240,7 +248,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </form>
             </div>
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              <form action={startRehearsalModeAction} className="rounded border border-metal-700 bg-black/20 p-3">
+              <form
+                action={startRehearsalModeAction}
+                className="rounded border border-metal-700 bg-black/20 p-3"
+              >
                 <p className="text-sm font-bold text-white">Start rehearsal mode</p>
                 <p className="mt-1 text-xs text-metal-300">
                   This resets operational state and loads a 12-player test roster.
@@ -272,10 +283,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Start Rehearsal
                 </button>
               </form>
-              <form action={seedRehearsalTiebreakAction} className="rounded border border-metal-700 bg-black/20 p-3">
+              <form
+                action={seedRehearsalTiebreakAction}
+                className="rounded border border-metal-700 bg-black/20 p-3"
+              >
                 <p className="text-sm font-bold text-white">Force rehearsal tiebreak</p>
                 <p className="mt-1 text-xs text-metal-300">
-                  After both current-round sets are drawn, seed ballots that create a two-chart least-ban tie.
+                  After both current-round sets are drawn, seed ballots that create a two-chart
+                  least-ban tie.
                 </p>
                 <button
                   className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
@@ -285,7 +300,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Seed Tiebreak
                 </button>
               </form>
-              <form action={resetRehearsalModeAction} className="rounded border border-metal-700 bg-black/20 p-3">
+              <form
+                action={resetRehearsalModeAction}
+                className="rounded border border-metal-700 bg-black/20 p-3"
+              >
                 <p className="text-sm font-bold text-white">Reset rehearsal data</p>
                 <p className="mt-1 text-xs text-metal-300">
                   This clears rehearsal state and returns to tournament mode.
@@ -392,7 +410,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </option>
                 ))}
               </select>
-              <button className="button-metal rounded px-3 py-2 text-xs font-bold uppercase" type="submit">
+              <button
+                className="button-metal rounded px-3 py-2 text-xs font-bold uppercase"
+                type="submit"
+              >
                 Review Pool
               </button>
             </form>
@@ -409,7 +430,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     data-testid="admin-chart-exclusion-row"
                   >
                     <input type="hidden" name="chartKey" value={chart.chartKey} />
-                    <input type="hidden" name="excluded" value={chart.excluded ? "false" : "true"} />
+                    <input
+                      type="hidden"
+                      name="excluded"
+                      value={chart.excluded ? "false" : "true"}
+                    />
                     <div className="min-w-0">
                       <p className="truncate font-bold text-white">{chart.name}</p>
                       <p className="truncate text-xs text-metal-300">{chart.artist}</p>
@@ -436,7 +461,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     />
                     <button
                       className={`rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40 ${
-                        chart.excluded ? "button-metal" : "border border-ember-300/40 text-ember-300"
+                        chart.excluded
+                          ? "button-metal"
+                          : "border border-ember-300/40 text-ember-300"
                       }`}
                       disabled={!canControl}
                       type="submit"
@@ -458,12 +485,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 Show live counts
               </summary>
               <p className="mt-3 text-sm text-metal-300">
-                Keep this closed on projector or stream. This warning does not require another password because
-                it does not change tournament state.
+                Keep this closed on projector or stream. This warning does not require another
+                password because it does not change tournament state.
               </p>
               <div className="mt-4 grid gap-3">
                 {liveCountRows.length === 0 ? (
-                  <p className="text-sm text-metal-300">Draw both current-round sets before live counts appear.</p>
+                  <p className="text-sm text-metal-300">
+                    Draw both current-round sets before live counts appear.
+                  </p>
                 ) : (
                   liveCountRows.map((set) => (
                     <div key={set.id} className="rounded border border-metal-700 bg-black/25 p-3">
@@ -488,7 +517,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
                   Voting Controls
                 </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">Round {currentRoundNumber}</h2>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                  Round {currentRoundNumber}
+                </h2>
               </div>
               <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
                 {votingSnapshot.status.replaceAll("_", " ")}
@@ -502,14 +533,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </p>
               </div>
               <div className="rounded border border-metal-700 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Ballots submitted</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                  Ballots submitted
+                </p>
                 <p className="mt-2 text-3xl font-black text-white">
                   {votingSnapshot.submittedCount} / {votingSnapshot.eligibleCount}
                 </p>
               </div>
               <div className="rounded border border-metal-700 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Ban selections cast</p>
-                <p className="mt-2 text-3xl font-black text-white">{votingSnapshot.banSelectionsCast}</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                  Ban selections cast
+                </p>
+                <p className="mt-2 text-3xl font-black text-white">
+                  {votingSnapshot.banSelectionsCast}
+                </p>
               </div>
               <div className="rounded border border-metal-700 bg-black/25 p-3">
                 <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Extension</p>
@@ -519,46 +556,38 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <form action={openVotingAction}>
-                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-                <button
-                  className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl || !votingSnapshot.canOpen}
-                  type="submit"
-                >
-                  Open Voting
-                </button>
-              </form>
-              <form action={pauseVotingAction}>
-                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-                <button
-                  className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
-                  disabled={!canControl || !votingSnapshot.canPause}
-                  type="submit"
-                >
-                  Pause
-                </button>
-              </form>
-              <form action={resumeVotingAction}>
-                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-                <button
-                  className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
-                  disabled={!canControl || !votingSnapshot.canResume}
-                  type="submit"
-                >
-                  Resume
-                </button>
-              </form>
-              <form action={closeVotingAction}>
-                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-                <button
-                  className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                  disabled={!canControl || !votingSnapshot.canClose}
-                  type="submit"
-                >
-                  Close Voting
-                </button>
-              </form>
+              <AdminActionButton
+                action={openVotingAction}
+                className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                disabled={!canControl || !votingSnapshot.canOpen}
+                fields={{ roundNumber: currentRoundNumber }}
+              >
+                Open Voting
+              </AdminActionButton>
+              <AdminActionButton
+                action={pauseVotingAction}
+                className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
+                disabled={!canControl || !votingSnapshot.canPause}
+                fields={{ roundNumber: currentRoundNumber }}
+              >
+                Pause
+              </AdminActionButton>
+              <AdminActionButton
+                action={resumeVotingAction}
+                className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
+                disabled={!canControl || !votingSnapshot.canResume}
+                fields={{ roundNumber: currentRoundNumber }}
+              >
+                Resume
+              </AdminActionButton>
+              <AdminActionButton
+                action={closeVotingAction}
+                className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                disabled={!canControl || !votingSnapshot.canClose}
+                fields={{ roundNumber: currentRoundNumber }}
+              >
+                Close Voting
+              </AdminActionButton>
             </div>
           </section>
           <section className="metal-panel rounded-lg p-4">
@@ -567,7 +596,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
                   Result Reveal Controls
                 </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">Round {currentRoundNumber}</h2>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                  Round {currentRoundNumber}
+                </h2>
               </div>
               <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
                 {result?.revealPhase.replaceAll("_", " ") ?? "not computed"}
@@ -577,32 +608,32 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Revealing live counts is sensitive. Confirm the stage is ready before advancing.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <form action={computeResultsAction}>
-                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-                <button
-                  className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl || votingSnapshot.status !== "voting_closed" || Boolean(result)}
-                  type="submit"
-                >
-                  Compute Results
-                </button>
-              </form>
-              <form action={advanceResultRevealAction}>
-                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-                <button
-                  className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                  disabled={!canControl || !result || result.revealPhase === "final"}
-                  type="submit"
-                >
-                  Next Reveal Step
-                </button>
-              </form>
+              <AdminActionButton
+                action={computeResultsAction}
+                className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                disabled={
+                  !canControl || votingSnapshot.status !== "voting_closed" || Boolean(result)
+                }
+                fields={{ roundNumber: currentRoundNumber }}
+              >
+                Compute Results
+              </AdminActionButton>
+              <AdminActionButton
+                action={advanceResultRevealAction}
+                className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                disabled={!canControl || !result || result.revealPhase === "final"}
+                fields={{ roundNumber: currentRoundNumber }}
+              >
+                Next Reveal Step
+              </AdminActionButton>
             </div>
             <div className="mt-4">
               <PrivateCsvDownload
                 roundNumber={currentRoundNumber}
                 enabled={Boolean(result && result.revealPhase === "final")}
-                autoDownloadKey={result?.finalRevealedAt ? `${result.id}:${result.finalRevealedAt}` : null}
+                autoDownloadKey={
+                  result?.finalRevealedAt ? `${result.id}:${result.finalRevealedAt}` : null
+                }
                 action={downloadPrivateCsvAction}
               />
             </div>
@@ -631,7 +662,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   { label: "Duration", fieldName: "durationMinutes" },
                 ]}
               >
-                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="durationMinutes">
+                <label
+                  className="mt-4 block text-sm font-semibold text-metal-300"
+                  htmlFor="durationMinutes"
+                >
                   Reopen duration
                 </label>
                 <select
@@ -646,7 +680,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <option value="5">5 minutes</option>
                   <option value="10">10 minutes</option>
                 </select>
-                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reopen-reason">
+                <label
+                  className="mt-4 block text-sm font-semibold text-metal-300"
+                  htmlFor="reopen-reason"
+                >
                   Audit reason
                 </label>
                 <textarea
@@ -674,7 +711,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 passwordId="reset-round-password"
                 summaryItems={[{ label: "Round", fieldName: "roundNumber" }]}
               >
-                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reset-round">
+                <label
+                  className="mt-4 block text-sm font-semibold text-metal-300"
+                  htmlFor="reset-round"
+                >
                   Round
                 </label>
                 <select
@@ -689,7 +729,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <option value="3">Round 3</option>
                   <option value="4">Round 4</option>
                 </select>
-                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reset-round-reason">
+                <label
+                  className="mt-4 block text-sm font-semibold text-metal-300"
+                  htmlFor="reset-round-reason"
+                >
                   Audit reason
                 </label>
                 <textarea
@@ -721,7 +764,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   { label: "Chart", fieldName: "resultTarget" },
                 ]}
               >
-                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="resultTarget">
+                <label
+                  className="mt-4 block text-sm font-semibold text-metal-300"
+                  htmlFor="resultTarget"
+                >
                   Corrected selected chart
                 </label>
                 <select
@@ -741,7 +787,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </optgroup>
                   ))}
                 </select>
-                <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="override-reason">
+                <label
+                  className="mt-4 block text-sm font-semibold text-metal-300"
+                  htmlFor="override-reason"
+                >
                   Audit reason
                 </label>
                 <textarea
@@ -770,9 +819,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </p>
                 <h2 className="mt-1 text-2xl font-black uppercase text-white">All Rounds</h2>
               </div>
-              <form action={rerollFullRoundAction} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <form
+                action={rerollFullRoundAction}
+                className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+              >
                 <p className="sm:col-span-3 text-xs font-bold text-ember-300">
-                  You are about to reroll a full round. This will replace both currently drawn sets for that round.
+                  You are about to reroll a full round. This will replace both currently drawn sets
+                  for that round.
                 </p>
                 <select
                   name="roundNumber"
@@ -810,7 +863,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               {drawControls.map(({ set, activeDraw, historyCount }) => (
-                <section key={set.displayLabel} className="rounded border border-metal-700 bg-black/20 p-3">
+                <section
+                  key={set.displayLabel}
+                  className="rounded border border-metal-700 bg-black/20 p-3"
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs uppercase tracking-[0.18em] text-ember-300">
@@ -833,7 +889,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   {activeDraw ? (
                     <div className="mt-3 grid gap-2">
                       <p className="text-xs uppercase tracking-[0.16em] text-metal-300">
-                        Version {activeDraw.version} / Pool {activeDraw.eligiblePoolCount} / History {historyCount}
+                        Version {activeDraw.version} / Pool {activeDraw.eligiblePoolCount} / History{" "}
+                        {historyCount}
                       </p>
                       {activeDraw.charts.map((chart, index) => (
                         <div
@@ -848,7 +905,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                           </div>
                           <form action={rerollOneChartAction} className="grid gap-2 sm:grid-cols-3">
                             <p className="sm:col-span-3 text-xs font-bold text-ember-300">
-                              You are about to reroll this chart. This will replace only this chart in the active
+                              You are about to reroll this chart. This will replace only this chart
+                              in the active
                               {` ${activeDraw.displayLabel}`} draw.
                             </p>
                             <input type="hidden" name="roundNumber" value={set.roundNumber} />
@@ -879,10 +937,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                           </form>
                         </div>
                       ))}
-                      <form action={rerollRoundSetAction} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                      <form
+                        action={rerollRoundSetAction}
+                        className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                      >
                         <p className="sm:col-span-3 text-xs font-bold text-ember-300">
-                          You are about to reroll Round {set.roundNumber} - {set.displayLabel}. This will replace
-                          all currently drawn charts for this set.
+                          You are about to reroll Round {set.roundNumber} - {set.displayLabel}. This
+                          will replace all currently drawn charts for this set.
                         </p>
                         <input type="hidden" name="roundNumber" value={set.roundNumber} />
                         <input type="hidden" name="setOrder" value={set.setOrder} />
@@ -920,7 +981,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <section className="metal-panel rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Roster</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Roster
+                </p>
                 <h2 className="mt-1 text-2xl font-black uppercase text-white">Players</h2>
               </div>
               <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm text-metal-300">
@@ -977,11 +1040,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   {players.map((player) => (
                     <tr key={player.id} className="border-t border-metal-700 bg-black/20">
                       <td className="p-3 font-semibold text-white">{player.startggUsername}</td>
-                      <td className="p-3 text-metal-300">{player.active ? "Active" : "Inactive"}</td>
+                      <td className="p-3 text-metal-300">
+                        {player.active ? "Active" : "Inactive"}
+                      </td>
                       <td className="p-3">
                         <form action={setPlayerActiveStatusAction}>
                           <input type="hidden" name="playerId" value={player.id} />
-                          <input type="hidden" name="active" value={player.active ? "false" : "true"} />
+                          <input
+                            type="hidden"
+                            name="active"
+                            value={player.active ? "false" : "true"}
+                          />
                           <button
                             className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
                             disabled={!canControl}
@@ -1000,7 +1069,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
         <aside className="grid content-start gap-5">
           <section className="metal-panel rounded-lg p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Session</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+              Session
+            </p>
             <h2 className="mt-1 text-2xl font-black uppercase text-white">Admin Access</h2>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <AdminInactivityTimer expiresAt={session.expiresAt} />
@@ -1013,15 +1084,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <DebugSnapshotDownload action={downloadDebugSnapshotAction} disabled={!canControl} />
           </section>
           <section className="metal-panel rounded-lg p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Host Lock</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+              Host Lock
+            </p>
             <h2 className="mt-1 text-2xl font-black uppercase text-white">Control</h2>
             <div className="mt-4 flex flex-wrap gap-2">
               {hostSnapshot.status === "readonly" ? (
                 <form action={takeHostControlAction} className="grid gap-3">
                   <input type="hidden" name="forceHostTakeover" value="true" />
                   <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
-                    Another admin has an unexpired host lock. Force takeover only if that host is unavailable
-                    or explicitly handed control to you.
+                    Another admin has an unexpired host lock. Force takeover only if that host is
+                    unavailable or explicitly handed control to you.
                   </p>
                   <button
                     className="rounded border border-ember-300/40 px-4 py-2 font-bold uppercase text-ember-300"
@@ -1053,14 +1126,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           </section>
           <section className="metal-panel rounded-lg p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">Audit</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+              Audit
+            </p>
             <h2 className="mt-1 text-2xl font-black uppercase text-white">Recent Actions</h2>
             <div className="mt-4 grid gap-2">
               {auditRecords.length === 0 ? (
-                <p className="text-sm text-metal-300">No admin actions recorded in this server process yet.</p>
+                <p className="text-sm text-metal-300">
+                  No admin actions recorded in this server process yet.
+                </p>
               ) : (
                 auditRecords.map((record) => (
-                  <article key={record.id} className="rounded border border-metal-700 bg-black/25 p-3 text-sm">
+                  <article
+                    key={record.id}
+                    className="rounded border border-metal-700 bg-black/25 p-3 text-sm"
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-bold text-white">{record.action.replaceAll("_", " ")}</p>
                       <p className="font-mono text-xs text-metal-300">{record.createdAt}</p>
@@ -1069,7 +1149,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     {record.reason ? (
                       <p className="mt-1 text-xs text-ember-300">Reason: {record.reason}</p>
                     ) : null}
-                    <p className="mt-1 text-xs text-metal-400">Session {record.sessionId.slice(0, 8)}</p>
+                    <p className="mt-1 text-xs text-metal-400">
+                      Session {record.sessionId.slice(0, 8)}
+                    </p>
                   </article>
                 ))
               )}
@@ -1101,7 +1183,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </option>
                 ))}
               </select>
-              <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="roundNumber">
+              <label
+                className="mt-4 block text-sm font-semibold text-metal-300"
+                htmlFor="roundNumber"
+              >
                 Round
               </label>
               <select
