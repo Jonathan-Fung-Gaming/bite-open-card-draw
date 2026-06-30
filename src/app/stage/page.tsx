@@ -230,6 +230,7 @@ export default async function StagePage() {
               label={view.bothSetsDrawn ? "Voting Window" : "Draw Status"}
               minutes={view.bothSetsDrawn ? formatVotingTime(snapshot.remainingMs) : "--:--"}
               targetTime={snapshot.canSubmit ? snapshot.closesAt : null}
+              serverNowMs={serverNowMs}
               paused={snapshot.status === "voting_paused"}
               caption={stageTimerCaption(snapshot, view.bothSetsDrawn)}
               compact

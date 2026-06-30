@@ -48,16 +48,21 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
   const shortRoomUrl = formatShortEventUrl(roomUrl);
 
   return (
-    <section className={clsx("metal-panel rounded-lg", compact ? "p-3" : "p-4")} data-testid="room-qr-panel">
+    <section
+      className={clsx("metal-panel rounded-lg", compact ? "p-3" : "p-4")}
+      data-testid="room-qr-panel"
+    >
       <div className="flex items-center gap-3 text-ember-300">
         <QrCode aria-hidden="true" className={compact ? "h-5 w-5" : "h-6 w-6"} />
-        <p className="text-xs font-semibold uppercase tracking-[0.22em]">Scan to vote or view charts</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em]">
+          Scan to vote or view charts
+        </p>
       </div>
       <Link
         href={roomPath}
         className={clsx(
           "flex aspect-square w-full items-center justify-center rounded-md border border-ember-300/25 bg-white text-furnace-950 shadow-ember-tight",
-          compact ? "mt-3 max-w-36 p-2" : "mt-4 max-w-72 p-3",
+          compact ? "mt-3 max-w-40 p-2 2xl:max-w-56" : "mt-4 max-w-72 p-3",
         )}
         data-qr-target={roomUrl}
         data-testid="room-qr-link"

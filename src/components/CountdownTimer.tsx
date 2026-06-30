@@ -9,6 +9,7 @@ type CountdownTimerProps = {
   minutes?: string;
   caption?: string;
   targetTime?: string | null;
+  serverNowMs?: number;
   paused?: boolean;
   compact?: boolean;
 };
@@ -18,26 +19,36 @@ export function CountdownTimer({
   minutes,
   caption,
   targetTime,
+  serverNowMs,
   paused = false,
   compact = false,
 }: CountdownTimerProps) {
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => serverNowMs ?? Date.now());
 
   useEffect(() => {
     if (!targetTime || paused) {
       return undefined;
     }
 
-    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    const baseNowMs = serverNowMs ?? Date.now();
+    const basePerformanceMs = window.performance.now();
+    const updateNow = () => setNowMs(baseNowMs + window.performance.now() - basePerformanceMs);
+    const intervalId = window.setInterval(updateNow, 1000);
+
+    updateNow();
 
     return () => window.clearInterval(intervalId);
-  }, [paused, targetTime]);
+  }, [paused, serverNowMs, targetTime]);
 
   const targetMs = targetTime ? Date.parse(targetTime) : null;
-  const display = targetMs === null || paused ? (minutes ?? "--:--") : formatVotingTime(targetMs - nowMs);
+  const display =
+    targetMs === null || paused ? (minutes ?? "--:--") : formatVotingTime(targetMs - nowMs);
 
   return (
-    <div className={clsx("metal-panel rounded-lg", compact ? "px-4 py-3" : "px-5 py-4")} data-testid="stage-countdown">
+    <div
+      className={clsx("metal-panel rounded-lg", compact ? "px-4 py-3" : "px-5 py-4")}
+      data-testid="stage-countdown"
+    >
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">{label}</p>
       <div
         className={clsx(

@@ -44,6 +44,7 @@ import {
   updateChartExclusionAction,
 } from "./actions";
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
+import { AdminLiveRefresh } from "./_components/AdminLiveRefresh";
 import { AdminSessionHeartbeat } from "./_components/AdminSessionHeartbeat";
 import { DebugSnapshotDownload } from "./_components/DebugSnapshotDownload";
 import { AdminActionButton } from "./_components/AdminActionButton";
@@ -117,6 +118,44 @@ function resolveSelectedChartPool(value: string | undefined, fallbackRoundNumber
   );
 }
 
+function revealPhaseLabel(phase: string | null | undefined) {
+  switch (phase) {
+    case "computed":
+      return "Computed, not yet revealed";
+    case "set_1_counts":
+      return "Set 1 ban counts on stage";
+    case "set_1_resolved":
+      return "Set 1 selected chart on stage";
+    case "set_2_counts":
+      return "Set 2 ban counts on stage";
+    case "set_2_resolved":
+      return "Set 2 selected chart on stage";
+    case "final":
+      return "Final two charts on stage";
+    default:
+      return "No result computed";
+  }
+}
+
+function nextRevealActionLabel(phase: string | null | undefined) {
+  switch (phase) {
+    case "computed":
+      return "Advance to Set 1 counts";
+    case "set_1_counts":
+      return "Reveal Set 1 selected chart";
+    case "set_1_resolved":
+      return "Advance to Set 2 counts";
+    case "set_2_counts":
+      return "Reveal Set 2 selected chart";
+    case "set_2_resolved":
+      return "Show final charts";
+    case "final":
+      return "Final charts shown";
+    default:
+      return "Advance reveal";
+  }
+}
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const session = await getAdminSessionFromCookies();
   const params = await searchParams;
@@ -184,9 +223,22 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }));
   const chartPoolRows = buildChartPoolRows(adminState.drawStateStore.getCharts());
   const selectedChartPoolRow = chartPoolRows.find((row) => row.pool === selectedChartPool);
+  const resultRevealStarted = Boolean(result && result.revealPhase !== "computed");
+  const canReopenVoting =
+    canControl &&
+    !resultRevealStarted &&
+    (votingSnapshot.status === "voting_closed" || votingSnapshot.status === "results_computed");
+  const reopenDisabledReason = !canControl
+    ? "Take host control to reopen voting."
+    : resultRevealStarted
+      ? "Emergency reopen is blocked after result reveal starts. Use the correction workflow instead."
+      : votingSnapshot.status === "voting_closed" || votingSnapshot.status === "results_computed"
+        ? null
+        : "Emergency reopen is available only after voting closes and before result reveal starts.";
 
   return (
     <AdminLayout hostStatus={hostSnapshot.status}>
+      <AdminLiveRefresh />
       <AdminSessionHeartbeat />
       <HostHeartbeat active={hostSnapshot.status === "active"} />
       <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
@@ -624,8 +676,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </p>
             </div>
             <p className="mt-4 rounded border border-ember-300/25 bg-black/25 p-3 text-sm text-metal-300">
-              Revealing live counts is sensitive. Confirm the stage is ready before advancing.
+              Advancing reveal phases changes what public screens may show. Confirm the stage is
+              ready before each click.
             </p>
+            <div className="mt-3 grid gap-2 rounded border border-metal-700 bg-black/25 p-3 text-sm md:grid-cols-2">
+              <p className="text-metal-300">
+                Current phase:{" "}
+                <span className="font-bold text-white">
+                  {revealPhaseLabel(result?.revealPhase)}
+                </span>
+              </p>
+              <p className="text-metal-300">
+                Next action:{" "}
+                <span className="font-bold text-ember-300">
+                  {nextRevealActionLabel(result?.revealPhase)}
+                </span>
+              </p>
+            </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <AdminActionButton
                 action={computeResultsAction}
@@ -643,7 +710,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 disabled={!canControl || !result || result.revealPhase === "final"}
                 fields={{ roundNumber: currentRoundNumber }}
               >
-                Next Reveal Step
+                {nextRevealActionLabel(result?.revealPhase)}
               </AdminActionButton>
             </div>
             <div className="mt-4">
@@ -674,7 +741,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <DangerousActionDialog
                 action={`reopen Round ${currentRoundNumber} voting`}
                 consequence="invalidate any computed unrevealed result and allow ballot edits for the chosen duration"
-                disabled={!canControl}
+                disabled={!canReopenVoting}
                 passwordId="reopen-voting-password"
                 summaryItems={[
                   { label: "Round", fieldName: "roundNumber" },
@@ -690,7 +757,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <select
                   id="durationMinutes"
                   name="durationMinutes"
-                  disabled={!canControl}
+                  disabled={!canReopenVoting}
                   className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
                 >
                   <option value="1">1 minute</option>
@@ -709,13 +776,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   id="reopen-reason"
                   name="reason"
                   required
-                  disabled={!canControl}
+                  disabled={!canReopenVoting}
                   rows={3}
                   className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
                 />
+                {reopenDisabledReason ? (
+                  <p className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
+                    {reopenDisabledReason}
+                  </p>
+                ) : null}
                 <button
                   className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl}
+                  disabled={!canReopenVoting}
                   type="submit"
                 >
                   Reopen Voting
@@ -844,11 +916,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               >
                 <p className="sm:col-span-3 text-xs font-bold text-ember-300">
                   You are about to reroll a full round. This will replace both currently drawn sets
-                  for that round.
+                  for that round, invalidate any submitted ballots for that round, clear any
+                  computed result, and reset the voting window for that round.
                 </p>
                 <select
                   name="roundNumber"
                   disabled={!canControl}
+                  defaultValue={currentRoundNumber}
                   className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
                 >
                   <option value="1">Round 1</option>
@@ -926,7 +1000,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                             <p className="sm:col-span-3 text-xs font-bold text-ember-300">
                               You are about to reroll this chart. This will replace only this chart
                               in the active
-                              {` ${activeDraw.displayLabel}`} draw.
+                              {` ${activeDraw.displayLabel}`} draw, invalidate any submitted ballots
+                              for this round, clear any computed result, and reset the round voting
+                              window.
                             </p>
                             <input type="hidden" name="roundNumber" value={set.roundNumber} />
                             <input type="hidden" name="setOrder" value={set.setOrder} />
@@ -962,7 +1038,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       >
                         <p className="sm:col-span-3 text-xs font-bold text-ember-300">
                           You are about to reroll Round {set.roundNumber} - {set.displayLabel}. This
-                          will replace all currently drawn charts for this set.
+                          will replace all currently drawn charts for this set, invalidate any
+                          submitted ballots for this round, clear any computed result, and reset the
+                          round voting window.
                         </p>
                         <input type="hidden" name="roundNumber" value={set.roundNumber} />
                         <input type="hidden" name="setOrder" value={set.setOrder} />

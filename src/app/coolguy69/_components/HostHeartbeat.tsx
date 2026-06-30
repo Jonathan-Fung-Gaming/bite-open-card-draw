@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { refreshHostLockAction } from "../actions";
 
 type HostHeartbeatProps = {
@@ -8,17 +9,27 @@ type HostHeartbeatProps = {
 };
 
 export function HostHeartbeat({ active }: HostHeartbeatProps) {
+  const router = useRouter();
+
   useEffect(() => {
     if (!active) {
       return;
     }
 
     const interval = window.setInterval(() => {
-      void refreshHostLockAction();
+      void refreshHostLockAction()
+        .then((refreshed) => {
+          if (!refreshed) {
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          router.refresh();
+        });
     }, 5000);
 
     return () => window.clearInterval(interval);
-  }, [active]);
+  }, [active, router]);
 
   return null;
 }

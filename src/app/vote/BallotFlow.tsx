@@ -27,6 +27,7 @@ type BallotFlowProps = {
 const IDENTITY_STORAGE_KEY = "bite-open-card-draw:startgg-identity:v1";
 const DEVICE_STORAGE_KEY = "bite-open-card-draw:device-id:v1";
 const EDIT_TOKEN_STORAGE_KEY = "bite-open-card-draw:ballot-edit-tokens:v1";
+const SAVE_FAILURE_REASSURANCE = "Previous server-confirmed ballot remains valid.";
 
 function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
   return draws.map((draw) => ({
@@ -166,6 +167,18 @@ function describeChoice(draw: DrawRecord | undefined, choice: BallotSetChoice) {
   });
 
   return names.join(", ");
+}
+
+function saveFailureMessage(message: string) {
+  return message.includes(SAVE_FAILURE_REASSURANCE)
+    ? message
+    : `${message} ${SAVE_FAILURE_REASSURANCE}`;
+}
+
+function feedbackRole(message: string) {
+  return /failed|could not|not open|disabled|warning|another active device/i.test(message)
+    ? "alert"
+    : "status";
 }
 
 export function BallotFlow({
@@ -463,17 +476,25 @@ export function BallotFlow({
         setSavedAt(ballot.submittedAt);
         setMessage(`Saved revision ${ballot.revision}.`);
       } catch (error) {
+        if (existingBallot) {
+          setChoices(choicesFromBallot(draws, existingBallot));
+          setSavedAt(existingBallot.submittedAt);
+        }
+
         setMessage(
           error instanceof Error
-            ? error.message
-            : "Save failed. Previous server ballot remains valid.",
+            ? saveFailureMessage(error.message)
+            : saveFailureMessage("Save failed."),
         );
       }
     });
   }
 
   const presenceWarningBanner = presenceWarning ? (
-    <p className="mt-3 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">
+    <p
+      className="mt-3 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300"
+      role="alert"
+    >
       {presenceWarning}
     </p>
   ) : null;
@@ -546,14 +567,19 @@ export function BallotFlow({
           </p>
         ) : null}
         {warning ? (
-          <p className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
+          <p
+            className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300"
+            role="alert"
+          >
             {warning}
           </p>
         ) : null}
         {presenceWarningBanner}
         <button
           className="button-metal mt-5 w-full rounded px-4 py-3 font-black uppercase disabled:opacity-40"
-          disabled={!hydrated || !selectedPlayer || lookupPending || presencePending || !liveCanSubmit}
+          disabled={
+            !hydrated || !selectedPlayer || lookupPending || presencePending || !liveCanSubmit
+          }
           onClick={async () => {
             if (!selectedPlayer) {
               return;
@@ -572,7 +598,11 @@ export function BallotFlow({
           }}
           type="button"
         >
-          {presencePending ? "Checking username" : lookupPending ? "Checking saved ballot" : "Confirm"}
+          {presencePending
+            ? "Checking username"
+            : lookupPending
+              ? "Checking saved ballot"
+              : "Confirm"}
         </button>
       </section>
     );
@@ -614,7 +644,11 @@ export function BallotFlow({
             );
           })}
         </div>
-        {message ? <p className="mt-3 text-sm text-ember-300">{message}</p> : null}
+        {message ? (
+          <p className="mt-3 text-sm text-ember-300" role={feedbackRole(message)}>
+            {message}
+          </p>
+        ) : null}
         {liveCanSubmit ? (
           <button
             className="button-metal mt-5 rounded px-4 py-3 font-black uppercase"
@@ -671,7 +705,11 @@ export function BallotFlow({
             </div>
           ))}
         </div>
-        {message ? <p className="mt-3 text-sm text-ember-300">{message}</p> : null}
+        {message ? (
+          <p className="mt-3 text-sm text-ember-300" role={feedbackRole(message)}>
+            {message}
+          </p>
+        ) : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <button
             className="rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300"
@@ -710,6 +748,7 @@ export function BallotFlow({
         <p
           className="mt-3 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300"
           data-testid="ban-limit-feedback"
+          role="alert"
         >
           {selectionMessage}
         </p>
@@ -732,7 +771,7 @@ export function BallotFlow({
                 selected
                   ? "border-ember-300 bg-ember-900/40 shadow-ember-tight"
                   : "border-metal-700 bg-black/25",
-                index === 6 ? "col-span-2 mx-auto w-[calc((100%_-_0.75rem)/2)] min-w-40" : "",
+                index === 6 ? "col-span-2 mx-auto w-[calc((100%_-_0.75rem)/2)] min-w-0" : "",
               )}
               data-chart-image-path={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
               data-testid="ballot-chart-card"

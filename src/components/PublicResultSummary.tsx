@@ -100,8 +100,8 @@ export function PublicResultSummary({
                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300">
                         {row.chart.displayDifficulty}
                       </p>
-                      <p className="mt-1 truncate font-bold text-white">{row.chart.name}</p>
-                      <p className="truncate text-xs text-metal-300">{row.chart.artist}</p>
+                      <p className="mt-1 break-words font-bold text-white">{row.chart.name}</p>
+                      <p className="break-words text-xs text-metal-300">{row.chart.artist}</p>
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
                       <p className="font-mono font-black text-ember-300">

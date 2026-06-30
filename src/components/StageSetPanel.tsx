@@ -58,10 +58,15 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
       return;
     }
 
-    const intervalId = window.setInterval(() => setNowMs(Date.now()), 250);
+    const baseNowMs = serverNowMs ?? Date.now();
+    const basePerformanceMs = window.performance.now();
+    const updateNow = () => setNowMs(baseNowMs + window.performance.now() - basePerformanceMs);
+    const intervalId = window.setInterval(updateNow, 250);
+
+    updateNow();
 
     return () => window.clearInterval(intervalId);
-  }, [draw, revealStartsAt, revealedCount, set.drawCount]);
+  }, [draw, revealStartsAt, revealedCount, serverNowMs, set.drawCount]);
 
   return (
     <section

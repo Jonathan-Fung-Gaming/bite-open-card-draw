@@ -92,7 +92,9 @@ async function expectAdminRevealPhase(page: Page, phase: string) {
 }
 
 async function advanceRevealAndWaitForAdminPhase(page: Page, phase: string) {
-  const nextButton = page.getByRole("button", { name: "Next Reveal Step" });
+  const nextButton = page.getByRole("button", {
+    name: /Advance to Set 1 counts|Reveal Set 1 selected chart|Advance to Set 2 counts|Reveal Set 2 selected chart|Show final charts/,
+  });
 
   await expect(nextButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await nextButton.click();
