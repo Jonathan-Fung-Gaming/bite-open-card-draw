@@ -1,5 +1,8 @@
 import { spawnSync } from "node:child_process";
 import net from "node:net";
+import nextEnv from "@next/env";
+
+const { loadEnvConfig } = nextEnv;
 
 async function findOpenPort() {
   return new Promise((resolve, reject) => {
@@ -47,15 +50,24 @@ function sanitizeEnv(env) {
   );
 }
 
-const requestedArgs = process.argv.slice(2);
+const rawArgs = process.argv.slice(2);
+const skipBuildArg = rawArgs.includes("--skip-build");
+const requestedArgs = rawArgs.filter((arg) => arg !== "--skip-build");
+loadEnvConfig(process.cwd());
+const usesLoadConfig = requestedArgs.some((arg) => arg.includes("playwright.load.config"));
+const usesPhase9Config = requestedArgs.some((arg) => arg.includes("playwright.phase9.config"));
 const e2ePort = process.env.E2E_PORT || (await findOpenPort());
 const e2eBaseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
+const e2eServerMode = process.env.E2E_SERVER_MODE || (usesLoadConfig || usesPhase9Config ? "dev" : "start");
+const skipBuild = skipBuildArg || process.env.E2E_SKIP_BUILD === "1" || e2eServerMode === "dev";
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
 const env = sanitizeEnv({
   ...process.env,
+  NODE_ENV: "production",
   E2E_PORT: e2ePort,
   E2E_BASE_URL: e2eBaseURL,
+  E2E_SERVER_MODE: e2eServerMode,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || e2eBaseURL,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "local-anon-key",
@@ -64,5 +76,7 @@ const env = sanitizeEnv({
   TOURNAMENT_TEST_PUBLIC_SITE_URL: process.env.TOURNAMENT_TEST_PUBLIC_SITE_URL || e2eBaseURL,
 });
 
-run(npmCommand, ["run", "build"], env);
+if (!skipBuild) {
+  run(npmCommand, ["run", "build"], env);
+}
 run(npxCommand, ["playwright", ...requestedArgs], env);

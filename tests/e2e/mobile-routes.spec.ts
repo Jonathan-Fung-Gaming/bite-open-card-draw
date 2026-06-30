@@ -86,7 +86,12 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async (
   } else {
     await goto(page, "/charts");
     const statusText = (await page.getByTestId("view-only-status").textContent()) ?? "";
-    test.skip(!statusText.includes("Voting open"), "WebKit public-route coverage needs the mobile Chromium setup state.");
+
+    if (!statusText.includes("Voting open")) {
+      await loginAndTakeHost(page);
+      await startRehearsalMode(page);
+      await drawBothSetsAndOpenVoting(page);
+    }
   }
 
   await goto(page, "/room");

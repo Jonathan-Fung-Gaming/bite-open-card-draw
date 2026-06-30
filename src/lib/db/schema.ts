@@ -13,6 +13,7 @@ export const CORE_DATABASE_TABLES = [
   "voting_windows",
   "round_player_eligibility",
   "active_voter_presence",
+  "rate_limit_buckets",
   "ballots",
   "ballot_choices",
   "ballot_revisions",
@@ -23,6 +24,7 @@ export const CORE_DATABASE_TABLES = [
   "admin_sessions",
   "admin_actions",
   "host_locks",
+  "event_persistence_locks",
   "image_assets",
   "tournament_state_snapshots",
 ] as const;
@@ -38,6 +40,7 @@ export const EVENT_SCOPED_DATABASE_TABLES = [
   "voting_windows",
   "round_player_eligibility",
   "active_voter_presence",
+  "rate_limit_buckets",
   "ballots",
   "ballot_choices",
   "ballot_revisions",
@@ -48,6 +51,7 @@ export const EVENT_SCOPED_DATABASE_TABLES = [
   "admin_sessions",
   "admin_actions",
   "host_locks",
+  "event_persistence_locks",
 ] as const satisfies readonly CoreDatabaseTable[];
 
 export type EventScopedDatabaseTable = (typeof EVENT_SCOPED_DATABASE_TABLES)[number];
@@ -70,6 +74,7 @@ export const SERVER_ONLY_SECRET_ENV_KEYS = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "ADMIN_PASSWORD_HASH",
   "SESSION_SECRET",
+  "TOURNAMENT_TEST_ROUTE_TOKEN",
 ] as const;
 
 export const PUBLIC_BROWSER_ENV_KEYS = [

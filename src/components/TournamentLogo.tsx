@@ -22,7 +22,7 @@ export function TournamentLogo({ className, priority = false, size = "standard" 
         fill
         priority={priority}
         sizes={size === "compact" ? "(max-width: 640px) 112px, 144px" : "(max-width: 640px) 176px, 224px"}
-        className="object-contain drop-shadow-[0_0_18px_rgba(255,122,26,0.45)]"
+        className="pointer-events-none object-contain drop-shadow-[0_0_18px_rgba(255,122,26,0.45)]"
       />
     </div>
   );

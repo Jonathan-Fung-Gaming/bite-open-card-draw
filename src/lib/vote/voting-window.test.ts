@@ -4,6 +4,7 @@ import {
   ONE_MINUTE_MS,
   TEN_MINUTES_MS,
   VotingWindowStore,
+  formatVotingTime,
 } from "./voting-window";
 
 const players = [
@@ -30,6 +31,12 @@ function snapshot(
 }
 
 describe("voting window store", () => {
+  it("formats countdowns as fixed-width MM:SS", () => {
+    expect(formatVotingTime(9 * 60 * 1000 + 55 * 1000)).toBe("09:55");
+    expect(formatVotingTime(TEN_MINUTES_MS)).toBe("10:00");
+    expect(formatVotingTime(0)).toBe("00:00");
+  });
+
   it("opens one 10-minute window from server time after both sets are drawn", () => {
     const store = new VotingWindowStore(() => 1_000);
 
@@ -87,9 +94,46 @@ describe("voting window store", () => {
     expect(finalWarning.remainingMs).toBe(FINAL_CHANGE_MS);
     expect(finalWarning.canSubmit).toBe(true);
 
-    const closed = snapshot(store, ["player-1", "player-2"], 5_000 + FINAL_CHANGE_MS, players.slice(0, 2));
+    const closed = snapshot(
+      store,
+      ["player-1", "player-2"],
+      5_000 + FINAL_CHANGE_MS,
+      players.slice(0, 2),
+    );
 
     expect(closed.status).toBe("voting_closed");
+  });
+
+  it("enters final-change mode when every eligible player submits during the one-minute extension", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+
+    store.advanceVoting(1, ["player-1", "player-2"], TEN_MINUTES_MS);
+    expect(snapshot(store, ["player-1", "player-2"], TEN_MINUTES_MS).status).toBe(
+      "extension_1_minute",
+    );
+
+    store.advanceVoting(
+      1,
+      ["player-1", "player-2", "player-3", "player-4"],
+      TEN_MINUTES_MS + 15_000,
+    );
+
+    const finalWarning = snapshot(
+      store,
+      ["player-1", "player-2", "player-3", "player-4"],
+      TEN_MINUTES_MS + 15_000,
+    );
+
+    expect(finalWarning.status).toBe("final_30_seconds");
+    expect(finalWarning.canSubmit).toBe(true);
+    expect(finalWarning.remainingMs).toBe(FINAL_CHANGE_MS);
   });
 
   it("derives deadline status without mutating snapshots", () => {

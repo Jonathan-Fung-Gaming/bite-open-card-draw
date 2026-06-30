@@ -333,6 +333,24 @@ export type Database = {
           user_agent?: string | null;
         }
       >;
+      rate_limit_buckets: TableDefinition<
+        {
+          event_id: string;
+          bucket_key_hash: string;
+          count: number;
+          reset_at: Timestamp;
+          created_at: Timestamp;
+          updated_at: Timestamp;
+        },
+        {
+          event_id?: string;
+          bucket_key_hash: string;
+          count?: number;
+          reset_at: Timestamp;
+          created_at?: Timestamp;
+          updated_at?: Timestamp;
+        }
+      >;
       ballots: TableDefinition<
         {
           id: Uuid;
@@ -549,6 +567,20 @@ export type Database = {
           released_at?: Timestamp | null;
         }
       >;
+      event_persistence_locks: TableDefinition<
+        {
+          event_id: string;
+          lock_token: string;
+          locked_until: Timestamp;
+          updated_at: Timestamp;
+        },
+        {
+          event_id: string;
+          lock_token: string;
+          locked_until: Timestamp;
+          updated_at?: Timestamp;
+        }
+      >;
       image_assets: TableDefinition<
         {
           id: Uuid;
@@ -589,6 +621,7 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       normalized_submit_ballot: NormalizedRuntimeRpc;
+      normalized_check_rate_limit: NormalizedRuntimeRpc;
       normalized_manual_ballot_override: NormalizedRuntimeRpc;
       normalized_claim_voter_presence: NormalizedRuntimeRpc;
       normalized_touch_voter_presence: NormalizedRuntimeRpc;
@@ -615,6 +648,25 @@ export type Database = {
       normalized_touch_admin_session: NormalizedRuntimeRpc;
       normalized_logout_admin_session: NormalizedRuntimeRpc;
       normalized_revoke_admin_session: NormalizedRuntimeRpc;
+      normalized_database_time: {
+        Args: Record<string, never>;
+        Returns: Timestamp;
+      };
+      normalized_acquire_event_persistence_lock: {
+        Args: {
+          p_event_id: string;
+          p_lock_token: string;
+          p_locked_until: Timestamp;
+        };
+        Returns: boolean;
+      };
+      normalized_release_event_persistence_lock: {
+        Args: {
+          p_event_id: string;
+          p_lock_token: string;
+        };
+        Returns: boolean;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

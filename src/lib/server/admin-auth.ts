@@ -79,7 +79,7 @@ export async function requireAdminSession() {
 
 export async function createAdminSessionCookie(password: string) {
   assertMaxStringLength(password, "Admin password", ADMIN_PASSWORD_MAX_LENGTH);
-  assertRateLimit({
+  await assertRateLimit({
     key: await getRequestRateLimitKey("admin-login"),
     limit: 12,
     windowMs: 5 * 60 * 1000,
@@ -175,7 +175,7 @@ export async function clearHostTokenCookie() {
 
 export async function verifyDangerousActionPassword(password: string) {
   assertMaxStringLength(password, "Admin password", ADMIN_PASSWORD_MAX_LENGTH);
-  assertRateLimit({
+  await assertRateLimit({
     key: await getRequestRateLimitKey("dangerous-admin-password"),
     limit: 30,
     windowMs: 5 * 60 * 1000,

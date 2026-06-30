@@ -11,6 +11,7 @@ import { hydrateTournamentState } from "@/lib/server/persistence";
 import { getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
+import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { formatVotingTime, type VotingRoundSnapshot } from "@/lib/vote/voting-window";
 import { StageAutoRefresh } from "./StageAutoRefresh";
 
@@ -110,10 +111,10 @@ export default async function StagePage() {
   await hydrateTournamentState();
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
+  const serverNowMs = await getAuthoritativeNowMs();
   const view = buildStageRoundView(adminState.drawStateStore, roundNumber);
-  const snapshot = getVotingRoundSnapshot(roundNumber);
+  const snapshot = getVotingRoundSnapshot(roundNumber, serverNowMs);
   const result = adminState.resultStore.getRoundResult(roundNumber);
-  const serverNowMs = Date.now();
 
   if (result) {
     const [setOne, setTwo] = result.sets;
@@ -123,9 +124,16 @@ export default async function StagePage() {
         <>
           <StageAutoRefresh />
           <main className="min-h-screen">
-            <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Stable final screen" compact />
+            <RoundHeader
+              title={`ROUND ${roundNumber} FINAL CHARTS`}
+              status="Stable final screen"
+              compact
+            />
             <section className="px-5 py-5 lg:px-8">
-              <div className="grid min-h-[calc(100vh-220px)] gap-6 md:grid-cols-2" data-testid="stage-final-chart-list">
+              <div
+                className="grid min-h-[calc(100vh-220px)] gap-6 md:grid-cols-2"
+                data-testid="stage-final-chart-list"
+              >
                 {result.sets.map((set, index) => (
                   <section key={set.roundSetId} className="grid content-stretch gap-3">
                     <div className="flex items-center justify-between gap-3">

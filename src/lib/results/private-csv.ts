@@ -78,10 +78,12 @@ export function generatePrivateBallotCsv(input: {
 
   for (const player of result.eligiblePlayers) {
     const ballot = ballotsByPlayer.get(player.id);
-    const setOneChoice = ballot?.choices.find((choice) => choice.drawId === setOne.drawId);
-    const setTwoChoice = ballot?.choices.find((choice) => choice.drawId === setTwo.drawId);
-    const setOneBans = setOneChoice?.bannedChartIds.map((chartId) => chartNames.get(chartId) ?? chartId) ?? [];
-    const setTwoBans = setTwoChoice?.bannedChartIds.map((chartId) => chartNames.get(chartId) ?? chartId) ?? [];
+    const setOneChoice = ballot?.choices.find((choice) => choice?.drawId === setOne.drawId);
+    const setTwoChoice = ballot?.choices.find((choice) => choice?.drawId === setTwo.drawId);
+    const setOneBans =
+      setOneChoice?.bannedChartIds.map((chartId) => chartNames.get(chartId) ?? chartId) ?? [];
+    const setTwoBans =
+      setTwoChoice?.bannedChartIds.map((chartId) => chartNames.get(chartId) ?? chartId) ?? [];
 
     rows.push(
       [
@@ -125,7 +127,9 @@ export function generatePrivateBallotCsv(input: {
         setTwo.tiebreakCandidateIds.join("|"),
         setTwo.tiebreakWinnerChartId ?? "",
         setTwo.winnerRevealStartedAt ?? "",
-      ].map(escapeCsv).join(","),
+      ]
+        .map(escapeCsv)
+        .join(","),
     );
   }
 

@@ -21,7 +21,7 @@ describe("CI and secret hygiene", () => {
       "npm run cache:chart-images -- --fallback-only",
       "npm audit --omit=dev",
       "npm run build",
-      "npm run test:e2e",
+      "npm run test:e2e:no-build",
     ]) {
       expect(workflow).toContain(command);
     }

@@ -30,7 +30,8 @@ export type NormalizedRepositoryBoundary =
   | "results"
   | "adminSessions"
   | "adminAudit"
-  | "hostLocks";
+  | "hostLocks"
+  | "rateLimits";
 
 type RepositoryDefinition<TTable extends EventScopedDatabaseTable> = {
   boundary: NormalizedRepositoryBoundary;
@@ -80,7 +81,8 @@ const BALLOT_TABLES = [
 const RESULT_TABLES = ["result_snapshots", "result_rows", "tiebreaks"] as const;
 const ADMIN_SESSION_TABLES = ["admin_sessions"] as const;
 const ADMIN_AUDIT_TABLES = ["admin_actions"] as const;
-const HOST_LOCK_TABLES = ["host_locks"] as const;
+const HOST_LOCK_TABLES = ["host_locks", "event_persistence_locks"] as const;
+const RATE_LIMIT_TABLES = ["rate_limit_buckets"] as const;
 
 export class PlayerRepository extends EventScopedRepository<(typeof PLAYER_TABLES)[number]> {
   constructor(dependencies?: RepositoryDependencies) {
@@ -152,6 +154,12 @@ export class HostLockRepository extends EventScopedRepository<(typeof HOST_LOCK_
   }
 }
 
+export class RateLimitRepository extends EventScopedRepository<(typeof RATE_LIMIT_TABLES)[number]> {
+  constructor(dependencies?: RepositoryDependencies) {
+    super({ boundary: "rateLimits", tables: RATE_LIMIT_TABLES }, dependencies);
+  }
+}
+
 export type NormalizedRuntimeRepositories = {
   playerRepository: PlayerRepository;
   chartExclusionRepository: ChartExclusionRepository;
@@ -163,6 +171,7 @@ export type NormalizedRuntimeRepositories = {
   adminSessionRepository: AdminSessionRepository;
   adminAuditRepository: AdminAuditRepository;
   hostLockRepository: HostLockRepository;
+  rateLimitRepository: RateLimitRepository;
 };
 
 export function createNormalizedRuntimeRepositories(
@@ -184,5 +193,6 @@ export function createNormalizedRuntimeRepositories(
     adminSessionRepository: new AdminSessionRepository(sharedDependencies),
     adminAuditRepository: new AdminAuditRepository(sharedDependencies),
     hostLockRepository: new HostLockRepository(sharedDependencies),
+    rateLimitRepository: new RateLimitRepository(sharedDependencies),
   };
 }

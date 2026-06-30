@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { deterministicUuid } from "@/lib/charts/normalize";
 import { loadRuntimeCharts } from "@/lib/charts/runtime-catalog";
 import type { NormalizedChart } from "@/lib/charts/types";
@@ -7,9 +8,14 @@ import type { DrawnChartSummary } from "@/lib/draw/draw-engine";
 import { toDrawnChartSummary } from "@/lib/draw/draw-engine";
 import {
   OPERATIONAL_STATE_SCHEMA_VERSION,
+  cloneOperationalStateSnapshot,
   type OperationalStateSnapshot,
 } from "@/lib/persistence/operational-state";
-import type { OperationalStateRepository } from "@/lib/persistence/repository";
+import { mergeOperationalStateSnapshots } from "@/lib/persistence/merge";
+import type {
+  OperationalStateRepository,
+  PersistMergedStateInput,
+} from "@/lib/persistence/repository";
 import type { ResultRevealPhase, ResultSetSnapshot } from "@/lib/results/result-engine";
 import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
 import type { BallotSetChoice, PhoneRoundStatus, RoundBallot } from "@/lib/vote/ballot";
@@ -26,16 +32,29 @@ type SupabaseError = {
 };
 
 type EventSelectBuilder<TTable extends TableName> = {
-  eq(column: string, value: string): Promise<{
+  eq(
+    column: string,
+    value: string,
+  ): Promise<{
     data: TableRow<TTable>[] | null;
     error: SupabaseError | null;
   }>;
 };
 
 type DeleteBuilder = {
-  eq(column: string, value: string): Promise<{
+  eq(
+    column: string,
+    value: string,
+  ): Promise<{
     error: SupabaseError | null;
-  }>;
+  }> & {
+    in(
+      column: string,
+      values: string[],
+    ): Promise<{
+      error: SupabaseError | null;
+    }>;
+  };
 };
 
 type NormalizedTableClient<TTable extends TableName> = {
@@ -43,14 +62,27 @@ type NormalizedTableClient<TTable extends TableName> = {
   insert(rows: TableInsert<TTable>[]): Promise<{
     error: SupabaseError | null;
   }>;
-  upsert(rows: TableInsert<TTable>[] | TableInsert<TTable>): Promise<{
+  upsert(
+    rows: TableInsert<TTable>[] | TableInsert<TTable>,
+    options?: { onConflict?: string },
+  ): Promise<{
     error: SupabaseError | null;
   }>;
   delete(): DeleteBuilder;
 };
 
+type NormalizedRuntimeRpcName =
+  "normalized_acquire_event_persistence_lock" | "normalized_release_event_persistence_lock";
+
 export type NormalizedOperationalSupabaseClient = {
   from<TTable extends TableName>(table: TTable): NormalizedTableClient<TTable>;
+  rpc(
+    functionName: NormalizedRuntimeRpcName,
+    args: Record<string, string>,
+  ): Promise<{
+    data: Json | null;
+    error: SupabaseError | null;
+  }>;
 };
 
 type NormalizedOperationalStateRepositoryDependencies = {
@@ -59,25 +91,27 @@ type NormalizedOperationalStateRepositoryDependencies = {
   now?: () => string;
 };
 
-const EVENT_TABLE_DELETE_ORDER: TableName[] = [
-  "active_voter_presence",
-  "host_locks",
-  "tiebreaks",
-  "result_rows",
-  "result_snapshots",
-  "ballot_invalidations",
-  "ballot_revisions",
-  "ballot_choices",
-  "ballots",
-  "voting_windows",
-  "round_player_eligibility",
-  "drawn_charts",
-  "draws",
-  "chart_exclusions",
-  "admin_actions",
-  "players",
-  "event_runtime_state",
+const EVENT_TABLE_DELETE_BATCHES: readonly (readonly TableName[])[] = [
+  [
+    "active_voter_presence",
+    "host_locks",
+    "tiebreaks",
+    "result_rows",
+    "ballot_invalidations",
+    "ballot_revisions",
+    "ballot_choices",
+    "round_player_eligibility",
+    "drawn_charts",
+    "chart_exclusions",
+    "voting_windows",
+  ],
+  ["result_snapshots", "ballots", "draws"],
+  ["admin_actions", "players", "event_runtime_state"],
 ];
+
+const EVENT_LOCK_TTL_MS = 30_000;
+const EVENT_LOCK_TIMEOUT_MS = 35_000;
+const EVENT_LOCK_RETRY_MS = 100;
 
 function createNormalizedSupabaseClient() {
   return createServiceRoleSupabaseClient() as unknown as NormalizedOperationalSupabaseClient;
@@ -93,7 +127,9 @@ function asEligiblePlayers(value: Json | null | undefined): EligiblePlayerSnapsh
   return Array.isArray(value)
     ? value
         .map((entry) => asRecord(entry as Json))
-        .filter((entry) => typeof entry.id === "string" && typeof entry.startggUsername === "string")
+        .filter(
+          (entry) => typeof entry.id === "string" && typeof entry.startggUsername === "string",
+        )
         .map((entry) => ({
           id: entry.id as string,
           startggUsername: entry.startggUsername as string,
@@ -107,6 +143,14 @@ function isoFromMs(value: number) {
 
 function msFromIso(value: string) {
   return Date.parse(value);
+}
+
+function stableJson(value: unknown) {
+  return JSON.stringify(value ?? null);
+}
+
+function ballotPersistenceKey(ballot: RoundBallot) {
+  return `${ballot.roundNumber}:${ballot.playerId}`;
 }
 
 function isUuid(value: string | null | undefined): value is string {
@@ -187,11 +231,18 @@ function buildWheelSlots(candidates: DrawnChartSummary[], zeroBallotTiebreak = f
     return [];
   }
 
-  return Array.from({ length: 12 }, (_, index) => candidates[index % candidates.length] as DrawnChartSummary);
+  return Array.from(
+    { length: 12 },
+    (_, index) => candidates[index % candidates.length] as DrawnChartSummary,
+  );
 }
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export class NormalizedOperationalStateRepository implements OperationalStateRepository {
@@ -206,6 +257,60 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
   }
 
   async load(): Promise<OperationalStateSnapshot | null> {
+    return this.loadUnlocked();
+  }
+
+  async save(snapshot: OperationalStateSnapshot): Promise<void> {
+    await this.withEventPersistenceLock(() => this.saveUnlocked(snapshot));
+  }
+
+  async persistMerged(input: PersistMergedStateInput): Promise<OperationalStateSnapshot> {
+    return this.withEventPersistenceLock(async () => {
+      const latest = await this.loadUnlocked();
+      const merged = mergeOperationalStateSnapshots({
+        ...input,
+        latest,
+      });
+
+      await this.saveUnlocked(merged);
+
+      return cloneOperationalStateSnapshot(merged);
+    });
+  }
+
+  async persistHostLock(hostLock: OperationalStateSnapshot["hostLock"]): Promise<void> {
+    await this.saveHostLockOnlyUnlocked(hostLock);
+  }
+
+  async persistVotingState(input: PersistMergedStateInput): Promise<OperationalStateSnapshot> {
+    return this.withEventPersistenceLock(async () => {
+      const latest = await this.loadUnlocked();
+      const merged = mergeOperationalStateSnapshots({
+        ...input,
+        latest,
+      });
+
+      await this.saveVotingStateUnlocked(merged, input);
+
+      return cloneOperationalStateSnapshot(merged);
+    });
+  }
+
+  async persistVotingAdminState(input: PersistMergedStateInput): Promise<OperationalStateSnapshot> {
+    return this.withEventPersistenceLock(async () => {
+      const latest = await this.loadUnlocked();
+      const merged = mergeOperationalStateSnapshots({
+        ...input,
+        latest,
+      });
+
+      await this.saveVotingAdminStateUnlocked(merged);
+
+      return cloneOperationalStateSnapshot(merged);
+    });
+  }
+
+  private async loadUnlocked(): Promise<OperationalStateSnapshot | null> {
     const [
       runtimeState,
       players,
@@ -257,7 +362,13 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
 
     const chartSummaries = this.loadRuntimeChartSummaries();
     const drawHistory = this.buildDrawHistory(draws, drawnCharts, chartSummaries);
-    const results = this.buildResults(resultSnapshots, resultRows, tiebreaks, draws, chartSummaries);
+    const results = this.buildResults(
+      resultSnapshots,
+      resultRows,
+      tiebreaks,
+      draws,
+      chartSummaries,
+    );
     const phoneStatus = this.buildPhoneStatus(votingWindows, results);
 
     return {
@@ -275,7 +386,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
               sessionId:
                 typeof metadata.sessionId === "string"
                   ? metadata.sessionId
-                  : row.admin_session_id ?? "unknown-session",
+                  : (row.admin_session_id ?? "unknown-session"),
               action: row.action_type,
               summary: row.action_summary,
               reason: row.reason,
@@ -292,7 +403,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         lock:
           hostLocks.length > 0
             ? {
-                ownerSessionId: hostLocks[0]?.owner_session_id ?? hostLocks[0]?.admin_session_id ?? "",
+                ownerSessionId:
+                  hostLocks[0]?.owner_session_id ?? hostLocks[0]?.admin_session_id ?? "",
                 hostTokenHash: hostLocks[0]?.host_token_hash ?? "",
                 acquiredAt: msFromIso(hostLocks[0]?.acquired_at ?? this.now()),
                 heartbeatAt: msFromIso(hostLocks[0]?.heartbeat_at ?? this.now()),
@@ -369,7 +481,9 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
           pausedFromStatus: row.paused_from_status as never,
           remainingMsWhenPaused:
             row.remaining_ms_when_paused ??
-            (row.remaining_seconds_at_pause === null ? null : row.remaining_seconds_at_pause * 1000),
+            (row.remaining_seconds_at_pause === null
+              ? null
+              : row.remaining_seconds_at_pause * 1000),
           updatedAt: row.updated_at,
         })),
       },
@@ -383,19 +497,267 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     };
   }
 
-  async save(snapshot: OperationalStateSnapshot): Promise<void> {
-    for (const table of EVENT_TABLE_DELETE_ORDER) {
-      await this.deleteEventRows(table);
+  private async saveUnlocked(snapshot: OperationalStateSnapshot): Promise<void> {
+    await this.deleteEventRowsInBatches();
+
+    await Promise.all([
+      this.saveRuntimeState(snapshot),
+      this.saveCharts(snapshot),
+      this.savePlayers(snapshot),
+      this.saveAdminActions(snapshot),
+    ]);
+
+    await Promise.all([this.saveChartExclusions(snapshot), this.saveDraws(snapshot)]);
+
+    await this.saveVotingWindows(snapshot);
+
+    await Promise.all([
+      this.saveBallots(snapshot),
+      this.saveResults(snapshot),
+      this.saveBallotInvalidations(snapshot),
+      this.savePresence(snapshot),
+      this.saveHostLock(snapshot),
+    ]);
+  }
+
+  private async saveHostLockOnlyUnlocked(hostLock: OperationalStateSnapshot["hostLock"]) {
+    if (!hostLock.lock) {
+      await this.deleteEventRows("host_locks");
+      return;
     }
 
+    await this.upsertOne(
+      "host_locks",
+      {
+        event_id: this.eventId,
+        lock_name: "tournament-host",
+        admin_session_id: isUuid(hostLock.lock.ownerSessionId)
+          ? hostLock.lock.ownerSessionId
+          : null,
+        owner_session_id: hostLock.lock.ownerSessionId,
+        host_token_hash: hostLock.lock.hostTokenHash,
+        acquired_at: isoFromMs(hostLock.lock.acquiredAt),
+        heartbeat_at: isoFromMs(hostLock.lock.heartbeatAt),
+        expires_at: isoFromMs(hostLock.lock.expiresAt),
+      },
+      { onConflict: "event_id,lock_name" },
+    );
+  }
+
+  private async saveVotingStateUnlocked(
+    snapshot: OperationalStateSnapshot,
+    changedInput?: PersistMergedStateInput,
+  ) {
+    const changedBallots = this.getChangedVotingBallots(snapshot, changedInput);
+
+    await this.deleteEventRows("active_voter_presence");
+    await Promise.all([
+      this.deleteEventRowsByColumnValues(
+        "ballot_revisions",
+        "ballot_id",
+        changedBallots.map((ballot) => ballot.id),
+      ),
+      this.deleteEventRowsByColumnValues(
+        "ballot_choices",
+        "ballot_id",
+        changedBallots.map((ballot) => ballot.id),
+      ),
+    ]);
+    await this.upsertVotingWindows(snapshot);
+    await Promise.all([this.saveBallots(snapshot, changedBallots), this.savePresence(snapshot)]);
+  }
+
+  private async saveVotingAdminStateUnlocked(snapshot: OperationalStateSnapshot) {
+    await Promise.all([
+      this.deleteEventRows("active_voter_presence"),
+      this.deleteEventRows("ballot_revisions"),
+      this.deleteEventRows("ballot_choices"),
+      this.deleteEventRows("round_player_eligibility"),
+      this.deleteEventRows("admin_actions"),
+    ]);
+    await Promise.all([this.deleteEventRows("voting_windows"), this.deleteEventRows("ballots")]);
+
+    await Promise.all([this.saveVotingWindows(snapshot), this.saveAdminActions(snapshot)]);
+    await Promise.all([
+      this.saveBallots(snapshot),
+      this.savePresence(snapshot),
+      this.saveHostLockOnlyUnlocked(snapshot.hostLock),
+    ]);
+  }
+
+  private getChangedVotingBallots(
+    snapshot: OperationalStateSnapshot,
+    changedInput?: PersistMergedStateInput,
+  ) {
+    if (!changedInput?.baseline) {
+      return snapshot.ballot.ballots;
+    }
+
+    const baseline = new Map(
+      changedInput.baseline.ballot.ballots.map((ballot) => [ballotPersistenceKey(ballot), ballot]),
+    );
+    const current = new Map(
+      changedInput.current.ballot.ballots.map((ballot) => [ballotPersistenceKey(ballot), ballot]),
+    );
+    const changedKeys = new Set<string>();
+
+    for (const [key, currentBallot] of current) {
+      if (stableJson(baseline.get(key)) !== stableJson(currentBallot)) {
+        changedKeys.add(key);
+      }
+    }
+
+    return snapshot.ballot.ballots.filter((ballot) =>
+      changedKeys.has(ballotPersistenceKey(ballot)),
+    );
+  }
+
+  private async withEventPersistenceLock<T>(callback: () => Promise<T>) {
+    const lockToken = await this.acquireEventPersistenceLock();
+
+    try {
+      return await callback();
+    } finally {
+      await this.releaseEventPersistenceLock(lockToken);
+    }
+  }
+
+  private async acquireEventPersistenceLock() {
+    const lockToken = randomUUID();
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < EVENT_LOCK_TIMEOUT_MS) {
+      const lockedUntil = new Date(Date.now() + EVENT_LOCK_TTL_MS).toISOString();
+      const { data, error } = await this.supabase.rpc("normalized_acquire_event_persistence_lock", {
+        p_event_id: this.eventId,
+        p_lock_token: lockToken,
+        p_locked_until: lockedUntil,
+      });
+
+      if (error) {
+        throw new Error(`Could not acquire normalized runtime event lock: ${error.message}`);
+      }
+
+      if (data === true) {
+        return lockToken;
+      }
+
+      await sleep(EVENT_LOCK_RETRY_MS);
+    }
+
+    throw new Error(
+      `Timed out waiting for normalized runtime event lock for event ${this.eventId}.`,
+    );
+  }
+
+  private async releaseEventPersistenceLock(lockToken: string) {
+    const { error } = await this.supabase.rpc("normalized_release_event_persistence_lock", {
+      p_event_id: this.eventId,
+      p_lock_token: lockToken,
+    });
+
+    if (error) {
+      throw new Error(`Could not release normalized runtime event lock: ${error.message}`);
+    }
+  }
+
+  private async selectEventRows<TTable extends TableName>(table: TTable) {
+    const { data, error } = await this.supabase
+      .from(table)
+      .select("*")
+      .eq("event_id", this.eventId);
+
+    if (error) {
+      throw new Error(`Could not load ${table} normalized runtime rows: ${error.message}`);
+    }
+
+    return data ?? [];
+  }
+
+  private async deleteEventRows(table: TableName) {
+    const { error } = await this.supabase.from(table).delete().eq("event_id", this.eventId);
+
+    if (error) {
+      throw new Error(`Could not clear ${table} normalized runtime rows: ${error.message}`);
+    }
+  }
+
+  private async deleteEventRowsByColumnValues(table: TableName, column: string, values: string[]) {
+    if (values.length === 0) {
+      return;
+    }
+
+    const { error } = await this.supabase
+      .from(table)
+      .delete()
+      .eq("event_id", this.eventId)
+      .in(column, values);
+
+    if (error) {
+      throw new Error(`Could not clear ${table} normalized runtime rows: ${error.message}`);
+    }
+  }
+
+  private async deleteEventRowsInBatches() {
+    for (const batch of EVENT_TABLE_DELETE_BATCHES) {
+      await Promise.all(batch.map((table) => this.deleteEventRows(table)));
+    }
+  }
+
+  private async insertMany<TTable extends TableName>(table: TTable, rows: TableInsert<TTable>[]) {
+    if (rows.length === 0) {
+      return;
+    }
+
+    const { error } = await this.supabase.from(table).insert(rows);
+
+    if (error) {
+      throw new Error(`Could not insert ${table} normalized runtime rows: ${error.message}`);
+    }
+  }
+
+  private async upsertMany<TTable extends TableName>(
+    table: TTable,
+    rows: TableInsert<TTable>[],
+    options?: { onConflict?: string },
+  ) {
+    if (rows.length === 0) {
+      return;
+    }
+
+    const { error } = await this.supabase.from(table).upsert(rows, options);
+
+    if (error) {
+      throw new Error(`Could not upsert ${table} normalized runtime rows: ${error.message}`);
+    }
+  }
+
+  private async upsertOne<TTable extends TableName>(
+    table: TTable,
+    row: TableInsert<TTable>,
+    options?: { onConflict?: string },
+  ) {
+    const { error } = await this.supabase.from(table).upsert(row, options);
+
+    if (error) {
+      throw new Error(`Could not upsert ${table} normalized runtime row: ${error.message}`);
+    }
+  }
+
+  private loadRuntimeChartSummaries() {
+    return new Map(loadRuntimeCharts().map((chart) => [chart.id, toDrawnChartSummary(chart)]));
+  }
+
+  private async saveRuntimeState(snapshot: OperationalStateSnapshot) {
     await this.upsertOne("event_runtime_state", {
       event_id: this.eventId,
       current_round: snapshot.roundState.currentRound,
       rehearsal_mode: snapshot.roundState.rehearsalMode,
       updated_at: snapshot.savedAt,
     });
+  }
 
-    await this.saveCharts(snapshot);
+  private async savePlayers(snapshot: OperationalStateSnapshot) {
     await this.insertMany(
       "players",
       snapshot.roster.players.map((player) => ({
@@ -409,7 +771,9 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         updated_at: player.updatedAt,
       })),
     );
+  }
 
+  private async saveAdminActions(snapshot: OperationalStateSnapshot) {
     await this.insertMany(
       "admin_actions",
       snapshot.audit.records.map((record) => ({
@@ -430,79 +794,16 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         } as Json,
       })),
     );
-
-    await this.saveChartExclusions(snapshot);
-    await this.saveDraws(snapshot);
-    await this.saveVotingWindows(snapshot);
-    await this.saveBallots(snapshot);
-    await this.saveResults(snapshot);
-    await this.saveBallotInvalidations(snapshot);
-    await this.savePresence(snapshot);
-    await this.saveHostLock(snapshot);
-  }
-
-  private async selectEventRows<TTable extends TableName>(table: TTable) {
-    const { data, error } = await this.supabase.from(table).select("*").eq("event_id", this.eventId);
-
-    if (error) {
-      throw new Error(`Could not load ${table} normalized runtime rows: ${error.message}`);
-    }
-
-    return data ?? [];
-  }
-
-  private async deleteEventRows(table: TableName) {
-    const { error } = await this.supabase.from(table).delete().eq("event_id", this.eventId);
-
-    if (error) {
-      throw new Error(`Could not clear ${table} normalized runtime rows: ${error.message}`);
-    }
-  }
-
-  private async insertMany<TTable extends TableName>(table: TTable, rows: TableInsert<TTable>[]) {
-    if (rows.length === 0) {
-      return;
-    }
-
-    const { error } = await this.supabase.from(table).insert(rows);
-
-    if (error) {
-      throw new Error(`Could not insert ${table} normalized runtime rows: ${error.message}`);
-    }
-  }
-
-  private async upsertMany<TTable extends TableName>(table: TTable, rows: TableInsert<TTable>[]) {
-    if (rows.length === 0) {
-      return;
-    }
-
-    const { error } = await this.supabase.from(table).upsert(rows);
-
-    if (error) {
-      throw new Error(`Could not upsert ${table} normalized runtime rows: ${error.message}`);
-    }
-  }
-
-  private async upsertOne<TTable extends TableName>(table: TTable, row: TableInsert<TTable>) {
-    const { error } = await this.supabase.from(table).upsert(row);
-
-    if (error) {
-      throw new Error(`Could not upsert ${table} normalized runtime row: ${error.message}`);
-    }
-  }
-
-  private loadRuntimeChartSummaries() {
-    return new Map(loadRuntimeCharts().map((chart) => [chart.id, toDrawnChartSummary(chart)]));
   }
 
   private async saveCharts(snapshot: OperationalStateSnapshot) {
     const rows = new Map<string, TableInsert<"charts">>();
-
-    for (const chart of loadRuntimeCharts()) {
+    const runtimeChartsByKey = new Map(loadRuntimeCharts().map((chart) => [chart.chartKey, chart]));
+    const addNormalized = (chart: NormalizedChart) =>
       rows.set(chart.id, chartInsertFromNormalized(chart));
-    }
 
-    const addSummary = (chart: DrawnChartSummary) => rows.set(chart.id, chartInsertFromSummary(chart));
+    const addSummary = (chart: DrawnChartSummary) =>
+      rows.set(chart.id, chartInsertFromSummary(chart));
 
     for (const draw of snapshot.draw.drawHistory) {
       draw.charts.forEach(addSummary);
@@ -513,6 +814,14 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         set.rows.forEach((row) => addSummary(row.chart));
         addSummary(set.selectedChart);
         set.wheelSlots.forEach(addSummary);
+      }
+    }
+
+    for (const exclusion of snapshot.draw.chartExclusions ?? []) {
+      const chart = runtimeChartsByKey.get(exclusion.chartKey);
+
+      if (chart) {
+        addNormalized(chart);
       }
     }
 
@@ -581,7 +890,9 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         paused_at: window.pausedAt,
         paused_from_status: window.pausedFromStatus,
         remaining_seconds_at_pause:
-          window.remainingMsWhenPaused === null ? null : Math.ceil(window.remainingMsWhenPaused / 1000),
+          window.remainingMsWhenPaused === null
+            ? null
+            : Math.ceil(window.remainingMsWhenPaused / 1000),
         remaining_ms_when_paused: window.remainingMsWhenPaused,
         extension_used: window.extensionUsed,
         final_warning_started_at: window.finalWarningStartedAt,
@@ -621,10 +932,37 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     await this.insertMany("round_player_eligibility", [...rows.values()]);
   }
 
-  private async saveBallots(snapshot: OperationalStateSnapshot) {
-    await this.insertMany(
+  private async upsertVotingWindows(snapshot: OperationalStateSnapshot) {
+    await this.upsertMany(
+      "voting_windows",
+      snapshot.votingWindow.windows.map((window) => ({
+        event_id: this.eventId,
+        round_number: window.roundNumber,
+        status: window.status,
+        opened_at: window.openedAt,
+        closes_at: window.closesAt,
+        paused_at: window.pausedAt,
+        paused_from_status: window.pausedFromStatus,
+        remaining_seconds_at_pause:
+          window.remainingMsWhenPaused === null
+            ? null
+            : Math.ceil(window.remainingMsWhenPaused / 1000),
+        remaining_ms_when_paused: window.remainingMsWhenPaused,
+        extension_used: window.extensionUsed,
+        final_warning_started_at: window.finalWarningStartedAt,
+        closed_at: window.closedAt,
+        eligible_players: window.eligiblePlayers as unknown as Json,
+        created_at: window.openedAt,
+        updated_at: window.updatedAt,
+      })),
+      { onConflict: "event_id,round_number" },
+    );
+  }
+
+  private async saveBallots(snapshot: OperationalStateSnapshot, ballots = snapshot.ballot.ballots) {
+    await this.upsertMany(
       "ballots",
-      snapshot.ballot.ballots.map((ballot) => ({
+      ballots.map((ballot) => ({
         id: ballot.id,
         event_id: this.eventId,
         round_number: ballot.roundNumber,
@@ -640,10 +978,11 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         created_at: ballot.submittedAt,
         updated_at: ballot.submittedAt,
       })),
+      { onConflict: "event_id,round_number,player_id" },
     );
     await this.insertMany(
       "ballot_choices",
-      snapshot.ballot.ballots.flatMap((ballot) =>
+      ballots.flatMap((ballot) =>
         ballot.choices.map((choice) => ({
           event_id: this.eventId,
           ballot_id: ballot.id,
@@ -658,7 +997,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     );
     await this.insertMany(
       "ballot_revisions",
-      snapshot.ballot.ballots.map((ballot) => ({
+      ballots.map((ballot) => ({
         event_id: this.eventId,
         ballot_id: ballot.id,
         revision_number: ballot.revision,
@@ -813,13 +1152,21 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
           sameRoundBlockedSongKeysSnapshot: [...draw.same_round_blocked_song_keys_snapshot],
           charts: (drawnByDrawId.get(draw.id) ?? [])
             .sort((left, right) => left.draw_order - right.draw_order)
-            .map((row) => charts.get(row.chart_id) ?? fallbackChartSummary(row.chart_id, set.displayLabel)),
+            .map(
+              (row) =>
+                charts.get(row.chart_id) ?? fallbackChartSummary(row.chart_id, set.displayLabel),
+            ),
           createdAt: draw.created_at,
           supersededAt: draw.superseded_at,
           reason: draw.reason ?? "Restored normalized draw.",
         };
       })
-      .sort((left, right) => left.roundNumber - right.roundNumber || left.setOrder - right.setOrder || left.version - right.version);
+      .sort(
+        (left, right) =>
+          left.roundNumber - right.roundNumber ||
+          left.setOrder - right.setOrder ||
+          left.version - right.version,
+      );
   }
 
   private buildBallots(
@@ -851,7 +1198,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         id: ballot.id,
         roundNumber: ballot.round_number as 1 | 2 | 3 | 4,
         playerId: ballot.player_id,
-        playerStartggUsername: playersById.get(ballot.player_id)?.startgg_username ?? ballot.player_id,
+        playerStartggUsername:
+          playersById.get(ballot.player_id)?.startgg_username ?? ballot.player_id,
         choices: (choicesByBallotId.get(ballot.id) ?? []).map((choice): BallotSetChoice => {
           const set = requireRoundSet(choice.round_set_id);
 
@@ -897,13 +1245,20 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       tiebreakBySnapshotAndDraw.set(`${tiebreak.result_snapshot_id}:${tiebreak.draw_id}`, tiebreak);
     }
 
-    return snapshots.map((snapshot) => {
+    return snapshots.flatMap((snapshot) => {
       const sets = [...rowsBySnapshotAndDraw.entries()]
         .filter(([key]) => key.startsWith(`${snapshot.id}:`))
-        .map(([, setRows]): ResultSetSnapshot => {
-          const firstRow = setRows[0] as TableRow<"result_rows">;
+        .map(([, setRows]): ResultSetSnapshot | null => {
+          const firstRow = setRows[0];
+
+          if (!firstRow) {
+            return null;
+          }
+
           const set = requireRoundSet(firstRow.round_set_id);
-          const orderedRows = [...setRows].sort((left, right) => left.reveal_order - right.reveal_order);
+          const orderedRows = [...setRows].sort(
+            (left, right) => left.reveal_order - right.reveal_order,
+          );
           const chartRows = orderedRows.map((row) => ({
             chart: charts.get(row.chart_id) ?? fallbackChartSummary(row.chart_id, set.displayLabel),
             banCount: row.ban_count,
@@ -911,7 +1266,9 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
             tiedForFewest: row.is_tiebreak_candidate,
           }));
           const selectedChart =
-            chartRows.find((row) => row.selected)?.chart ?? chartRows[0]?.chart ?? fallbackChartSummary("unknown");
+            chartRows.find((row) => row.selected)?.chart ??
+            chartRows[0]?.chart ??
+            fallbackChartSummary("unknown");
           const tiebreak = tiebreakBySnapshotAndDraw.get(`${snapshot.id}:${firstRow.draw_id}`);
           const candidates =
             tiebreak?.candidate_chart_ids.map(
@@ -939,18 +1296,27 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
             winnerRevealStartedAt: tiebreak?.winner_reveal_started_at ?? null,
           };
         })
+        .filter((set): set is ResultSetSnapshot => Boolean(set))
         .sort((left, right) => left.setOrder - right.setOrder);
 
-      return {
-        id: snapshot.id,
-        roundNumber: snapshot.round_number as 1 | 2 | 3 | 4,
-        computedAt: snapshot.computed_at,
-        eligiblePlayers: asEligiblePlayers(snapshot.eligible_players),
-        sets: [sets[0], sets[1]] as never,
-        revealPhase: snapshot.reveal_phase as ResultRevealPhase,
-        revealPhaseStartedAt: snapshot.reveal_phase_started_at ?? snapshot.computed_at,
-        finalRevealedAt: snapshot.final_revealed_at,
-      };
+      if (sets.length !== 2 || !sets[0] || !sets[1]) {
+        return [];
+      }
+
+      const resultSets: [ResultSetSnapshot, ResultSetSnapshot] = [sets[0], sets[1]];
+
+      return [
+        {
+          id: snapshot.id,
+          roundNumber: snapshot.round_number as 1 | 2 | 3 | 4,
+          computedAt: snapshot.computed_at,
+          eligiblePlayers: asEligiblePlayers(snapshot.eligible_players),
+          sets: resultSets,
+          revealPhase: snapshot.reveal_phase as ResultRevealPhase,
+          revealPhaseStartedAt: snapshot.reveal_phase_started_at ?? snapshot.computed_at,
+          finalRevealedAt: snapshot.final_revealed_at,
+        },
+      ];
     });
   }
 

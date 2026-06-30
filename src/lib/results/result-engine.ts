@@ -42,12 +42,7 @@ export type RoundResultSnapshot = {
 };
 
 export type ResultRevealPhase =
-  | "computed"
-  | "set_1_counts"
-  | "set_1_resolved"
-  | "set_2_counts"
-  | "set_2_resolved"
-  | "final";
+  "computed" | "set_1_counts" | "set_1_resolved" | "set_2_counts" | "set_2_resolved" | "final";
 
 export const RESULT_REVEAL_PHASES: ResultRevealPhase[] = [
   "computed",
@@ -75,7 +70,10 @@ export function buildWheelSlots(candidates: DrawnChartSummary[], zeroBallotTiebr
     return [];
   }
 
-  return Array.from({ length: 12 }, (_, index) => candidates[index % candidates.length] as DrawnChartSummary);
+  return Array.from(
+    { length: 12 },
+    (_, index) => candidates[index % candidates.length] as DrawnChartSummary,
+  );
 }
 
 export function computeResultSet(
@@ -86,7 +84,7 @@ export function computeResultSet(
   const banCounts = new Map(draw.charts.map((chart) => [chart.id, 0]));
 
   for (const ballot of ballots) {
-    const choice = ballot.choices.find((candidate) => candidate.drawId === draw.id);
+    const choice = ballot.choices.find((candidate) => candidate?.drawId === draw.id);
 
     for (const chartId of choice?.bannedChartIds ?? []) {
       if (banCounts.has(chartId)) {
@@ -96,7 +94,7 @@ export function computeResultSet(
   }
 
   const ballotCountForSet = ballots.filter((ballot) =>
-    ballot.choices.some((choice) => choice.drawId === draw.id),
+    ballot.choices.some((choice) => choice?.drawId === draw.id),
   ).length;
   const leastBanCount = Math.min(...banCounts.values());
   const maxBanCount = Math.max(...banCounts.values());

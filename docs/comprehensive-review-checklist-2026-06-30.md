@@ -28,10 +28,17 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
 - [x] `rtk npm run test` - passed, 33 files / 108 tests.
 - [x] `rtk npm run build` - passed.
 - [x] `rtk npm run test:e2e` - initially failed once because port `127.0.0.1:3100`
-  was still in use/TIME_WAIT; retry passed, 2 Playwright tests.
+      was still in use/TIME_WAIT; retry passed, 2 Playwright tests.
+- [x] Phase 9 hosted Supabase `rtk npm run test:e2e` - passed, 4 Playwright tests with
+      `TOURNAMENT_STATE_BACKEND=supabase`.
+- [x] Phase 9 hosted Supabase `rtk npm run test:load` - passed, 100 player submissions/edits with
+      final private CSV verification.
+- [x] Phase 9 hosted Supabase `rtk npm run test:phase9` - passed, four-round rehearsal against
+      production Supabase by approved exception using event id
+      `phase9-fourround-2026-06-30-prod-05`.
 - [x] Validation checklist grep targets were reviewed.
 - [x] In-app Browser plugin was attempted, but no browser targets were registered
-  in this session, so visual review used source and Playwright coverage.
+      in this session, so visual review used source and Playwright coverage.
 
 ## Positive Confirmations
 
@@ -42,16 +49,16 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
 - [x] Voting identity label uses `Select your start.gg username`.
 - [x] Voter confirmation includes the selected start.gg username.
 - [x] The phone ballot flow requires each set to be complete and includes explicit
-  `No bans for this set`.
+      `No bans for this set`.
 - [x] Public result pages do not show final results before the final stage reveal.
 - [x] No reduced-motion UI toggle was found.
 - [x] No obvious official DOOM assets were found in the inspected source.
 - [x] No tracked real secrets were found; `.env.local` exists but is gitignored and
-  was not read.
+      was not read.
 
 ## Critical
 
-- [ ] CR-001 - Non-transactional whole-state persistence can lose ballots or state.
+- [x] CR-001 - Non-transactional whole-state persistence can lose ballots or state.
   - Severity: Critical.
   - Files: `src/app/vote/actions.ts:70`, `src/lib/server/persistence.ts:66`,
     `src/lib/server/normalized-operational-state.ts:382`,
@@ -68,15 +75,10 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     same-player edits preserve latest valid ballot; host heartbeat racing with
     manual ballot or draw does not roll state back; 100 concurrent submissions
     preserve 100 latest ballots.
-  - Phase 1 progress: added baseline/current/latest snapshot merge plus an in-process
-    persistence write queue, with regression tests for concurrent different-player
-    submissions, same-player latest-ballot wins, and host heartbeat vs ballot saves.
-    Deferred to remediation Phase 9 for hosted Supabase closure; this remains unchecked until the
-    Supabase save path is a database-transactional row-scoped mutation or equivalent cross-instance
-    event revision.
-  - Phase 9 blocker: no hosted Supabase write rehearsal or transactional row-scoped mutation cutover
-    was run because an approved non-production project/ref and `TOURNAMENT_EVENT_ID` have not been
-    provided in this session.
+  - Closure evidence: Supabase-backed player ballots now use the service-role
+    `normalized_submit_ballot` RPC for row-scoped ballot/choice/revision writes. Admin voting
+    mutations use queued hydrate/mutate/persist helpers, and host heartbeat persists only host-lock
+    state. Hosted Supabase e2e, 100-player load, and four-round Phase 9 rehearsal passed.
 
 - [x] CR-002 - Public voter actions expose existing live ballot choices.
   - Severity: Critical.
@@ -94,16 +96,13 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: public action cannot retrieve another player's `choices`;
     duplicate-name warning still appears; original device can edit via token; phones
     do not expose chart-by-chart choices before reveal.
-  - Fixed in Phase 2 remediation: public ballot lookup and polling now return
-    existence/revision/warning metadata unless the caller presents the device-scoped
-    edit token whose hash is stored server-side. Same-device reloads hydrate choices
-    through that token, while second devices can submit a replacement ballot without
-    viewing prior choices.
+  - Closure evidence: fixed in Phase 2 with device-scoped edit-token authorization and public
+    metadata-only duplicate lookup.
 
 ## High
 
-- [ ] CR-003 - Official voting timer transitions use app-server/request time instead
-  of database time.
+- [x] CR-003 - Official voting timer transitions use app-server/request time instead
+      of database time.
   - Severity: High.
   - Files: `src/lib/vote/voting-window.ts:170`,
     `src/lib/vote/voting-window.ts:367`, `src/lib/server/voting-round.ts:18`.
@@ -116,14 +115,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     server mutation with concurrency control.
   - Suggested tests: app-server clock skew; no polling at deadline; pause/resume
     across process restart; deadline enforcement from DB timestamps.
-  - Phase 3 progress: `VotingWindowStore.getSnapshot()` no longer mutates official
-    state, deadline derivation is anchored to persisted `closesAt` values, and
-    mutation paths explicitly advance/persist timer state where needed. The hosted
-    database-time transactional closure remains deferred to remediation Phase 9, so
-    this item stays unchecked until Supabase RPC/row-scoped timer mutations use
-    database time rather than app-server time.
-  - Phase 9 blocker: database-time transactional timer closure still requires hosted Supabase
-    mutation work and rehearsal against an approved non-production event namespace.
+  - Closure evidence: Supabase backend operation uses `normalized_database_time()` through
+    `getAuthoritativeNowMs()` and the `normalized_submit_ballot` RPC. Hosted Supabase e2e, load,
+    and four-round rehearsal exercised open/close/final-reveal paths with the Supabase backend.
 
 - [x] CR-004 - Future-round selected-song blocking can be bypassed by drawing ahead.
   - Severity: High.
@@ -141,10 +135,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: compute Round 1 with a song also present in Round 2, attempt
     Round 2 draw before final reveal, and assert it is blocked or excludes selected
     songs.
-  - Phase 4 closure: selected-song blocks are reconciled from all computed result
-    snapshots, not only final reveals. Computing results immediately updates draw
-    eligibility, clearing/reopening/recomputing removes stale blocks, overrides
-    resync corrected winners, and restore derives blocks from computed results.
+  - Closure evidence: fixed in Phase 4 by synchronizing selected-song blocks from computed result
+    snapshots before later-round draws.
 
 - [x] CR-005 - Stage QR/timer placement does not match the validation checklist.
   - Severity: High.
@@ -159,10 +151,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: Playwright screenshots at 1920x1080 and 1280x720 asserting QR
     target is `/room`, short URL is visible, QR is right of timer, and both are above
     chart rows.
-  - Phase 6 closure: `/stage` voting now uses a top voting band with a compact
-    projector header, large timer on the left, compact QR/short URL on the right,
-    and the two chart rows below. Playwright verifies the `/room` target, short URL,
-    QR geometry to the right of the timer, and both above the chart rows.
+  - Closure evidence: fixed in Phase 6 with a top voting band and Playwright stage assertions.
 
 - [x] CR-006 - Stage result reveal can overflow projector view.
   - Severity: High.
@@ -176,11 +165,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     revealing Set 2, or redesign reveal into a projector-fit layout.
   - Suggested tests: screenshots at 1920x1080 and 1280x720; assert no vertical
     scrolling is needed and the active set's seven rows are visible.
-  - Phase 6 closure: Set 2 reveal phases now collapse Set 1 to a compact selected
-    chart summary and render active result rows in a compact projector grid. Tiebreak
-    detail sits beside the row grid in stage mode. Playwright verifies no vertical
-    scrolling at the default 1280x720 stage viewport for voting and Set 2 reveal
-    phases.
+  - Closure evidence: fixed in Phase 6 with compact reveal rows and collapsed prior-set summaries.
 
 - [x] CR-007 - Rune wheel is not a visible selector aligned to the backend winner.
   - Severity: High.
@@ -196,13 +181,9 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     slot, then highlight selected chart after 5 seconds.
   - Suggested tests: unit test 2/3/4-way slot sequences; e2e test that 12 visible
     slots exist and pointer-selected slot matches committed winner after 5 seconds.
-  - Phase 6 closure: rune-wheel slots now show chart labels during the sealed
-    animation, compact stage wheels remain visible, and final rotation is computed
-    from the committed winner slot. Unit coverage proves the pointer lands on the
-    committed winner slot for 12-slot and seven-chart wheels; Playwright verifies 12
-    visible slots and no `Sealed rune` placeholder during the tiebreak reveal.
+  - Closure evidence: fixed in Phase 6 with populated wheel slots and winner-aligned rotation.
 
-- [ ] CR-008 - Hosted Supabase rehearsal remains an event-readiness blocker.
+- [x] CR-008 - Hosted Supabase rehearsal remains an event-readiness blocker.
   - Severity: High.
   - Files: `docs/phase-status.md:5`, `docs/phase-status.md:15`,
     `docs/remaining-todo-2026-06-30.md:31`, `docs/deployment-readiness.md:50`.
@@ -215,14 +196,15 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: four full rounds against hosted Supabase, including
     refresh/redeploy survival for draws, voting windows, ballots, results, admin
     sessions, host locks, CSV download, and QR.
-  - Phase 9 blocker: hosted rehearsal was not run because the repo does not contain a Supabase
-    config and `.env.local` may contain secrets. Explicit approval, target project/ref, and a
-    disposable `TOURNAMENT_EVENT_ID` are required before writing to hosted Supabase.
+  - Closure evidence: hosted Supabase four-round rehearsal passed on
+    `phase9-fourround-2026-06-30-prod-05` with production Supabase by approved exception. The run
+    covered seeded tiebreaks, manual admin ballots, `/stage`, `/charts`, `/results`, final reveal,
+    and manual private CSV download.
 
 ## Medium
 
 - [x] CR-009 - Zero-ballot result path uses the 5+ tie fallback instead of the
-  checklist's all-7-chart spinner.
+      checklist's all-7-chart spinner.
   - Severity: Medium.
   - Files: `src/lib/results/result-engine.ts:68`,
     `src/lib/results/result-engine.ts:93`, `src/components/ResultSetPanel.tsx:115`.
@@ -234,9 +216,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     selector that still uses a precommitted backend winner.
   - Suggested tests: zero ballots in both sets; verify each set has 7 tiebreak
     candidates and a backend-decided winner reveal.
-  - Phase 4 closure: true zero-ballot sets now use a backend-decided tiebreak across
-    all seven drawn charts with seven wheel slots. Non-zero 5+ least-ban ties remain
-    on the safe fallback path.
+  - Closure evidence: fixed in Phase 4 with a backend-decided seven-chart zero-ballot wheel.
 
 - [x] CR-010 - Failed rerolls can mutate draw history before replacement succeeds.
   - Severity: Medium.
@@ -250,9 +230,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     make full-round reroll atomic or roll back both sets on failure.
   - Suggested tests: active draw remains active after a failed set reroll; full-round
     reroll leaves both previous active draws intact if the second set cannot be drawn.
-  - Phase 4 closure: draw creation now plans and validates eligibility before
-    superseding active history. Full-round rerolls plan both replacement sets before
-    committing either one.
+  - Closure evidence: fixed in Phase 4 with plan-then-commit draw/reroll mutation.
 
 - [x] CR-011 - Reroll-one-chart can redraw the exact same chart.
   - Severity: Medium.
@@ -264,9 +242,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     replacement pool; error if no replacement exists.
   - Suggested tests: deterministic RNG tries to pick the target chart; assert the
     replacement differs.
-  - Phase 4 closure: reroll-one-chart excludes every current chart key including the
-    target. It also prefers to block the target song, falling back only to a different
-    chart from the target song if no different-song replacement exists.
+  - Closure evidence: fixed in Phase 4 by excluding the target chart and preferring a different
+    song.
 
 - [x] CR-012 - Draws do not snapshot the full eligible pool.
   - Severity: Medium.
@@ -280,10 +257,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     snapshot metadata with each draw.
   - Suggested tests: draw a set, change exclusions/source data, then verify audit can
     reconstruct the original eligible pool.
-  - Phase 4 closure: draw records now persist `eligibleChartIds`,
-    `excludedChartKeysSnapshot`, `selectedSongKeysSnapshot`, and
-    `sameRoundBlockedSongKeysSnapshot` in operational snapshots and normalized
-    `draws` rows.
+  - Closure evidence: fixed in Phase 4 by persisting eligible chart and exclusion/song-block
+    snapshots.
 
 - [x] CR-013 - Transactional Supabase RPCs acknowledge success without mutating state.
   - Severity: Medium.
@@ -299,9 +274,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     cannot be mistaken for persistence.
   - Suggested tests: run each RPC against local Supabase/Postgres and assert actual
     rows change; invalid ballot completion is rejected.
-  - Fixed in Phase 1 remediation: placeholder commit acknowledgements are rejected
-    by the server-side RPC wrapper, and the migration overrides mutation-named RPCs
-    so they raise until implemented as row-changing transactions.
+  - Closure evidence: fixed in Phase 1 by rejecting placeholder mutation acknowledgements until real
+    row-changing RPCs were implemented.
 
 - [x] CR-014 - Supabase draw schema does not enforce core eligibility invariants.
   - Severity: Medium.
@@ -319,9 +293,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: migration tests attempting invalid inserts should fail for wrong
     level/type, excluded chart, duplicate active draw, incomplete draw, and cross-set
     duplicate song.
-  - Fixed in Phase 1 remediation: added active-draw uniqueness, draw status checks,
-    drawn-chart pool/exclusion/same-round/prior-selected-song trigger guards, and a
-    voting-open draw-completion trigger, with schema tests for those guards.
+  - Closure evidence: fixed in Phase 1 with active-draw uniqueness and draw invariant trigger
+    guards.
 
 - [x] CR-015 - Emergency reopen can unexpectedly receive another low-turnout extension.
   - Severity: Medium.
@@ -335,27 +308,12 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     extension-ineligible.
   - Suggested tests: close early, reopen for 3 minutes with turnout below 75%, verify
     it closes at 3 minutes with no extra minute.
-  - Fixed in Phase 3 remediation: emergency reopen now marks the voting window
-    extension-used, and unit coverage verifies a 3-minute reopen closes at the chosen
-    duration with no additional low-turnout extension.
+  - Closure evidence: fixed in Phase 3 by making emergency reopen windows extension-ineligible.
 
 - [x] CR-016 - Admin inactivity timeout is effectively a 10-hour auto-refreshed session.
   - Severity: Medium.
-  - Files: `src/lib/admin/session.ts:3`,
-    `src/app/coolguy69/_components/AdminSessionHeartbeat.tsx:6`,
-    `src/lib/server/admin-auth.ts:90`,
-    `src/app/coolguy69/_components/AdminInactivityTimer.tsx:14`.
-  - Current behavior: admin sessions use a sliding 10-hour TTL and a background
-    heartbeat refreshes every minute while the tab is open.
-  - Expected behavior: checklist recommends a 30-minute inactivity timeout.
-  - Suggested fix: set default TTL to 30 minutes, refresh only on real admin
-    interaction with debounce, and auto-logout/redirect when idle.
-  - Suggested tests: idle tab for more than 30 minutes cannot mutate; real admin
-    interaction extends expiry; passive heartbeat alone does not.
-  - Phase 5 closure: admin session TTL is 30 minutes, the admin page refreshes the
-    session only after real browser activity with debounce, the visible timer
-    redirects on expiry, and passive host-lock heartbeat validates without sliding
-    the admin session.
+  - Closure evidence: fixed in Phase 5 with a 30-minute admin session TTL, interaction-driven
+    refresh, passive heartbeat validation without session sliding, and visible expiry redirect.
 
 - [x] CR-017 - Sensitive actions lack basic rate limiting.
   - Severity: Medium.
@@ -371,11 +329,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: repeated wrong passwords are blocked; excessive ballot edits or
     presence claims are throttled without changing state; normal 100-player voting
     still passes.
-  - Fixed in Phase 2 remediation: added process-local fixed-window throttles for
-    admin login, dangerous password re-entry, voter presence claims, and public
-    ballot submissions/edits. Added action-boundary string length caps for admin
-    passwords, audit reasons, usernames, device ids, edit tokens, and bulk free-text
-    form fields.
+  - Closure evidence: fixed in Phase 2 with fixed-window throttles and action-boundary input caps.
 
 - [x] CR-018 - Public-schema `SECURITY DEFINER` RPCs need explicit execute lockdown.
   - Severity: Medium.
@@ -391,30 +345,13 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     only to `service_role`, or move functions to a private schema.
   - Suggested tests: anon Supabase client cannot call mutation RPCs; service-role
     executor still can.
-  - Fixed in Phase 1 remediation: added explicit `REVOKE EXECUTE` from `public`,
-    `anon`, and `authenticated` and `GRANT EXECUTE` to `service_role` for each
-    normalized mutation RPC, with migration coverage in unit tests.
+  - Closure evidence: fixed in Phase 1 with explicit execute revokes for public/anon/authenticated
+    roles and service-role grants.
 
 - [x] CR-019 - Debug operational snapshot export exposes sensitive live data.
   - Severity: Medium.
-  - Files: `src/app/coolguy69/page.tsx:1004`,
-    `src/app/coolguy69/actions.ts:781`,
-    `src/lib/persistence/debug-export.ts:15`,
-    `src/lib/persistence/operational-state.ts:24`.
-  - Current behavior: any authenticated admin can download a full debug operational
-    snapshot, including live ballots, audit records, roster, host-lock hashes, and
-    invalidated ballot payloads.
-  - Expected behavior: sensitive live data should be deliberate and guarded; private
-    ballot export is an admin/private artifact after reveal.
-  - Suggested fix: remove debug export in production or require active host control
-    plus password re-entry; redact host/session internals; block during voting unless
-    explicitly needed for backup.
-  - Suggested tests: debug export unavailable or password-gated in production; JSON
-    redacts sensitive internals; live ballots are not exported during voting.
-  - Phase 5 closure: debug snapshot export now requires active host control and
-    dangerous-action password re-entry, is blocked while voting is active or paused,
-    and redacts host token hashes, session ids, edit-token hashes, invalidation
-    admin ids, and presence device ids.
+  - Closure evidence: fixed in Phase 5 by requiring active host control and password re-entry,
+    blocking export during active/paused voting, and redacting sensitive internals.
 
 - [x] CR-020 - Dangerous-action prompts ask for password before exact target details.
   - Severity: Medium.
@@ -430,10 +367,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     summary including selected round/player/chart/duration, then password entry.
   - Suggested tests: e2e for reopen/reset/override/current-round add verifying visible
     summary includes selected target and consequence before password submission.
-  - Phase 5 closure: the shared dangerous-action dialog now renders target fields
-    first, then an action summary with selected field values, then the password
-    prompt. Reopen, reset, override, and current-round eligibility forms provide
-    summary fields.
+  - Closure evidence: fixed in Phase 5 by rendering target fields and action summaries before the
+    password prompt.
 
 - [x] CR-021 - Manual ballot replacement confirmation is weak.
   - Severity: Medium.
@@ -452,9 +387,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested tests: select a player with an existing ballot; verify username-specific
     warning, submit rejected until explicit replacement confirmation, and CSV marks
     replacement.
-  - Phase 5 closure: the manual ballot form names the selected start.gg username in
-    replacement mode, requires an explicit `Replace existing ballot for [username]`
-    checkbox, and the server rejection names the player.
+  - Closure evidence: fixed in Phase 5 with username-specific replacement warnings and confirmation.
 
 - [x] CR-022 - Manual ballot UI does not enforce max bans or no-bans exclusivity.
   - Severity: Medium.
@@ -471,9 +404,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     no-bans is checked.
   - Suggested tests: manual ballot e2e for >2 bans rejection before submit and no-bans
     mutual exclusion.
-  - Phase 5 closure: manual ballot set controls are stateful, show a `0/2` counter,
-    disable third-ban selections, disable chart bans when no-bans is checked, and
-    disable no-bans while chart bans are selected.
+  - Closure evidence: fixed in Phase 5 with stateful manual set controls and mutual exclusion.
 
 - [x] CR-023 - `/charts` lacks explicit mobile set navigation and status.
   - Severity: Medium.
@@ -486,10 +417,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     compact status banner for voting open/closed/revealing/final.
   - Suggested tests: mobile Playwright for `/charts`: verify Set 1/Set 2 navigation,
     no vote controls, no username selector, final state shows selected charts first.
-  - Phase 7 closure: `/charts` now renders a view-only status banner and mobile
-    Set 1/Set 2 tabs with next/back controls. Desktop still shows both sets together.
-    Playwright verifies mobile tab switching, voting-open status, and absence of
-    username or submit controls.
+  - Closure evidence: fixed in Phase 7 with mobile set tabs, next/back controls, and view-only
+    status.
 
 - [x] CR-024 - Ballot chart selection needs clearer ban affordance and accessibility.
   - Severity: Medium.
@@ -501,13 +430,11 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Expected behavior: players should clearly understand they are selecting bans,
     up to 2 per set, with explicit accessible state and feedback.
   - Suggested fix: add `aria-pressed`, visible selected/check state, a `0/2 bans
-    selected` counter, and feedback when the limit is reached.
+selected` counter, and feedback when the limit is reached.
   - Suggested tests: keyboard/screen-reader pass; Playwright asserts `aria-pressed`
     toggles and third selection shows feedback without changing prior selections.
-  - Phase 7 closure: vote cards now expose `aria-pressed`, visible `Ban selected`
-    state, a `0/2 bans selected` counter, and explicit limit feedback when a third
-    ban is attempted. Playwright verifies the third attempt leaves the first two
-    selections intact.
+  - Closure evidence: fixed in Phase 7 with `aria-pressed`, selected-state copy, counters, and
+    third-ban feedback.
 
 - [x] CR-025 - Ballot card text can overflow on narrow phones.
   - Severity: Medium.
@@ -521,9 +448,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     `PublicDrawSetPanel`.
   - Suggested tests: screenshot test with long song/artist names at 360px and 390px;
     assert no text overlaps or escapes card bounds.
-  - Phase 7 closure: ballot cards now use stable minimum heights, constrained widths
-    for the centered seventh card, `min-w-0`, `break-words`, and line clamps for
-    chart names and artists. The phone e2e flow now runs at 390px width.
+  - Closure evidence: fixed in Phase 7 with stable mobile card sizing and text clamping.
 
 - [x] CR-026 - `round_complete` phone state can show pre-vote copy instead of final charts.
   - Severity: Medium.
@@ -537,9 +462,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     and status is `results_revealed` or `round_complete`.
   - Suggested tests: route/state test for `round_complete + final result` asserting
     selected chart cards render before full counts.
-  - Fixed in Phase 3 remediation: `/vote` uses a tested final-phone helper so
-    `results_revealed` and `round_complete` both render selected final charts first
-    when the committed result reveal phase is `final`.
+  - Closure evidence: fixed in Phase 3 with final-phone rendering keyed to final reveal state.
 
 - [x] CR-027 - Stage rows risk poor readability at smaller projector widths.
   - Severity: Medium.
@@ -556,11 +479,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     16:9 layout.
   - Suggested tests: screenshots at 1024x768, 1280x720, and 1920x1080; verify titles,
     set labels, QR, and timer remain readable.
-  - Phase 6 closure: the voting sidebar was removed, the stage header/timer/QR have
-    compact projector variants, and standard stage chart cards use shorter heights
-    below 1536px while preserving larger 2xl cards. Playwright verifies the 1280x720
-    stage viewport does not vertically scroll during voting and still shows two
-    horizontal seven-card rows.
+  - Closure evidence: fixed in Phase 6 with compact projector variants and tuned stage card heights.
 
 - [x] CR-028 - Final two-chart reveal is visually undersized.
   - Severity: Medium.
@@ -575,10 +494,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     reveal.
   - Suggested tests: screenshot asserts exactly two final cards are large/readable
     and set labels/difficulties are visible.
-  - Phase 6 closure: final `/stage` results now use a dedicated two-column selected
-    chart layout with set labels and featured chart cards. The final QR/sidebar was
-    removed from the stable final stage screen, and Playwright verifies exactly two
-    final cards with large card heights.
+  - Closure evidence: fixed in Phase 6 with a dedicated two-card final stage layout.
 
 - [x] CR-029 - E2E harness has shown flakiness around build/start and port reuse.
   - Severity: Medium.
@@ -593,11 +509,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     stage/draw status before image assertions.
   - Suggested tests: keep full-flow and tiebreak tests; add retry-free assertion that
     `/stage` receives both drawn sets after reset/draw.
-  - Phase 8 closure: `npm run test:e2e` now runs through `scripts/run-playwright.mjs`,
-    which chooses a free local port, sets matching public URL test env, builds once before
-    Playwright starts, and leaves Playwright's web server command responsible only for
-    `next start`. The config runs single-worker against shared memory state, and the smoke
-    assertions now derive QR targets from the active base URL instead of hard-coding port 3100.
+  - Closure evidence: fixed in Phase 8 with `scripts/run-playwright.mjs`, free-port selection, and
+    one prebuilt Next app per Playwright run.
 
 - [x] CR-030 - Browser/mobile UI coverage does not match the validation checklist.
   - Severity: Medium.
@@ -609,11 +522,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     manual blockers if CI cannot run them.
   - Suggested tests: `/vote` mobile layout, 7th-card centering, no text overlap,
     ballot flow, `/room`, `/charts`, `/results`, and 1920x1080 stage viewport.
-  - Phase 8 closure: Playwright now runs `desktop-chromium`, `mobile-chromium`, and
-    `mobile-webkit` projects. `tests/e2e/mobile-routes.spec.ts` covers `/room`, `/charts`,
-    `/vote`, and `/results`, verifies the two-column phone ballot with centered seventh card
-    and no horizontal overflow, and confirms view-only pages do not expose username or submit
-    controls. CI installs both Chromium and WebKit browsers.
+  - Closure evidence: fixed in Phase 8 with desktop Chromium, mobile Chromium, and mobile WebKit
+    Playwright projects.
 
 - [x] CR-031 - Load coverage is store-level, not event-like.
   - Severity: Medium.
@@ -627,12 +537,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     that exercises actual routes/server actions.
   - Suggested tests: 100 players submit/edit, `/stage` polling, `/coolguy69` host
     open, `/charts` spectators, and final CSV verification under load.
-  - Phase 8 closure: `npm run test:load` runs `playwright.load.config.ts` against a
-    Playwright/API hybrid rehearsal. The test opens admin, stage, room, charts, and results
-    browser pages, bulk-imports 100 eligible players through `/coolguy69`, submits and edits
-    every ballot through a gated HTTP route using server-side ballot validation/persistence,
-    advances reveal timing, downloads the private CSV, and verifies all 100 players and selected
-    chart columns are present.
+  - Closure evidence: fixed in Phase 8 with a Playwright/API 100-player load rehearsal and CSV
+    verification.
 
 - [x] CR-032 - Source docs still conflict on result reveal order.
   - Severity: Medium.
@@ -647,8 +553,8 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested fix: update stale docs/phase notes to remove the old order.
   - Suggested tests: keep result-engine test asserting least-to-most order; add a doc
     consistency grep/test if desired.
-  - Phase 4 closure: stale result-order text in `docs/codex-execution-plan.md` and
-    `docs/phase-status.md` now says least banned to most banned.
+  - Closure evidence: fixed in Phase 4 by updating stale result-order docs to least banned to most
+    banned.
 
 ## Low
 
@@ -664,9 +570,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     and keep live timer/status visible while editing.
   - Suggested tests: mobile QA for submitted ballot edit; change each set, resubmit,
     and verify timestamp/revision updates.
-  - Phase 7 closure: saved-ballot and review screens now include direct `Edit
-    [set label]` actions that jump to the chosen set. Playwright edits S16 directly
-    from the saved screen and verifies the saved revision increments.
+  - Closure evidence: fixed in Phase 7 with direct saved-ballot and review edit actions per set.
 
 - [x] CR-034 - Legacy `ChartSetPanel` still encodes a non-checklist 2/4-column layout.
   - Severity: Low.
@@ -679,8 +583,7 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     reused for stage/phone layouts by accident.
   - Suggested tests: grep/test preventing `ChartSetPanel` from being imported into
     `/stage`, `/vote`, or `/charts` unless intentionally redesigned.
-  - Phase 7 closure: `src/components/ChartSetPanel.tsx` was removed and the barrel
-    export was deleted. Source grep no longer finds `ChartSetPanel` under `src`.
+  - Closure evidence: fixed in Phase 7 by removing the unused legacy component and export.
 
 - [x] CR-035 - Debug/release docs should record final e2e retry result.
   - Severity: Low.
@@ -692,6 +595,5 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
   - Suggested fix: after addressing e2e harness reliability, record the clean final
     gate run and note whether the transient failure has been eliminated.
   - Suggested tests: run final gates from a clean shell with no prior dev server.
-  - Phase 9 closure: Phase 8's final clean gate evidence is recorded in `docs/phase-status.md`.
-    `rtk npm run test:e2e` now chooses a free port and passed retry-free with 4 Playwright tests;
-    `rtk npm run test:load` also passed with the 100-player rehearsal and final CSV verification.
+  - Closure evidence: Phase 8 and Phase 9 evidence is recorded in `docs/phase-status.md`,
+    `docs/release-checklist.md`, and `docs/comprehensive-review-remediation-plan-2026-06-30.md`.

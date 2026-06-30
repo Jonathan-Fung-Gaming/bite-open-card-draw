@@ -100,6 +100,7 @@ export const reopenVotingWindowInputSchema = z.object({
 export const submitBallotInputSchema = z.object({
   roundNumber: roundNumberSchema,
   playerId: uuidSchema,
+  editTokenHash: z.string().trim().min(1).optional(),
   choices: z
     .array(
       z.object({
@@ -130,6 +131,7 @@ export const resetRoundInputSchema = z.object({
 
 export const computeResultsInputSchema = z.object({
   roundNumber: roundNumberSchema,
+  adminSessionId: uuidSchema.optional(),
 });
 
 export const commitTiebreakInputSchema = z.object({

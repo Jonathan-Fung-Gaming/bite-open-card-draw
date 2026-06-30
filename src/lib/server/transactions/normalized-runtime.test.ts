@@ -79,7 +79,7 @@ function createMockRpcClient(
   return {
     async rpc(functionName, args) {
       calls.push({
-        functionName,
+        functionName: functionName as RpcFunctionName,
         args,
       });
 
@@ -225,6 +225,34 @@ describe("normalized runtime transactional mutations", () => {
         },
       ),
     ).rejects.toThrow(/placeholder commit acknowledgement/);
+  });
+
+  it("implements production ballot/result RPCs as row-changing transactions", () => {
+    const migrations = readMigrations();
+    const submitFunctions = [
+      ...migrations.matchAll(
+        /create or replace function public\.normalized_submit_ballot\(p_event_id text, p_payload jsonb\)[\s\S]*?grant execute on function public\.normalized_submit_ballot\(text, jsonb\) to service_role;/gi,
+      ),
+    ];
+    const computeFunctions = [
+      ...migrations.matchAll(
+        /create or replace function public\.normalized_compute_results\(p_event_id text, p_payload jsonb\)[\s\S]*?grant execute on function public\.normalized_compute_results\(text, jsonb\) to service_role;/gi,
+      ),
+    ];
+    const submitFunction = submitFunctions.at(-1)?.[0];
+    const computeFunction = computeFunctions.at(-1)?.[0];
+
+    expect(submitFunction).toContain("normalized_apply_voting_deadline_locked");
+    expect(submitFunction).toContain("Voting is not open for ballot changes.");
+    expect(submitFunction?.indexOf("normalized_apply_voting_deadline_locked")).toBeLessThan(
+      submitFunction?.indexOf("Voting is not open for ballot changes.") ?? 0,
+    );
+    expect(computeFunction).toContain("normalized_apply_voting_deadline_locked");
+    expect(computeFunction).toContain("insert into public.result_snapshots");
+    expect(computeFunction).toContain("insert into public.result_rows");
+    expect(computeFunction).toContain("insert into public.tiebreaks");
+    expect(computeFunction).not.toContain("normalized_runtime_transaction_ack");
+    expect(computeFunction).not.toContain("normalized_runtime_transaction_disabled");
   });
 
   it("locks down tournament-changing RPC execute privileges", () => {

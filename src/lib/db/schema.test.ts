@@ -113,7 +113,9 @@ describe("Phase 2 database schema", () => {
   });
 
   it("stores public ballot edit tokens only as server-side hashes", () => {
-    expect(migration).toMatch(/alter table public\.ballots\s+add column if not exists edit_token_hash text/i);
+    expect(migration).toMatch(
+      /alter table public\.ballots\s+add column if not exists edit_token_hash text/i,
+    );
     expect(migration).toContain("Never expose to browser clients");
   });
 
@@ -133,6 +135,26 @@ describe("Phase 2 database schema", () => {
     expect(migration).toContain("excluded_chart_keys_snapshot text[]");
     expect(migration).toContain("selected_song_keys_snapshot text[]");
     expect(migration).toContain("same_round_blocked_song_keys_snapshot text[]");
+  });
+
+  it("serializes hosted event persistence and exposes database time only to service role", () => {
+    expect(migration).toMatch(/create table if not exists public\.event_persistence_locks/i);
+    expect(migration).toMatch(/function public\.normalized_database_time\(\)/i);
+    expect(migration).toMatch(/select clock_timestamp\(\)/i);
+    expect(migration).toMatch(/function public\.normalized_acquire_event_persistence_lock/i);
+    expect(migration).toMatch(/function public\.normalized_release_event_persistence_lock/i);
+    expect(migration).toMatch(
+      /revoke execute on function public\.normalized_database_time\(\) from public, anon, authenticated/i,
+    );
+    expect(migration).toMatch(
+      /grant execute on function public\.normalized_database_time\(\) to service_role/i,
+    );
+    expect(migration).toMatch(
+      /revoke execute on function public\.normalized_acquire_event_persistence_lock\(text, text, timestamptz\)\s+from public, anon, authenticated/i,
+    );
+    expect(migration).toMatch(
+      /grant execute on function public\.normalized_acquire_event_persistence_lock\(text, text, timestamptz\)\s+to service_role/i,
+    );
   });
 
   it("keeps generated database types aligned with all runtime tables", () => {

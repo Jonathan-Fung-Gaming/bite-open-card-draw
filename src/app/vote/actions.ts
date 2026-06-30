@@ -1,14 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import {
-  createOperationalStateSnapshot,
-  restoreOperationalStateSnapshot,
-} from "@/lib/persistence/operational-state";
 import { adminState } from "@/lib/server/admin-state";
+import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { assertMaxStringLength, DEVICE_ID_MAX_LENGTH } from "@/lib/server/input-limits";
-import { hydrateTournamentState, persistTournamentState } from "@/lib/server/persistence";
+import {
+  getTournamentStateBackend,
+  hydrateTournamentState,
+  withPersistedVotingState,
+} from "@/lib/server/persistence";
 import { assertRateLimit } from "@/lib/server/rate-limit";
+import { submitNormalizedPlayerBallot } from "@/lib/server/normalized-ballots";
 import {
   getRoundDrawRecords,
   getSubmittedPlayerIdsForRound,
@@ -30,7 +32,11 @@ type PublicSubmitRoundBallotInput = Omit<SubmitRoundBallotInput, "playerStartggU
   editToken: string;
 };
 
-function assertPublicIdentifierLengths(input: { playerId: string; deviceId?: string; editToken?: string }) {
+function assertPublicIdentifierLengths(input: {
+  playerId: string;
+  deviceId?: string;
+  editToken?: string;
+}) {
   if (!input.playerId.trim()) {
     throw new Error("Player id is required.");
   }
@@ -72,8 +78,8 @@ export async function getVoteLiveStateAction(
 
   await hydrateTournamentState();
 
-  const snapshot = getVotingRoundSnapshot(roundNumber);
-  const submittedPlayerIds = getSubmittedPlayerIdsForRound(roundNumber);
+  const nowMs = await getAuthoritativeNowMs();
+  const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
   const result = adminState.resultStore.getRoundResult(roundNumber);
 
   return {
@@ -82,8 +88,8 @@ export async function getVoteLiveStateAction(
     statusLabel: formatVotingStatusLabel(snapshot.status),
     timerText: formatVotingTime(snapshot.remainingMs),
     turnoutText: `Ballots submitted: ${snapshot.submittedCount} / ${snapshot.eligibleCount}`,
-    eligiblePlayerIds: snapshot.eligiblePlayers.map((player) => player.id),
-    submittedPlayerIds,
+    eligibleCount: snapshot.eligibleCount,
+    submittedCount: snapshot.submittedCount,
     existingBallotLookup: playerId
       ? buildPublicBallotLookup(adminState.ballotStore.get(roundNumber, playerId), editToken)
       : null,
@@ -97,36 +103,36 @@ export async function claimVoterPresenceAction(input: {
   deviceId: string;
 }) {
   assertPublicIdentifierLengths(input);
-  assertRateLimit({
+  await assertRateLimit({
     key: `voter-presence:${input.roundNumber}:${input.playerId}:${input.deviceId}`,
     limit: 12,
     windowMs: 60_000,
     message: "Too many voter presence claims. Try again shortly.",
   });
 
-  await hydrateTournamentState();
+  return withPersistedVotingState(async () => {
+    const nowMs = await getAuthoritativeNowMs();
+    const snapshot = getVotingRoundSnapshot(input.roundNumber, nowMs);
+    const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === input.playerId);
 
-  const snapshot = getVotingRoundSnapshot(input.roundNumber);
-  const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === input.playerId);
+    if (!player) {
+      throw new Error("This start.gg username is not eligible for the open voting window.");
+    }
 
-  if (!snapshot.canSubmit) {
-    throw new Error("Voting is not open for voter presence claims.");
-  }
+    if (!snapshot.canSubmit) {
+      return {
+        otherActiveDeviceCount: 0,
+        hasOtherActiveDevice: false,
+      };
+    }
 
-  if (!player) {
-    throw new Error("This start.gg username is not eligible for the open voting window.");
-  }
-
-  const presence = adminState.ballotStore.claimVoterPresence(input);
-
-  await persistTournamentState();
-
-  return presence;
+    return adminState.ballotStore.claimVoterPresence({ ...input, nowMs });
+  });
 }
 
 export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInput) {
   assertPublicIdentifierLengths(input);
-  assertRateLimit({
+  await assertRateLimit({
     key: `ballot-submit:${input.roundNumber}:${input.playerId}:${input.deviceId}`,
     limit: 10,
     windowMs: 60_000,
@@ -135,44 +141,71 @@ export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInpu
 
   const editTokenHash = hashBallotEditToken(input.editToken);
 
-  await hydrateTournamentState();
-  const rollbackSnapshot = createOperationalStateSnapshot(adminState);
+  if (getTournamentStateBackend() === "supabase") {
+    const ballot = await submitNormalizedPlayerBallot({
+      roundNumber: input.roundNumber,
+      playerId: input.playerId,
+      choices: input.choices,
+      editTokenHash,
+    });
 
-  const snapshot = getVotingRoundSnapshot(input.roundNumber);
-  const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === input.playerId);
+    revalidateTournamentViews(revalidatePath);
 
-  if (!snapshot.canSubmit) {
-    throw new Error("Voting is not open for ballot changes.");
+    return {
+      id: ballot.ballotId,
+      roundNumber: input.roundNumber,
+      playerId: input.playerId,
+      playerStartggUsername: ballot.playerStartggUsername,
+      choices: input.choices,
+      submittedAt: ballot.submittedAt,
+      revision: ballot.revision,
+      source: "player" as const,
+      manualReason: null,
+      manualOverride: false,
+      replacedExistingBallot: false,
+    };
   }
 
-  if (!player) {
-    throw new Error("This start.gg username is not eligible for the open voting window.");
-  }
+  const publicBallot = await withPersistedVotingState(async () => {
+    const nowMs = await getAuthoritativeNowMs();
+    adminState.votingWindowStore.advanceVoting(
+      input.roundNumber,
+      getSubmittedPlayerIdsForRound(input.roundNumber),
+      nowMs,
+    );
+    const snapshot = getVotingRoundSnapshot(input.roundNumber, nowMs);
+    const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === input.playerId);
 
-  const draws = getRoundDrawRecords(input.roundNumber);
-  const ballot = adminState.ballotStore.submit(
-    {
-      ...input,
-      playerStartggUsername: player.startggUsername,
-    },
-    draws,
-    snapshot.serverNow,
-    { source: "player", editTokenHash },
-  );
+    if (!snapshot.canSubmit) {
+      throw new Error("Voting is not open for ballot changes.");
+    }
 
-  adminState.votingWindowStore.advanceVoting(
-    input.roundNumber,
-    getSubmittedPlayerIdsForRound(input.roundNumber),
-    Date.parse(snapshot.serverNow),
-  );
-  getVotingRoundSnapshot(input.roundNumber);
-  try {
-    await persistTournamentState();
-  } catch (error) {
-    restoreOperationalStateSnapshot(adminState, rollbackSnapshot);
-    throw error;
-  }
+    if (!player) {
+      throw new Error("This start.gg username is not eligible for the open voting window.");
+    }
+
+    const draws = getRoundDrawRecords(input.roundNumber);
+    const ballot = adminState.ballotStore.submit(
+      {
+        ...input,
+        playerStartggUsername: player.startggUsername,
+      },
+      draws,
+      snapshot.serverNow,
+      { source: "player", editTokenHash },
+    );
+
+    adminState.votingWindowStore.advanceVoting(
+      input.roundNumber,
+      getSubmittedPlayerIdsForRound(input.roundNumber),
+      nowMs,
+    );
+    getVotingRoundSnapshot(input.roundNumber, nowMs);
+
+    return toPublicEditableBallot(ballot);
+  });
+
   revalidateTournamentViews(revalidatePath);
 
-  return toPublicEditableBallot(ballot);
+  return publicBallot;
 }
