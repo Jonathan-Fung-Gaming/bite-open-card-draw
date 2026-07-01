@@ -12,6 +12,43 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Phase 9 Rehearsal Harness Refactor - 2026-07-02
+
+Status: complete for local validation. The full hosted four-round rehearsal remains an explicit
+pre-event command, not a default PR/smoke gate.
+
+### Changed Files
+
+- Replaced `tests/phase9/hosted-four-round.spec.ts` with `tests/phase9/hosted-one-round-smoke.spec.ts`
+  and `tests/phase9/hosted-full-rehearsal.spec.ts`.
+- Added Phase 9 helper modules under `tests/phase9/fixtures`, `tests/phase9/pages`,
+  `tests/phase9/flows`, and `tests/phase9/assertions`.
+- Updated `package.json` so `rtk npm run test:phase9` runs the `@smoke` one-round path and
+  `rtk npm run test:phase9:full` runs the `@full` four-round path.
+- Updated rehearsal/release/deployment docs with the new command split.
+
+### Checks Run
+
+- `rtk npm run typecheck` - passed.
+- `rtk npm run lint` - passed.
+- `rtk npx playwright test --config=playwright.phase9.config.ts --grep "@smoke" --list` - passed,
+  one smoke spec selected.
+- `rtk npx playwright test --config=playwright.phase9.config.ts --grep "@full" --list` - passed,
+  one full rehearsal spec selected.
+- `rtk npm run test:phase9` - passed, one-round smoke rehearsal.
+- `rtk npm run test` - passed, 41 files / 163 tests.
+- `rtk git diff --check` - passed.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 4 Playwright tests.
+
+### Risks And Assumptions
+
+- `rtk npm run test:phase9:full` was not run during this refactor because it is the long hosted
+  four-round rehearsal gate. Use it with hosted Supabase variables and a disposable
+  `TOURNAMENT_EVENT_ID` before event release.
+- The refactor preserves the existing hosted fallback helpers for Supabase host lock, current-round
+  updates, and final reveal recovery; those are harness stabilizers rather than tournament logic.
+
 As of Phase 9 completion on 2026-06-30, real cached chart artwork population and rendering
 verification are closed (`RIC-020`, `RIC-021`, `RIC-022`, and `RIC-028`), Phase 8 local e2e/load
 gates are clean, and the hosted Supabase rehearsal has passed. Production Supabase was used by

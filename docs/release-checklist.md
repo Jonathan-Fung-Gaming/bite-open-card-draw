@@ -11,8 +11,9 @@ Use this checklist on the release branch before tournament use.
 - [x] Hosted Supabase rehearsal evidence recorded with `TOURNAMENT_STATE_BACKEND=supabase` and a
       disposable `TOURNAMENT_EVENT_ID`. Production Supabase was used by explicit exception because
       no spare project remained; global migration risk was accepted and recorded.
-- [x] Phase 9 hosted four-round evidence recorded: `rtk npm run test:phase9` passed with event id
-      `phase9-fourround-2026-06-30-prod-05`.
+- [x] Phase 9 hosted four-round evidence recorded before the command split: historical
+      `rtk npm run test:phase9` passed with event id `phase9-fourround-2026-06-30-prod-05`.
+      Current four-round rehearsals use `rtk npm run test:phase9:full`.
 - [x] Phase 9 hosted load evidence recorded: `rtk npm run test:load` passed with
       `TOURNAMENT_STATE_BACKEND=supabase` and event id `phase9-load-2026-06-30-prod-07`.
 
@@ -102,6 +103,8 @@ workflow.
 - [ ] `rtk npm run test`
 - [ ] `rtk npm run test:e2e`
 - [ ] `rtk npm run test:load`
+- [ ] `rtk npm run test:phase9`
+- [ ] `rtk npm run test:phase9:full`
 - [ ] `rtk npm run import:charts`
 - [ ] `rtk npm run cache:chart-images`
 - [ ] `rtk npm run verify:real-chart-images`

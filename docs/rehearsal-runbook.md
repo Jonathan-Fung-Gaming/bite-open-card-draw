@@ -6,6 +6,17 @@ This runbook is for local operator practice. Production readiness still requires
 Supabase four-round rehearsal with `TOURNAMENT_STATE_BACKEND=supabase` and a disposable
 `TOURNAMENT_EVENT_ID`; local memory-mode rehearsal does not count as release evidence.
 
+## Automated Rehearsal Commands
+
+The Phase 9 Playwright rehearsal is split into reusable page objects and flows under
+`tests/phase9/`:
+
+- `rtk npm run test:phase9` runs the one-round hosted smoke path tagged `@smoke`.
+- `rtk npm run test:phase9:full` runs the explicit four-round hosted rehearsal tagged `@full`.
+
+Use the one-round smoke after routine changes. Use the four-round command for pre-event release
+evidence with hosted Supabase environment variables and a disposable `TOURNAMENT_EVENT_ID`.
+
 ## Start Rehearsal
 
 1. Open `/coolguy69`.

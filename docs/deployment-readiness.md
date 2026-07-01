@@ -39,6 +39,8 @@ rtk npm run typecheck
 rtk npm run test
 rtk npm run test:e2e
 rtk npm run test:load
+rtk npm run test:phase9
+rtk npm run test:phase9:full
 rtk npm run import:charts
 rtk npm run cache:chart-images
 rtk npm run verify:real-chart-images
@@ -85,7 +87,10 @@ Hosted Supabase rehearsal is no longer an unresolved release blocker as of 2026-
   `phase9-e2e-2026-06-30-prod-23`.
 - Hosted `rtk npm run test:load` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
   `phase9-load-2026-06-30-prod-07`.
-- Hosted `rtk npm run test:phase9` passed a four-round rehearsal with event id
+- Hosted four-round Phase 9 rehearsal evidence was recorded before the command split. Current
+  four-round runs use `rtk npm run test:phase9:full`; the default `rtk npm run test:phase9` now runs
+  the shorter one-round smoke path.
+- Historical hosted `rtk npm run test:phase9` passed a four-round rehearsal with event id
   `phase9-fourround-2026-06-30-prod-05`.
 - The Vercel non-root route failure reported with digest `2042555441` was resolved by configuring
   the production runtime environment variables and redeploying.

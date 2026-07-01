@@ -1,0 +1,36 @@
+import { expect, type Page } from "@playwright/test";
+import { HOSTED_REFRESH_TIMEOUT_MS, goto } from "../fixtures/phase9-env";
+
+export class StagePage {
+  constructor(
+    readonly page: Page,
+    readonly baseURL: string,
+  ) {}
+
+  async goto() {
+    await goto(this.page, this.baseURL, "/stage");
+  }
+
+  async reload() {
+    await this.page.reload({ waitUntil: "domcontentloaded" });
+  }
+
+  async expectTwoRowsOfSevenCharts() {
+    await this.reload();
+    await expect(this.page.getByTestId("stage-set-row")).toHaveCount(2);
+    await expect(
+      this.page.getByTestId("stage-set-row").nth(0).getByTestId("stage-chart-card"),
+    ).toHaveCount(7);
+    await expect(
+      this.page.getByTestId("stage-set-row").nth(1).getByTestId("stage-chart-card"),
+    ).toHaveCount(7);
+  }
+
+  async expectFinalCharts(roundNumber: number) {
+    await expect(
+      this.page.getByRole("heading", { name: `ROUND ${roundNumber} FINAL CHARTS` }),
+    ).toBeVisible({
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
+  }
+}
