@@ -104,6 +104,35 @@ describe("voting window store", () => {
     expect(closed.status).toBe("voting_closed");
   });
 
+  it("gives a full 30-second final-change window even near the original deadline", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players.slice(0, 2),
+      nowMs: 0,
+    });
+
+    const transitionAt = TEN_MINUTES_MS - 5_000;
+
+    store.advanceVoting(1, ["player-1", "player-2"], transitionAt);
+
+    const finalWarning = snapshot(
+      store,
+      ["player-1", "player-2"],
+      transitionAt,
+      players.slice(0, 2),
+    );
+
+    expect(finalWarning.status).toBe("final_30_seconds");
+    expect(finalWarning.remainingMs).toBe(FINAL_CHANGE_MS);
+
+    expect(
+      snapshot(store, ["player-1", "player-2"], TEN_MINUTES_MS, players.slice(0, 2)).status,
+    ).toBe("final_30_seconds");
+  });
+
   it("enters final-change mode when every eligible player submits during the one-minute extension", () => {
     const store = new VotingWindowStore();
 

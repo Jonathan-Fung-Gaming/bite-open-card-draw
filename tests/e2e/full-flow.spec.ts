@@ -14,7 +14,7 @@ function getAdminPassword() {
 
 const ADMIN_PASSWORD = getAdminPassword();
 const FALLBACK_CHART_IMAGE_PATH = "/chart-images/fallback-card.svg";
-const HOSTED_REFRESH_TIMEOUT_MS = 15_000;
+const HOSTED_REFRESH_TIMEOUT_MS = 30_000;
 
 function expectRealCachedImagePath(source: string | null) {
   expect(source).toBeTruthy();
@@ -31,16 +31,28 @@ async function loginAndTakeHost(page: Page) {
   await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
   await page.getByRole("button", { name: "Log In" }).click();
   await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
-  const hostControlButton = page.getByRole("button", {
-    name: /^(Force Host Takeover|Take Host Control)$/,
-  });
+  const releaseButton = page.getByRole("button", { name: "Release" });
 
-  await expect(hostControlButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
-  await hostControlButton.click();
+  if (await releaseButton.isEnabled()) {
+    await expect(page.getByText("Voting Controls")).toBeVisible();
+    return;
+  }
+
+  const takeHostButton = page.getByRole("button", { name: "Take Host Control" });
+
+  if ((await takeHostButton.count()) > 0 && (await takeHostButton.isEnabled())) {
+    await takeHostButton.click();
+  } else {
+    const forceHostForm = page.locator("form", {
+      has: page.getByRole("button", { name: "Force Host Takeover" }),
+    });
+
+    await forceHostForm.getByLabel("Audit reason").fill("e2e host takeover");
+    await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+    await forceHostForm.getByRole("button", { name: "Force Host Takeover" }).click();
+  }
   await expect(page.getByText("Voting Controls")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Release" })).toBeEnabled({
-    timeout: HOSTED_REFRESH_TIMEOUT_MS,
-  });
+  await expect(releaseButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 
 async function expectStageRows(page: Page) {
@@ -187,7 +199,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     .getByPlaceholder("Bulk import start.gg usernames")
     .fill("Alpha\nBravo\nCharlie\nDelta");
   await page.getByRole("button", { name: "Bulk Import" }).click();
-  await expect(page.getByRole("cell", { name: "Alpha" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Alpha", exact: true })).toBeVisible();
 
   const stagePage = await page.context().newPage();
   await goto(stagePage, "/stage");
@@ -199,8 +211,12 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await page.getByRole("button", { name: "Draw Set" }).nth(0).click();
   await expect(page.getByText(/Version 1/).first()).toBeVisible();
-  await expect(stagePage.getByText(/Version 1 \/ (Revealing|Pool)/)).toBeVisible({ timeout: 7000 });
-  await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({ timeout: 7000 });
+  await expect(stagePage.getByText(/Version 1 \/ (Revealing|Pool)/)).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 
   const firstChartRerollForm = page
     .locator("form")
@@ -212,13 +228,17 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     (form as HTMLFormElement).requestSubmit();
   });
   await expect(page.getByText(/Version 2/).first()).toBeVisible();
-  await expect(stagePage.getByText(/Version 2 \/ (Revealing|Pool)/)).toBeVisible({ timeout: 7000 });
-  await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({ timeout: 7000 });
+  await expect(stagePage.getByText(/Version 2 \/ (Revealing|Pool)/)).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 
   await page.getByRole("button", { name: "Draw Set" }).nth(1).click();
   await expect(page.getByText("ready to vote")).toBeVisible();
   await expect(stagePage.getByText(/Version 1 \/ (Revealing [0-7] \/ 7|Pool)/)).toBeVisible({
-    timeout: 7000,
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expectStageRows(stagePage);
   await expectRenderedRealStageImage(stagePage);
@@ -227,7 +247,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await page.getByRole("button", { name: "Open Voting", exact: true }).click();
   await expect(page.getByText("voting open")).toBeVisible();
-  await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible({ timeout: 7000 });
+  await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await expectReadableVotingAccess(stagePage);
   await expectNoStageVerticalScroll(stagePage);
 
@@ -264,7 +286,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(ballotCards.nth(0)).toHaveAttribute("aria-pressed", "true");
   await expect(ballotCards.nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect(ballotCards.nth(2)).toHaveAttribute("aria-pressed", "false");
-  await phonePage.getByRole("button", { name: "Next" }).click();
+  await phonePage.getByRole("button", { name: "Next", exact: true }).click();
   await phonePage.getByLabel("No bans for this set").check();
   await phonePage.getByRole("button", { name: "Review" }).click();
   await phonePage.getByRole("button", { name: "Submit Ballot" }).click();
@@ -277,7 +299,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await phonePage.getByRole("button", { name: "Edit S16" }).click();
   await expect(phonePage.getByRole("heading", { name: "S16" })).toBeVisible();
   await expect(phonePage.getByTestId("ban-selection-counter")).toHaveText("2/2 bans selected");
-  await phonePage.getByRole("button", { name: "Next" }).click();
+  await phonePage.getByRole("button", { name: "Next", exact: true }).click();
   await phonePage.getByRole("button", { name: "Review" }).click();
   await phonePage.getByRole("button", { name: "Submit Ballot" }).click();
   await expect(phonePage.getByText("Saved revision 2.")).toBeVisible();
@@ -300,11 +322,15 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await duplicatePhonePage.close();
 
   await page.getByRole("button", { name: "Close Voting" }).click();
-  await expect(page.getByText("voting closed")).toBeVisible();
+  await expect(page.getByText("voting closed")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await expect(phonePage.getByText("Voting is closed.")).toBeVisible({ timeout: 7000 });
   await expect(phonePage.getByText("Results are being revealed on stage.")).toBeVisible();
   await page.getByRole("button", { name: "Compute Results" }).click();
-  await expect(page.getByText("results computed")).toBeVisible();
+  await expect(page.getByText("results computed")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await expectAdminRevealPhase(page, "computed");
 
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
@@ -366,6 +392,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(downloadButton).toBeEnabled();
   await downloadButton.click();
   await expect(page.getByText("Downloaded round-1-private-ballots.csv.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Release" }).click();
+  await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });
 
 test("stage tiebreak wheel hides the winner until the five-second reveal completes", async ({
@@ -398,9 +427,13 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   await seedTiebreakForm.getByPlaceholder("Audit reason").fill("e2e forced tiebreak");
   await page.getByRole("button", { name: "Seed Tiebreak" }).click();
   await page.getByRole("button", { name: "Close Voting" }).click();
-  await expect(page.getByText("voting closed")).toBeVisible();
+  await expect(page.getByText("voting closed")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await page.getByRole("button", { name: "Compute Results" }).click();
-  await expect(page.getByText("results computed")).toBeVisible();
+  await expect(page.getByText("results computed")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await expectAdminRevealPhase(page, "computed");
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
@@ -430,4 +463,7 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
     "Backend winner revealed:",
   );
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Release" }).click();
+  await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });

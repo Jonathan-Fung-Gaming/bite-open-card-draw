@@ -12,11 +12,14 @@ export type PersistMergedStateInput = {
 
 export type OperationalStateRepository = {
   load(): Promise<OperationalStateSnapshot | null>;
+  loadVotingAdminState?(): Promise<OperationalStateSnapshot | null>;
+  loadResultAdminState?(): Promise<OperationalStateSnapshot | null>;
   save(snapshot: OperationalStateSnapshot): Promise<void>;
   persistMerged?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
   persistHostLock?(hostLock: HostLockStoreSnapshot): Promise<void>;
   persistVotingState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
   persistVotingAdminState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
+  persistResultAdminState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
 };
 
 export class MemoryOperationalStateRepository implements OperationalStateRepository {
@@ -24,6 +27,14 @@ export class MemoryOperationalStateRepository implements OperationalStateReposit
 
   async load() {
     return this.snapshot ? cloneOperationalStateSnapshot(this.snapshot) : null;
+  }
+
+  async loadResultAdminState() {
+    return this.load();
+  }
+
+  async loadVotingAdminState() {
+    return this.load();
   }
 
   async save(snapshot: OperationalStateSnapshot) {
@@ -46,6 +57,10 @@ export class MemoryOperationalStateRepository implements OperationalStateReposit
   }
 
   async persistVotingAdminState(input: PersistMergedStateInput) {
+    return this.persistMerged(input);
+  }
+
+  async persistResultAdminState(input: PersistMergedStateInput) {
     return this.persistMerged(input);
   }
 

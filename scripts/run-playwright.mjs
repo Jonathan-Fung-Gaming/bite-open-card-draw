@@ -56,9 +56,12 @@ const requestedArgs = rawArgs.filter((arg) => arg !== "--skip-build");
 loadEnvConfig(process.cwd());
 const usesLoadConfig = requestedArgs.some((arg) => arg.includes("playwright.load.config"));
 const usesPhase9Config = requestedArgs.some((arg) => arg.includes("playwright.phase9.config"));
+const e2eTournamentStateBackend = process.env.E2E_TOURNAMENT_STATE_BACKEND ?? "memory";
 const e2ePort = process.env.E2E_PORT || (await findOpenPort());
 const e2eBaseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
-const e2eServerMode = process.env.E2E_SERVER_MODE || (usesLoadConfig || usesPhase9Config ? "dev" : "start");
+const defaultServerMode =
+  e2eTournamentStateBackend === "memory" || usesLoadConfig || usesPhase9Config ? "dev" : "start";
+const e2eServerMode = process.env.E2E_SERVER_MODE || defaultServerMode;
 const skipBuild = skipBuildArg || process.env.E2E_SKIP_BUILD === "1" || e2eServerMode === "dev";
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";

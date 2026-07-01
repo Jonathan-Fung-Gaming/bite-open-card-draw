@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-export const HOST_LOCK_TTL_MS = 15_000;
+export const HOST_LOCK_TTL_MS = 60_000;
 
 export type HostLockStatus = "inactive" | "active" | "readonly";
 

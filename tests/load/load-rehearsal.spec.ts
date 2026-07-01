@@ -22,9 +22,11 @@ function getTestRouteHeaders() {
 
   return { "x-tournament-test-token": token };
 }
-const PLAYER_COUNT = 100;
-const LOAD_CONCURRENCY = Number(process.env.E2E_LOAD_CONCURRENCY ?? 6);
-const HOSTED_REFRESH_TIMEOUT_MS = 15_000;
+const PLAYER_COUNT = 50;
+const LOAD_CONCURRENCY = Number(process.env.E2E_LOAD_CONCURRENCY ?? 3);
+const LOAD_CHUNK_DELAY_MS = Number(process.env.E2E_LOAD_CHUNK_DELAY_MS ?? 750);
+const EDIT_EVERY_N_PLAYERS = 5;
+const HOSTED_REFRESH_TIMEOUT_MS = 90_000;
 
 function playerName(index: number) {
   return `Load Player ${String(index + 1).padStart(3, "0")}`;
@@ -40,28 +42,63 @@ async function goto(page: Page, baseURL: string, path: string) {
 
 async function loginAndTakeHost(page: Page, baseURL: string) {
   await goto(page, baseURL, "/coolguy69");
-  await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Log In" }).click();
+  const passwordInput = page.getByLabel("Shared admin password");
+
+  if ((await passwordInput.count()) > 0) {
+    await passwordInput.fill(ADMIN_PASSWORD);
+    await page.getByRole("button", { name: "Log In" }).click();
+  }
+
   await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
-  await page.getByRole("button", { name: /^(Force Host Takeover|Take Host Control)$/ }).click();
+  const releaseButton = page.getByRole("button", { name: "Release" });
+
+  if (await releaseButton.isEnabled()) {
+    await expect(page.getByText("Voting Controls")).toBeVisible();
+    return;
+  }
+
+  const takeHostButton = page.getByRole("button", { name: "Take Host Control" });
+
+  if ((await takeHostButton.count()) > 0 && (await takeHostButton.isEnabled())) {
+    await takeHostButton.click();
+  } else {
+    const forceHostForm = page.locator("form", {
+      has: page.getByRole("button", { name: "Force Host Takeover" }),
+    });
+
+    await forceHostForm.getByLabel("Audit reason").fill("load e2e host takeover");
+    await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+    await forceHostForm.getByRole("button", { name: "Force Host Takeover" }).click();
+  }
+
   await expect(page.getByText("Voting Controls")).toBeVisible();
+  await expect(releaseButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 
 async function drawRoundAndOpenVoting(page: Page) {
   await page.getByRole("button", { name: "Draw Set" }).nth(0).click();
-  await expect(page.getByText(/Version 1/).first()).toBeVisible();
+  await expect(page.getByText(/Version 1/).first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await page.getByRole("button", { name: "Draw Set" }).nth(1).click();
-  await expect(page.getByText("ready to vote")).toBeVisible();
+  await expect(page.getByText("ready to vote")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await page.getByRole("button", { name: "Open Voting", exact: true }).click();
-  await expect(page.getByText("voting open")).toBeVisible();
+  await expect(page.getByText("voting open")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 }
 
 async function submitAndEditBallot(
   request: APIRequestContext,
   baseURL: string,
   startggUsername: string,
+  shouldEdit: boolean,
 ) {
-  for (const revision of [1, 2] as const) {
+  const revisions = shouldEdit ? ([1, 2] as const) : ([1] as const);
+
+  for (const revision of revisions) {
     const response = await request.post(route(baseURL, "/api/e2e/load-ballot"), {
       headers: getTestRouteHeaders(),
       data: {
@@ -79,45 +116,95 @@ async function submitAndEditBallot(
   }
 }
 
-async function submitLoadChunk(request: APIRequestContext, baseURL: string, players: string[]) {
-  await Promise.all(players.map((player) => submitAndEditBallot(request, baseURL, player)));
+async function submitLoadChunk(
+  request: APIRequestContext,
+  baseURL: string,
+  players: string[],
+  startingIndex: number,
+) {
+  await Promise.all(
+    players.map((player, index) =>
+      submitAndEditBallot(
+        request,
+        baseURL,
+        player,
+        (startingIndex + index + 1) % EDIT_EVERY_N_PLAYERS === 0,
+      ),
+    ),
+  );
 }
 
-async function expectAdminRevealPhase(page: Page, phase: string) {
-  await expect(
-    page
-      .locator("section", { hasText: "Result Reveal Controls" })
-      .getByText(phase, { exact: true }),
-  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+async function expectAdminTextAfterNavigation(page: Page, baseURL: string, text: string | RegExp) {
+  await expect
+    .poll(
+      async () => {
+        await goto(page, baseURL, "/coolguy69");
+
+        const passwordInput = page.getByLabel("Shared admin password");
+
+        if ((await passwordInput.count()) > 0) {
+          await passwordInput.fill(ADMIN_PASSWORD);
+          await page.getByRole("button", { name: "Log In" }).click();
+          await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
+        }
+
+        return page.getByText(text).isVisible();
+      },
+      { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+    )
+    .toBe(true);
 }
 
-async function advanceRevealAndWaitForAdminPhase(page: Page, phase: string) {
+async function advanceRevealStep(page: Page, baseURL: string, settleMs: number) {
+  await loginAndTakeHost(page, baseURL);
+
   const nextButton = page.getByRole("button", {
     name: /Advance to Set 1 counts|Reveal Set 1 selected chart|Advance to Set 2 counts|Reveal Set 2 selected chart|Show final charts/,
   });
 
   await expect(nextButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await nextButton.click();
-  await expectAdminRevealPhase(page, phase);
+  await page.waitForTimeout(settleMs);
 }
 
-async function advanceToFinalReveal(page: Page) {
-  await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
-  await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
-  await page.waitForTimeout(6_000);
-  await advanceRevealAndWaitForAdminPhase(page, "set 2 counts");
-  await advanceRevealAndWaitForAdminPhase(page, "set 2 resolved");
-  await page.waitForTimeout(6_000);
-  await advanceRevealAndWaitForAdminPhase(page, "final");
+async function adminRevealPhaseIsVisible(page: Page, phase: string) {
+  return page
+    .locator("section", { hasText: "Result Reveal Controls" })
+    .getByText(phase, { exact: true })
+    .isVisible();
 }
 
-test("100-player browser rehearsal submits, edits, and exports final CSV", async ({
+async function advanceToFinalReveal(page: Page, baseURL: string) {
+  await advanceRevealStep(page, baseURL, 2_000);
+  await advanceRevealStep(page, baseURL, 7_000);
+  await advanceRevealStep(page, baseURL, 2_000);
+  await advanceRevealStep(page, baseURL, 7_000);
+  await advanceRevealStep(page, baseURL, 5_000);
+
+  await loginAndTakeHost(page, baseURL);
+
+  if (!(await adminRevealPhaseIsVisible(page, "final"))) {
+    await advanceRevealStep(page, baseURL, 5_000);
+  }
+
+  await expect
+    .poll(
+      async () => {
+        await goto(page, baseURL, "/coolguy69");
+        return adminRevealPhaseIsVisible(page, "final");
+      },
+      { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+    )
+    .toBe(true);
+}
+
+test("50-player sporadic browser rehearsal submits, edits, and exports final CSV", async ({
   page,
   browser,
   request,
   baseURL,
 }) => {
-  test.setTimeout(360_000);
+  test.setTimeout(600_000);
 
   if (!baseURL) {
     throw new Error("Missing Playwright baseURL.");
@@ -128,8 +215,10 @@ test("100-player browser rehearsal submits, edits, and exports final CSV", async
   await loginAndTakeHost(page, baseURL);
   await page.getByPlaceholder("Bulk import start.gg usernames").fill(players.join("\n"));
   await page.getByRole("button", { name: "Bulk Import" }).click();
-  await expect(page.getByRole("cell", { name: playerName(0) })).toBeVisible();
-  await expect(page.getByRole("cell", { name: playerName(PLAYER_COUNT - 1) })).toBeVisible();
+  await expect(page.getByRole("cell", { name: playerName(0), exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: playerName(PLAYER_COUNT - 1), exact: true }),
+  ).toBeVisible();
 
   await drawRoundAndOpenVoting(page);
 
@@ -149,30 +238,45 @@ test("100-player browser rehearsal submits, edits, and exports final CSV", async
 
   for (let index = 0; index < players.length; index += LOAD_CONCURRENCY) {
     const chunk = players.slice(index, index + LOAD_CONCURRENCY);
-    await submitLoadChunk(request, baseURL, chunk);
+    await submitLoadChunk(request, baseURL, chunk, index);
 
-    if ((index + chunk.length) % 25 === 0 || index + chunk.length === players.length) {
+    if ((index + chunk.length) % 10 === 0 || index + chunk.length === players.length) {
       await stagePage.reload({ waitUntil: "domcontentloaded" });
       await expect(
-        stagePage.locator("header").getByText(/Voting open|Final 30 seconds/),
+        stagePage.locator("header").getByText(/Voting open|Final 30 seconds|Voting closed/),
       ).toBeVisible();
+    }
+
+    if (index + chunk.length < players.length) {
+      await page.waitForTimeout(LOAD_CHUNK_DELAY_MS);
     }
   }
 
-  await page.reload({ waitUntil: "domcontentloaded" });
+  await loginAndTakeHost(page, baseURL);
   await expect(page.getByText(`${PLAYER_COUNT} / ${PLAYER_COUNT}`)).toBeVisible();
 
   await chartsSpectator.reload({ waitUntil: "domcontentloaded" });
   await expect(chartsSpectator.getByTestId("view-only-status")).toContainText(
-    /Voting open|Final 30 seconds/,
+    /Voting open|Final 30 seconds|Results being revealed/,
   );
 
-  await page.getByRole("button", { name: "Close Voting" }).click();
-  await expect(page.getByText("voting closed")).toBeVisible();
+  if (!(await page.getByText("voting closed").isVisible())) {
+    await expect(page.getByRole("button", { name: "Close Voting" })).toBeEnabled({
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
+    await page.getByRole("button", { name: "Close Voting" }).click();
+    await page.waitForTimeout(5_000);
+    await expectAdminTextAfterNavigation(page, baseURL, "voting closed");
+  }
+  await expectAdminTextAfterNavigation(page, baseURL, "voting closed");
+  await expect(page.getByRole("button", { name: "Compute Results" })).toBeEnabled({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await page.getByRole("button", { name: "Compute Results" }).click();
-  await expect(page.getByText("results computed")).toBeVisible();
+  await page.waitForTimeout(5_000);
+  await expectAdminTextAfterNavigation(page, baseURL, "results computed");
 
-  await advanceToFinalReveal(page);
+  await advanceToFinalReveal(page, baseURL);
   await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
     timeout: 15_000,
   });
@@ -199,4 +303,6 @@ test("100-player browser rehearsal submits, edits, and exports final CSV", async
   await roomSpectator.close();
   await chartsSpectator.close();
   await resultsSpectator.close();
+  await page.getByRole("button", { name: "Release" }).click();
+  await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });

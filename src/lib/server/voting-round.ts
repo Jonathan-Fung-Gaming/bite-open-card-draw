@@ -1,5 +1,6 @@
 import "server-only";
 import { adminState } from "@/lib/server/admin-state";
+import { evaluateRoundDrawReadiness } from "@/lib/draw/round-readiness";
 import { countBanSelections } from "@/lib/vote/ballot";
 
 export function getRoundDrawRecords(roundNumber: 1 | 2 | 3 | 4) {
@@ -17,16 +18,21 @@ export function getCurrentEligiblePlayers(roundNumber: 1 | 2 | 3 | 4) {
 
 export function getVotingRoundSnapshot(roundNumber: 1 | 2 | 3 | 4, nowMs?: number) {
   const draws = getRoundDrawRecords(roundNumber);
+  const drawReadiness = evaluateRoundDrawReadiness(roundNumber, draws);
   const ballots = adminState.ballotStore.listForRound(roundNumber);
 
   return adminState.votingWindowStore.getSnapshot({
     roundNumber,
-    drawnSetCount: draws.length,
+    drawnSetCount: drawReadiness.completeSetCount,
     eligiblePlayers: getCurrentEligiblePlayers(roundNumber),
     submittedPlayerIds: ballots.map((ballot) => ballot.playerId),
     banSelectionsCast: countBanSelections(ballots),
     nowMs,
   });
+}
+
+export function getRoundDrawReadiness(roundNumber: 1 | 2 | 3 | 4) {
+  return evaluateRoundDrawReadiness(roundNumber, getRoundDrawRecords(roundNumber));
 }
 
 export function getSubmittedPlayerIdsForRound(roundNumber: 1 | 2 | 3 | 4) {

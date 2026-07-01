@@ -34,6 +34,12 @@ function draw(id: string, setOrder: 1 | 2, displayLabel: string, charts: DrawnCh
   };
 }
 
+function sevenCharts(prefix: string) {
+  return Array.from({ length: 7 }, (_, index) =>
+    chart(`${prefix}-${index}`, `${prefix.toUpperCase()} ${index}`),
+  );
+}
+
 function ballot(playerId: string, setOneBans: string[], setTwoBans: string[] = []): RoundBallot {
   return {
     id: `ballot-${playerId}`,
@@ -74,10 +80,18 @@ describe("result store reveal timing", () => {
     const result = store.computeRound({
       roundNumber: 1,
       draws: [
-        draw("draw-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
-        draw("draw-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
+        draw("draw-1", 1, "S16", [
+          chart("a", "Alpha"),
+          chart("b", "Bravo"),
+          chart("c", "Charlie"),
+          chart("d", "Delta"),
+          chart("e", "Echo"),
+          chart("f", "Foxtrot"),
+          chart("g", "Golf"),
+        ]),
+        draw("draw-2", 2, "S17", sevenCharts("set-two")),
       ],
-      ballots: [ballot("p1", ["c"]), ballot("p2", ["c"])],
+      ballots: [ballot("p1", ["c", "d"]), ballot("p2", ["e", "f"]), ballot("p3", ["g"])],
       eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
       now: computedAt,
     });
@@ -107,10 +121,18 @@ describe("result store reveal timing", () => {
     const result = store.computeRound({
       roundNumber: 1,
       draws: [
-        draw("draw-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
-        draw("draw-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
+        draw("draw-1", 1, "S16", [
+          chart("a", "Alpha"),
+          chart("b", "Bravo"),
+          chart("c", "Charlie"),
+          chart("d", "Delta"),
+          chart("e", "Echo"),
+          chart("f", "Foxtrot"),
+          chart("g", "Golf"),
+        ]),
+        draw("draw-2", 2, "S17", sevenCharts("set-two")),
       ],
-      ballots: [ballot("p1", ["a"]), ballot("p2", ["a"])],
+      ballots: [ballot("p1", ["a", "d"]), ballot("p2", ["a", "e"]), ballot("p3", ["f", "g"])],
       eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
       now: "2026-06-28T00:00:00.000Z",
     });

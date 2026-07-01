@@ -20,7 +20,7 @@ class FakeNormalizedSupabaseClient {
     operation: "select" | "insert" | "upsert" | "delete";
     table: string;
   }> = [];
-  readonly rpcCalls: Array<{ functionName: string; args: Record<string, string> }> = [];
+  readonly rpcCalls: Array<{ functionName: string; args: Record<string, unknown> }> = [];
 
   from(table: string) {
     this.touchedTables.push(table);
@@ -53,7 +53,13 @@ class FakeNormalizedSupabaseClient {
           const keyColumns =
             table === "host_locks"
               ? ["event_id", "lock_name"]
-              : [table === "event_runtime_state" ? "event_id" : "id"];
+              : table === "event_runtime_state"
+                ? ["event_id"]
+                : table === "voting_windows" || table === "result_snapshots"
+                  ? ["event_id", "round_number"]
+                  : table === "tiebreaks"
+                    ? ["event_id", "result_snapshot_id", "draw_id"]
+                    : ["id"];
           const index = existing.findIndex((candidate) =>
             keyColumns.every((keyColumn) => candidate[keyColumn] === row[keyColumn]),
           );
@@ -112,8 +118,72 @@ class FakeNormalizedSupabaseClient {
     };
   }
 
-  async rpc(functionName: string, args: Record<string, string>) {
+  async rpc(functionName: string, args: Record<string, unknown>) {
     this.rpcCalls.push({ functionName, args });
+
+    if (functionName === "normalized_replace_draw_state") {
+      const eventId = String(args.p_event_id);
+      const payload = args.p_payload as {
+        draws?: Array<{
+          id: string;
+          roundSetId: string;
+          version: number;
+          status: string;
+          eligiblePoolCount: number;
+          eligibleChartIds: string[];
+          excludedChartKeysSnapshot: string[];
+          selectedSongKeysSnapshot: string[];
+          sameRoundBlockedSongKeysSnapshot: string[];
+          createdAt: string;
+          supersededAt: string | null;
+          reason: string;
+          charts: Array<{ id: string }>;
+        }>;
+      };
+      const draws = payload.draws ?? [];
+
+      this.rows.set(
+        "drawn_charts",
+        (this.rows.get("drawn_charts") ?? []).filter((row) => row.event_id !== eventId),
+      );
+      this.rows.set(
+        "draws",
+        (this.rows.get("draws") ?? []).filter((row) => row.event_id !== eventId),
+      );
+
+      this.rows.set("draws", [
+        ...(this.rows.get("draws") ?? []),
+        ...draws.map((draw) => ({
+          id: draw.id,
+          event_id: eventId,
+          round_set_id: draw.roundSetId,
+          draw_version: draw.version,
+          status: draw.status,
+          eligible_pool_count: draw.eligiblePoolCount,
+          eligible_chart_ids: draw.eligibleChartIds,
+          excluded_chart_keys_snapshot: draw.excludedChartKeysSnapshot,
+          selected_song_keys_snapshot: draw.selectedSongKeysSnapshot,
+          same_round_blocked_song_keys_snapshot: draw.sameRoundBlockedSongKeysSnapshot,
+          created_at: draw.createdAt,
+          superseded_at: draw.supersededAt,
+          reason: draw.reason,
+        })),
+      ]);
+      this.rows.set("drawn_charts", [
+        ...(this.rows.get("drawn_charts") ?? []),
+        ...draws.flatMap((draw) =>
+          draw.charts.map((chart, index) => ({
+            event_id: eventId,
+            draw_id: draw.id,
+            chart_id: chart.id,
+            draw_order: index + 1,
+            created_at: draw.createdAt,
+          })),
+        ),
+      ]);
+
+      return { data: { committed: true, rows_changed: draws.length }, error: null };
+    }
 
     return { data: true, error: null };
   }
@@ -355,6 +425,42 @@ describe("normalized operational state repository", () => {
     expect(supabase.rpcCalls.map((call) => call.functionName)).toEqual([]);
   });
 
+  it("keeps existing host locks when a full event save has no host-lock delta", async () => {
+    const supabase = new FakeNormalizedSupabaseClient();
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "host-lock-full-save-test",
+      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
+      now: () => "2026-06-30T00:00:00.000Z",
+    });
+    const hostStores = createAdminStateStores();
+    const unrelatedStores = createAdminStateStores();
+
+    hostStores.hostLockStore.acquire("session-a", "host-token-a", 0);
+    await repository.persistHostLock(hostStores.hostLockStore.exportSnapshot());
+
+    unrelatedStores.rosterStore.createOrUpdatePlayer({
+      startggUsername: "Alpha",
+      active: true,
+      now: "2026-06-30T00:00:01.000Z",
+    });
+
+    supabase.operations.length = 0;
+
+    await repository.save(
+      createOperationalStateSnapshot(unrelatedStores, "2026-06-30T00:00:02.000Z"),
+    );
+
+    const deletedTables = supabase.operations
+      .filter((operation) => operation.operation === "delete")
+      .map((operation) => operation.table);
+
+    expect(deletedTables).not.toContain("host_locks");
+    expect(supabase.rows.get("host_locks")).toHaveLength(1);
+    expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
+      owner_session_id: "session-a",
+    });
+  });
+
   it("persists public voting changes without rewriting unrelated event tables", async () => {
     const supabase = new FakeNormalizedSupabaseClient();
     const repository = new NormalizedOperationalStateRepository({
@@ -478,6 +584,14 @@ describe("normalized operational state repository", () => {
 
     await repository.save(createOperationalStateSnapshot(stores, "2026-06-30T00:00:00.000Z"));
 
+    supabase.touchedTables.length = 0;
+    await repository.loadVotingAdminState();
+    expect(supabase.touchedTables).not.toContain("ballots");
+    expect(supabase.touchedTables).not.toContain("ballot_choices");
+    expect(supabase.touchedTables).not.toContain("ballot_revisions");
+    expect(supabase.touchedTables).not.toContain("ballot_invalidations");
+    expect(supabase.touchedTables).not.toContain("active_voter_presence");
+
     const baseline = createOperationalStateSnapshot(stores, "2026-06-30T00:00:01.000Z");
 
     stores.votingWindowStore.closeVoting(1, 1_000);
@@ -502,6 +616,7 @@ describe("normalized operational state repository", () => {
       .filter((operation) => operation.operation !== "select")
       .map((operation) => operation.table);
 
+    expect(supabase.operations.some((operation) => operation.operation === "select")).toBe(false);
     expect(writeTables).toContain("admin_actions");
     expect(writeTables).toContain("host_locks");
     expect(writeTables).toContain("voting_windows");
@@ -509,6 +624,9 @@ describe("normalized operational state repository", () => {
     expect(writeTables).not.toContain("players");
     expect(writeTables).not.toContain("draws");
     expect(writeTables).not.toContain("drawn_charts");
+    expect(writeTables).not.toContain("ballots");
+    expect(writeTables).not.toContain("ballot_choices");
+    expect(writeTables).not.toContain("ballot_revisions");
     expect(supabase.rows.get("voting_windows")?.[0]).toMatchObject({
       round_number: 1,
       status: "voting_closed",
@@ -519,6 +637,101 @@ describe("normalized operational state repository", () => {
     expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
       owner_session_id: "session-a",
       heartbeat_at: "1970-01-01T00:00:01.000Z",
+    });
+  });
+
+  it("persists result reveal controls without rewriting ballots or result rows", async () => {
+    const supabase = new FakeNormalizedSupabaseClient();
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "result-admin-partial-test",
+      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
+      now: () => "2026-06-30T00:00:00.000Z",
+    });
+    const stores = createAdminStateStores();
+    const player = stores.rosterStore.createOrUpdatePlayer({
+      startggUsername: "Alpha",
+      active: true,
+      now: "2026-06-30T00:00:00.000Z",
+    });
+
+    stores.drawStateStore.setChartsForTest([
+      ...chartsFor("16", 10, "S16"),
+      ...chartsFor("17", 30, "S17"),
+    ]);
+    const firstDraw = stores.drawStateStore.drawRoundSet({ roundNumber: 1, setOrder: 1 });
+    const secondDraw = stores.drawStateStore.drawRoundSet({ roundNumber: 1, setOrder: 2 });
+    stores.votingWindowStore.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: [{ id: player.id, startggUsername: player.startggUsername }],
+      nowMs: 0,
+    });
+    stores.votingWindowStore.closeVoting(1, 1_000);
+    stores.resultStore.computeRound({
+      roundNumber: 1,
+      draws: [firstDraw, secondDraw],
+      ballots: [],
+      eligiblePlayers: [{ id: player.id, startggUsername: player.startggUsername }],
+      now: "2026-06-30T00:00:02.000Z",
+    });
+    stores.hostLockStore.acquire("session-a", "host-token-a", 0);
+
+    await repository.save(createOperationalStateSnapshot(stores, "2026-06-30T00:00:03.000Z"));
+
+    supabase.touchedTables.length = 0;
+    await repository.loadResultAdminState();
+    expect(supabase.touchedTables).not.toContain("ballots");
+    expect(supabase.touchedTables).not.toContain("ballot_choices");
+    expect(supabase.touchedTables).not.toContain("ballot_revisions");
+    expect(supabase.touchedTables).not.toContain("ballot_invalidations");
+    expect(supabase.touchedTables).not.toContain("active_voter_presence");
+
+    const baseline = createOperationalStateSnapshot(stores, "2026-06-30T00:00:04.000Z");
+
+    stores.resultStore.advanceReveal(1, "2026-06-30T00:00:05.000Z");
+    stores.votingWindowStore.setResultsPhase(1, "results_revealing");
+    stores.hostLockStore.refresh("session-a", "host-token-a", 5_000);
+    stores.auditStore.record({
+      sessionId: "session-a",
+      action: "advance_result_reveal",
+      summary: "Advanced Round 1 reveal to set_1_counts.",
+      metadata: { roundNumber: 1 },
+      now: "2026-06-30T00:00:05.000Z",
+    });
+
+    supabase.operations.length = 0;
+    supabase.rpcCalls.length = 0;
+
+    await repository.persistResultAdminState({
+      baseline,
+      current: createOperationalStateSnapshot(stores, "2026-06-30T00:00:06.000Z"),
+    });
+
+    const writeTables = supabase.operations
+      .filter((operation) => operation.operation !== "select")
+      .map((operation) => operation.table);
+
+    expect(supabase.operations.some((operation) => operation.operation === "select")).toBe(false);
+    expect(supabase.rpcCalls.map((call) => call.functionName)).toEqual([
+      "normalized_acquire_event_persistence_lock",
+      "normalized_replace_draw_state",
+      "normalized_release_event_persistence_lock",
+    ]);
+    expect(writeTables).toContain("result_snapshots");
+    expect(writeTables).toContain("voting_windows");
+    expect(writeTables).toContain("admin_actions");
+    expect(writeTables).toContain("host_locks");
+    expect(writeTables).not.toContain("ballots");
+    expect(writeTables).not.toContain("ballot_choices");
+    expect(writeTables).not.toContain("ballot_revisions");
+    expect(writeTables).not.toContain("result_rows");
+    expect(supabase.rows.get("result_snapshots")?.[0]).toMatchObject({
+      round_number: 1,
+      reveal_phase: "set_1_counts",
+    });
+    expect(supabase.rows.get("voting_windows")?.[0]).toMatchObject({
+      round_number: 1,
+      status: "results_revealing",
     });
   });
 });

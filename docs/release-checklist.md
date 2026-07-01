@@ -38,6 +38,7 @@ workflow.
 - [ ] `ADMIN_PASSWORD_HASH` is set in Vercel.
 - [ ] `SESSION_SECRET` is set in Vercel.
 - [ ] `TOURNAMENT_STATE_BACKEND=supabase` is set in Vercel.
+- [ ] Production does not set or rely on `TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND`.
 - [ ] `TOURNAMENT_EVENT_ID` is set in Vercel to the real event namespace, not a Phase 9 rehearsal
       id.
 - [ ] `TOURNAMENT_TEST_ROUTE_TOKEN` is not set in production.
@@ -66,7 +67,10 @@ workflow.
 
 - [ ] Admin password works.
 - [ ] Host lock was tested from two admin browsers.
+- [ ] Forced host takeover was tested with password re-entry and an audit reason.
 - [ ] Dangerous action password re-entry was tested.
+- [ ] Current-round inactive player add was tested and confirmed to affect only the current round.
+- [ ] Start.gg username typo editing was tested before history and rejected after history.
 - [ ] Manual ballot override flow was tested.
 - [ ] Rehearsal mode was reset and page shows `Tournament mode`.
 

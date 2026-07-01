@@ -5,6 +5,7 @@ import { refreshAdminSessionAction } from "../actions";
 
 const ADMIN_SESSION_REFRESH_DEBOUNCE_MS = 60_000;
 const ADMIN_ACTIVITY_EVENTS = ["pointerdown", "keydown", "submit"] as const;
+export const ADMIN_SESSION_REFRESHED_EVENT = "admin-session-refreshed";
 
 export function AdminSessionHeartbeat() {
   const lastRefreshAt = useRef(0);
@@ -18,7 +19,19 @@ export function AdminSessionHeartbeat() {
       }
 
       lastRefreshAt.current = now;
-      void refreshAdminSessionAction();
+      void refreshAdminSessionAction()
+        .then((result) => {
+          if (!result?.expiresAt) {
+            return;
+          }
+
+          window.dispatchEvent(
+            new CustomEvent(ADMIN_SESSION_REFRESHED_EVENT, {
+              detail: { expiresAt: result.expiresAt },
+            }),
+          );
+        })
+        .catch(() => undefined);
     };
 
     for (const eventName of ADMIN_ACTIVITY_EVENTS) {

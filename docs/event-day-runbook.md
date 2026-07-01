@@ -12,7 +12,8 @@ Use this checklist on the event machine before players arrive and before every r
 
 ## Before the Event
 
-- Run `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` on the release branch.
+- Run `rtk npm run lint`, `rtk npm run typecheck`, `rtk npm run test`, and
+  `rtk npm run build` on the release branch.
 - Confirm production environment variables are set in Vercel and not committed to Git.
 - Confirm Supabase migrations are applied.
 - Confirm `TOURNAMENT_STATE_BACKEND=supabase` and a stable `TOURNAMENT_EVENT_ID` are configured for
@@ -29,7 +30,8 @@ Use this checklist on the event machine before players arrive and before every r
 - Confirm the tournament logo renders correctly.
 - Confirm the admin password hash and session secret are configured.
 - Confirm the player roster has been imported and reviewed.
-- Run a complete four-round rehearsal using `docs/rehearsal-runbook.md` against persistent state.
+- Run a complete four-round rehearsal against hosted Supabase persistent state. Local rehearsal mode
+  is useful for operator practice, but it is not production release evidence.
 - During rehearsal, confirm private CSV auto-download and manual CSV download after final reveal.
 - Reset rehearsal data and confirm `Tournament mode` before importing or using real event data.
 

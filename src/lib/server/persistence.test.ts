@@ -91,6 +91,9 @@ describe("server persistence safety", () => {
     vi.stubEnv("TOURNAMENT_STATE_BACKEND", "memory");
     expect(() => getTournamentStateBackend()).toThrow(/supabase/);
 
+    vi.stubEnv("TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND", "true");
+    expect(() => getTournamentStateBackend()).toThrow(/supabase/);
+
     vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
     expect(getTournamentStateBackend()).toBe("supabase");
   });

@@ -13,9 +13,19 @@ function getAdminPassword() {
 }
 
 const ADMIN_PASSWORD = getAdminPassword();
+const HOSTED_REFRESH_TIMEOUT_MS = 30_000;
 
 async function goto(page: Page, path: string) {
-  await page.goto(path, { waitUntil: "domcontentloaded" });
+  try {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("interrupted by another navigation")) {
+      await page.goto(path, { waitUntil: "domcontentloaded" });
+      return;
+    }
+
+    throw error;
+  }
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -47,9 +57,29 @@ async function loginAndTakeHost(page: Page) {
   await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
   await page.getByRole("button", { name: "Log In" }).click();
   await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
-  await page.getByRole("button", { name: /^(Force Host Takeover|Take Host Control)$/ }).click();
+  const releaseButton = page.getByRole("button", { name: "Release" });
+
+  if (await releaseButton.isEnabled()) {
+    await expect(page.getByText("Voting Controls")).toBeVisible();
+    return;
+  }
+
+  const takeHostButton = page.getByRole("button", { name: "Take Host Control" });
+
+  if ((await takeHostButton.count()) > 0 && (await takeHostButton.isEnabled())) {
+    await takeHostButton.click();
+  } else {
+    const forceHostForm = page.locator("form", {
+      has: page.getByRole("button", { name: "Force Host Takeover" }),
+    });
+
+    await forceHostForm.getByLabel("Audit reason").fill("mobile route e2e takeover");
+    await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+    await forceHostForm.getByRole("button", { name: "Force Host Takeover" }).click();
+  }
+
   await expect(page.getByText("Voting Controls")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Release" })).toBeEnabled();
+  await expect(releaseButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 
 async function startRehearsalMode(page: Page) {
@@ -60,16 +90,24 @@ async function startRehearsalMode(page: Page) {
   await rehearsalForm.getByPlaceholder("Admin password").fill(ADMIN_PASSWORD);
   await rehearsalForm.getByPlaceholder("Audit reason").fill("mobile route e2e reset");
   await page.getByRole("button", { name: "Start Rehearsal" }).click();
-  await expect(page.getByText("Rehearsal mode", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Rehearsal mode", { exact: true }).first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 }
 
 async function drawBothSetsAndOpenVoting(page: Page) {
   await page.getByRole("button", { name: "Draw Set" }).nth(0).click();
-  await expect(page.getByText(/Version 1/).first()).toBeVisible();
+  await expect(page.getByText(/Version 1/).first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await page.getByRole("button", { name: "Draw Set" }).nth(1).click();
-  await expect(page.getByText("ready to vote")).toBeVisible();
+  await expect(page.getByText("ready to vote")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await page.getByRole("button", { name: "Open Voting", exact: true }).click();
-  await expect(page.getByText("voting open")).toBeVisible();
+  await expect(page.getByText("voting open")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 }
 
 test("mobile routes cover room, charts, vote, and pre-reveal results", async (
@@ -124,7 +162,7 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async (
   await expectNoHorizontalOverflow(page);
 
   await page.getByLabel("No bans for this set").check();
-  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByLabel("No bans for this set").check();
   await page.getByRole("button", { name: "Review" }).click();
   await page.getByRole("button", { name: "Submit Ballot" }).click();

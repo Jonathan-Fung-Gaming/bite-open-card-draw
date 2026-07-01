@@ -20,11 +20,18 @@ function getOptionalEnv(name: keyof NodeJS.ProcessEnv) {
   return process.env[name] || null;
 }
 
+function shouldUseSecureCookies() {
+  return (
+    process.env.NODE_ENV === "production" &&
+    process.env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL !== "true"
+  );
+}
+
 function getCookieOptions(maxAge = ADMIN_SESSION_TTL_SECONDS) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     path: "/",
     maxAge,
   };

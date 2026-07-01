@@ -12,6 +12,51 @@ describe("roster store", () => {
     ).toThrow("Active start.gg username already exists");
   });
 
+  it("edits a start.gg username before tournament history exists", () => {
+    const store = new RosterStore();
+    const player = store.createOrUpdatePlayer({
+      startggUsername: "TypoName",
+      active: true,
+      now: "now",
+    });
+
+    const edited = store.createOrUpdatePlayer({
+      playerId: player.id,
+      startggUsername: "Correct Name",
+      now: "later",
+    });
+
+    expect(edited.startggUsername).toBe("Correct Name");
+    expect(store.listPlayers()[0]?.normalizedUsername).toBe("correct name");
+  });
+
+  it("rejects username edits after tournament history exists", () => {
+    const store = new RosterStore();
+
+    store.importSnapshot({
+      players: [
+        {
+          id: "player-1",
+          startggUsername: "LockedName",
+          normalizedUsername: "lockedname",
+          active: true,
+          hasTournamentHistory: true,
+          createdAt: "now",
+          updatedAt: "now",
+        },
+      ],
+      currentRoundEligibility: [],
+    });
+
+    expect(() =>
+      store.createOrUpdatePlayer({
+        playerId: "player-1",
+        startggUsername: "New Name",
+        now: "later",
+      }),
+    ).toThrow("Cannot edit a start.gg username after tournament history exists.");
+  });
+
   it("keeps inactive players visible and restorable", () => {
     const store = new RosterStore();
     const player = store.createOrUpdatePlayer({ startggUsername: "PlayerTwo", active: true, now: "now" });

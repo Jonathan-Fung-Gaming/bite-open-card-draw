@@ -24,6 +24,7 @@ import {
   downloadDebugSnapshotAction,
   downloadPrivateCsvAction,
   drawRoundSetAction,
+  editPlayerUsernameAction,
   releaseHostControlAction,
   manualBallotAction,
   openVotingAction,
@@ -1139,8 +1140,30 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <td className="p-3 font-semibold text-white">{player.startggUsername}</td>
                       <td className="p-3 text-metal-300">
                         {player.active ? "Active" : "Inactive"}
+                        {player.hasTournamentHistory ? (
+                          <span className="mt-1 block text-xs text-metal-400">History locked</span>
+                        ) : null}
                       </td>
-                      <td className="p-3">
+                      <td className="grid gap-2 p-3">
+                        <form
+                          action={editPlayerUsernameAction}
+                          className="flex flex-col gap-2 sm:flex-row"
+                        >
+                          <input type="hidden" name="playerId" value={player.id} />
+                          <input
+                            name="startggUsername"
+                            defaultValue={player.startggUsername}
+                            disabled={!canControl || player.hasTournamentHistory}
+                            className="min-w-0 rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white disabled:opacity-40"
+                          />
+                          <button
+                            className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
+                            disabled={!canControl || player.hasTournamentHistory}
+                            type="submit"
+                          >
+                            Save Name
+                          </button>
+                        </form>
                         <form action={setPlayerActiveStatusAction}>
                           <input type="hidden" name="playerId" value={player.id} />
                           <input
@@ -1189,10 +1212,30 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {hostSnapshot.status === "readonly" ? (
                 <form action={takeHostControlAction} className="grid gap-3">
                   <input type="hidden" name="forceHostTakeover" value="true" />
-                  <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
-                    Another admin has an unexpired host lock. Force takeover only if that host is
-                    unavailable or explicitly handed control to you.
-                  </p>
+                  <DangerousActionDialog
+                    action="force takeover of the active host lock"
+                    consequence="make this browser the active host and put other admin browsers in read-only mode"
+                    disabled={false}
+                    passwordId="force-host-takeover-password"
+                  >
+                    <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
+                      Another admin has an unexpired host lock. Force takeover only if that host is
+                      unavailable or explicitly handed control to you.
+                    </p>
+                    <label
+                      className="mt-4 block text-sm font-semibold text-metal-300"
+                      htmlFor="forceHostTakeoverReason"
+                    >
+                      Audit reason
+                    </label>
+                    <textarea
+                      id="forceHostTakeoverReason"
+                      name="reason"
+                      required
+                      rows={3}
+                      className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                    />
+                  </DangerousActionDialog>
                   <button
                     className="rounded border border-ember-300/40 px-4 py-2 font-bold uppercase text-ember-300"
                     type="submit"
@@ -1255,6 +1298,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
           </section>
           <form action={addInactivePlayerToCurrentRoundAction}>
+            <input type="hidden" name="roundNumber" value={currentRoundNumber} />
             <DangerousActionDialog
               action="add an inactive player to current round eligibility"
               consequence="make that player eligible for the selected current round"
@@ -1280,23 +1324,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </option>
                 ))}
               </select>
-              <label
-                className="mt-4 block text-sm font-semibold text-metal-300"
-                htmlFor="roundNumber"
-              >
-                Round
-              </label>
-              <select
-                id="roundNumber"
-                name="roundNumber"
-                disabled={!canControl}
-                className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-              >
-                <option value="1">Round 1</option>
-                <option value="2">Round 2</option>
-                <option value="3">Round 3</option>
-                <option value="4">Round 4</option>
-              </select>
+              <p className="mt-4 rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                Round {currentRoundNumber}
+              </p>
               <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reason">
                 Audit reason
               </label>

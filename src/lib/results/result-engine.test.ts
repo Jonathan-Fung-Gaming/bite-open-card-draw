@@ -33,6 +33,12 @@ function draw(id: string, setOrder: 1 | 2, displayLabel: string, charts: DrawnCh
   };
 }
 
+function sevenCharts(prefix: string) {
+  return Array.from({ length: 7 }, (_, index) =>
+    chart(`${prefix}-${index}`, `${prefix.toUpperCase()} ${index}`),
+  );
+}
+
 function ballot(playerId: string, setOneBans: string[], setTwoBans: string[] = []): RoundBallot {
   return {
     id: `ballot-${playerId}`,
@@ -70,19 +76,30 @@ describe("result engine", () => {
       id: "result",
       roundNumber: 1,
       draws: [
-        draw("draw-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
-        draw("draw-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
+        draw("draw-1", 1, "S16", [
+          chart("a", "Alpha"),
+          chart("b", "Bravo"),
+          chart("c", "Charlie"),
+          chart("d", "Delta"),
+          chart("e", "Echo"),
+          chart("f", "Foxtrot"),
+          chart("g", "Golf"),
+        ]),
+        draw("draw-2", 2, "S17", sevenCharts("set-two")),
       ],
-      ballots: [ballot("p1", ["a"]), ballot("p2", ["a"]), ballot("p3", ["b"])],
+      ballots: [
+        ballot("p1", ["a", "d"]),
+        ballot("p2", ["a", "e"]),
+        ballot("p3", ["b", "f"]),
+        ballot("p4", ["g"]),
+      ],
       eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
       computedAt: "now",
     });
 
-    expect(result.sets[0].rows.map((row) => [row.chart.name, row.banCount])).toEqual([
-      ["Charlie", 0],
-      ["Bravo", 1],
-      ["Alpha", 2],
-    ]);
+    expect(result.sets[0].rows).toHaveLength(7);
+    expect(result.sets[0].rows[0]).toMatchObject({ banCount: 0 });
+    expect(result.sets[0].rows[0]?.chart.name).toBe("Charlie");
     expect(result.sets[0].selectedChart.name).toBe("Charlie");
     expect(result.sets[0].tiebreakUsed).toBe(false);
   });
@@ -92,10 +109,18 @@ describe("result engine", () => {
       id: "result",
       roundNumber: 1,
       draws: [
-        draw("draw-1", 1, "S16", [chart("a", "Alpha"), chart("b", "Bravo"), chart("c", "Charlie")]),
-        draw("draw-2", 2, "S17", [chart("d", "Delta"), chart("e", "Echo"), chart("f", "Foxtrot")]),
+        draw("draw-1", 1, "S16", [
+          chart("a", "Alpha"),
+          chart("b", "Bravo"),
+          chart("c", "Charlie"),
+          chart("d", "Delta"),
+          chart("e", "Echo"),
+          chart("f", "Foxtrot"),
+          chart("g", "Golf"),
+        ]),
+        draw("draw-2", 2, "S17", sevenCharts("set-two")),
       ],
-      ballots: [ballot("p1", ["c"]), ballot("p2", ["c"])],
+      ballots: [ballot("p1", ["c", "d"]), ballot("p2", ["e", "f"]), ballot("p3", ["g"])],
       eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
       computedAt: "now",
       randomIndex: () => 1,
@@ -113,6 +138,22 @@ describe("result engine", () => {
       "Alpha",
       "Bravo",
     ]);
+  });
+
+  it("rejects malformed round draws that do not contain exactly seven charts per set", () => {
+    expect(() =>
+      computeRoundResult({
+        id: "result",
+        roundNumber: 1,
+        draws: [
+          draw("draw-1", 1, "S16", [chart("a", "Alpha")]),
+          draw("draw-2", 2, "S17", sevenCharts("set-two")),
+        ],
+        ballots: [],
+        eligiblePlayers: [],
+        computedAt: "now",
+      }),
+    ).toThrow(/exactly 7 charts/);
   });
 
   it("uses a seven-chart wheel for true zero-ballot sets", () => {

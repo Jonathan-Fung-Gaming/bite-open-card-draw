@@ -53,19 +53,11 @@ function getMemoryRepository() {
   );
 }
 
-function isTestMemoryBackendAllowed() {
-  return process.env.TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND === "true";
-}
-
 export function getTournamentStateBackend(): TournamentStateBackend {
   const configuredBackend = process.env.TOURNAMENT_STATE_BACKEND;
 
   if (configuredBackend === "supabase" || configuredBackend === "memory") {
-    if (
-      process.env.NODE_ENV === "production" &&
-      configuredBackend !== "supabase" &&
-      !isTestMemoryBackendAllowed()
-    ) {
+    if (process.env.NODE_ENV === "production" && configuredBackend !== "supabase") {
       throw new Error("TOURNAMENT_STATE_BACKEND=supabase is required in production.");
     }
 
@@ -161,6 +153,29 @@ async function persistVotingAdminStateUnlocked(
   hydrationBaselines.set(stores, cloneOperationalStateSnapshot(merged));
 }
 
+async function persistResultAdminStateUnlocked(
+  stores: AdminStateStores,
+  repository: OperationalStateRepository,
+) {
+  const persistResultAdminStateInRepository = repository.persistResultAdminState;
+
+  if (!persistResultAdminStateInRepository) {
+    await persistTournamentStateUnlocked(stores, repository);
+
+    return;
+  }
+
+  const baseline = hydrationBaselines.get(stores) ?? null;
+  const current = createOperationalStateSnapshot(stores);
+  const merged = await persistResultAdminStateInRepository.call(repository, {
+    baseline,
+    current,
+  });
+
+  restoreOperationalStateSnapshot(stores, merged);
+  hydrationBaselines.set(stores, cloneOperationalStateSnapshot(merged));
+}
+
 async function persistHostLockStateUnlocked(
   stores: AdminStateStores,
   repository: OperationalStateRepository,
@@ -216,6 +231,13 @@ export async function persistVotingAdminState(
   return withPersistenceWriteQueue(() => persistVotingAdminStateUnlocked(stores, repository));
 }
 
+export async function persistResultAdminState(
+  stores: AdminStateStores = adminState,
+  repository = getOperationalStateRepository(),
+) {
+  return withPersistenceWriteQueue(() => persistResultAdminStateUnlocked(stores, repository));
+}
+
 export async function withPersistedTournamentState<T>(
   callback: () => T | Promise<T>,
   stores: AdminStateStores = adminState,
@@ -268,13 +290,52 @@ export async function withPersistedVotingAdminState<T>(
   repository = getOperationalStateRepository(),
 ) {
   return withPersistenceWriteQueue(async () => {
-    await hydrateTournamentState(stores, repository);
+    const snapshot = repository.loadVotingAdminState
+      ? await repository.loadVotingAdminState()
+      : await repository.load();
+
+    if (snapshot) {
+      restoreOperationalStateSnapshot(stores, snapshot);
+    }
+
+    hydrationBaselines.set(stores, createOperationalStateSnapshot(stores));
     const rollbackSnapshot = createOperationalStateSnapshot(stores);
 
     try {
       const result = await callback();
 
       await persistVotingAdminStateUnlocked(stores, repository);
+
+      return result;
+    } catch (error) {
+      restoreOperationalStateSnapshot(stores, rollbackSnapshot);
+
+      throw error;
+    }
+  });
+}
+
+export async function withPersistedResultAdminState<T>(
+  callback: () => T | Promise<T>,
+  stores: AdminStateStores = adminState,
+  repository = getOperationalStateRepository(),
+) {
+  return withPersistenceWriteQueue(async () => {
+    const snapshot = repository.loadResultAdminState
+      ? await repository.loadResultAdminState()
+      : await repository.load();
+
+    if (snapshot) {
+      restoreOperationalStateSnapshot(stores, snapshot);
+    }
+
+    hydrationBaselines.set(stores, createOperationalStateSnapshot(stores));
+    const rollbackSnapshot = createOperationalStateSnapshot(stores);
+
+    try {
+      const result = await callback();
+
+      await persistResultAdminStateUnlocked(stores, repository);
 
       return result;
     } catch (error) {

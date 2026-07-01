@@ -111,12 +111,16 @@ function resolveHostLock(
     return current;
   }
 
-  if (!current.lock || !latest.lock) {
+  if (!current.lock) {
     return latest;
   }
 
+  if (!latest.lock) {
+    return current;
+  }
+
   if (current.lock.ownerSessionId !== latest.lock.ownerSessionId) {
-    return latest;
+    return current.lock.acquiredAt >= latest.lock.acquiredAt ? current : latest;
   }
 
   return current.lock.heartbeatAt >= latest.lock.heartbeatAt ? current : latest;

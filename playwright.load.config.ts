@@ -3,7 +3,7 @@ import { e2eBaseURL, e2eWebServer } from "./playwright.env";
 
 export default defineConfig({
   testDir: "./tests/load",
-  timeout: 360_000,
+  timeout: 600_000,
   expect: {
     timeout: 15_000,
   },

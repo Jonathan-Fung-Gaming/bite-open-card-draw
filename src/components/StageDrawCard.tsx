@@ -15,7 +15,7 @@ export function StageDrawCard({ chart, index, variant = "standard" }: StageDrawC
     <article
       className={clsx(
         "stage-card relative overflow-hidden rounded-md border border-ember-300/25 bg-furnace-900 shadow-ember-tight",
-        featured ? "min-h-[min(58vh,34rem)]" : "min-h-20 2xl:min-h-44",
+        featured ? "min-h-[min(58vh,34rem)]" : "min-h-[4.5rem] 2xl:min-h-44",
         chart && "border-ember-300/45",
       )}
       data-has-chart={chart ? "true" : "false"}
@@ -35,7 +35,9 @@ export function StageDrawCard({ chart, index, variant = "standard" }: StageDrawC
       <div
         className={clsx(
           "relative flex h-full flex-col justify-between",
-          featured ? "min-h-[min(58vh,34rem)] p-5" : "min-h-20 p-2 2xl:min-h-44 2xl:p-3",
+          featured
+            ? "min-h-[min(58vh,34rem)] p-5"
+            : "min-h-[4.5rem] p-2 2xl:min-h-44 2xl:p-3",
         )}
       >
         <div className="flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-ember-300">

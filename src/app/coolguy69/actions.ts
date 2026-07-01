@@ -9,7 +9,10 @@ import {
   operationalDebugSnapshotFilename,
   serializeOperationalDebugSnapshotExport,
 } from "@/lib/persistence/debug-export";
-import { createOperationalStateSnapshot } from "@/lib/persistence/operational-state";
+import {
+  createOperationalStateSnapshot,
+  restoreOperationalStateSnapshot,
+} from "@/lib/persistence/operational-state";
 import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import { syncSelectedSongBlocksFromResultStore } from "@/lib/results/selected-song-blocks";
 import { adminState, resetTournamentOperationalState } from "@/lib/server/admin-state";
@@ -23,7 +26,9 @@ import {
 } from "@/lib/server/input-limits";
 import {
   getTournamentStateBackend,
+  getOperationalStateRepository,
   hydrateTournamentState,
+  withPersistedResultAdminState,
   persistTournamentState,
   withPersistedHostLockState,
   withPersistedVotingAdminState,
@@ -31,6 +36,7 @@ import {
 import { computeNormalizedResults } from "@/lib/server/normalized-results";
 import {
   getRoundDrawRecords,
+  getRoundDrawReadiness,
   getSubmittedPlayerIdsForRound,
   getVotingRoundSnapshot,
   revalidateTournamentViews,
@@ -206,7 +212,9 @@ export async function adminLogoutAction() {
 }
 
 export async function refreshAdminSessionAction() {
-  await refreshAdminSessionCookie();
+  const session = await refreshAdminSessionCookie();
+
+  return { expiresAt: session.expiresAt };
 }
 
 export async function takeHostControlAction(formData: FormData) {
@@ -215,11 +223,20 @@ export async function takeHostControlAction(formData: FormData) {
   const force = getString(formData, "forceHostTakeover") === "true";
 
   try {
-    await hydrateTournamentState();
-    const nowMs = await getAuthoritativeNowMs();
-    const before = adminState.hostLockStore.getSnapshot(session.sessionId, nowMs);
-    const result = adminState.hostLockStore.acquire(session.sessionId, hostToken, nowMs, {
-      force,
+    const reason = force ? getRequiredReason(formData) : null;
+
+    if (force) {
+      await verifyDangerousActionPassword(getAdminPassword(formData));
+    }
+
+    const { before, result } = await withPersistedHostLockState(async () => {
+      const nowMs = await getAuthoritativeNowMs();
+      const previous = adminState.hostLockStore.getSnapshot(session.sessionId, nowMs);
+      const acquired = adminState.hostLockStore.acquire(session.sessionId, hostToken, nowMs, {
+        force,
+      });
+
+      return { before: previous, result: acquired };
     });
 
     await setHostTokenCookie(hostToken);
@@ -228,6 +245,7 @@ export async function takeHostControlAction(formData: FormData) {
       summary: result.takeover
         ? "Forced takeover of the active host lock."
         : "Acquired host control.",
+      reason,
       dangerous: result.takeover,
       tournamentChanging: false,
       metadata: {
@@ -262,11 +280,11 @@ export async function releaseHostControlAction() {
   const session = await requireAdminSession();
   const hostToken = await getHostTokenCookie();
 
-  await hydrateTournamentState();
-
-  if (hostToken) {
-    adminState.hostLockStore.release(session.sessionId, hostToken);
-  }
+  await withPersistedHostLockState(async () => {
+    if (hostToken) {
+      adminState.hostLockStore.release(session.sessionId, hostToken);
+    }
+  });
 
   audit(session, {
     action: "host_lock_release",
@@ -292,6 +310,27 @@ async function requireActiveHost() {
   return session;
 }
 
+async function requireActiveHostForNormalizedAction() {
+  const session = await requireAdminSession();
+  const hostToken = await getHostTokenCookie();
+  const repository = getOperationalStateRepository();
+  const snapshot = repository.loadVotingAdminState
+    ? await repository.loadVotingAdminState()
+    : await repository.load();
+
+  if (snapshot) {
+    restoreOperationalStateSnapshot(adminState, snapshot);
+  }
+
+  const nowMs = await getAuthoritativeNowMs();
+
+  if (!hostToken || !adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs)) {
+    throw new Error("Host control is required for this action.");
+  }
+
+  return session;
+}
+
 async function withActiveHostVotingAdminState<T>(
   callback: (session: AdminSessionPayload, nowMs: number) => T | Promise<T>,
 ) {
@@ -299,6 +338,23 @@ async function withActiveHostVotingAdminState<T>(
   const hostToken = await getHostTokenCookie();
 
   return withPersistedVotingAdminState(async () => {
+    const nowMs = await getAuthoritativeNowMs();
+
+    if (!hostToken || !adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs)) {
+      throw new Error("Host control is required for this action.");
+    }
+
+    return callback(session, nowMs);
+  });
+}
+
+async function withActiveHostResultAdminState<T>(
+  callback: (session: AdminSessionPayload, nowMs: number) => T | Promise<T>,
+) {
+  const session = await requireAdminSession();
+  const hostToken = await getHostTokenCookie();
+
+  return withPersistedResultAdminState(async () => {
     const nowMs = await getAuthoritativeNowMs();
 
     if (!hostToken || !adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs)) {
@@ -369,6 +425,29 @@ export async function setPlayerActiveStatusAction(formData: FormData) {
   revalidatePath("/coolguy69");
 }
 
+export async function editPlayerUsernameAction(formData: FormData) {
+  const session = await requireActiveHost();
+
+  try {
+    const player = adminState.rosterStore.createOrUpdatePlayer({
+      playerId: getString(formData, "playerId"),
+      startggUsername: getString(formData, "startggUsername", STARTGG_USERNAME_MAX_LENGTH),
+    });
+    audit(session, {
+      action: "roster_username_edit",
+      summary: `Edited start.gg username to ${player.startggUsername}.`,
+      affectedRecords: [{ type: "player", id: player.id }],
+    });
+  } catch (error) {
+    redirectWithError(
+      error instanceof Error ? error.message : "Could not edit start.gg username.",
+    );
+  }
+
+  await persistTournamentState();
+  revalidatePath("/coolguy69");
+}
+
 export async function updateChartExclusionAction(formData: FormData) {
   const session = await requireActiveHost();
 
@@ -417,7 +496,13 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
 
   try {
     await verifyDangerousActionPassword(getAdminPassword(formData));
-    const roundNumber = getRoundNumber(formData);
+    const roundNumber = adminState.roundStateStore.getSnapshot().currentRound;
+    const submittedRoundNumber = getString(formData, "roundNumber");
+
+    if (submittedRoundNumber && Number(submittedRoundNumber) !== roundNumber) {
+      throw new Error("Inactive players can only be added to the current round.");
+    }
+
     const reason = getRequiredReason(formData);
     const nowMs = await getAuthoritativeNowMs();
     const entry = adminState.rosterStore.addPlayerToCurrentRoundEligibility({
@@ -606,10 +691,11 @@ export async function openVotingAction(formData: FormData) {
 
     await withActiveHostVotingAdminState((session, nowMs) => {
       const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
+      const drawReadiness = getRoundDrawReadiness(roundNumber);
 
       adminState.votingWindowStore.openVoting({
         roundNumber,
-        drawsReady: snapshot.drawnSetCount === 2,
+        drawsReady: drawReadiness.isReady,
         eligiblePlayers: snapshot.eligiblePlayers,
         nowMs,
       });
@@ -673,12 +759,7 @@ export async function closeVotingAction(formData: FormData) {
     const roundNumber = getRoundNumber(formData);
 
     await withActiveHostVotingAdminState((session, nowMs) => {
-      const advanced = advanceVotingDeadline(roundNumber, nowMs);
-
-      if (advanced?.status !== "voting_closed") {
-        adminState.votingWindowStore.closeVoting(roundNumber, nowMs);
-      }
-
+      adminState.votingWindowStore.closeVoting(roundNumber, nowMs);
       adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
       audit(session, {
         action: "close_voting",
@@ -796,18 +877,18 @@ export async function manualBallotAction(formData: FormData) {
 }
 
 export async function computeResultsAction(formData: FormData) {
-  const session = await requireActiveHost();
-
   try {
     const roundNumber = getRoundNumber(formData);
 
     if (getTournamentStateBackend() === "supabase") {
+      const session = await requireActiveHostForNormalizedAction();
+
       await computeNormalizedResults({ roundNumber, adminSessionId: session.sessionId });
-      await hydrateTournamentState();
       revalidateTournamentViews(revalidatePath);
       return;
     }
 
+    const session = await requireActiveHost();
     const nowMs = await getAuthoritativeNowMs();
     advanceVotingDeadline(roundNumber, nowMs);
     const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
@@ -841,42 +922,44 @@ export async function computeResultsAction(formData: FormData) {
 }
 
 export async function advanceResultRevealAction(formData: FormData) {
-  const session = await requireActiveHost();
-
   try {
     const roundNumber = getRoundNumber(formData);
-    const nowMs = await getAuthoritativeNowMs();
-    const result = adminState.resultStore.advanceReveal(roundNumber, new Date(nowMs).toISOString());
 
-    if (result.revealPhase === "final") {
-      adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealed");
-      adminState.ballotStore.setPhoneStatus(roundNumber, {
-        phase: "revealed",
-        selectedCharts: result.sets.map((set) => ({
-          id: set.selectedChart.id,
-          name: set.selectedChart.name,
-          artist: set.selectedChart.artist,
-          displayDifficulty: set.selectedChart.displayDifficulty,
-          localImagePath: set.selectedChart.localImagePath,
-        })),
+    await withActiveHostResultAdminState((session, nowMs) => {
+      const result = adminState.resultStore.advanceReveal(
+        roundNumber,
+        new Date(nowMs).toISOString(),
+      );
+
+      if (result.revealPhase === "final") {
+        adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealed");
+        adminState.ballotStore.setPhoneStatus(roundNumber, {
+          phase: "revealed",
+          selectedCharts: result.sets.map((set) => ({
+            id: set.selectedChart.id,
+            name: set.selectedChart.name,
+            artist: set.selectedChart.artist,
+            displayDifficulty: set.selectedChart.displayDifficulty,
+            localImagePath: set.selectedChart.localImagePath,
+          })),
+        });
+
+        syncSelectedSongBlocks();
+      } else {
+        adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealing");
+        adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
+      }
+      audit(session, {
+        action: "advance_result_reveal",
+        summary: `Advanced Round ${roundNumber} reveal to ${result.revealPhase}.`,
+        affectedRecords: [{ type: "result", id: result.id }],
+        metadata: { roundNumber, revealPhase: result.revealPhase },
       });
-
-      syncSelectedSongBlocks();
-    } else {
-      adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealing");
-      adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
-    }
-    audit(session, {
-      action: "advance_result_reveal",
-      summary: `Advanced Round ${roundNumber} reveal to ${result.revealPhase}.`,
-      affectedRecords: [{ type: "result", id: result.id }],
-      metadata: { roundNumber, revealPhase: result.revealPhase },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not advance result reveal.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 

@@ -2,6 +2,10 @@
 
 Use rehearsal mode only with disposable local/in-memory data. Reset rehearsal data before tournament operation.
 
+This runbook is for local operator practice. Production readiness still requires a full hosted
+Supabase four-round rehearsal with `TOURNAMENT_STATE_BACKEND=supabase` and a disposable
+`TOURNAMENT_EVENT_ID`; local memory-mode rehearsal does not count as release evidence.
+
 ## Start Rehearsal
 
 1. Open `/coolguy69`.

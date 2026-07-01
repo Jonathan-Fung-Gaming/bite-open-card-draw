@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createHostToken, HOST_LOCK_TTL_MS, HostLockStore } from "./host-lock";
 
 describe("host lock store", () => {
+  it("keeps enough acquisition margin for remote persistence and page refresh", () => {
+    expect(HOST_LOCK_TTL_MS).toBeGreaterThanOrEqual(60_000);
+  });
+
   it("allows one active host and marks others read-only", () => {
     const store = new HostLockStore();
     const token = createHostToken();

@@ -242,8 +242,12 @@ describe("normalized runtime transactional mutations", () => {
     const submitFunction = submitFunctions.at(-1)?.[0];
     const computeFunction = computeFunctions.at(-1)?.[0];
 
+    expect(migrations).not.toContain("least(v_closes_at, p_now + interval '30 seconds')");
     expect(submitFunction).toContain("normalized_apply_voting_deadline_locked");
     expect(submitFunction).toContain("Voting is not open for ballot changes.");
+    expect(submitFunction).toContain("pg_advisory_xact_lock");
+    expect(submitFunction).toContain("v_now + interval '30 seconds'");
+    expect(submitFunction).not.toContain("least(coalesce(closes_at");
     expect(submitFunction?.indexOf("normalized_apply_voting_deadline_locked")).toBeLessThan(
       submitFunction?.indexOf("Voting is not open for ballot changes.") ?? 0,
     );
@@ -253,6 +257,31 @@ describe("normalized runtime transactional mutations", () => {
     expect(computeFunction).toContain("insert into public.tiebreaks");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_ack");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_disabled");
+  });
+
+  it("persists normalized draw state through one transactional RPC", () => {
+    const migrations = readMigrations();
+    const drawPersistFunctions = [
+      ...migrations.matchAll(
+        /create or replace function public\.normalized_replace_draw_state\(p_event_id text, p_payload jsonb\)[\s\S]*?grant execute on function public\.normalized_replace_draw_state\(text, jsonb\) to service_role;/gi,
+      ),
+    ];
+    const drawPersistFunction = drawPersistFunctions.at(-1)?.[0] ?? "";
+    const repositorySource = readFileSync(
+      path.join(process.cwd(), "src/lib/server/normalized-operational-state.ts"),
+      "utf8",
+    );
+    const deleteBatchDeclaration =
+      repositorySource.match(/const EVENT_TABLE_DELETE_BATCHES[\s\S]*?\n];/)?.[0] ?? "";
+
+    expect(drawPersistFunction).toContain("delete from public.drawn_charts");
+    expect(drawPersistFunction).toContain("insert into public.draws");
+    expect(drawPersistFunction).toContain("insert into public.drawn_charts");
+    expect(drawPersistFunction).toContain("revoke execute on function public.normalized_replace_draw_state");
+    expect(repositorySource).toContain('"normalized_replace_draw_state"');
+    expect(deleteBatchDeclaration).not.toContain('"draws"');
+    expect(deleteBatchDeclaration).not.toContain('"drawn_charts"');
+    expect(deleteBatchDeclaration).not.toContain('"host_locks"');
   });
 
   it("locks down tournament-changing RPC execute privileges", () => {
