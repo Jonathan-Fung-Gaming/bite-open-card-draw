@@ -56,4 +56,54 @@ describe("admin audit store", () => {
       sourceRowNumber: 42,
     });
   });
+
+  it("persists private CSV export audit metadata as non-tournament-changing", () => {
+    const store = new AdminAuditStore();
+
+    store.record({
+      sessionId: "session-1",
+      action: "private_csv_export_denied",
+      summary: "Denied Round 1 private CSV export because active host control is required.",
+      tournamentChanging: false,
+      metadata: { roundNumber: 1, reason: "host_lock_required" },
+      now: "2026-07-02T00:00:00.000Z",
+    });
+    store.record({
+      sessionId: "session-1",
+      action: "private_csv_export",
+      summary: "Downloaded Round 1 private ballot CSV.",
+      tournamentChanging: false,
+      affectedRecords: [{ type: "result", id: "result-1" }],
+      metadata: {
+        roundNumber: 1,
+        filename: "event-round-1-private-ballots-2026-07-02T00-01-00-000Z-abc123.csv",
+        ballotCount: 12,
+      },
+      now: "2026-07-02T00:01:00.000Z",
+    });
+
+    const restored = new AdminAuditStore();
+
+    restored.importSnapshot(store.exportSnapshot());
+
+    expect(restored.list(2)).toMatchObject([
+      {
+        action: "private_csv_export",
+        dangerous: false,
+        tournamentChanging: false,
+        affectedRecords: [{ type: "result", id: "result-1" }],
+        metadata: {
+          roundNumber: 1,
+          filename: "event-round-1-private-ballots-2026-07-02T00-01-00-000Z-abc123.csv",
+          ballotCount: 12,
+        },
+      },
+      {
+        action: "private_csv_export_denied",
+        dangerous: false,
+        tournamentChanging: false,
+        metadata: { roundNumber: 1, reason: "host_lock_required" },
+      },
+    ]);
+  });
 });

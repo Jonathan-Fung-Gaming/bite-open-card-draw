@@ -392,4 +392,60 @@ describe("voting window store", () => {
 
     expect(snapshot(store, [], 2_000).status).toBe("voting_closed");
   });
+
+  it("keeps post-compute invalidation in closed manual-override mode", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+    store.closeVoting(1, 1_000);
+    store.setResultsPhase(1, "results_computed");
+
+    const computed = snapshot(store, ["player-1"], 2_000);
+
+    expect(computed).toMatchObject({
+      status: "results_computed",
+      canSubmit: false,
+      canAcceptManualBallot: true,
+      postCloseManualBallotsAreOverrides: true,
+    });
+
+    store.returnToClosedForRecompute(1, 3_000);
+
+    expect(snapshot(store, ["player-1"], 3_000)).toMatchObject({
+      status: "voting_closed",
+      canSubmit: false,
+      canAcceptManualBallot: true,
+      postCloseManualBallotsAreOverrides: true,
+      closedAt: new Date(1_000).toISOString(),
+    });
+  });
+
+  it("blocks emergency reopen after result reveal has started", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+    store.closeVoting(1, 1_000);
+    store.setResultsPhase(1, "results_computed");
+    store.setResultsPhase(1, "results_revealing");
+
+    expect(() => store.reopenVoting({ roundNumber: 1, durationMinutes: 3, nowMs: 2_000 })).toThrow(
+      /before reveal/,
+    );
+
+    store.setResultsPhase(1, "results_revealed");
+
+    expect(() => store.reopenVoting({ roundNumber: 1, durationMinutes: 3, nowMs: 3_000 })).toThrow(
+      /before reveal/,
+    );
+  });
 });

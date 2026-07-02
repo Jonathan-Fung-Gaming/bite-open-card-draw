@@ -122,7 +122,7 @@ export default async function StagePage() {
     if (result.revealPhase === "final") {
       return (
         <>
-          <StageAutoRefresh />
+          <StageAutoRefresh enabled={false} />
           <main className="min-h-screen">
             <RoundHeader
               title={`ROUND ${roundNumber} FINAL CHARTS`}

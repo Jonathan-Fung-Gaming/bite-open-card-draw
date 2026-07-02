@@ -1,20 +1,19 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { expect, test, type Download, type Locator, type Page } from "@playwright/test";
+import {
+  clickAdminActionAndWait,
+  getAdminPassword,
+  goto,
+  HOSTED_REFRESH_TIMEOUT_MS,
+  loginAndTakeHost,
+} from "./admin-helpers";
 
 test.describe.configure({ mode: "serial" });
 
-function getAdminPassword() {
-  const password = process.env.E2E_ADMIN_PASSWORD;
-
-  if (!password) {
-    throw new Error("Missing E2E_ADMIN_PASSWORD from Playwright config.");
-  }
-
-  return password;
-}
-
 const ADMIN_PASSWORD = getAdminPassword();
 const FALLBACK_CHART_IMAGE_PATH = "/chart-images/fallback-card.svg";
-const HOSTED_REFRESH_TIMEOUT_MS = 30_000;
+const PRIVATE_CSV_FILENAME_PATTERN =
+  /^e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv$/;
 
 function expectRealCachedImagePath(source: string | null) {
   expect(source).toBeTruthy();
@@ -22,37 +21,31 @@ function expectRealCachedImagePath(source: string | null) {
   expect(source).not.toContain(FALLBACK_CHART_IMAGE_PATH);
 }
 
-async function goto(page: Page, path: string) {
-  await page.goto(path, { waitUntil: "domcontentloaded" });
+async function readDownloadText(download: Download) {
+  const path = await download.path();
+
+  if (!path) {
+    throw new Error("Playwright download did not provide a local file path.");
+  }
+
+  return readFile(path, "utf8");
 }
 
-async function loginAndTakeHost(page: Page) {
-  await goto(page, "/coolguy69");
-  await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Log In" }).click();
-  await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
-  const releaseButton = page.getByRole("button", { name: "Release" });
+function expectPrivateCsvContent(csv: string) {
+  const lines = csv.trimEnd().split(/\r?\n/);
+  const header = lines[0]?.split(",") ?? [];
 
-  if (await releaseButton.isEnabled()) {
-    await expect(page.getByText("Voting Controls")).toBeVisible();
-    return;
-  }
-
-  const takeHostButton = page.getByRole("button", { name: "Take Host Control" });
-
-  if ((await takeHostButton.count()) > 0 && (await takeHostButton.isEnabled())) {
-    await takeHostButton.click();
-  } else {
-    const forceHostForm = page.locator("form", {
-      has: page.getByRole("button", { name: "Force Host Takeover" }),
-    });
-
-    await forceHostForm.getByLabel("Audit reason").fill("e2e host takeover");
-    await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
-    await forceHostForm.getByRole("button", { name: "Force Host Takeover" }).click();
-  }
-  await expect(page.getByText("Voting Controls")).toBeVisible();
-  await expect(releaseButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  expect(header).toContain("round_number");
+  expect(header).toContain("player_startgg_username");
+  expect(header).toContain("submitted");
+  expect(header).toContain("selected_set_1_chart");
+  expect(header).toContain("selected_set_2_chart");
+  expect(header).toContain("set_1_tiebreak_used");
+  expect(header).toContain("set_2_tiebreak_used");
+  expect(csv).toContain("Alpha");
+  expect(csv).toContain("S16");
+  expect(csv).toContain("S17");
+  expect(lines.length).toBeGreaterThanOrEqual(2);
 }
 
 async function expectStageRows(page: Page) {
@@ -112,6 +105,7 @@ async function expectReadableVotingAccess(page: Page) {
   const qrCode = page.getByTestId("room-qr-code");
   const roomUrl = new URL("/room", page.url()).toString();
   const shortRoomUrl = `${new URL(roomUrl).host}/room`;
+  const stageUrl = page.url();
   const votingBandBox = await page.getByTestId("stage-voting-band").boundingBox();
   const chartRowsBox = await page.getByTestId("stage-chart-rows").boundingBox();
   const qrBox = await qrLink.boundingBox();
@@ -119,10 +113,12 @@ async function expectReadableVotingAccess(page: Page) {
   const qrPathCount = await qrCode.locator("svg path").count();
 
   await expect(qrLink).toBeVisible();
+  await expect(qrLink).not.toHaveAttribute("href", /.+/);
   await expect(qrLink).toHaveAttribute("data-qr-target", roomUrl);
   await expect(qrCode.locator("svg")).toBeVisible();
   await expect(page.getByTestId("room-short-url")).toHaveText(shortRoomUrl);
   await expect(page.getByTestId("stage-countdown-display")).toHaveText(/\d{2}:\d{2}/);
+  expect(await qrLink.evaluate((element) => element.tagName.toLowerCase())).toBe("div");
   expect(qrPathCount).toBeGreaterThan(0);
   expect(qrBox).not.toBeNull();
   expect(timerBox).not.toBeNull();
@@ -136,6 +132,9 @@ async function expectReadableVotingAccess(page: Page) {
   expect(votingBandBox!.y + votingBandBox!.height).toBeLessThanOrEqual(chartRowsBox!.y);
   expect(qrBox!.y).toBeLessThan(chartRowsBox!.y);
   expect(timerBox!.y).toBeLessThan(chartRowsBox!.y);
+
+  await qrLink.click();
+  await expect.poll(async () => page.url()).toBe(stageUrl);
 }
 
 async function expectNoStageVerticalScroll(page: Page) {
@@ -181,6 +180,72 @@ async function advanceRevealAndWaitForAdminPhase(page: Page, phase: string) {
   await expectAdminRevealPhase(page, phase);
 }
 
+async function expectNoFinalResultSpoilers(page: Page) {
+  await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toHaveCount(0);
+  await expect(page.getByText("Full ban counts")).toHaveCount(0);
+  await expect(page.getByText("Least banned to most banned")).toHaveCount(0);
+  await expect(page.getByTestId("stage-final-chart-list")).toHaveCount(0);
+  await expect(page.getByTestId("phone-final-chart-card")).toHaveCount(0);
+  await expect(page.getByTestId("result-selected-label")).toHaveCount(0);
+}
+
+async function expectPublicRoutesHideFinalSpoilersBeforeReveal(page: Page) {
+  const publicPage = await page.context().newPage();
+
+  try {
+    await goto(publicPage, "/vote");
+    await expect(publicPage.getByText("Voting is closed.")).toBeVisible();
+    await expect(publicPage.getByText("Results are being revealed on stage.")).toBeVisible();
+    await expectNoFinalResultSpoilers(publicPage);
+
+    await goto(publicPage, "/charts");
+    await expect(publicPage.getByTestId("view-only-status")).toContainText(
+      "Results being revealed",
+    );
+    await expectNoFinalResultSpoilers(publicPage);
+
+    await goto(publicPage, "/results");
+    await expect(publicPage.getByText("Voting is closed.")).toBeVisible();
+    await expect(publicPage.getByText("Results are being revealed on stage.")).toBeVisible();
+    await expectNoFinalResultSpoilers(publicPage);
+
+    await goto(publicPage, "/stage");
+    await expect(publicPage.getByRole("heading", { name: "Awaiting Host Reveal" })).toBeVisible();
+    await expectNoFinalResultSpoilers(publicPage);
+  } finally {
+    await publicPage.close();
+  }
+}
+
+async function expectDetailsOpen(details: Locator) {
+  await expect
+    .poll(async () => details.evaluate((element) => (element as HTMLDetailsElement).open))
+    .toBe(true);
+}
+
+async function expectFinalBanCountDetailsRemainOpenAfterWait(page: Page) {
+  const details = page.locator("details", { hasText: "ban counts" });
+
+  await expect(details).toHaveCount(2);
+
+  for (const index of [0, 1]) {
+    const detail = details.nth(index);
+
+    if (!(await detail.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await detail.locator("summary").click();
+    }
+    await expectDetailsOpen(detail);
+    await expect(detail.locator("li")).toHaveCount(7);
+    await expect(detail.getByTestId("result-selected-label")).toHaveCount(1);
+  }
+
+  await page.waitForTimeout(1_500);
+
+  for (const index of [0, 1]) {
+    await expectDetailsOpen(details.nth(index));
+  }
+}
+
 test("full round smoke flow reaches final reveal and downloads private CSV", async ({
   page,
   browser,
@@ -198,7 +263,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await page
     .getByPlaceholder("Bulk import start.gg usernames")
     .fill("Alpha\nBravo\nCharlie\nDelta");
-  await page.getByRole("button", { name: "Bulk Import" }).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Bulk Import" }));
   await expect(page.getByRole("cell", { name: "Alpha", exact: true })).toBeVisible();
 
   const stagePage = await page.context().newPage();
@@ -316,9 +381,13 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await duplicatePhonePage
     .getByLabel("Select your start.gg username")
     .selectOption({ label: "Alpha" });
+  await expect(duplicatePhonePage.getByText("Are you sure you are voting as Alpha?")).toBeVisible();
+  await expect(duplicatePhonePage.getByTestId("ballot-chart-card")).toHaveCount(0);
   await expect(
     duplicatePhonePage.getByText("A ballot already exists for this start.gg username"),
   ).toBeVisible({ timeout: 7000 });
+  await expect(duplicatePhonePage.getByRole("button", { name: "Confirm" })).toBeEnabled();
+  await expect(duplicatePhonePage.getByTestId("ballot-chart-card")).toHaveCount(0);
   await duplicatePhonePage.close();
 
   await page.getByRole("button", { name: "Close Voting" }).click();
@@ -334,6 +403,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expectAdminRevealPhase(page, "computed");
+  await expectPublicRoutesHideFinalSpoilersBeforeReveal(page);
 
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
@@ -349,10 +419,10 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   const privateCsvDownloadPromise = page.waitForEvent("download");
   await advanceRevealAndWaitForAdminPhase(page, "final");
   const privateCsvDownload = await privateCsvDownloadPromise;
+  const privateCsvText = await readDownloadText(privateCsvDownload);
 
-  expect(privateCsvDownload.suggestedFilename()).toMatch(
-    /^e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv$/,
-  );
+  expect(privateCsvDownload.suggestedFilename()).toMatch(PRIVATE_CSV_FILENAME_PATTERN);
+  expectPrivateCsvContent(privateCsvText);
 
   await expect(
     page
@@ -366,9 +436,17 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: 7000,
   });
   await expectRenderedRealStageImage(chartsPage);
+  await expectFinalBanCountDetailsRemainOpenAfterWait(chartsPage);
+  await chartsPage.reload({ waitUntil: "domcontentloaded" });
+  await expect(chartsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
+  await expectFinalBanCountDetailsRemainOpenAfterWait(chartsPage);
   await chartsPage.close();
   await expect(phonePage.getByText("Full ban counts")).toBeVisible({ timeout: 7000 });
   await expectRenderedRealBackgroundImage(phonePage.getByTestId("phone-final-chart-card").first());
+  await expectFinalBanCountDetailsRemainOpenAfterWait(phonePage);
+  await phonePage.reload({ waitUntil: "domcontentloaded" });
+  await expect(phonePage.getByText("Full ban counts")).toBeVisible({ timeout: 7000 });
+  await expectFinalBanCountDetailsRemainOpenAfterWait(phonePage);
 
   await goto(page, "/stage");
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
@@ -379,29 +457,44 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   expect((await finalStageCards.first().boundingBox())?.height).toBeGreaterThan(300);
   expect((await finalStageCards.nth(1).boundingBox())?.height).toBeGreaterThan(300);
   await expectRenderedRealStageImage(page);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
+  await expect(
+    page.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card"),
+  ).toHaveCount(2);
 
   await goto(page, "/charts");
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
   await expectRenderedRealStageImage(page);
+  await expectFinalBanCountDetailsRemainOpenAfterWait(page);
 
   await goto(page, "/results");
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
   await expectRenderedRealStageImage(page);
+  await expectFinalBanCountDetailsRemainOpenAfterWait(page);
 
   await goto(page, "/vote");
   await expect(page.getByText("Full ban counts")).toBeVisible();
+  await expectFinalBanCountDetailsRemainOpenAfterWait(page);
 
   await goto(page, "/coolguy69");
   const downloadButton = page.getByRole("button", { name: "Download private ballot CSV" });
   await expect(downloadButton).toBeEnabled();
+  const manualCsvDownloadPromise = page.waitForEvent("download");
   await downloadButton.click();
+  const manualCsvDownload = await manualCsvDownloadPromise;
+  const manualCsvText = await readDownloadText(manualCsvDownload);
+
+  expect(manualCsvDownload.suggestedFilename()).toMatch(PRIVATE_CSV_FILENAME_PATTERN);
+  expectPrivateCsvContent(manualCsvText);
+  expect(manualCsvText).toBe(privateCsvText);
   await expect(
     page.getByText(
       /^Downloaded e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv\.$/,
     ),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Release" }).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Release" }));
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });
 
@@ -472,6 +565,6 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   );
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(1);
 
-  await page.getByRole("button", { name: "Release" }).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Release" }));
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });

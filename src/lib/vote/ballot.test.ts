@@ -388,9 +388,7 @@ describe("ballot validation and store", () => {
     const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
     const input = validBallotInput(draws);
 
-    expect(() => validateRoundBallot(input, [draws[0]!])).toThrow(
-      /Both chart sets must be drawn/,
-    );
+    expect(() => validateRoundBallot(input, [draws[0]!])).toThrow(/Both chart sets must be drawn/);
   });
 
   it("rejects third bans server-side", () => {
@@ -502,5 +500,57 @@ describe("ballot validation and store", () => {
     ).toThrow(/outside the drawn set/);
 
     expect(store.get(1, "player-valid")).toEqual(first);
+  });
+
+  it("round-trips only the latest valid revision after a later edit fails", () => {
+    const store = new BallotStore();
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    store.submit(input, draws, "first");
+    const latestValid = store.submit(
+      {
+        ...input,
+        choices: [
+          {
+            ...input.choices[0]!,
+            noBans: true,
+            bannedChartIds: [],
+          },
+          input.choices[1]!,
+        ],
+      },
+      draws,
+      "second",
+    );
+
+    expect(() =>
+      store.submit(
+        {
+          ...input,
+          choices: [
+            {
+              ...input.choices[0]!,
+              bannedChartIds: ["stale-chart-id"],
+            },
+            input.choices[1]!,
+          ],
+        },
+        draws,
+        "failed-third",
+      ),
+    ).toThrow(/outside the drawn set/);
+
+    const restored = new BallotStore();
+
+    restored.importSnapshot(store.exportSnapshot());
+
+    expect(restored.get(1, "player-valid")).toMatchObject({
+      id: latestValid.id,
+      submittedAt: "second",
+      revision: 2,
+      choices: latestValid.choices,
+    });
+    expect(restored.get(1, "player-valid")?.choices[0]?.noBans).toBe(true);
   });
 });
