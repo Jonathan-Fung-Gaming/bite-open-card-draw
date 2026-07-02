@@ -1,6 +1,11 @@
 import type { APIRequestContext } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { expectPrivateCsvExport } from "../fixtures/private-csv";
-import { expectSupabaseRevealPhase, expectSupabaseSupportedTiebreaks } from "../fixtures/supabase-state";
+import {
+  expectSupabaseRevealPhase,
+  expectSupabaseSupportedTiebreaks,
+} from "../fixtures/supabase-state";
 import { AdminPage } from "../pages/admin.page";
 
 export async function computeAndRevealRoundResults(adminPage: AdminPage, roundNumber: number) {
@@ -15,6 +20,21 @@ export async function computeAndRevealRoundResults(adminPage: AdminPage, roundNu
   await adminPage.advanceToFinalReveal(roundNumber);
 }
 
+function isBrowserCsvDownloadOnly() {
+  return (
+    process.env.E2E_PROFILE === "production-flow" ||
+    process.env.E2E_USE_ADMIN_ACTIONS_ONLY === "true"
+  );
+}
+
+async function defaultCsvDownloadPath(roundNumber: number) {
+  const outputDir = join(process.cwd(), "test-results", "phase9", "downloads");
+
+  await mkdir(outputDir, { recursive: true });
+
+  return join(outputDir, `round-${roundNumber}-private-ballots.csv`);
+}
+
 export async function verifyRoundCsvExport(options: {
   adminPage: AdminPage;
   baseURL: string;
@@ -24,14 +44,20 @@ export async function verifyRoundCsvExport(options: {
 }) {
   const { adminPage, baseURL, browserDownloadPath, request, roundNumber } = options;
 
-  await expectPrivateCsvExport({
-    baseURL,
-    expectedRows: 12,
-    request,
-    roundNumber,
-  });
+  if (!isBrowserCsvDownloadOnly()) {
+    await expectPrivateCsvExport({
+      baseURL,
+      expectedRows: 12,
+      request,
+      roundNumber,
+    });
+  }
 
-  if (browserDownloadPath) {
-    await adminPage.verifyManualCsvDownload(roundNumber, browserDownloadPath);
+  const resolvedDownloadPath =
+    browserDownloadPath ??
+    (isBrowserCsvDownloadOnly() ? await defaultCsvDownloadPath(roundNumber) : undefined);
+
+  if (resolvedDownloadPath) {
+    await adminPage.verifyManualCsvDownload(roundNumber, resolvedDownloadPath);
   }
 }

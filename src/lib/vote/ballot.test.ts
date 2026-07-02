@@ -35,6 +35,21 @@ function draw(id: string, displayLabel: string, level: string): DrawRecord {
   };
 }
 
+function validBallotInput(draws: DrawRecord[]) {
+  return {
+    roundNumber: 1 as const,
+    playerId: "player-valid",
+    playerStartggUsername: "ValidPlayer",
+    choices: draws.map((candidate) => ({
+      drawId: candidate.id,
+      roundSetId: candidate.roundSetId,
+      displayLabel: candidate.displayLabel,
+      noBans: false,
+      bannedChartIds: [candidate.charts[0]?.id ?? ""],
+    })),
+  };
+}
+
 describe("ballot validation and store", () => {
   it("requires either 1-2 bans or explicit no bans per set", () => {
     expect(
@@ -352,5 +367,109 @@ describe("ballot validation and store", () => {
         draws,
       ),
     ).toThrow(/static round set/);
+  });
+
+  it("rejects incomplete ballots server-side", () => {
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    expect(() =>
+      validateRoundBallot(
+        {
+          ...input,
+          choices: [input.choices[0]!],
+        },
+        draws,
+      ),
+    ).toThrow(/Both chart sets/);
+  });
+
+  it("rejects third bans server-side", () => {
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    expect(() =>
+      validateRoundBallot(
+        {
+          ...input,
+          choices: [
+            {
+              ...input.choices[0]!,
+              bannedChartIds: draws[0]!.charts.slice(0, 3).map((chart) => chart.id),
+            },
+            input.choices[1]!,
+          ],
+        },
+        draws,
+      ),
+    ).toThrow(/Both chart sets/);
+  });
+
+  it("rejects stale chart ids server-side", () => {
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    expect(() =>
+      validateRoundBallot(
+        {
+          ...input,
+          choices: [
+            {
+              ...input.choices[0]!,
+              bannedChartIds: ["stale-chart-id"],
+            },
+            input.choices[1]!,
+          ],
+        },
+        draws,
+      ),
+    ).toThrow(/outside the drawn set/);
+  });
+
+  it("rejects no-bans plus bans combinations server-side", () => {
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    expect(() =>
+      validateRoundBallot(
+        {
+          ...input,
+          choices: [
+            {
+              ...input.choices[0]!,
+              noBans: true,
+            },
+            input.choices[1]!,
+          ],
+        },
+        draws,
+      ),
+    ).toThrow(/Both chart sets/);
+  });
+
+  it("preserves the prior valid ballot when an edit fails validation", () => {
+    const store = new BallotStore();
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+    const first = store.submit(input, draws, "first");
+
+    expect(() =>
+      store.submit(
+        {
+          ...input,
+          choices: [
+            {
+              ...input.choices[0]!,
+              bannedChartIds: ["stale-chart-id"],
+            },
+            input.choices[1]!,
+          ],
+        },
+        draws,
+        "failed-edit",
+      ),
+    ).toThrow(/outside the drawn set/);
+
+    expect(store.get(1, "player-valid")).toEqual(first);
   });
 });

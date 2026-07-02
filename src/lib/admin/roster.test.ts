@@ -57,6 +57,50 @@ describe("roster store", () => {
     ).toThrow("Cannot edit a start.gg username after tournament history exists.");
   });
 
+  it("sets tournament history after player ballot submission and locks username edits", () => {
+    const store = new RosterStore();
+    const player = store.createOrUpdatePlayer({
+      startggUsername: "Player Ballot",
+      active: true,
+      now: "created",
+    });
+
+    const locked = store.markTournamentHistory(player.id, "submitted");
+
+    expect(locked.hasTournamentHistory).toBe(true);
+    expect(locked.updatedAt).toBe("submitted");
+    expect(() =>
+      store.createOrUpdatePlayer({
+        playerId: player.id,
+        startggUsername: "Player Renamed",
+        now: "later",
+      }),
+    ).toThrow("Cannot edit a start.gg username after tournament history exists.");
+  });
+
+  it("sets tournament history after manual ballot submission and persists through snapshots", () => {
+    const store = new RosterStore();
+    const player = store.createOrUpdatePlayer({
+      startggUsername: "Manual Ballot",
+      active: true,
+      now: "created",
+    });
+
+    store.markTournamentHistory(player.id, "manual-submitted");
+
+    const restored = new RosterStore();
+    restored.importSnapshot(store.exportSnapshot());
+
+    expect(restored.getPlayer(player.id)?.hasTournamentHistory).toBe(true);
+    expect(() =>
+      restored.createOrUpdatePlayer({
+        playerId: player.id,
+        startggUsername: "Manual Renamed",
+        now: "later",
+      }),
+    ).toThrow("Cannot edit a start.gg username after tournament history exists.");
+  });
+
   it("keeps inactive players visible and restorable", () => {
     const store = new RosterStore();
     const player = store.createOrUpdatePlayer({ startggUsername: "PlayerTwo", active: true, now: "now" });

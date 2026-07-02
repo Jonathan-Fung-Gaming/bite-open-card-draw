@@ -23,12 +23,44 @@ function activeElementIsEditing() {
   return element instanceof HTMLElement && element.isContentEditable;
 }
 
+function formHasDirtyEditableField() {
+  const fields = document.querySelectorAll("input, textarea, select");
+
+  return Array.from(fields).some((field) => {
+    if (
+      !(field instanceof HTMLInputElement) &&
+      !(field instanceof HTMLTextAreaElement) &&
+      !(field instanceof HTMLSelectElement)
+    ) {
+      return false;
+    }
+
+    if (field.disabled || (field instanceof HTMLInputElement && field.type === "hidden")) {
+      return false;
+    }
+
+    if (field instanceof HTMLInputElement) {
+      if (field.type === "checkbox" || field.type === "radio") {
+        return field.checked !== field.defaultChecked;
+      }
+
+      return field.value !== field.defaultValue;
+    }
+
+    if (field instanceof HTMLTextAreaElement) {
+      return field.value !== field.defaultValue;
+    }
+
+    return Array.from(field.options).some((option) => option.selected !== option.defaultSelected);
+  });
+}
+
 export function AdminLiveRefresh() {
   const router = useRouter();
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      if (document.hidden || activeElementIsEditing()) {
+      if (document.hidden || activeElementIsEditing() || formHasDirtyEditableField()) {
         return;
       }
 

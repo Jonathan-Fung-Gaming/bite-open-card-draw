@@ -4,6 +4,7 @@ import { REQUIRED_CHART_POOLS, type NormalizedChart } from "@/lib/charts/types";
 import { adminState } from "@/lib/server/admin-state";
 import { getAdminSessionFromCookies } from "@/lib/server/admin-auth";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
+import { getDeploymentSafetySnapshot } from "@/lib/server/deployment-safety";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import {
   getRoundDrawRecords,
@@ -207,6 +208,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const inactivePlayers = players.filter((player) => !player.active);
   const activeCount = adminState.rosterStore.getActivePlayerCount();
   const canControl = hostSnapshot.status === "active";
+  const deploymentSafety = getDeploymentSafetySnapshot();
+  const canUseRehearsalControls =
+    canControl && deploymentSafety.rehearsalAdminControlsAllowed;
+  const rehearsalControlsDisabledReason = !canControl
+    ? "Take host control to use rehearsal controls."
+    : deploymentSafety.rehearsalControlBlockReason;
   const roundSnapshot = adminState.roundStateStore.getSnapshot();
   const currentRoundNumber = roundSnapshot.currentRound;
   const selectedChartPool = resolveSelectedChartPool(params?.chartPool, currentRoundNumber);
@@ -265,8 +272,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </div>
             {roundSnapshot.rehearsalMode ? (
               <p className="mt-4 rounded border border-ember-300/25 bg-ember-900/15 p-3 text-sm text-ember-300">
-                Rehearsal mode uses disposable in-memory data. Reset rehearsal data before switching
-                back to tournament operation.
+                Rehearsal mode is using {deploymentSafety.operationalDataDescription}. Reset
+                rehearsal data before switching back to tournament operation.
               </p>
             ) : null}
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -300,114 +307,130 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </button>
               </form>
             </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              <form
-                action={startRehearsalModeAction}
-                className="rounded border border-metal-700 bg-black/20 p-3"
-              >
-                <p className="text-sm font-bold text-white">Start rehearsal mode</p>
-                <p className="mt-1 text-xs text-metal-300">
-                  This resets operational state and loads a 12-player test roster.
-                </p>
-                <p className="mt-2 text-xs font-bold text-ember-300">
-                  Dangerous action: this clears current in-memory tournament operation data.
-                </p>
-                <input
-                  name="adminPassword"
-                  type="password"
-                  required
-                  disabled={!canControl}
-                  placeholder="Admin password"
-                  className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                />
-                <textarea
-                  name="reason"
-                  required
-                  disabled={!canControl}
-                  rows={2}
-                  placeholder="Audit reason"
-                  className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                />
-                <button
-                  className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl}
-                  type="submit"
+            {deploymentSafety.rehearsalAdminControlsAllowed ? (
+              <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                <form
+                  action={startRehearsalModeAction}
+                  className="rounded border border-metal-700 bg-black/20 p-3"
                 >
-                  Start Rehearsal
-                </button>
-              </form>
-              <form
-                action={seedRehearsalTiebreakAction}
-                className="rounded border border-metal-700 bg-black/20 p-3"
-              >
-                <p className="text-sm font-bold text-white">Force rehearsal tiebreak</p>
-                <p className="mt-1 text-xs text-metal-300">
-                  After both current-round sets are drawn, seed ballots that create a two-chart
-                  least-ban tie.
-                </p>
-                <p className="mt-2 text-xs font-bold text-ember-300">
-                  Dangerous action: this can open voting and creates manual-admin rehearsal ballots.
-                </p>
-                <input
-                  name="adminPassword"
-                  type="password"
-                  required
-                  disabled={!canControl || !roundSnapshot.rehearsalMode}
-                  placeholder="Admin password"
-                  className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                />
-                <textarea
-                  name="reason"
-                  required
-                  disabled={!canControl || !roundSnapshot.rehearsalMode}
-                  rows={2}
-                  placeholder="Audit reason"
-                  className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                />
-                <button
-                  className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl || !roundSnapshot.rehearsalMode}
-                  type="submit"
+                  <p className="text-sm font-bold text-white">Start rehearsal mode</p>
+                  <p className="mt-1 text-xs text-metal-300">
+                    This resets {deploymentSafety.operationalDataDescription} and loads a 12-player
+                    test roster.
+                  </p>
+                  <p className="mt-2 text-xs font-bold text-ember-300">
+                    Dangerous action: this clears current tournament operation data for this
+                    deployment context.
+                  </p>
+                  <input
+                    name="adminPassword"
+                    type="password"
+                    required
+                    disabled={!canUseRehearsalControls}
+                    placeholder="Admin password"
+                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                  />
+                  <textarea
+                    name="reason"
+                    required
+                    disabled={!canUseRehearsalControls}
+                    rows={2}
+                    placeholder="Audit reason"
+                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                  />
+                  <button
+                    className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                    disabled={!canUseRehearsalControls}
+                    type="submit"
+                  >
+                    Start Rehearsal
+                  </button>
+                </form>
+                <form
+                  action={seedRehearsalTiebreakAction}
+                  className="rounded border border-metal-700 bg-black/20 p-3"
                 >
-                  Seed Tiebreak
-                </button>
-              </form>
-              <form
-                action={resetRehearsalModeAction}
-                className="rounded border border-metal-700 bg-black/20 p-3"
-              >
-                <p className="text-sm font-bold text-white">Reset rehearsal data</p>
-                <p className="mt-1 text-xs text-metal-300">
-                  This clears rehearsal state and returns to tournament mode.
-                </p>
-                <p className="mt-2 text-xs font-bold text-ember-300">
-                  Dangerous action: this clears current in-memory rehearsal operation data.
-                </p>
-                <input
-                  name="adminPassword"
-                  type="password"
-                  required
-                  disabled={!canControl}
-                  placeholder="Admin password"
-                  className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                />
-                <textarea
-                  name="reason"
-                  required
-                  disabled={!canControl}
-                  rows={2}
-                  placeholder="Audit reason"
-                  className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                />
-                <button
-                  className="mt-3 w-full rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                  disabled={!canControl}
-                  type="submit"
+                  <p className="text-sm font-bold text-white">Force rehearsal tiebreak</p>
+                  <p className="mt-1 text-xs text-metal-300">
+                    After both current-round sets are drawn, seed ballots that create a two-chart
+                    least-ban tie.
+                  </p>
+                  <p className="mt-2 text-xs font-bold text-ember-300">
+                    Dangerous action: this can open voting and creates manual-admin rehearsal
+                    ballots.
+                  </p>
+                  <input
+                    name="adminPassword"
+                    type="password"
+                    required
+                    disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                    placeholder="Admin password"
+                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                  />
+                  <textarea
+                    name="reason"
+                    required
+                    disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                    rows={2}
+                    placeholder="Audit reason"
+                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                  />
+                  <button
+                    className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                    disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                    type="submit"
+                  >
+                    Seed Tiebreak
+                  </button>
+                </form>
+                <form
+                  action={resetRehearsalModeAction}
+                  className="rounded border border-metal-700 bg-black/20 p-3"
                 >
-                  Reset Rehearsal
-                </button>
-              </form>
-            </div>
+                  <p className="text-sm font-bold text-white">Reset rehearsal data</p>
+                  <p className="mt-1 text-xs text-metal-300">
+                    This clears {deploymentSafety.operationalDataDescription} and returns to
+                    tournament mode.
+                  </p>
+                  <p className="mt-2 text-xs font-bold text-ember-300">
+                    Dangerous action: this clears current rehearsal operation data for this
+                    deployment context.
+                  </p>
+                  <input
+                    name="adminPassword"
+                    type="password"
+                    required
+                    disabled={!canUseRehearsalControls}
+                    placeholder="Admin password"
+                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                  />
+                  <textarea
+                    name="reason"
+                    required
+                    disabled={!canUseRehearsalControls}
+                    rows={2}
+                    placeholder="Audit reason"
+                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                  />
+                  <button
+                    className="mt-3 w-full rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                    disabled={!canUseRehearsalControls}
+                    type="submit"
+                  >
+                    Reset Rehearsal
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
+                <p className="text-sm font-bold text-white">
+                  Rehearsal reset controls unavailable
+                </p>
+                <p className="mt-1 text-xs text-metal-300">
+                  {rehearsalControlsDisabledReason}
+                </p>
+              </div>
+            )}
           </section>
           <section className="metal-panel rounded-lg p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -717,7 +740,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <div className="mt-4">
               <PrivateCsvDownload
                 roundNumber={currentRoundNumber}
-                enabled={Boolean(result && result.revealPhase === "final")}
+                enabled={canControl && Boolean(result && result.revealPhase === "final")}
+                disabledReason={
+                  !canControl
+                    ? "Take host control to download the private ballot CSV."
+                    : "Available after the final two-chart reveal finishes on stage."
+                }
                 autoDownloadKey={
                   result?.finalRevealedAt ? `${result.id}:${result.finalRevealedAt}` : null
                 }

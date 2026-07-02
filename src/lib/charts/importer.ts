@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { parse } from "csv-parse/sync";
 import { applyChartExclusions, getEligibleTournamentCharts } from "./exclusions";
 import { normalizeChartRow } from "./normalize";
@@ -6,13 +7,28 @@ import {
   REQUIRED_CHART_POOLS,
   type ChartDuplicate,
   type ChartExclusion,
+  type ChartImportRowDiagnostic,
   type ChartImportReport,
   type NormalizedChart,
   type RawChartCsvRow,
   type RequiredChartPool,
 } from "./types";
 
+export type ParsedChartCsv = {
+  rows: RawChartCsvRow[];
+  repairedRows: ChartImportRowDiagnostic[];
+  sourceSha256: string;
+};
+
+export function hashChartCsvText(csvText: string) {
+  return createHash("sha256").update(csvText).digest("hex");
+}
+
 export function parseChartCsv(csvText: string): RawChartCsvRow[] {
+  return parseChartCsvWithReport(csvText).rows;
+}
+
+export function parseChartCsvWithReport(csvText: string): ParsedChartCsv {
   const records = parse(csvText, {
     bom: true,
     columns: false,
@@ -24,8 +40,25 @@ export function parseChartCsv(csvText: string): RawChartCsvRow[] {
 
   const [header, ...rows] = records;
   validateChartCsvHeader(header ?? []);
+  const repairedRows: ChartImportRowDiagnostic[] = [];
 
-  return rows.map((row, index) => repairRawChartRecord(row, index + 2));
+  return {
+    rows: rows.map((row, index) => {
+      const sourceRowNumber = index + 2;
+      const repaired = repairRawChartRecord(row, sourceRowNumber);
+
+      if (repaired.reason) {
+        repairedRows.push({
+          sourceRowNumber,
+          reason: repaired.reason,
+        });
+      }
+
+      return repaired.row;
+    }),
+    repairedRows,
+    sourceSha256: hashChartCsvText(csvText),
+  };
 }
 
 export function validateChartCsvHeader(header: readonly string[]) {
@@ -40,9 +73,27 @@ function joinCsvParts(parts: readonly string[]) {
   return parts.join(", ").trim();
 }
 
-function repairRawChartRecord(record: readonly string[], sourceRowNumber: number): RawChartCsvRow {
+function repairRawChartRecord(
+  record: readonly string[],
+  sourceRowNumber: number,
+): { row: RawChartCsvRow; reason: string | null } {
   if (record.length < EXPECTED_CHART_CSV_COLUMNS.length) {
     throw new Error(`Chart CSV row ${sourceRowNumber} has too few columns.`);
+  }
+
+  if (record.length === EXPECTED_CHART_CSV_COLUMNS.length) {
+    return {
+      row: {
+        name: record[0] ?? "",
+        name_kr: record[1] ?? "",
+        artist: record[2] ?? "",
+        label: record[3] ?? "",
+        type: record[4] ?? "",
+        level: record[5] ?? "",
+        bg_img: record[6] ?? "",
+      },
+      reason: null,
+    };
   }
 
   const [label, type, level, bgImg] = record.slice(-4);
@@ -88,7 +139,10 @@ function repairRawChartRecord(record: readonly string[], sourceRowNumber: number
     throw new Error(`Chart CSV row ${sourceRowNumber} could not be repaired.`);
   }
 
-  return best.row;
+  return {
+    row: best.row,
+    reason: `Row had ${record.length} columns; reconstructed the expected ${EXPECTED_CHART_CSV_COLUMNS.length} columns.`,
+  };
 }
 
 export function createFallbackChartRows(): RawChartCsvRow[] {
@@ -130,6 +184,11 @@ export function importChartRows(
     usedFixture?: boolean;
     exclusions?: readonly ChartExclusion[];
     generatedAt?: string;
+    sourceSha256?: string | null;
+    repairedRows?: readonly ChartImportRowDiagnostic[];
+    strict?: boolean;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
   },
 ): {
   charts: NormalizedChart[];
@@ -138,6 +197,7 @@ export function importChartRows(
   const chartsByKey = new Map<string, NormalizedChart>();
   const duplicateChartKeys: ChartDuplicate[] = [];
   const skippedRows: ChartImportReport["skippedRows"] = [];
+  const outOfScopeRows: ChartImportReport["outOfScopeRows"] = [];
 
   rows.forEach((row, index) => {
     const sourceRowNumber = index + 2;
@@ -145,6 +205,13 @@ export function importChartRows(
     try {
       const chart = normalizeChartRow(row, sourceRowNumber);
       const existing = chartsByKey.get(chart.chartKey);
+
+      if (!chart.tournamentScope) {
+        outOfScopeRows.push({
+          sourceRowNumber,
+          reason: `${chart.displayDifficulty} is outside required tournament pools.`,
+        });
+      }
 
       if (existing) {
         duplicateChartKeys.push({
@@ -167,6 +234,22 @@ export function importChartRows(
   const charts = applyChartExclusions([...chartsByKey.values()], options.exclusions ?? []);
   const poolCounts = buildPoolCounts(charts);
   const poolsWithTooFewCharts = REQUIRED_CHART_POOLS.filter((pool) => poolCounts[pool] < 7);
+  const repairedRows = [...(options.repairedRows ?? [])];
+  const strictFailures = options.strict
+    ? [
+        ...repairedRows.map(
+          (row) => `Row ${row.sourceRowNumber} was repaired: ${row.reason}`,
+        ),
+        ...skippedRows.map((row) => `Row ${row.sourceRowNumber} was skipped: ${row.reason}`),
+        ...duplicateChartKeys.map(
+          (duplicate) =>
+            `Duplicate chart key ${duplicate.chartKey} at rows ${duplicate.firstSourceRowNumber} and ${duplicate.duplicateSourceRowNumber}.`,
+        ),
+        ...poolsWithTooFewCharts.map(
+          (pool) => `Required pool ${pool} has ${poolCounts[pool]} eligible charts.`,
+        ),
+      ]
+    : [];
 
   return {
     charts,
@@ -174,12 +257,19 @@ export function importChartRows(
       sourcePath: options.sourcePath,
       usedFixture: options.usedFixture ?? false,
       generatedAt: options.generatedAt ?? new Date().toISOString(),
+      sourceSha256: options.sourceSha256 ?? null,
+      strictMode: options.strict ?? false,
+      reviewedBy: options.reviewedBy ?? null,
+      reviewedAt: options.reviewedAt ?? null,
       totalSourceRows: rows.length,
       importedCharts: charts.length,
+      repairedRows,
       skippedRows,
+      outOfScopeRows,
       duplicateChartKeys,
       poolCounts,
       poolsWithTooFewCharts,
+      strictFailures,
     },
   };
 }

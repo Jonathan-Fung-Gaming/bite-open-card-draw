@@ -10,6 +10,27 @@ type ServerEnv = {
   tournamentEventId: string;
 };
 
+type EnvRecord = {
+  NODE_ENV?: string;
+  VERCEL_ENV?: string;
+  TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL?: string;
+};
+
+export function isProductionDeploymentEnv(env: EnvRecord = process.env) {
+  return env.NODE_ENV === "production" || env.VERCEL_ENV === "production";
+}
+
+export function assertProductionTestFlagsDisabled(env: EnvRecord = process.env) {
+  if (
+    isProductionDeploymentEnv(env) &&
+    env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL === "true"
+  ) {
+    throw new Error(
+      "TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL cannot be enabled in production deployment environments.",
+    );
+  }
+}
+
 function requireEnv(name: keyof NodeJS.ProcessEnv) {
   const value = process.env[name];
 
@@ -21,6 +42,8 @@ function requireEnv(name: keyof NodeJS.ProcessEnv) {
 }
 
 export function getServerEnv(): ServerEnv {
+  assertProductionTestFlagsDisabled();
+
   return {
     nextPublicSiteUrl: requireEnv("NEXT_PUBLIC_SITE_URL"),
     nextPublicSupabaseUrl: requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
@@ -33,6 +56,8 @@ export function getServerEnv(): ServerEnv {
 }
 
 export function getTournamentEventId() {
+  assertProductionTestFlagsDisabled();
+
   const eventId = process.env.TOURNAMENT_EVENT_ID?.trim();
 
   if (!eventId) {

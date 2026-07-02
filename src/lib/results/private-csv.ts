@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { RoundResultSnapshot } from "@/lib/results/result-engine";
 import type { RoundBallot } from "@/lib/vote/ballot";
 
@@ -19,21 +20,33 @@ const CSV_COLUMNS = [
   "set_1_draw_id",
   "set_1_draw_version",
   "set_1_ban_1",
+  "set_1_ban_1_chart_id",
+  "set_1_ban_1_difficulty",
   "set_1_ban_2",
+  "set_1_ban_2_chart_id",
+  "set_1_ban_2_difficulty",
   "set_1_no_bans",
   "set_2_label",
   "set_2_round_set_id",
   "set_2_draw_id",
   "set_2_draw_version",
   "set_2_ban_1",
+  "set_2_ban_1_chart_id",
+  "set_2_ban_1_difficulty",
   "set_2_ban_2",
+  "set_2_ban_2_chart_id",
+  "set_2_ban_2_difficulty",
   "set_2_no_bans",
   "manual_override",
   "override_admin",
   "override_reason",
   "replaced_existing_ballot",
   "selected_set_1_chart",
+  "selected_set_1_chart_id",
+  "selected_set_1_chart_difficulty",
   "selected_set_2_chart",
+  "selected_set_2_chart_id",
+  "selected_set_2_chart_difficulty",
   "set_1_tiebreak_used",
   "set_1_tiebreak_candidate_ids",
   "set_1_tiebreak_winner_chart_id",
@@ -44,35 +57,142 @@ const CSV_COLUMNS = [
   "set_2_tiebreak_winner_reveal_started_at",
 ] as const;
 
-function escapeCsv(value: string | number | boolean | null | undefined) {
-  const text = value === null || value === undefined ? "" : String(value);
+type CsvCell = string | number | boolean | null | undefined;
+type CsvChart = RoundResultSnapshot["sets"][number]["selectedChart"];
+type RoundBallotWithTimestamps = RoundBallot & {
+  firstSubmittedAt?: string | null;
+  lastRevisionAt?: string | null;
+};
 
-  if (/[",\r\n]/.test(text)) {
-    return `"${text.replaceAll('"', '""')}"`;
-  }
+type EligibilityExportMetadata = {
+  playerId: string;
+  activeAtRoundStart: boolean;
+};
 
-  return text;
+function neutralizeSpreadsheetFormula(text: string) {
+  return /^[\t\r\n ]*[=+\-@]/.test(text) ? `'${text}` : text;
 }
 
-function chartNamesById(result: RoundResultSnapshot) {
-  const names = new Map<string, string>();
+function escapeCsv(value: string | number | boolean | null | undefined) {
+  const text = value === null || value === undefined ? "" : String(value);
+  const safeText = typeof value === "string" ? neutralizeSpreadsheetFormula(text) : text;
+
+  if (/[",\r\n]/.test(safeText)) {
+    return `"${safeText.replaceAll('"', '""')}"`;
+  }
+
+  return safeText;
+}
+
+function chartById(result: RoundResultSnapshot) {
+  const charts = new Map<string, CsvChart>();
 
   for (const set of result.sets) {
     for (const row of set.rows) {
-      names.set(row.chart.id, row.chart.name);
+      charts.set(row.chart.id, row.chart);
     }
   }
 
-  return names;
+  return charts;
+}
+
+function formatChartForCsv(chart: CsvChart | null | undefined, fallbackChartId = "") {
+  if (!chart) {
+    return fallbackChartId;
+  }
+
+  return `${chart.name} [${chart.displayDifficulty}] <${chart.id}>`;
+}
+
+function bannedChartCells(chartId: string | undefined, chartsById: ReadonlyMap<string, CsvChart>) {
+  if (!chartId) {
+    return ["", "", ""] as const;
+  }
+
+  const chart = chartsById.get(chartId);
+
+  return [
+    formatChartForCsv(chart, chartId),
+    chart?.id ?? chartId,
+    chart?.displayDifficulty ?? "",
+  ] as const;
+}
+
+function activeAtRoundStartForPlayer(
+  player: RoundResultSnapshot["eligiblePlayers"][number],
+  activeByPlayerId: ReadonlyMap<string, boolean>,
+  emergencyAddedPlayerIds: ReadonlySet<string>,
+) {
+  const playerWithMetadata = player as typeof player & {
+    activeAtRoundStart?: unknown;
+    playerActiveAtRoundStart?: unknown;
+  };
+
+  if (typeof playerWithMetadata.activeAtRoundStart === "boolean") {
+    return playerWithMetadata.activeAtRoundStart;
+  }
+
+  if (typeof playerWithMetadata.playerActiveAtRoundStart === "boolean") {
+    return playerWithMetadata.playerActiveAtRoundStart;
+  }
+
+  if (activeByPlayerId.has(player.id)) {
+    return activeByPlayerId.get(player.id) as boolean;
+  }
+
+  return !emergencyAddedPlayerIds.has(player.id);
+}
+
+function firstSubmittedAt(ballot: RoundBallotWithTimestamps | undefined) {
+  return ballot?.firstSubmittedAt ?? ballot?.submittedAt ?? "";
+}
+
+function lastRevisionAt(ballot: RoundBallotWithTimestamps | undefined) {
+  return ballot?.lastRevisionAt ?? ballot?.submittedAt ?? "";
+}
+
+function sanitizeFilenameSegment(value: string) {
+  return (
+    value
+      .trim()
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "event"
+  );
+}
+
+export function buildPrivateBallotCsvFilename(input: {
+  eventId: string;
+  roundNumber: 1 | 2 | 3 | 4;
+  generatedAt?: string;
+  nonce?: string;
+}) {
+  const generatedAt = input.generatedAt ?? new Date().toISOString();
+  const timestamp = generatedAt.replace(/[:.]/g, "-").replace(/[^0-9TZ-]/g, "");
+  const nonce = sanitizeFilenameSegment(input.nonce ?? randomUUID().slice(0, 8));
+  const eventId = sanitizeFilenameSegment(input.eventId);
+
+  return `${eventId}-round-${input.roundNumber}-private-ballots-${timestamp}-${nonce}.csv`;
 }
 
 export function generatePrivateBallotCsv(input: {
   result: RoundResultSnapshot;
   ballots: readonly RoundBallot[];
+  roundEligibility?: readonly EligibilityExportMetadata[];
+  emergencyEligiblePlayerIds?: readonly string[];
 }) {
   const { result } = input;
-  const ballotsByPlayer = new Map(input.ballots.map((ballot) => [ballot.playerId, ballot]));
-  const chartNames = chartNamesById(result);
+  const ballotsByPlayer = new Map(
+    input.ballots.map((ballot) => [ballot.playerId, ballot as RoundBallotWithTimestamps]),
+  );
+  const chartsById = chartById(result);
+  const activeByPlayerId = new Map(
+    (input.roundEligibility ?? []).map((entry) => [
+      entry.playerId,
+      entry.activeAtRoundStart,
+    ]),
+  );
+  const emergencyAddedPlayerIds = new Set(input.emergencyEligiblePlayerIds ?? []);
   const rows = [CSV_COLUMNS.join(",")];
   const [setOne, setTwo] = result.sets;
 
@@ -80,13 +200,12 @@ export function generatePrivateBallotCsv(input: {
     const ballot = ballotsByPlayer.get(player.id);
     const setOneChoice = ballot?.choices.find((choice) => choice?.drawId === setOne.drawId);
     const setTwoChoice = ballot?.choices.find((choice) => choice?.drawId === setTwo.drawId);
-    const setOneBans =
-      setOneChoice?.bannedChartIds.map((chartId) => chartNames.get(chartId) ?? chartId) ?? [];
-    const setTwoBans =
-      setTwoChoice?.bannedChartIds.map((chartId) => chartNames.get(chartId) ?? chartId) ?? [];
+    const setOneBanOne = bannedChartCells(setOneChoice?.bannedChartIds[0], chartsById);
+    const setOneBanTwo = bannedChartCells(setOneChoice?.bannedChartIds[1], chartsById);
+    const setTwoBanOne = bannedChartCells(setTwoChoice?.bannedChartIds[0], chartsById);
+    const setTwoBanTwo = bannedChartCells(setTwoChoice?.bannedChartIds[1], chartsById);
 
-    rows.push(
-      [
+    const cells: CsvCell[] = [
         result.roundNumber,
         result.id,
         result.computedAt,
@@ -94,31 +213,35 @@ export function generatePrivateBallotCsv(input: {
         result.revealPhaseStartedAt,
         result.finalRevealedAt ?? "",
         player.startggUsername,
-        true,
+        activeAtRoundStartForPlayer(player, activeByPlayerId, emergencyAddedPlayerIds),
         Boolean(ballot),
-        ballot?.submittedAt ?? "",
-        ballot?.submittedAt ?? "",
+        firstSubmittedAt(ballot),
+        lastRevisionAt(ballot),
         ballot?.revision ?? "",
         setOne.displayLabel,
         setOne.roundSetId,
         setOne.drawId,
         setOne.drawVersion,
-        setOneBans[0] ?? "",
-        setOneBans[1] ?? "",
+        ...setOneBanOne,
+        ...setOneBanTwo,
         setOneChoice?.noBans ?? false,
         setTwo.displayLabel,
         setTwo.roundSetId,
         setTwo.drawId,
         setTwo.drawVersion,
-        setTwoBans[0] ?? "",
-        setTwoBans[1] ?? "",
+        ...setTwoBanOne,
+        ...setTwoBanTwo,
         setTwoChoice?.noBans ?? false,
         ballot?.manualOverride ?? false,
         ballot?.source === "manual_admin" ? "shared_admin" : "",
         ballot?.manualReason ?? "",
         ballot?.replacedExistingBallot ?? false,
-        setOne.selectedChart.name,
-        setTwo.selectedChart.name,
+        formatChartForCsv(setOne.selectedChart),
+        setOne.selectedChart.id,
+        setOne.selectedChart.displayDifficulty,
+        formatChartForCsv(setTwo.selectedChart),
+        setTwo.selectedChart.id,
+        setTwo.selectedChart.displayDifficulty,
         setOne.tiebreakUsed,
         setOne.tiebreakCandidateIds.join("|"),
         setOne.tiebreakWinnerChartId ?? "",
@@ -127,10 +250,9 @@ export function generatePrivateBallotCsv(input: {
         setTwo.tiebreakCandidateIds.join("|"),
         setTwo.tiebreakWinnerChartId ?? "",
         setTwo.winnerRevealStartedAt ?? "",
-      ]
-        .map(escapeCsv)
-        .join(","),
-    );
+      ];
+
+    rows.push(cells.map(escapeCsv).join(","));
   }
 
   return `${rows.join("\r\n")}\r\n`;

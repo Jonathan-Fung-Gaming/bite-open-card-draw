@@ -22,6 +22,7 @@ export type VotingRoundStatus =
 export type EligiblePlayerSnapshot = Pick<RosterPlayer, "id" | "startggUsername">;
 
 type TimedVotingStatus = "voting_open" | "final_30_seconds" | "extension_1_minute";
+type FinalWarningPreviousStatus = Exclude<TimedVotingStatus, "final_30_seconds">;
 
 export type VotingWindowRecord = {
   roundNumber: 1 | 2 | 3 | 4;
@@ -32,6 +33,7 @@ export type VotingWindowRecord = {
   closedAt: string | null;
   extensionUsed: boolean;
   finalWarningStartedAt: string | null;
+  finalWarningPreviousStatus?: FinalWarningPreviousStatus | null;
   pausedAt: string | null;
   pausedFromStatus: TimedVotingStatus | null;
   remainingMsWhenPaused: number | null;
@@ -181,6 +183,10 @@ export function isPostCloseManualOverride(status: VotingRoundStatus) {
   return status === "voting_closed" || status === "results_computed";
 }
 
+export function isCurrentRoundEligibilityChangeAllowed(status: VotingRoundStatus) {
+  return isPlayerSubmissionOpen(status) || status === "voting_paused";
+}
+
 export class VotingWindowStore {
   private windows = new Map<1 | 2 | 3 | 4, VotingWindowRecord>();
 
@@ -218,6 +224,7 @@ export class VotingWindowStore {
       closedAt: null,
       extensionUsed: false,
       finalWarningStartedAt: null,
+      finalWarningPreviousStatus: null,
       pausedAt: null,
       pausedFromStatus: null,
       remainingMsWhenPaused: null,
@@ -284,6 +291,7 @@ export class VotingWindowStore {
     record.status = "voting_closed";
     record.closedAt = record.closedAt ?? toIso(nowMs);
     record.closesAt = record.closedAt;
+    record.finalWarningPreviousStatus = null;
     record.pausedAt = null;
     record.pausedFromStatus = null;
     record.remainingMsWhenPaused = null;
@@ -326,6 +334,7 @@ export class VotingWindowStore {
     record.closedAt = null;
     record.extensionUsed = true;
     record.finalWarningStartedAt = null;
+    record.finalWarningPreviousStatus = null;
     record.pausedAt = null;
     record.pausedFromStatus = null;
     record.remainingMsWhenPaused = null;
@@ -344,6 +353,7 @@ export class VotingWindowStore {
     record.status = "voting_closed";
     record.closedAt = record.closedAt ?? toIso(nowMs);
     record.closesAt = record.closedAt;
+    record.finalWarningPreviousStatus = null;
     record.updatedAt = toIso(nowMs);
 
     return record;
@@ -356,6 +366,7 @@ export class VotingWindowStore {
   addEligiblePlayerToOpenRound(input: {
     roundNumber: 1 | 2 | 3 | 4;
     player: EligiblePlayerSnapshot;
+    submittedPlayerIds?: string[];
     nowMs?: number;
   }) {
     const record = this.windows.get(input.roundNumber);
@@ -364,14 +375,29 @@ export class VotingWindowStore {
       return null;
     }
 
-    if (record.status === "results_revealed" || record.status === "round_complete") {
-      throw new Error("Current-round eligibility cannot change after results reveal.");
+    if (!isCurrentRoundEligibilityChangeAllowed(record.status)) {
+      throw new Error(
+        "Current-round eligibility can change only while voting is open or paused before results are computed.",
+      );
     }
 
+    const wasAlreadyEligible = record.eligiblePlayers.some(
+      (player) => player.id === input.player.id,
+    );
     const eligiblePlayers = dedupePlayers([...record.eligiblePlayers, input.player]);
+    const nowMs = input.nowMs ?? this.clock();
 
     record.eligiblePlayers = eligiblePlayers;
-    record.updatedAt = toIso(input.nowMs ?? this.clock());
+
+    if (!wasAlreadyEligible) {
+      this.recomputeFinalWarningAfterEligibilityChange(
+        record,
+        input.submittedPlayerIds ?? [],
+        nowMs,
+      );
+    }
+
+    record.updatedAt = toIso(nowMs);
 
     return record;
   }
@@ -459,6 +485,7 @@ export class VotingWindowStore {
       eligibleCount > 0 &&
       submittedCount >= eligibleCount
     ) {
+      record.finalWarningPreviousStatus = record.status;
       record.status = "final_30_seconds";
       record.finalWarningStartedAt = toIso(nowMs);
       record.closesAt = toIso(nowMs + FINAL_CHANGE_MS);
@@ -490,7 +517,35 @@ export class VotingWindowStore {
     record.status = "voting_closed";
     record.closedAt = record.closedAt ?? toIso(closesAtMs);
     record.closesAt = record.closedAt;
+    record.finalWarningPreviousStatus = null;
     record.updatedAt = toIso(nowMs);
+  }
+
+  private recomputeFinalWarningAfterEligibilityChange(
+    record: VotingWindowRecord,
+    submittedPlayerIds: string[],
+    nowMs: number,
+  ) {
+    if (record.status !== "final_30_seconds") {
+      return;
+    }
+
+    const submittedCount = countSubmittedEligible(record.eligiblePlayers, submittedPlayerIds);
+
+    if (submittedCount >= record.eligiblePlayers.length) {
+      return;
+    }
+
+    const previousStatus = record.finalWarningPreviousStatus ?? "voting_open";
+    const openedAtMs = parseIso(record.openedAt) ?? nowMs;
+    const existingClosesAtMs = parseIso(record.closesAt) ?? nowMs;
+    const scheduledClosesAtMs =
+      openedAtMs + TEN_MINUTES_MS + (previousStatus === "extension_1_minute" ? ONE_MINUTE_MS : 0);
+
+    record.status = previousStatus;
+    record.finalWarningStartedAt = null;
+    record.finalWarningPreviousStatus = null;
+    record.closesAt = toIso(Math.max(nowMs, existingClosesAtMs, scheduledClosesAtMs));
   }
 
   private snapshotFromRecord(

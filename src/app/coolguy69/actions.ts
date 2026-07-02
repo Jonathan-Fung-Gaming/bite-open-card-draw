@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createHostToken } from "@/lib/admin/host-lock";
+import { createHostToken, type HostLockReleaseOutcome } from "@/lib/admin/host-lock";
 import type { AdminSessionPayload } from "@/lib/admin/session";
 import {
   createOperationalDebugSnapshotExport,
@@ -13,10 +13,20 @@ import {
   createOperationalStateSnapshot,
   restoreOperationalStateSnapshot,
 } from "@/lib/persistence/operational-state";
-import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
-import { syncSelectedSongBlocksFromResultStore } from "@/lib/results/selected-song-blocks";
+import {
+  buildPrivateBallotCsvFilename,
+  generatePrivateBallotCsv,
+} from "@/lib/results/private-csv";
+import {
+  assertNoFutureSelectedSongConflicts,
+  syncSelectedSongBlocksFromResultStore,
+} from "@/lib/results/selected-song-blocks";
 import { adminState, resetTournamentOperationalState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
+import {
+  getDeploymentSafetySnapshot,
+  requireRehearsalAdminControlsAllowed,
+} from "@/lib/server/deployment-safety";
 import {
   ADMIN_PASSWORD_MAX_LENGTH,
   AUDIT_REASON_MAX_LENGTH,
@@ -33,7 +43,9 @@ import {
   withPersistedHostLockState,
   withPersistedVotingAdminState,
 } from "@/lib/server/persistence";
+import { getTournamentEventId } from "@/lib/server/env";
 import { computeNormalizedResults } from "@/lib/server/normalized-results";
+import { isCurrentRoundEligibilityChangeAllowed } from "@/lib/vote/voting-window";
 import {
   getRoundDrawRecords,
   getRoundDrawReadiness,
@@ -52,6 +64,16 @@ import {
   setHostTokenCookie,
   verifyDangerousActionPassword,
 } from "@/lib/server/admin-auth";
+import {
+  durationMinutesInputSchema,
+  overrideResultTargetInputSchema,
+  roundNumberInputSchema,
+  setOrderInputSchema,
+} from "@/lib/server/mutation-contracts";
+import {
+  assertNormalizedTransactionalMutationImplemented,
+  type NormalizedRuntimeMutationName,
+} from "@/lib/server/transactions/normalized-runtime";
 
 function getString(formData: FormData, name: string, maxLength = FORM_TEXT_MAX_LENGTH) {
   const value = formData.get(name);
@@ -78,7 +100,25 @@ function redirectWithError(message: string) {
 }
 
 function getRoundNumber(formData: FormData) {
-  return Number(getString(formData, "roundNumber")) as 1 | 2 | 3 | 4;
+  return roundNumberInputSchema.parse(getString(formData, "roundNumber"));
+}
+
+function getSetOrder(formData: FormData) {
+  return setOrderInputSchema.parse(getString(formData, "setOrder"));
+}
+
+function getDurationMinutes(formData: FormData) {
+  return durationMinutesInputSchema.parse(getString(formData, "durationMinutes"));
+}
+
+function getOverrideResultTarget(formData: FormData) {
+  return overrideResultTargetInputSchema.parse(getString(formData, "resultTarget"));
+}
+
+function assertSupabaseTransactionalMutationImplemented(name: NormalizedRuntimeMutationName) {
+  if (getTournamentStateBackend() === "supabase") {
+    assertNormalizedTransactionalMutationImplemented(name);
+  }
 }
 
 function advanceVotingDeadline(roundNumber: 1 | 2 | 3 | 4, nowMs: number) {
@@ -147,6 +187,43 @@ function assertDebugSnapshotAllowed() {
       `Debug snapshot export is blocked while Round ${activeVotingWindow.roundNumber} voting is active or paused.`,
     );
   }
+}
+
+function privateCsvFilename(roundNumber: 1 | 2 | 3 | 4, nowMs: number) {
+  return buildPrivateBallotCsvFilename({
+    eventId: getTournamentEventId(),
+    roundNumber,
+    generatedAt: new Date(nowMs).toISOString(),
+  });
+}
+
+async function requireRehearsalControlsForAction(
+  session: AdminSessionPayload,
+  actionLabel: string,
+) {
+  const safety = getDeploymentSafetySnapshot();
+
+  if (safety.rehearsalAdminControlsAllowed) {
+    return safety;
+  }
+
+  audit(session, {
+    action: "rehearsal_control_denied",
+    summary: `Denied ${actionLabel}: rehearsal controls are unavailable in this deployment.`,
+    metadata: {
+      actionLabel,
+      backend: safety.backend,
+      nodeEnv: safety.nodeEnv,
+      eventId: safety.eventId,
+      reason: safety.rehearsalControlBlockReason,
+    },
+    dangerous: true,
+    tournamentChanging: false,
+  });
+  await persistTournamentState();
+  requireRehearsalAdminControlsAllowed(actionLabel);
+
+  return safety;
 }
 
 function resetRoundState(roundNumber: 1 | 2 | 3 | 4) {
@@ -229,8 +306,11 @@ export async function takeHostControlAction(formData: FormData) {
       await verifyDangerousActionPassword(getAdminPassword(formData));
     }
 
+    let acquiredAtMs = 0;
     const { before, result } = await withPersistedHostLockState(async () => {
       const nowMs = await getAuthoritativeNowMs();
+
+      acquiredAtMs = nowMs;
       const previous = adminState.hostLockStore.getSnapshot(session.sessionId, nowMs);
       const acquired = adminState.hostLockStore.acquire(session.sessionId, hostToken, nowMs, {
         force,
@@ -238,6 +318,10 @@ export async function takeHostControlAction(formData: FormData) {
 
       return { before: previous, result: acquired };
     });
+
+    if (adminState.hostLockStore.getSnapshot(session.sessionId, acquiredAtMs).status !== "active") {
+      throw new Error("Host control changed before this request could save. Refresh and try again.");
+    }
 
     await setHostTokenCookie(hostToken);
     audit(session, {
@@ -259,6 +343,7 @@ export async function takeHostControlAction(formData: FormData) {
   }
 
   revalidatePath("/coolguy69");
+  redirect("/coolguy69");
 }
 
 export async function refreshHostLockAction() {
@@ -269,31 +354,63 @@ export async function refreshHostLockAction() {
     return false;
   }
 
-  return withPersistedHostLockState(async () => {
+  let refreshedAtMs = 0;
+  const refreshed = await withPersistedHostLockState(async () => {
     const nowMs = await getAuthoritativeNowMs();
 
+    refreshedAtMs = nowMs;
     return adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs);
   });
+
+  return (
+    refreshed &&
+    adminState.hostLockStore.getSnapshot(session.sessionId, refreshedAtMs).status === "active"
+  );
 }
 
 export async function releaseHostControlAction() {
   const session = await requireAdminSession();
   const hostToken = await getHostTokenCookie();
+  let releasedAtMs = 0;
 
-  await withPersistedHostLockState(async () => {
-    if (hostToken) {
-      adminState.hostLockStore.release(session.sessionId, hostToken);
+  const releaseResult = await withPersistedHostLockState(async (): Promise<HostLockReleaseOutcome> => {
+    const nowMs = await getAuthoritativeNowMs();
+
+    releasedAtMs = nowMs;
+
+    if (!hostToken) {
+      return "no_active_lock";
     }
+
+    return adminState.hostLockStore.release(session.sessionId, hostToken, nowMs).outcome;
   });
+  let releaseOutcome = releaseResult;
+
+  if (
+    releaseOutcome === "released" &&
+    adminState.hostLockStore.getSnapshot(session.sessionId, releasedAtMs).status !== "inactive"
+  ) {
+    releaseOutcome = "not_active_host";
+  }
+
+  const released = releaseOutcome === "released";
 
   audit(session, {
-    action: "host_lock_release",
-    summary: "Released host control.",
+    action: released ? "host_lock_release" : "host_lock_release_noop",
+    summary: released
+      ? "Released host control."
+      : releaseOutcome === "not_active_host"
+        ? "Ignored release host control request because this session is not the active host."
+        : "Ignored release host control request because there is no active host lock.",
     tournamentChanging: false,
+    metadata: {
+      releaseOutcome,
+    },
   });
   await persistTournamentState();
   await clearHostTokenCookie();
   revalidatePath("/coolguy69");
+  redirect("/coolguy69");
 }
 
 async function requireActiveHost() {
@@ -505,6 +622,14 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
 
     const reason = getRequiredReason(formData);
     const nowMs = await getAuthoritativeNowMs();
+    const votingSnapshot = getVotingRoundSnapshot(roundNumber, nowMs);
+
+    if (!isCurrentRoundEligibilityChangeAllowed(votingSnapshot.status)) {
+      throw new Error(
+        "Current-round eligibility can change only while voting is open or paused before results are computed.",
+      );
+    }
+
     const entry = adminState.rosterStore.addPlayerToCurrentRoundEligibility({
       playerId: getString(formData, "playerId"),
       roundNumber,
@@ -519,6 +644,7 @@ export async function addInactivePlayerToCurrentRoundAction(formData: FormData) 
           id: player.id,
           startggUsername: player.startggUsername,
         },
+        submittedPlayerIds: getSubmittedPlayerIdsForRound(roundNumber),
         nowMs,
       });
     }
@@ -546,7 +672,7 @@ export async function drawRoundSetAction(formData: FormData) {
   try {
     const draw = adminState.drawStateStore.drawRoundSet({
       roundNumber: getRoundNumber(formData),
-      setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
+      setOrder: getSetOrder(formData),
     });
     audit(session, {
       action: "draw_round_set",
@@ -583,7 +709,7 @@ export async function rerollOneChartAction(formData: FormData) {
     );
     const draw = adminState.drawStateStore.rerollOneChart({
       roundNumber,
-      setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
+      setOrder: getSetOrder(formData),
       chartId,
       reason,
     });
@@ -627,7 +753,7 @@ export async function rerollRoundSetAction(formData: FormData) {
     );
     const draw = adminState.drawStateStore.rerollRoundSet({
       roundNumber,
-      setOrder: Number(getString(formData, "setOrder")) as 1 | 2,
+      setOrder: getSetOrder(formData),
       reason,
     });
     audit(session, {
@@ -775,9 +901,10 @@ export async function closeVotingAction(formData: FormData) {
 }
 
 export async function manualBallotAction(formData: FormData) {
-  const session = await requireActiveHost();
-
   try {
+    assertSupabaseTransactionalMutationImplemented("manualBallotOverride");
+    const session = await requireActiveHost();
+
     await verifyDangerousActionPassword(getAdminPassword(formData));
 
     const roundNumber = getRoundNumber(formData);
@@ -844,6 +971,7 @@ export async function manualBallotAction(formData: FormData) {
         replacedExistingBallot: Boolean(existing),
       },
     );
+    adminState.rosterStore.markTournamentHistory(player.id, snapshot.serverNow);
 
     if (result?.revealPhase === "computed") {
       adminState.resultStore.clearRoundResult(roundNumber);
@@ -964,20 +1092,63 @@ export async function advanceResultRevealAction(formData: FormData) {
 }
 
 export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
-  await requireAdminSession();
+  const session = await requireAdminSession();
+  const hostToken = await getHostTokenCookie();
   await hydrateTournamentState();
+  const nowMs = await getAuthoritativeNowMs();
+
+  if (!hostToken || !adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs)) {
+    audit(session, {
+      action: "private_csv_export_denied",
+      summary: `Denied Round ${roundNumber} private CSV export because active host control is required.`,
+      tournamentChanging: false,
+      metadata: { roundNumber, reason: "host_lock_required" },
+    });
+    await persistTournamentState();
+
+    throw new Error("Active host control is required to download the private CSV.");
+  }
 
   const result = adminState.resultStore.getRoundResult(roundNumber);
 
   if (!result || result.revealPhase !== "final") {
+    audit(session, {
+      action: "private_csv_export_denied",
+      summary: `Denied Round ${roundNumber} private CSV export before the final reveal.`,
+      tournamentChanging: false,
+      metadata: { roundNumber, reason: "final_reveal_required" },
+    });
+    await persistTournamentState();
+
     throw new Error("Private CSV is available only after the final reveal.");
   }
 
+  const filename = privateCsvFilename(roundNumber, nowMs);
+  const ballots = adminState.ballotStore.listForRound(roundNumber);
+  const roundEligibility = adminState.rosterStore
+    .listCurrentRoundEligibility()
+    .filter((entry) => entry.roundNumber === roundNumber)
+    .map((entry) => ({ playerId: entry.playerId, activeAtRoundStart: false }));
+
+  audit(session, {
+    action: "private_csv_export",
+    summary: `Downloaded Round ${roundNumber} private ballot CSV.`,
+    tournamentChanging: false,
+    affectedRecords: [{ type: "result", id: result.id }],
+    metadata: {
+      roundNumber,
+      filename,
+      ballotCount: ballots.length,
+    },
+  });
+  await persistTournamentState();
+
   return {
-    filename: `round-${roundNumber}-private-ballots.csv`,
+    filename,
     csv: generatePrivateBallotCsv({
       result,
-      ballots: adminState.ballotStore.listForRound(roundNumber),
+      ballots,
+      roundEligibility,
     }),
   };
 }
@@ -1010,12 +1181,17 @@ export async function setCurrentRoundAction(formData: FormData) {
 
   try {
     const roundNumber = getRoundNumber(formData);
+    const currentRound = adminState.roundStateStore.getSnapshot().currentRound;
+    const nowMs = await getAuthoritativeNowMs();
+    const snapshot = getVotingRoundSnapshot(currentRound, nowMs);
 
-    adminState.roundStateStore.setCurrentRound(roundNumber);
+    adminState.roundStateStore.setCurrentRound(roundNumber, {
+      currentRoundStatus: snapshot.status,
+    });
     audit(session, {
       action: "set_current_round",
       summary: `Set current round to Round ${roundNumber}.`,
-      metadata: { roundNumber },
+      metadata: { roundNumber, previousRound: currentRound, previousRoundStatus: snapshot.status },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not set current round.");
@@ -1029,11 +1205,17 @@ export async function advanceCurrentRoundAction() {
   const session = await requireActiveHost();
 
   try {
-    const next = adminState.roundStateStore.advanceRound();
+    const currentRound = adminState.roundStateStore.getSnapshot().currentRound;
+    const nowMs = await getAuthoritativeNowMs();
+    const snapshot = getVotingRoundSnapshot(currentRound, nowMs);
+    const next = adminState.roundStateStore.advanceRound({
+      currentRoundStatus: snapshot.status,
+    });
+
     audit(session, {
       action: "advance_current_round",
       summary: `Advanced current round to Round ${next.currentRound}.`,
-      metadata: next,
+      metadata: { ...next, previousRound: currentRound, previousRoundStatus: snapshot.status },
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not advance round.");
@@ -1047,6 +1229,7 @@ export async function startRehearsalModeAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
+    await requireRehearsalControlsForAction(session, "start rehearsal mode");
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     resetTournamentOperationalState();
@@ -1078,6 +1261,7 @@ export async function resetRehearsalModeAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
+    await requireRehearsalControlsForAction(session, "reset rehearsal mode");
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     resetTournamentOperationalState();
@@ -1101,6 +1285,7 @@ export async function seedRehearsalTiebreakAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
+    await requireRehearsalControlsForAction(session, "seed rehearsal tiebreak ballots");
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const { currentRound, rehearsalMode } = adminState.roundStateStore.getSnapshot();
@@ -1188,13 +1373,14 @@ export async function seedRehearsalTiebreakAction(formData: FormData) {
 }
 
 export async function reopenVotingAction(formData: FormData) {
-  const session = await requireActiveHost();
-
   try {
+    assertSupabaseTransactionalMutationImplemented("reopenVotingWindow");
+    const session = await requireActiveHost();
+
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
-    const durationMinutes = Number(getString(formData, "durationMinutes"));
+    const durationMinutes = getDurationMinutes(formData);
     const nowMs = await getAuthoritativeNowMs();
     const result = adminState.resultStore.getRoundResult(roundNumber);
 
@@ -1236,9 +1422,10 @@ export async function reopenVotingAction(formData: FormData) {
 }
 
 export async function resetRoundAction(formData: FormData) {
-  const session = await requireActiveHost();
-
   try {
+    assertSupabaseTransactionalMutationImplemented("resetRound");
+    const session = await requireActiveHost();
+
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
@@ -1266,15 +1453,29 @@ export async function overrideResultAction(formData: FormData) {
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
-    const [setOrderText, chartId] = getString(formData, "resultTarget").split("|");
-    const setOrder = Number(setOrderText) as 1 | 2;
+    const { setOrder, chartId } = getOverrideResultTarget(formData);
     const before = adminState.resultStore.getRoundResult(roundNumber);
 
     if (!before) {
       throw new Error("Results must be computed before a result correction.");
     }
 
-    const oldSelected = before.sets.find((set) => set.setOrder === setOrder)?.selectedChart;
+    const targetSet = before.sets.find((set) => set.setOrder === setOrder);
+    const oldSelected = targetSet?.selectedChart;
+    const targetRow = targetSet?.rows.find((candidate) => candidate.chart.id === chartId);
+
+    if (!targetSet || !targetRow) {
+      throw new Error("Override chart must be part of the computed result set.");
+    }
+
+    assertNoFutureSelectedSongConflicts({
+      roundNumber,
+      candidateSongKey: targetRow.chart.songKey,
+      existingSelectedSongKey: oldSelected?.songKey ?? null,
+      drawStateStore: adminState.drawStateStore,
+      resultStore: adminState.resultStore,
+    });
+
     const result = adminState.resultStore.overrideSelectedChart({
       roundNumber,
       setOrder,

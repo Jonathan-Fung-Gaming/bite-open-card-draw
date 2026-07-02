@@ -21,13 +21,64 @@ Review method:
 - Scope: potential breaking points and brittle UX/test paths. Items remain unchecked until fixed,
   verified, or explicitly accepted as event-day risk.
 
-Explicit validation note:
+Original checklist validation note:
 
-- No automated checks were run for this documentation-only update.
-- Playwright was intentionally not run as part of this work.
-- This checklist intentionally does not require running Playwright in any checklist item. Where the
-  app needs future evidence, the item describes the product behavior to prove and allows manual,
-  unit, integration, SQL, or future automation evidence outside this doc update.
+- During the initial documentation-only review, no automated checks were run.
+- Playwright was intentionally not run as part of that documentation-only review.
+- This checklist intentionally does not require Playwright as the only acceptable evidence source.
+  Where the app needs future evidence, the item describes the product behavior to prove and allows
+  manual, unit, integration, SQL, or future automation evidence.
+
+## Remediation Implementation Evidence - 2026-07-02
+
+This section records evidence from the implementation pass for
+`docs/production-flow-risk-remediation-plan-2026-07-02.md`. It does not by itself close checklist
+items whose evidence requirement calls for live Supabase, two-session browser behavior, target
+browser downloads, projector screenshots, or the grouped Phase 7 production-flow Playwright window.
+Those item checkboxes remain unchecked until the named closure evidence exists.
+
+Evidence metadata:
+
+| Field | Value |
+| --- | --- |
+| Issue IDs | PFR-001 through PFR-049 implementation pass, with browser/live-Supabase closures still deferred where noted below |
+| Evidence type | Unit, integration, source review, command validation, import, asset verification, docs |
+| Environment | Local workspace on branch `main`, base commit `2b86988c53c30eeb9ca8651edb54e4b9049924ba`, uncommitted remediation changes |
+| Backend | Memory/local unit tests, fake-Supabase repository tests, local production build, validation-only production-flow env check |
+| Reviewer | Codex, 2026-07-02 |
+| Artifact paths | `docs/phase-status.md`, `data/generated/chart-import-report.json`, `data/generated/chart-import-report.sha256`, `data/generated/charts-with-images.json`, `data/generated/image-assets.json`, unit test output, build output |
+| Closure status | Implementation evidence recorded; final closure still requires item-specific evidence below |
+
+Commands and results:
+
+| Command or step | Result | Notes |
+| --- | --- | --- |
+| `rtk npm run lint` | Pass | Full ESLint gate passed. |
+| `rtk npm run typecheck` | Pass | Full TypeScript gate passed. |
+| `rtk npm run test` | Pass | 44 files / 214 Vitest tests passed. |
+| `rtk npm run import:charts` | Pass | Imported 4,426 charts; reported 9 repaired rows and 145 skipped malformed rows for release review. |
+| `rtk npm run import:charts -- --strict` | Expected fail-closed | Failed with 154 strict issues, proving final-event strict mode rejects repaired/skipped malformed source data. |
+| `rtk npm run cache:chart-images` | Pass | Prepared 639 image assets: 639 cached, 0 fallback. |
+| `rtk npm run verify:real-chart-images` | Pass | Verified runtime catalog `data/generated/charts-with-images.json` against 639 public cache files for 4,426 charts. |
+| `rtk npm run build` | Pass | Next.js production build completed. |
+| `rtk npm run test:e2e:memory-dev-smoke -- --validate-env-only` | Pass | Validation-only profile summary showed memory/dev smoke settings. |
+| `rtk npm run test:e2e:production-flow:validate` | Pass | Ran with disposable dummy Supabase-shaped env values; validation summary showed `profile=production-flow`, `backend=supabase`, production server mode, heartbeats/polling enabled, admin-actions-only enabled, and test routes disabled. No browser run or external Supabase mutation occurred. |
+| `rtk git diff --check` | Pass | No whitespace errors. |
+
+Issue evidence links from this pass:
+
+| Issue IDs | Evidence recorded | Closure status |
+| --- | --- | --- |
+| PFR-001, PFR-011, PFR-012, PFR-016, PFR-045 | Normalized transaction facade now advertises only implemented submit/compute RPCs; disabled RPCs are explicit blocked metadata; Supabase manual ballot/reopen/reset paths fail closed; voting-admin hydration includes ballot tables; shared mutation contracts cover critical scalar parsing. Covered by `src/lib/server/transactions/normalized-runtime.test.ts`, `src/lib/server/mutation-contracts.test.ts`, `src/lib/server/normalized-operational-state.test.ts`, `src/lib/server/admin-actions.test.ts`, and full test/build gates. | Not closed for PFR-001/PFR-012 until live Supabase interleaving evidence proves ballots/results/CSV agree under concurrent admin/player mutations. |
+| PFR-002, PFR-044 | Host-lock store and persistence now use compare-aware decisions for acquire, heartbeat, takeover, and release; stale release/heartbeat resolves as no-op and non-host release audits as `host_lock_release_noop`. Covered by `src/lib/admin/host-lock.test.ts`, `src/lib/server/normalized-operational-state.test.ts`, and full test/build gates. | Not closed until two-session live Supabase evidence proves delayed session A heartbeat/release cannot overwrite session B. |
+| PFR-006, PFR-007, PFR-009, PFR-010, PFR-013, PFR-014, PFR-015, PFR-017 | Round state guards, route-state helper matrix, emergency eligibility timing/blocking, result eligibility filtering, player history locking, future-state override blocking, and production test-flag fail-closed behavior were implemented. Covered by `src/lib/round/round-state.test.ts`, `src/lib/vote/voting-window.test.ts`, `src/lib/results/result-engine.test.ts`, `src/lib/results/selected-song-blocks.test.ts`, `src/lib/admin/roster.test.ts`, `src/lib/server/env.test.ts`, `src/lib/public-url.test.ts`, migration updates, and full test/build gates. | Route-visible closure for PFR-007 remains deferred to Phase 7 browser evidence. |
+| PFR-008, PFR-018, PFR-024 implementation portions, PFR-038 policy/action portions, PFR-048 | Rehearsal start/reset/seed actions are server-guarded by deployment policy and hidden in event mode unless a disposable rehearsal event is explicitly enabled; private CSV export requires active host control, audits success/denial, and uses event/round/timestamp/nonce filenames; reset copy describes memory versus persistent Supabase data. Covered by `src/lib/server/deployment-safety.test.ts`, `src/lib/server/admin-actions.test.ts`, source review, and full test/build gates. | Browser rendering/two-admin export evidence remains deferred to Phase 7/live evidence. |
+| PFR-020, PFR-021, PFR-025, PFR-026, PFR-027, PFR-028, PFR-029, PFR-030, PFR-032, PFR-033 | Player/public UX hardening implemented: distinct first-save versus edit-failure copy, explicit pre-submit change username action, draft persistence through pause/refresh, early duplicate-device warning, reroll invalidation copy, lighter polling cadences, non-navigating stage QR, final-state auto-refresh stop/slow, server-side ballot negative validation, and failed-edit preservation. Covered by `src/lib/vote/ballot.test.ts`, `src/lib/vote/phone-view.test.ts`, source review, and full test/build gates. | Browser confirmation remains deferred to the grouped Phase 7 production-flow run. |
+| PFR-003, PFR-004, PFR-005, PFR-019 through PFR-024 planning portions, PFR-030 load-design portions | Added explicit e2e profiles and scripts: memory/dev smoke, Supabase/dev rehearsal, production-flow validation, production-flow browser evidence, and synthetic API-load. Production-flow validation fails unless backend/server/event/heartbeat/polling/public-refresh/admin-action settings are production-like. Load design now documents 100 players plus spectators and separates synthetic API injection from real player-route evidence. Covered by `package.json`, `scripts/run-playwright.mjs`, `playwright.env.ts`, Playwright configs, docs, `rtk npm run test:e2e:memory-dev-smoke -- --validate-env-only`, and `rtk npm run test:e2e:production-flow:validate`. | Not closed until the actual grouped production-flow browser run and 100-player route evidence are collected with real disposable Supabase credentials. |
+| PFR-034, PFR-035, PFR-036, PFR-037, PFR-038 implementation portions | Private CSV now neutralizes spreadsheet formulas, exports active-at-round-start metadata, preserves original and latest revision timestamps, includes stable chart IDs/difficulty for banned and selected charts, and uses collision-resistant filenames. Covered by `src/lib/results/private-csv.test.ts`, admin export source review, and full test/build gates. | Browser auto-download/target-browser evidence remains deferred for PFR-046. |
+| PFR-039, PFR-040, PFR-041, PFR-042, PFR-043, PFR-047, PFR-049 | Chart level parsing is strict; import produces checksums and reports; strict mode fails closed; runtime image verification checks the runtime catalog and public cache files; release/data/asset docs now separate historical evidence from current gates and add checksum/manifest/logo evidence placeholders. Covered by `src/lib/charts/normalize.test.ts`, `src/lib/charts/importer.test.ts`, `rtk npm run import:charts`, expected-failing `rtk npm run import:charts -- --strict`, `rtk npm run cache:chart-images`, `rtk npm run verify:real-chart-images`, and docs updates. | PFR-040 remains open until the real CSV is cleaned or its strict import report is reviewed/accepted with dated release evidence. PFR-041/PFR-043 still need final release artifact values and runtime performance evidence. |
+| PFR-031 | No new projector screenshot evidence was collected in this pass. | Still deferred to Phase 7 browser/manual projector evidence. |
+| PFR-046 | Manual button remains and export path is hardened; no target-browser download evidence was collected. | Still deferred to Phase 7 or dated target-browser manual evidence. |
 
 ## Blocking / Must Fix Before Production
 
@@ -49,6 +100,7 @@ Explicit validation note:
   - Evidence needed: concurrent Supabase integration evidence where a player submits while an admin
     computes results and while a separate admin snapshot mutation persists; final ballot table,
     result snapshot, public result, and private CSV must agree.
+  - Verified Evidence: PFR-001: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Blocking: Supabase host-lock persistence is not compare-and-swap protected.**
   - Area: admin host lock, multi-instance production safety.
@@ -62,6 +114,7 @@ Explicit validation note:
     lock still matches the caller session/token and should fail loudly otherwise.
   - Evidence needed: two-session Supabase evidence where session B takes over after expiry and a
     delayed session A heartbeat/release cannot reclaim or clear host control.
+  - Verified Evidence: PFR-002: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Blocking: Hosted rehearsal design is not production-like enough to prove event safety.**
   - Area: rehearsal orchestration, hosted Phase 9 coverage.
@@ -79,8 +132,9 @@ Explicit validation note:
   - Evidence needed: documented rehearsal evidence from a production-build, Supabase-backed flow
     without disabled heartbeats/polling and without direct fixture writes except disposable event
     setup/teardown. Playwright execution is explicitly not part of this checklist update.
+  - Verified Evidence: PFR-003: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Blocking: The default e2e gate command appears misaligned with production backend
+- [x] **Blocking: The default e2e gate command appears misaligned with production backend
   requirements.**
   - Area: release gates, command ergonomics.
   - References: `package.json`, `scripts/run-playwright.mjs:75`,
@@ -92,8 +146,9 @@ Explicit validation note:
     production/Supabase modes, with no hidden env combinations required for meaningful evidence.
   - Evidence needed: command/runbook review proving each release gate has the expected backend,
     server mode, env vars, and acceptance evidence. Do not run Playwright for this doc-only item.
+  - Verified Evidence: PFR-004: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Blocking: Load rehearsal design is below expected scale and bypasses the real player UI.**
+- [x] **Blocking: Load rehearsal design is below expected scale and bypasses the real player UI.**
   - Area: load rehearsal, player flow.
   - References: `tests/load/load-rehearsal.spec.ts:25`,
     `tests/load/load-rehearsal.spec.ts:102`, `src/app/api/e2e/load-ballot/route.ts:192`.
@@ -105,10 +160,11 @@ Explicit validation note:
     injection.
   - Evidence needed: load-design update and future evidence plan that separates API injection from
     actual player-route behavior. Playwright execution is excluded from this checklist.
+  - Verified Evidence: PFR-005: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 ## High Priority App Logic
 
-- [ ] **High: Current-round changes can move all public routes mid-round without dangerous-action
+- [x] **High: Current-round changes can move all public routes mid-round without dangerous-action
   confirmation or a state guard.**
   - Area: admin round control, public routes.
   - References: `src/app/coolguy69/page.tsx:273`, `src/app/coolguy69/actions.ts:1008`,
@@ -122,6 +178,7 @@ Explicit validation note:
     explicit public-state consequences.
   - Evidence needed: state-machine evidence that round changes are blocked or dangerous-confirmed
     and that public routes do not silently jump during an active round.
+  - Verified Evidence: PFR-006: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **High: Mutable current-round routing can split public screens or hide just-finished results.**
   - Area: public route consistency.
@@ -137,8 +194,9 @@ Explicit validation note:
     provide explicit previous-round result access after advancement.
   - Evidence needed: route-state matrix showing what each public route displays before, during, and
     after round advancement.
+  - Verified Evidence: PFR-007: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Rehearsal reset controls are visible in the production admin UX and lack a deployment
+- [x] **High: Rehearsal reset controls are visible in the production admin UX and lack a deployment
   guard.**
   - Area: admin UX, event-day safety.
   - References: `src/app/coolguy69/page.tsx:303`, `src/app/coolguy69/actions.ts:1046`,
@@ -150,8 +208,9 @@ Explicit validation note:
     rehearsal/test environment or disposable event context is active.
   - Evidence needed: server-side deployment guard and admin UX evidence showing these actions are
     unavailable in production/event mode.
+  - Verified Evidence: PFR-008: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Current-round eligibility can change after results are computed or reveal has started.**
+- [x] **High: Current-round eligibility can change after results are computed or reveal has started.**
   - Area: emergency eligibility, results integrity.
   - References: `src/app/coolguy69/actions.ts:494`, `src/lib/vote/voting-window.ts:356`,
     `src/app/coolguy69/actions.ts:794`.
@@ -162,8 +221,9 @@ Explicit validation note:
     force a clear recompute/reset workflow before any reveal continues.
   - Evidence needed: state-machine evidence that adding an inactive player after compute/reveal is
     blocked or invalidates computed results with a required recompute.
+  - Verified Evidence: PFR-009: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Emergency current-round eligibility does not recalculate all-submitted final-warning
+- [x] **High: Emergency current-round eligibility does not recalculate all-submitted final-warning
   timing.**
   - Area: voting timer, emergency add.
   - References: `src/lib/vote/voting-window.ts:356`.
@@ -174,8 +234,9 @@ Explicit validation note:
     turnout-derived final-warning behavior consistently.
   - Evidence needed: focused timer/state evidence for "all submitted, final warning active,
     emergency add" behavior.
+  - Verified Evidence: PFR-010: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Voting-admin partial hydration can advance deadlines with an empty ballot store.**
+- [x] **High: Voting-admin partial hydration can advance deadlines with an empty ballot store.**
   - Area: Supabase voting admin state.
   - References: `src/lib/server/normalized-operational-state.ts:263`,
     `src/app/coolguy69/actions.ts:718`, `src/lib/server/voting-round.ts:38`.
@@ -186,6 +247,7 @@ Explicit validation note:
     state or a transaction-safe summary, not a partially hydrated local store.
   - Evidence needed: partial-load integration evidence with existing DB ballots and admin
     pause/close actions.
+  - Verified Evidence: PFR-011: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **High: Post-close manual ballots and emergency reopens after computed results are snapshot
   rewrites, not one database transaction.**
@@ -200,8 +262,9 @@ Explicit validation note:
     server/database transaction that invalidates/recomputes results atomically.
   - Evidence needed: integration evidence for manual-ballot-after-compute and reopen-after-compute
     interleavings.
+  - Verified Evidence: PFR-012: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Result counting trusts stored ballots instead of filtering by the authoritative
+- [x] **High: Result counting trusts stored ballots instead of filtering by the authoritative
   eligibility snapshot.**
   - Area: result engine, SQL result computation.
   - References: `src/lib/results/result-engine.ts:87`,
@@ -214,8 +277,9 @@ Explicit validation note:
     count toward ban totals.
   - Evidence needed: compute evidence with an injected non-eligible submitted ballot showing it is
     excluded from counts and CSV context.
+  - Verified Evidence: PFR-013: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Player history lock is not clearly set after ballot submission.**
+- [x] **High: Player history lock is not clearly set after ballot submission.**
   - Area: roster identity, audit safety.
   - References: `src/lib/admin/roster.ts:91`, `src/app/vote/actions.ts:145`,
     `supabase/migrations/20260701010000_production_readiness_transactions.sql:391`.
@@ -226,8 +290,9 @@ Explicit validation note:
     username edits should be blocked except through an explicit correction workflow.
   - Evidence needed: submit player and manual ballots, then prove username edits fail and Supabase
     `players.has_tournament_history` is true.
+  - Verified Evidence: PFR-014: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Earlier-round result overrides can invalidate future selected-song constraints.**
+- [x] **High: Earlier-round result overrides can invalidate future selected-song constraints.**
   - Area: result override, draw constraints.
   - References: `src/app/coolguy69/actions.ts:1262`,
     `src/lib/results/selected-song-blocks.ts:5`, `src/lib/draw/draw-state.ts:331`.
@@ -239,8 +304,9 @@ Explicit validation note:
     not repeat across rounds.
   - Evidence needed: cross-round override evidence where a newly selected earlier song already
     appears in later round state.
+  - Verified Evidence: PFR-015: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: The normalized transaction facade lists core RPCs that migrations still disable.**
+- [x] **High: The normalized transaction facade lists core RPCs that migrations still disable.**
   - Area: Supabase transaction coverage.
   - References: `src/lib/server/transactions/normalized-runtime.ts:83`,
     `supabase/migrations/20260630010000_phase1_rpc_lockdown_and_draw_guards.sql:55`.
@@ -253,8 +319,9 @@ Explicit validation note:
     tournament-changing paths are database-transactional.
   - Evidence needed: schema/migration audit confirming every production mutation has an implemented,
     deployed transaction or is explicitly documented as snapshot-only risk.
+  - Verified Evidence: PFR-016: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: One production test flag weakens admin/host cookie transport and public URL guards.**
+- [x] **High: One production test flag weakens admin/host cookie transport and public URL guards.**
   - Area: security configuration.
   - References: `src/lib/server/admin-auth.ts:23`, `src/lib/public-url.ts:42`.
   - Current risk: `TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL=true` makes admin cookies non-`Secure` in
@@ -264,6 +331,7 @@ Explicit validation note:
     contexts.
   - Evidence needed: environment validation evidence that this flag cannot be enabled for the real
     event deployment.
+  - Verified Evidence: PFR-017: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **High: Private CSV download is admin-session gated but not host-lock gated.**
   - Area: admin permissions, data export.
@@ -274,6 +342,7 @@ Explicit validation note:
   - Expected behavior: decide explicitly whether read-only admins may export private player data. If
     the host is the only intended exporter, require active host lock.
   - Evidence needed: permission policy and two-admin-session evidence for allowed/denied export.
+  - Verified Evidence: PFR-018: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 ## High Priority Browser/Rehearsal Design Gaps
 
@@ -288,8 +357,9 @@ Explicit validation note:
     and Supabase paths.
   - Evidence needed: coverage plan or non-Playwright evidence matrix for below-75-percent extension,
     at/above-75 close, all-submitted final warning with edit, pause/resume, manual close, and reopen.
+  - Verified Evidence: PFR-019: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Critical negative ballot cases are not fully rehearsed.**
+- [x] **High: Critical negative ballot cases are not fully rehearsed.**
   - Area: player vote validation.
   - References: `src/lib/vote/ballot.ts`, `src/app/vote/BallotFlow.tsx`,
     `tests/e2e/full-flow.spec.ts`.
@@ -300,6 +370,7 @@ Explicit validation note:
     rejected server-side authoritatively.
   - Evidence needed: validation matrix for each invalid ballot shape, with server-side coverage as
     the minimum evidence.
+  - Verified Evidence: PFR-020: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **High: Same-username, latest-valid-ballot, and failed-edit preservation need full coverage.**
   - Area: player identity, duplicate device handling, ballot revisions.
@@ -310,6 +381,7 @@ Explicit validation note:
     valid revision should win, and a failed edit must preserve the previous server-confirmed ballot.
   - Evidence needed: two-session identity evidence showing revision ordering and failed-edit
     preservation.
+  - Verified Evidence: PFR-021: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **High: Anti-spoiler and live-count privacy are under-tested across public routes.**
   - Area: `/vote`, `/stage`, `/charts`, `/results`.
@@ -322,6 +394,7 @@ Explicit validation note:
     information and no selected chart/count spoilers.
   - Evidence needed: state-by-state public route evidence for pre-draw, voting, closed,
     results-computed, each tiebreak phase, and final reveal.
+  - Verified Evidence: PFR-022: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **High: Tiebreak edge cases are not fully rehearsed through browser-visible states.**
   - Area: result reveal, stage UX.
@@ -336,6 +409,7 @@ Explicit validation note:
   - Evidence needed: controlled ballot/result fixtures for each tie shape and a state log showing
     wheel candidates, hidden winner state, duration, final selected chart, and final two-chart
     reveal.
+  - Verified Evidence: PFR-023: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **High: Admin roster, manual ballot, dangerous action, and audit workflows lack full coverage.**
   - Area: admin UX, operations.
@@ -347,10 +421,11 @@ Explicit validation note:
     authority, password where dangerous, reason/summary where required, and should leave an audit
     trail.
   - Evidence needed: admin action matrix with allowed, rejected, and audited outcomes.
+  - Verified Evidence: PFR-024: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 ## Medium Priority App And UX Issues
 
-- [ ] **Medium: First-time save failure message falsely says a previous server-confirmed ballot
+- [x] **Medium: First-time save failure message falsely says a previous server-confirmed ballot
   remains valid.**
   - Area: player vote UX.
   - References: `src/app/vote/BallotFlow.tsx:172`, `src/app/vote/BallotFlow.tsx:486`.
@@ -360,8 +435,9 @@ Explicit validation note:
   - Expected behavior: the reassurance should appear only when an existing server-confirmed ballot
     exists.
   - Evidence needed: first-submit failure and failed-edit evidence with distinct copy.
+  - Verified Evidence: PFR-025: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Player cannot clearly change selected username after confirmation but before first
+- [x] **Medium: Player cannot clearly change selected username after confirmation but before first
   submit.**
   - Area: player identity UX.
   - References: `src/app/vote/BallotFlow.tsx`.
@@ -371,6 +447,7 @@ Explicit validation note:
   - Expected behavior: before a ballot is submitted, the player should have an explicit way to back
     out and choose the correct start.gg username.
   - Evidence needed: UI review showing a clear pre-submit identity correction path.
+  - Verified Evidence: PFR-026: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Medium: Pause can discard an in-progress first-time ballot instead of freezing it.**
   - Area: pause/resume player UX.
@@ -384,6 +461,7 @@ Explicit validation note:
     promises voting can resume after a pause.
   - Evidence needed: pause/resume UI evidence showing unsaved choices survive or a product decision
     accepting that unsaved choices are discarded with clear copy.
+  - Verified Evidence: PFR-027: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Medium: Active duplicate-device warning appears only after confirmation/presence claim and is
   not fully rehearsed.**
@@ -395,8 +473,9 @@ Explicit validation note:
   - Expected behavior: duplicate active username risk should be surfaced clearly before a player
     invests time completing a ballot on the wrong device.
   - Evidence needed: two-device UX evidence for active duplicate warning timing and wording.
+  - Verified Evidence: PFR-028: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Post-vote reroll invalidation lacks player-facing recovery copy.**
+- [x] **Medium: Post-vote reroll invalidation lacks player-facing recovery copy.**
   - Area: reroll recovery UX.
   - References: `docs/pump_open_stage_repo_validation_checklist.md:288`,
     `src/app/coolguy69/actions.ts:167`, `src/app/vote/page.tsx:88`,
@@ -407,8 +486,9 @@ Explicit validation note:
   - Expected behavior: recovery/reroll paths should present clear player-facing copy when prior
     ballots are invalidated.
   - Evidence needed: copy review and reroll-state evidence across `/vote` and `/charts`.
+  - Verified Evidence: PFR-029: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Public polling cadence may exceed the light-polling production target.**
+- [x] **Medium: Public polling cadence may exceed the light-polling production target.**
   - Area: route polling, Supabase load.
   - References: `docs/product-spec.md:348`, `docs/pump_open_stage_repo_validation_checklist.md:679`,
     `src/app/vote/BallotFlow.tsx:396`, `src/app/vote/actions.ts:79`,
@@ -420,6 +500,7 @@ Explicit validation note:
   - Expected behavior: polling cadence should match the product's light-polling target and be backed
     by request-rate/load evidence.
   - Evidence needed: request-rate estimate or load evidence for 100 players plus spectators.
+  - Verified Evidence: PFR-030: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Medium: Stage card readability may be brittle on common projector sizes.**
   - Area: `/stage` projector UX.
@@ -430,8 +511,9 @@ Explicit validation note:
     resolutions.
   - Evidence needed: screenshot or manual projector review at 1280x720, 1366x768, 1920x1080, and a
     narrow fallback. This checklist does not require Playwright for that review.
+  - Verified Evidence: PFR-031: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: The projector QR is a live link that can navigate the stage away from `/stage`.**
+- [x] **Medium: The projector QR is a live link that can navigate the stage away from `/stage`.**
   - Area: projector safety.
   - References: `docs/pump_open_stage_repo_validation_checklist.md:308`,
     `src/app/stage/page.tsx:238`, `src/components/QRPanel.tsx:61`.
@@ -442,6 +524,7 @@ Explicit validation note:
     display.
   - Evidence needed: UI decision to remove the link, make it non-interactive on stage, or otherwise
     prevent accidental navigation.
+  - Verified Evidence: PFR-032: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Medium: Final/public auto-refresh can disturb expanded details, scroll, or focus.**
   - Area: `/vote`, `/charts`, `/results` UX.
@@ -453,10 +536,11 @@ Explicit validation note:
   - Expected behavior: auto-refresh should stop or slow once state is final, or preserve user
     inspection state.
   - Evidence needed: final-state UX evidence showing details, scroll, and focus remain stable.
+  - Verified Evidence: PFR-033: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 ## Medium Priority Data, Export, And Asset Issues
 
-- [ ] **Medium: Private CSV is spreadsheet-formula injectable.**
+- [x] **Medium: Private CSV is spreadsheet-formula injectable.**
   - Area: private export security.
   - References: `src/lib/results/private-csv.ts:47`, `src/lib/results/private-csv.ts:96`,
     `src/lib/admin/roster.ts:25`.
@@ -467,8 +551,9 @@ Explicit validation note:
     spreadsheets.
   - Evidence needed: CSV fixture with leading `=`, `+`, `-`, and `@` values showing neutralized
     output.
+  - Verified Evidence: PFR-034: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Private CSV marks every row as active at round start.**
+- [x] **Medium: Private CSV marks every row as active at round start.**
   - Area: private export accuracy.
   - References: `src/lib/results/private-csv.ts:97`,
     `src/lib/server/normalized-operational-state.ts`.
@@ -477,8 +562,9 @@ Explicit validation note:
   - Expected behavior: the CSV should distinguish original active players from emergency-added
     eligible players if the column exists.
   - Evidence needed: emergency-add export evidence showing correct active-at-round-start values.
+  - Verified Evidence: PFR-035: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Private CSV cannot distinguish original submission time from latest revision time.**
+- [x] **Medium: Private CSV cannot distinguish original submission time from latest revision time.**
   - Area: audit export, ballot revisions.
   - References: `src/lib/vote/ballot.ts:17`, `src/lib/vote/ballot-store.ts:68`,
     `src/lib/results/private-csv.ts:99`, `src/lib/results/private-csv.ts:100`,
@@ -493,8 +579,9 @@ Explicit validation note:
     revision/manual override time separately.
   - Evidence needed: submit-at-`t1`, edit-at-`t2` export evidence where `ballot_revision === 2`,
     `submitted_at === t1`, and `last_revision_at === t2`.
+  - Verified Evidence: PFR-036: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Private CSV chart identity can be ambiguous for duplicate/remix names.**
+- [x] **Medium: Private CSV chart identity can be ambiguous for duplicate/remix names.**
   - Area: private export accuracy.
   - References: `src/lib/results/private-csv.ts:83`.
   - Current risk: banned chart columns primarily contain chart names, which can be ambiguous if the
@@ -502,8 +589,9 @@ Explicit validation note:
   - Expected behavior: export should include stable chart IDs and/or display difficulty alongside
     names for every selected and banned chart.
   - Evidence needed: duplicate-name fixture evidence showing exported rows remain unambiguous.
+  - Verified Evidence: PFR-037: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Private CSV export is not host-only, audited, or collision-resistant.**
+- [x] **Medium: Private CSV export is not host-only, audited, or collision-resistant.**
   - Area: private export operations.
   - References: `docs/product-spec.md:315`, `src/app/coolguy69/actions.ts:966`,
     `src/app/coolguy69/actions.ts:976`.
@@ -513,8 +601,9 @@ Explicit validation note:
   - Expected behavior: export policy should state who can export, every export should be audited if
     private-data access must be tracked, and filenames should uniquely identify event/round/time.
   - Evidence needed: permission/audit/filename policy and implementation evidence.
+  - Verified Evidence: PFR-038: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Chart CSV normalization is too permissive for level values.**
+- [x] **Medium: Chart CSV normalization is too permissive for level values.**
   - Area: chart import, data validation.
   - References: `src/lib/charts/normalize.ts:19`, `src/lib/charts/importer.ts`.
   - Current risk: `Number.parseInt` accepts values such as `16x` as `16`, and importer repair logic
@@ -523,8 +612,9 @@ Explicit validation note:
     S16-S22/D23 pools.
   - Evidence needed: import fixtures for `16x`, ` 16 `, empty level, decimal level, and wrong
     type/level combinations.
+  - Verified Evidence: PFR-039: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: CSV import can silently repair or skip malformed event data.**
+- [x] **Medium: CSV import can silently repair or skip malformed event data.**
   - Area: chart import, data integrity.
   - References: `docs/data-audit.md:50`, `src/lib/charts/importer.ts:16`,
     `src/lib/charts/importer.ts:159`, `scripts/import-charts.ts:91`.
@@ -533,8 +623,9 @@ Explicit validation note:
   - Expected behavior: final event imports should fail loudly on malformed required rows unless the
     repair is explicitly reviewed and recorded.
   - Evidence needed: strict import mode or signed import report for the exact event CSV.
+  - Verified Evidence: PFR-040: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Release docs do not freeze the exact event chart/artifact set.**
+- [x] **Medium: Release docs do not freeze the exact event chart/artifact set.**
   - Area: release process, chart assets.
   - References: `docs/release-checklist.md:50`, `.gitignore:28`, `scripts/import-charts.ts:72`,
     `docs/release-checklist.md:114`.
@@ -543,8 +634,9 @@ Explicit validation note:
   - Expected behavior: release evidence should freeze the exact chart CSV, import report, image
     cache manifest, and deployed commit.
   - Evidence needed: checksum/manifest section in the release checklist.
+  - Verified Evidence: PFR-041: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Runtime image evidence and runtime image source can diverge.**
+- [x] **Medium: Runtime image evidence and runtime image source can diverge.**
   - Area: chart images, deployment assets.
   - References: `scripts/verify-real-chart-images.ts:25`, `src/lib/charts/runtime-catalog.ts:60`,
     `src/lib/charts/runtime-catalog.ts:67`.
@@ -554,6 +646,7 @@ Explicit validation note:
   - Expected behavior: image verification should validate the same source of truth and paths used by
     the deployed app.
   - Evidence needed: release check tied to the exact deployed runtime catalog and public cache files.
+  - Verified Evidence: PFR-042: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Medium: Tournament logo asset readiness is treated as visual-only.**
   - Area: asset performance.
@@ -564,10 +657,11 @@ Explicit validation note:
   - Expected behavior: logo asset readiness should include size/performance evidence for phone and
     projector routes.
   - Evidence needed: optimized asset size target and route performance evidence for the logo.
+  - Verified Evidence: PFR-043: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 ## Lower Priority / Operational Hardening
 
-- [ ] **Low: Non-host release-host action can create misleading audit history.**
+- [x] **Low: Non-host release-host action can create misleading audit history.**
   - Area: admin host lock.
   - References: `src/app/coolguy69/actions.ts:279`, `src/lib/admin/host-lock.ts:105`.
   - Current risk: a non-host release attempt clears the caller cookie and can audit a release even if
@@ -575,8 +669,9 @@ Explicit validation note:
   - Expected behavior: release should require the active host or record a clearly failed/no-op audit
     event.
   - Evidence needed: two-admin-session host release evidence with unambiguous audit rows.
+  - Verified Evidence: PFR-044: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Low: Some admin actions still parse critical scalars by hand instead of shared mutation
+- [x] **Low: Some admin actions still parse critical scalars by hand instead of shared mutation
   contracts.**
   - Area: admin action validation.
   - References: `src/app/coolguy69/actions.ts`.
@@ -584,6 +679,7 @@ Explicit validation note:
   - Expected behavior: dangerous or tournament-changing actions should use shared validation
     contracts where practical.
   - Evidence needed: mutation contract coverage for every admin server action input.
+  - Verified Evidence: PFR-045: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Low: Private CSV auto-download may be blocked by browsers.**
   - Area: admin export UX.
@@ -593,6 +689,7 @@ Explicit validation note:
     event-day path should be verified.
   - Expected behavior: the CSV should reliably download in the browser that will be used by the host.
   - Evidence needed: manual target-browser evidence that the file appears with expected content.
+  - Verified Evidence: PFR-046: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 - [ ] **Low: Chart exclusion audit can lose clarity if source CSV later removes or renames a chart.**
   - Area: chart exclusions, audit.
@@ -602,8 +699,9 @@ Explicit validation note:
   - Expected behavior: audit records for exclusions should preserve enough display metadata to
     explain what was excluded even after data changes.
   - Evidence needed: exclusion audit evidence after fixture catalog rename/removal.
+  - Verified Evidence: PFR-047: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Low: Rehearsal reset UI copy understates persistence risk.**
+- [x] **Low: Rehearsal reset UI copy understates persistence risk.**
   - Area: admin UX copy.
   - References: `src/app/coolguy69/page.tsx:268`, `src/app/coolguy69/page.tsx:303`,
     `src/app/coolguy69/actions.ts:1052`, `docs/deployment-readiness.md:116`.
@@ -612,8 +710,9 @@ Explicit validation note:
   - Expected behavior: reset copy should accurately describe whether state is memory-only or
     persistent for the current deployment/backend.
   - Evidence needed: admin copy review across memory and Supabase modes.
+  - Verified Evidence: PFR-048: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Low: Release checklist mixes stale checked evidence with current unchecked gates.**
+- [x] **Low: Release checklist mixes stale checked evidence with current unchecked gates.**
   - Area: release docs.
   - References: `docs/release-checklist.md:5`, `docs/release-checklist.md:99`,
     `docs/deployment-readiness.md:78`.
@@ -622,6 +721,7 @@ Explicit validation note:
   - Expected behavior: release docs should separate historical evidence from current release-blocking
     gates and require dates/commit IDs for completed items.
   - Evidence needed: release checklist cleanup with dates, commit IDs, and current status.
+  - Verified Evidence: PFR-049: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
 ## Production Readiness Evidence Checklist
 
@@ -630,29 +730,62 @@ is intentionally excluded from this checklist.
 
 - [ ] Production-build, Supabase-backed full-flow evidence exists with production-like heartbeat,
   host-lock, polling, and admin action behavior.
+  - Verified Evidence: Pending. `test:e2e:production-flow:validate` passed with dummy Supabase-shaped
+    env, but no production-build browser flow against disposable Supabase credentials was run.
 - [ ] All four rounds have evidence for draw both sets, open voting, submit/edit ballots,
   close/compute, tiebreak reveal, and final two-chart reveal.
+  - Verified Evidence: Pending. Unit/build gates passed, but grouped four-round browser evidence has
+    not been collected.
 - [ ] `/stage`, `/room`, `/vote`, `/charts`, `/results`, and `/coolguy69` have state-transition
   evidence for every major round state.
-- [ ] `/stage` evidence shows exactly two set rows of seven cards and QR target `/room`.
-- [ ] Player dropdown label evidence shows exactly `Select your start.gg username`.
-- [ ] Player confirmation evidence shows exactly
+  - Verified Evidence: Pending. Route-state helpers and implementation evidence exist; full
+    route-visible transition evidence is still deferred.
+- [x] `/stage` evidence shows exactly two set rows of seven cards and QR target `/room`.
+  - Verified Evidence: Source-review evidence was already recorded in the review section; the stage
+    QR target remains `/room`, and the stage card layout uses two set rows of seven cards.
+- [x] Player dropdown label evidence shows exactly `Select your start.gg username`.
+  - Verified Evidence: Source-review evidence was already recorded in the review section and the full
+    test/build gates passed after the remediation changes.
+- [x] Player confirmation evidence shows exactly
   `Are you sure you are voting as [start.gg username]?`.
+  - Verified Evidence: Source-review evidence was already recorded in the review section and the full
+    test/build gates passed after the remediation changes.
 - [ ] Duplicate active usernames cannot vote silently from multiple devices.
-- [ ] Each set requires either 1-2 bans or explicit `No bans for this set`.
-- [ ] A player can edit before close and the latest valid revision wins.
-- [ ] First-submit failure does not imply a saved ballot.
+  - Verified Evidence: Pending. Early duplicate-device warning was implemented, but two-device UX
+    evidence is still deferred.
+- [x] Each set requires either 1-2 bans or explicit `No bans for this set`.
+  - Verified Evidence: Server-side negative ballot validation is covered by `src/lib/vote/ballot.test.ts`
+    and the full `rtk npm run test` gate passed.
+- [x] A player can edit before close and the latest valid revision wins.
+  - Verified Evidence: Ballot revision behavior and failed-edit preservation are covered by
+    `src/lib/vote/ballot.test.ts` and the full test/build gates passed.
+- [x] First-submit failure does not imply a saved ballot.
+  - Verified Evidence: Player vote copy was updated to distinguish first-submit failure from
+    failed-edit preservation; the change is covered by source review and full test/build gates.
 - [ ] Admin live counts are hidden by default and public pages do not leak chart-by-chart counts
   before reveal.
+  - Verified Evidence: Pending. Implementation/source evidence exists for privacy behavior, but
+    state-by-state public-route anti-spoiler evidence is still deferred.
 - [ ] All dangerous admin actions require password re-entry, reason, and a clear action summary.
+  - Verified Evidence: Pending. Several server-side guards and contracts were implemented, but a full
+    admin action matrix with allowed/rejected/audited outcomes has not been collected.
 - [ ] Only one host can control the tournament across two sessions and stale sessions cannot
   overwrite host control.
+  - Verified Evidence: Pending. Compare-aware host-lock behavior is covered by unit/fake-store tests,
+    but live two-session Supabase evidence is still required.
 - [ ] Private CSV content after final reveal matches expected ballots, revisions, timestamps,
   active-at-round-start values, selected charts, and unambiguous chart identities.
+  - Verified Evidence: Pending for final browser/export flow. CSV unit coverage exists for formula
+    neutralization, active-at-round-start, timestamps, chart IDs/difficulty, and filename policy.
 - [ ] Load evidence covers at least 100 eligible players and concurrent spectators without relying
   solely on synthetic ballot injection.
+  - Verified Evidence: Pending. Load scripts/docs now target 100 players plus spectators and separate
+    API injection from player-route evidence, but the full load evidence has not been run.
 - [ ] Event-day target browser can download the private CSV.
+  - Verified Evidence: Pending. Export permission/content hardening was implemented, but target-browser
+    download evidence has not been collected.
 - [ ] Projector-size `/stage` and mobile `/vote` evidence show readable, non-overlapping UI.
+  - Verified Evidence: Pending. No projector-size or mobile visual evidence was collected in this pass.
 
 ## Already Verified During Review
 

@@ -2,19 +2,30 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { PUBLIC_INSPECTION_REFRESH_INTERVAL_MS } from "@/lib/vote/phone-view";
 
-const CHARTS_REFRESH_INTERVAL_MS = 2000;
+type ChartsAutoRefreshProps = {
+  enabled?: boolean;
+  intervalMs?: number;
+};
 
-export function ChartsAutoRefresh() {
+export function ChartsAutoRefresh({
+  enabled = true,
+  intervalMs = PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
+}: ChartsAutoRefreshProps) {
   const router = useRouter();
 
   useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
+
     const intervalId = window.setInterval(() => {
       router.refresh();
-    }, CHARTS_REFRESH_INTERVAL_MS);
+    }, intervalMs);
 
     return () => window.clearInterval(intervalId);
-  }, [router]);
+  }, [enabled, intervalMs, router]);
 
   return null;
 }

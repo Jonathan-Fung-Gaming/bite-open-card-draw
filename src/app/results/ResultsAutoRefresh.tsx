@@ -2,19 +2,30 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { PUBLIC_INSPECTION_REFRESH_INTERVAL_MS } from "@/lib/vote/phone-view";
 
-const RESULTS_REFRESH_INTERVAL_MS = 2000;
+type ResultsAutoRefreshProps = {
+  enabled?: boolean;
+  intervalMs?: number;
+};
 
-export function ResultsAutoRefresh() {
+export function ResultsAutoRefresh({
+  enabled = true,
+  intervalMs = PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
+}: ResultsAutoRefreshProps) {
   const router = useRouter();
 
   useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
+
     const intervalId = window.setInterval(() => {
       router.refresh();
-    }, RESULTS_REFRESH_INTERVAL_MS);
+    }, intervalMs);
 
     return () => window.clearInterval(intervalId);
-  }, [router]);
+  }, [enabled, intervalMs, router]);
 
   return null;
 }

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { QrCode } from "lucide-react";
 import QRCode from "qrcode";
 import clsx from "clsx";
@@ -58,8 +57,7 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
           Scan to vote or view charts
         </p>
       </div>
-      <Link
-        href={roomPath}
+      <div
         className={clsx(
           "flex aspect-square w-full items-center justify-center rounded-md border border-ember-300/25 bg-white text-furnace-950 shadow-ember-tight",
           compact ? "mt-3 max-w-40 p-2 2xl:max-w-56" : "mt-4 max-w-72 p-3",
@@ -74,7 +72,7 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
           role="img"
           dangerouslySetInnerHTML={{ __html: qrSvg }}
         />
-      </Link>
+      </div>
       <p
         className={clsx(
           "break-words text-center font-mono font-black text-white",

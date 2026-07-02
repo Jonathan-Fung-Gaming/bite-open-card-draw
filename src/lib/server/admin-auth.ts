@@ -15,16 +15,16 @@ import {
   createNormalizedAdminSessionStore,
   shouldUseNormalizedAdminSessions,
 } from "@/lib/server/admin-session-store";
+import { assertProductionTestFlagsDisabled } from "@/lib/server/env";
 
 function getOptionalEnv(name: keyof NodeJS.ProcessEnv) {
   return process.env[name] || null;
 }
 
 function shouldUseSecureCookies() {
-  return (
-    process.env.NODE_ENV === "production" &&
-    process.env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL !== "true"
-  );
+  assertProductionTestFlagsDisabled();
+
+  return process.env.NODE_ENV === "production";
 }
 
 function getCookieOptions(maxAge = ADMIN_SESSION_TTL_SECONDS) {

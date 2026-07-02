@@ -66,6 +66,8 @@ export class BallotStore {
       playerStartggUsername: input.playerStartggUsername,
       choices: input.choices,
       submittedAt: now,
+      firstSubmittedAt: existing?.firstSubmittedAt ?? existing?.submittedAt ?? now,
+      lastRevisionAt: now,
       revision: (existing?.revision ?? 0) + 1,
       editTokenHash: options.editTokenHash ?? null,
       source: options.source ?? "player",

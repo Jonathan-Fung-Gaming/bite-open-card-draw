@@ -70,6 +70,10 @@ function ballot(playerId: string, setOneBans: string[], setTwoBans: string[] = [
   };
 }
 
+function eligiblePlayers(...playerIds: string[]) {
+  return playerIds.map((playerId) => ({ id: playerId, startggUsername: playerId }));
+}
+
 describe("result engine", () => {
   it("includes zero-ban charts and selects the unique least-banned chart", () => {
     const result = computeRoundResult({
@@ -93,7 +97,7 @@ describe("result engine", () => {
         ballot("p3", ["b", "f"]),
         ballot("p4", ["g"]),
       ],
-      eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
+      eligiblePlayers: eligiblePlayers("p1", "p2", "p3", "p4"),
       computedAt: "now",
     });
 
@@ -121,7 +125,7 @@ describe("result engine", () => {
         draw("draw-2", 2, "S17", sevenCharts("set-two")),
       ],
       ballots: [ballot("p1", ["c", "d"]), ballot("p2", ["e", "f"]), ballot("p3", ["g"])],
-      eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
+      eligiblePlayers: eligiblePlayers("p1", "p2", "p3"),
       computedAt: "now",
       randomIndex: () => 1,
     });
@@ -205,7 +209,7 @@ describe("result engine", () => {
         draw("draw-2", 2, "S17", setTwoCharts),
       ],
       ballots: [ballot("p1", ["a-6"], ["b-6"])],
-      eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
+      eligiblePlayers: eligiblePlayers("p1"),
       computedAt: "now",
       randomIndex: () => 0,
     });
@@ -214,5 +218,38 @@ describe("result engine", () => {
     expect(result.sets[0].zeroBallotTiebreak).toBe(false);
     expect(result.sets[0].wheelSupported).toBe(false);
     expect(result.sets[0].wheelSlots).toEqual([]);
+  });
+
+  it("excludes submitted ballots outside the authoritative eligibility snapshot", () => {
+    const result = computeRoundResult({
+      id: "result",
+      roundNumber: 1,
+      draws: [
+        draw("draw-1", 1, "S16", [
+          chart("a", "Alpha"),
+          chart("b", "Bravo"),
+          chart("c", "Charlie"),
+          chart("d", "Delta"),
+          chart("e", "Echo"),
+          chart("f", "Foxtrot"),
+          chart("g", "Golf"),
+        ]),
+        draw("draw-2", 2, "S17", sevenCharts("set-two")),
+      ],
+      ballots: [ballot("p1", ["a", "d"]), ballot("not-eligible", ["b", "c"])],
+      eligiblePlayers: eligiblePlayers("p1"),
+      computedAt: "now",
+      randomIndex: () => 0,
+    });
+
+    const setOneCounts = new Map(
+      result.sets[0].rows.map((row) => [row.chart.id, row.banCount]),
+    );
+
+    expect(setOneCounts.get("a")).toBe(1);
+    expect(setOneCounts.get("d")).toBe(1);
+    expect(setOneCounts.get("b")).toBe(0);
+    expect(setOneCounts.get("c")).toBe(0);
+    expect(result.eligiblePlayers).toEqual(eligiblePlayers("p1"));
   });
 });

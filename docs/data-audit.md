@@ -123,3 +123,23 @@ Required pool status: PASS - every required pool has at least 7 charts.
 - Chart exclusions can reduce pool size; Phase 3 should validate post-exclusion pools still have at least 7 eligible charts.
 - The audit found non-canonical type and non-numeric level values; Phase 3 ingestion should either repair those rows from a better CSV export or fail clearly with row-level diagnostics.
 - If future CSV exports change column names or type/level formatting, the ingestion code should fail with a clear validation error.
+
+## Phase 5 Release Artifact Evidence Placeholders
+
+Do not mark the event chart data ready until these values are filled for the current release commit.
+
+- Event CSV SHA-256: `TODO`
+- Event CSV byte size: `TODO`
+- Event CSV row count from current import report: `TODO`
+- Import command: `rtk npm run import:charts` or `rtk npm run import:charts -- --strict`
+- Import report path: `data/generated/chart-import-report.json`
+- Import report SHA-256 path: `data/generated/chart-import-report.sha256`
+- Import report reviewer/date when strict mode is not clean: `TODO`
+- Repaired rows reviewed: `TODO`
+- Skipped rows reviewed: `TODO`
+- Required pool counts after exclusions reviewed: `TODO`
+- Current release commit: `TODO`
+
+The import report now records repaired rows, skipped rows, out-of-scope rows, required pool counts,
+source CSV checksum, optional reviewer metadata, and strict-mode failures. For final event use,
+either run strict mode cleanly or record a reviewer/date accepting every repaired or skipped row.

@@ -85,6 +85,10 @@ const adminSessionEndInputSchema = z.object({
 
 export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   submitBallot: submitBallotInputSchema,
+  computeResults: computeResultsInputSchema,
+} as const;
+
+export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   manualBallotOverride: manualBallotOverrideInputSchema,
   claimActiveVoterPresence: activeVoterPresenceInputSchema,
   touchActiveVoterPresence: activeVoterPresenceInputSchema,
@@ -102,7 +106,6 @@ export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   rerollRoundSet: rerollRoundSetInputSchema,
   rerollFullRound: rerollFullRoundInputSchema,
   postVoteRerollInvalidation: postVoteRerollInvalidationInputSchema,
-  computeResults: computeResultsInputSchema,
   advanceResultReveal: advanceResultRevealInputSchema,
   markResultsRevealed: markResultsRevealedInputSchema,
   overrideResult: overrideResultInputSchema,
@@ -115,6 +118,11 @@ export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
 
 export type NormalizedTransactionalMutationName =
   keyof typeof NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS;
+export type NormalizedBlockedTransactionalMutationName =
+  keyof typeof NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS;
+export type NormalizedRuntimeMutationName =
+  | NormalizedTransactionalMutationName
+  | NormalizedBlockedTransactionalMutationName;
 
 export type NormalizedTransactionalMutationInput<
   TName extends NormalizedTransactionalMutationName,
@@ -122,6 +130,10 @@ export type NormalizedTransactionalMutationInput<
 
 export const NORMALIZED_RUNTIME_RPC_NAMES = {
   submitBallot: "normalized_submit_ballot",
+  computeResults: "normalized_compute_results",
+} as const satisfies Record<NormalizedTransactionalMutationName, NormalizedRuntimeRpcName>;
+
+export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
   manualBallotOverride: "normalized_manual_ballot_override",
   claimActiveVoterPresence: "normalized_claim_voter_presence",
   touchActiveVoterPresence: "normalized_touch_voter_presence",
@@ -139,7 +151,6 @@ export const NORMALIZED_RUNTIME_RPC_NAMES = {
   rerollRoundSet: "normalized_reroll_round_set",
   rerollFullRound: "normalized_reroll_full_round",
   postVoteRerollInvalidation: "normalized_invalidate_post_vote_reroll_ballots",
-  computeResults: "normalized_compute_results",
   advanceResultReveal: "normalized_advance_result_reveal",
   markResultsRevealed: "normalized_mark_results_revealed",
   overrideResult: "normalized_override_result",
@@ -148,7 +159,57 @@ export const NORMALIZED_RUNTIME_RPC_NAMES = {
   adminSessionTouch: "normalized_touch_admin_session",
   adminSessionLogout: "normalized_logout_admin_session",
   adminSessionRevoke: "normalized_revoke_admin_session",
-} as const satisfies Record<NormalizedTransactionalMutationName, NormalizedRuntimeRpcName>;
+} as const satisfies Record<NormalizedBlockedTransactionalMutationName, NormalizedRuntimeRpcName>;
+
+export const NORMALIZED_ALL_RUNTIME_RPC_NAMES = {
+  ...NORMALIZED_RUNTIME_RPC_NAMES,
+  ...NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES,
+} as const satisfies Record<NormalizedRuntimeMutationName, NormalizedRuntimeRpcName>;
+
+export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATIONS = Object.fromEntries(
+  Object.entries(NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES).map(([name, rpcName]) => [
+    name,
+    {
+      rpcName,
+      reason:
+        "This normalized RPC is currently disabled in migrations and must not be used as an advertised transaction boundary until implemented.",
+    },
+  ]),
+) as Record<
+  NormalizedBlockedTransactionalMutationName,
+  {
+    rpcName: NormalizedRuntimeRpcName;
+    reason: string;
+  }
+>;
+
+export function isNormalizedTransactionalMutationImplemented(
+  name: NormalizedRuntimeMutationName,
+): name is NormalizedTransactionalMutationName {
+  return name in NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS;
+}
+
+export function getNormalizedTransactionalMutationBlockedMessage(
+  name: NormalizedRuntimeMutationName,
+) {
+  if (isNormalizedTransactionalMutationImplemented(name)) {
+    return null;
+  }
+
+  const blocked = NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATIONS[name];
+
+  return `Normalized runtime mutation ${name} is blocked: ${blocked.reason}`;
+}
+
+export function assertNormalizedTransactionalMutationImplemented(
+  name: NormalizedRuntimeMutationName,
+): asserts name is NormalizedTransactionalMutationName {
+  const blockedMessage = getNormalizedTransactionalMutationBlockedMessage(name);
+
+  if (blockedMessage) {
+    throw new Error(blockedMessage);
+  }
+}
 
 function createRpcClient() {
   return createServiceRoleSupabaseClient() as unknown as RpcClient;
@@ -171,6 +232,14 @@ export async function executeNormalizedTransactionalMutation<
   input: NormalizedTransactionalMutationInput<TName>,
   dependencies: TransactionDependencies = {},
 ) {
+  const mutationName = name as NormalizedRuntimeMutationName;
+
+  if (!(mutationName in NORMALIZED_ALL_RUNTIME_RPC_NAMES)) {
+    throw new Error(`Unknown normalized runtime mutation ${mutationName}.`);
+  }
+
+  assertNormalizedTransactionalMutationImplemented(mutationName);
+
   const payload = NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS[name].parse(input) as Json;
   const eventId = dependencies.eventId ?? getTournamentEventId();
   const supabase = dependencies.supabase ?? createRpcClient();

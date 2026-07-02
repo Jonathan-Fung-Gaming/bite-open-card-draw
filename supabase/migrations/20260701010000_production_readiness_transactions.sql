@@ -488,6 +488,12 @@ begin
     )
   );
 
+  update public.players
+  set has_tournament_history = true,
+      updated_at = v_now
+  where event_id = p_event_id
+    and id = v_player_id;
+
   select count(*)::integer
     into v_eligible_count
   from public.round_player_eligibility as eligibility
@@ -699,6 +705,10 @@ begin
       on choice.event_id = ballot.event_id
      and choice.ballot_id = ballot.id
      and choice.draw_id = v_draw.draw_id
+    join public.round_player_eligibility as eligibility
+      on eligibility.event_id = ballot.event_id
+     and eligibility.round_number = ballot.round_number
+     and eligibility.player_id = ballot.player_id
     where ballot.event_id = p_event_id
       and ballot.round_number = v_round_number
       and ballot.submitted = true
@@ -708,7 +718,10 @@ begin
       select
         drawn.chart_id,
         chart.name,
-        count(ballot.id) filter (where drawn.chart_id = any(choice.banned_chart_ids))::integer as ban_count
+        count(ballot.id) filter (
+          where eligibility.player_id is not null
+            and drawn.chart_id = any(choice.banned_chart_ids)
+        )::integer as ban_count
       from public.drawn_charts as drawn
       join public.charts as chart on chart.id = drawn.chart_id
       left join public.ballot_choices as choice
@@ -720,6 +733,10 @@ begin
        and ballot.round_number = v_round_number
        and ballot.submitted = true
        and ballot.invalidated_at is null
+      left join public.round_player_eligibility as eligibility
+        on eligibility.event_id = ballot.event_id
+       and eligibility.round_number = ballot.round_number
+       and eligibility.player_id = ballot.player_id
       where drawn.event_id = p_event_id
         and drawn.draw_id = v_draw.draw_id
       group by drawn.chart_id, chart.name
@@ -732,7 +749,10 @@ begin
       select
         drawn.chart_id,
         chart.name,
-        count(ballot.id) filter (where drawn.chart_id = any(choice.banned_chart_ids))::integer as ban_count
+        count(ballot.id) filter (
+          where eligibility.player_id is not null
+            and drawn.chart_id = any(choice.banned_chart_ids)
+        )::integer as ban_count
       from public.drawn_charts as drawn
       join public.charts as chart on chart.id = drawn.chart_id
       left join public.ballot_choices as choice
@@ -744,6 +764,10 @@ begin
        and ballot.round_number = v_round_number
        and ballot.submitted = true
        and ballot.invalidated_at is null
+      left join public.round_player_eligibility as eligibility
+        on eligibility.event_id = ballot.event_id
+       and eligibility.round_number = ballot.round_number
+       and eligibility.player_id = ballot.player_id
       where drawn.event_id = p_event_id
         and drawn.draw_id = v_draw.draw_id
       group by drawn.chart_id, chart.name
@@ -772,7 +796,10 @@ begin
       select
         drawn.chart_id,
         chart.name,
-        count(ballot.id) filter (where drawn.chart_id = any(choice.banned_chart_ids))::integer as ban_count
+        count(ballot.id) filter (
+          where eligibility.player_id is not null
+            and drawn.chart_id = any(choice.banned_chart_ids)
+        )::integer as ban_count
       from public.drawn_charts as drawn
       join public.charts as chart on chart.id = drawn.chart_id
       left join public.ballot_choices as choice
@@ -784,6 +811,10 @@ begin
        and ballot.round_number = v_round_number
        and ballot.submitted = true
        and ballot.invalidated_at is null
+      left join public.round_player_eligibility as eligibility
+        on eligibility.event_id = ballot.event_id
+       and eligibility.round_number = ballot.round_number
+       and eligibility.player_id = ballot.player_id
       where drawn.event_id = p_event_id
         and drawn.draw_id = v_draw.draw_id
       group by drawn.chart_id, chart.name

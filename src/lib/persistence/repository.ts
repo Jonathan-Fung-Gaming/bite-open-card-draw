@@ -5,6 +5,11 @@ import {
 import { mergeOperationalStateSnapshots } from "@/lib/persistence/merge";
 import type { HostLockStoreSnapshot } from "@/lib/admin/host-lock";
 
+export type PersistHostLockInput = {
+  baseline: HostLockStoreSnapshot | null;
+  current: HostLockStoreSnapshot;
+};
+
 export type PersistMergedStateInput = {
   baseline: OperationalStateSnapshot | null;
   current: OperationalStateSnapshot;
@@ -16,7 +21,7 @@ export type OperationalStateRepository = {
   loadResultAdminState?(): Promise<OperationalStateSnapshot | null>;
   save(snapshot: OperationalStateSnapshot): Promise<void>;
   persistMerged?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
-  persistHostLock?(hostLock: HostLockStoreSnapshot): Promise<void>;
+  persistHostLock?(input: PersistHostLockInput): Promise<HostLockStoreSnapshot>;
   persistVotingState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
   persistVotingAdminState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
   persistResultAdminState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;

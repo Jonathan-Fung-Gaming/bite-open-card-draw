@@ -24,7 +24,7 @@ export default async function VotePage() {
   const result = adminState.resultStore.getRoundResult(roundNumber);
   const showFinalPhoneResults = shouldShowFinalPhoneResults(snapshot.status, result?.revealPhase);
 
-  if (snapshot.status === "voting_paused") {
+  if (snapshot.status === "voting_paused" && draws.length !== 2) {
     return (
       <main className="min-h-screen">
         <VoteAutoRefresh />
@@ -60,7 +60,7 @@ export default async function VotePage() {
   if (snapshot.status === "results_revealed" || showFinalPhoneResults) {
     return (
       <main className="min-h-screen">
-        <VoteAutoRefresh />
+        {result && showFinalPhoneResults ? null : <VoteAutoRefresh />}
         <RoundHeader
           title={`Round ${roundNumber} Final Charts`}
           status={formatVotingStatusLabel(snapshot.status)}
@@ -85,10 +85,10 @@ export default async function VotePage() {
     );
   }
 
-  if (!snapshot.canSubmit) {
+  if (!snapshot.canSubmit && snapshot.status !== "voting_paused") {
     const message =
       snapshot.status === "ready_to_vote"
-        ? "Both chart sets are drawn. Waiting for the host to open voting."
+        ? "Both chart sets are drawn. Waiting for the host to open voting. If charts were rerolled after voting started, prior ballots were invalidated and players must submit again when voting reopens."
         : "Both chart sets must be drawn before voting opens.";
 
     return (
@@ -106,6 +106,7 @@ export default async function VotePage() {
 
   return (
     <main className="min-h-screen">
+      <VoteAutoRefresh />
       <RoundHeader
         title="Player Ballot"
         status={`${formatVotingStatusLabel(snapshot.status)} - Round ${roundNumber}`}
@@ -116,6 +117,7 @@ export default async function VotePage() {
           players={snapshot.eligiblePlayers}
           draws={draws}
           statusLabel={formatVotingStatusLabel(snapshot.status)}
+          status={snapshot.status}
           timerText={formatVotingTime(snapshot.remainingMs)}
           turnoutText={`Ballots submitted: ${snapshot.submittedCount} / ${snapshot.eligibleCount}`}
           canSubmit={snapshot.canSubmit}

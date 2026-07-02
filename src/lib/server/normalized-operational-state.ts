@@ -1,5 +1,10 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import {
+  resolveHostLockPersistence,
+  type HostLockRecord,
+  type HostLockStoreSnapshot,
+} from "@/lib/admin/host-lock";
 import { deterministicUuid } from "@/lib/charts/normalize";
 import { loadRuntimeCharts } from "@/lib/charts/runtime-catalog";
 import type { NormalizedChart } from "@/lib/charts/types";
@@ -14,6 +19,7 @@ import {
 import { mergeOperationalStateSnapshots } from "@/lib/persistence/merge";
 import type {
   OperationalStateRepository,
+  PersistHostLockInput,
   PersistMergedStateInput,
 } from "@/lib/persistence/repository";
 import type { ResultRevealPhase, ResultSetSnapshot } from "@/lib/results/result-engine";
@@ -153,6 +159,14 @@ function ballotPersistenceKey(ballot: RoundBallot) {
   return `${ballot.roundNumber}:${ballot.playerId}`;
 }
 
+function ballotFirstSubmittedAt(ballot: RoundBallot) {
+  return ballot.firstSubmittedAt ?? ballot.submittedAt;
+}
+
+function ballotLastRevisionAt(ballot: RoundBallot) {
+  return ballot.lastRevisionAt ?? ballot.submittedAt;
+}
+
 function isUuid(value: string | null | undefined): value is string {
   return Boolean(
     value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
@@ -261,7 +275,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
   }
 
   async loadVotingAdminState(): Promise<OperationalStateSnapshot | null> {
-    return this.loadUnlocked({ includeBallotTables: false });
+    return this.loadUnlocked({ includeBallotTables: true });
   }
 
   async loadResultAdminState(): Promise<OperationalStateSnapshot | null> {
@@ -286,8 +300,10 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     });
   }
 
-  async persistHostLock(hostLock: OperationalStateSnapshot["hostLock"]): Promise<void> {
-    await this.saveHostLockOnlyUnlocked(hostLock);
+  async persistHostLock(input: PersistHostLockInput): Promise<HostLockStoreSnapshot> {
+    return this.withEventPersistenceLock(async () => {
+      return this.persistHostLockSnapshot(input.baseline, input.current);
+    });
   }
 
   async persistVotingState(input: PersistMergedStateInput): Promise<OperationalStateSnapshot> {
@@ -306,7 +322,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
 
   async persistVotingAdminState(input: PersistMergedStateInput): Promise<OperationalStateSnapshot> {
     return this.withEventPersistenceLock(async () => {
-      await this.saveVotingAdminStateUnlocked(input.current);
+      await this.saveVotingAdminStateUnlocked(input);
 
       return cloneOperationalStateSnapshot(input.current);
     });
@@ -314,7 +330,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
 
   async persistResultAdminState(input: PersistMergedStateInput): Promise<OperationalStateSnapshot> {
     return this.withEventPersistenceLock(async () => {
-      await this.saveResultAdminStateUnlocked(input.current);
+      await this.saveResultAdminStateUnlocked(input);
 
       return cloneOperationalStateSnapshot(input.current);
     });
@@ -424,19 +440,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
             };
           }),
       },
-      hostLock: {
-        lock:
-          hostLocks.length > 0
-            ? {
-                ownerSessionId:
-                  hostLocks[0]?.owner_session_id ?? hostLocks[0]?.admin_session_id ?? "",
-                hostTokenHash: hostLocks[0]?.host_token_hash ?? "",
-                acquiredAt: msFromIso(hostLocks[0]?.acquired_at ?? this.now()),
-                heartbeatAt: msFromIso(hostLocks[0]?.heartbeat_at ?? this.now()),
-                expiresAt: msFromIso(hostLocks[0]?.expires_at ?? this.now()),
-              }
-            : null,
-      },
+      hostLock: this.hostLockSnapshotFromRows(hostLocks),
       roster: {
         players: players
           .map((row) => ({
@@ -545,30 +549,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     ]);
   }
 
-  private async saveHostLockOnlyUnlocked(hostLock: OperationalStateSnapshot["hostLock"]) {
-    if (!hostLock.lock) {
-      await this.deleteEventRows("host_locks");
-      return;
-    }
-
-    await this.upsertOne(
-      "host_locks",
-      {
-        event_id: this.eventId,
-        lock_name: "tournament-host",
-        admin_session_id: isUuid(hostLock.lock.ownerSessionId)
-          ? hostLock.lock.ownerSessionId
-          : null,
-        owner_session_id: hostLock.lock.ownerSessionId,
-        host_token_hash: hostLock.lock.hostTokenHash,
-        acquired_at: isoFromMs(hostLock.lock.acquiredAt),
-        heartbeat_at: isoFromMs(hostLock.lock.heartbeatAt),
-        expires_at: isoFromMs(hostLock.lock.expiresAt),
-      },
-      { onConflict: "event_id,lock_name" },
-    );
-  }
-
   private async saveVotingStateUnlocked(
     snapshot: OperationalStateSnapshot,
     changedInput?: PersistMergedStateInput,
@@ -592,7 +572,9 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     await Promise.all([this.saveBallots(snapshot, changedBallots), this.savePresence(snapshot)]);
   }
 
-  private async saveVotingAdminStateUnlocked(snapshot: OperationalStateSnapshot) {
+  private async saveVotingAdminStateUnlocked(input: PersistMergedStateInput) {
+    const snapshot = input.current;
+
     await Promise.all([
       this.deleteEventRows("active_voter_presence"),
       this.deleteEventRows("round_player_eligibility"),
@@ -604,11 +586,13 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.saveRoundPlayerEligibility(snapshot),
       this.saveAdminActions(snapshot),
       this.savePresence(snapshot),
-      this.saveHostLockOnlyUnlocked(snapshot.hostLock),
+      this.persistHostLockSnapshot(input.baseline?.hostLock ?? null, snapshot.hostLock),
     ]);
   }
 
-  private async saveResultAdminStateUnlocked(snapshot: OperationalStateSnapshot) {
+  private async saveResultAdminStateUnlocked(input: PersistMergedStateInput) {
+    const snapshot = input.current;
+
     await Promise.all([
       this.deleteEventRows("active_voter_presence"),
       this.deleteEventRows("round_player_eligibility"),
@@ -622,7 +606,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.upsertTiebreaks(snapshot),
       this.saveAdminActions(snapshot),
       this.savePresence(snapshot),
-      this.saveHostLockOnlyUnlocked(snapshot.hostLock),
+      this.persistHostLockSnapshot(input.baseline?.hostLock ?? null, snapshot.hostLock),
     ]);
   }
 
@@ -1007,15 +991,15 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         round_number: ballot.roundNumber,
         player_id: ballot.playerId,
         submitted: true,
-        submitted_at: ballot.submittedAt,
-        last_revision_at: ballot.submittedAt,
+        submitted_at: ballotFirstSubmittedAt(ballot),
+        last_revision_at: ballotLastRevisionAt(ballot),
         latest_revision_number: ballot.revision,
         edit_token_hash: ballot.editTokenHash ?? null,
         manual_override: ballot.manualOverride,
         override_reason: ballot.manualReason,
         replaced_existing_ballot: ballot.replacedExistingBallot,
-        created_at: ballot.submittedAt,
-        updated_at: ballot.submittedAt,
+        created_at: ballotFirstSubmittedAt(ballot),
+        updated_at: ballotLastRevisionAt(ballot),
       })),
       { onConflict: "event_id,round_number,player_id" },
     );
@@ -1029,8 +1013,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
           round_set_id: choice.roundSetId,
           no_bans: choice.noBans,
           banned_chart_ids: choice.bannedChartIds,
-          created_at: ballot.submittedAt,
-          updated_at: ballot.submittedAt,
+          created_at: ballotLastRevisionAt(ballot),
+          updated_at: ballotLastRevisionAt(ballot),
         })),
       ),
     );
@@ -1041,7 +1025,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         ballot_id: ballot.id,
         revision_number: ballot.revision,
         accepted: true,
-        submitted_at: ballot.submittedAt,
+        submitted_at: ballotLastRevisionAt(ballot),
         payload: {
           source: ballot.source,
           choices: ballot.choices,
@@ -1179,13 +1163,46 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     );
   }
 
-  private async saveHostLock(snapshot: OperationalStateSnapshot) {
-    const lock = snapshot.hostLock.lock;
+  private hostLockSnapshotFromRows(rows: TableRow<"host_locks">[]): HostLockStoreSnapshot {
+    const row = rows[0];
 
-    if (!lock) {
-      return;
+    return {
+      lock: row
+        ? {
+            ownerSessionId: row.owner_session_id ?? row.admin_session_id ?? "",
+            hostTokenHash: row.host_token_hash,
+            acquiredAt: msFromIso(row.acquired_at),
+            heartbeatAt: msFromIso(row.heartbeat_at),
+            expiresAt: msFromIso(row.expires_at),
+          }
+        : null,
+    };
+  }
+
+  private async persistHostLockSnapshot(
+    baseline: HostLockStoreSnapshot | null,
+    current: HostLockStoreSnapshot,
+  ) {
+    const latest = this.hostLockSnapshotFromRows(await this.selectEventRows("host_locks"));
+    const decision = resolveHostLockPersistence({
+      baseline,
+      current,
+      latest,
+      now: Date.parse(this.now()),
+    });
+
+    if (decision.action === "delete") {
+      await this.deleteEventRows("host_locks");
     }
 
+    if (decision.action === "write") {
+      await this.upsertHostLockRecord(decision.lock);
+    }
+
+    return decision.snapshot;
+  }
+
+  private async upsertHostLockRecord(lock: HostLockRecord) {
     await this.upsertOne(
       "host_locks",
       {
@@ -1200,6 +1217,16 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       },
       { onConflict: "event_id,lock_name" },
     );
+  }
+
+  private async saveHostLock(snapshot: OperationalStateSnapshot) {
+    const lock = snapshot.hostLock.lock;
+
+    if (!lock) {
+      return;
+    }
+
+    await this.upsertHostLockRecord(lock);
   }
 
   private buildDrawHistory(
@@ -1293,7 +1320,9 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
             bannedChartIds: [...choice.banned_chart_ids],
           };
         }),
-        submittedAt: ballot.submitted_at ?? ballot.updated_at,
+        submittedAt: ballot.last_revision_at ?? ballot.submitted_at ?? ballot.updated_at,
+        firstSubmittedAt: ballot.submitted_at ?? ballot.created_at,
+        lastRevisionAt: ballot.last_revision_at ?? ballot.updated_at,
         revision: ballot.latest_revision_number,
         editTokenHash: ballot.edit_token_hash,
         source,

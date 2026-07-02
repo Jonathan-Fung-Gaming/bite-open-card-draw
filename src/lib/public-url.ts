@@ -19,6 +19,15 @@ export function isAbsoluteHttpUrl(value: string) {
 }
 
 function isTestLocalOriginAllowed() {
+  if (
+    (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") &&
+    process.env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL === "true"
+  ) {
+    throw new Error(
+      "TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL cannot be enabled in production deployment environments.",
+    );
+  }
+
   return process.env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL === "true";
 }
 

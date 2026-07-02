@@ -10,7 +10,10 @@ export default defineConfig({
   },
   fullyParallel: false,
   workers: 1,
-  reporter: [["list", { printSteps: true }], ["json", { outputFile: "test-results/phase9/results.json" }]],
+  reporter: [
+    ["list", { printSteps: true }],
+    ["json", { outputFile: "test-results/phase9/results.json" }],
+  ],
   use: {
     baseURL: e2eBaseURL,
     acceptDownloads: true,
@@ -24,8 +27,10 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    ...e2eWebServer,
-    timeout: 180_000,
-  },
+  webServer: e2eWebServer
+    ? {
+        ...e2eWebServer,
+        timeout: 180_000,
+      }
+    : undefined,
 });
