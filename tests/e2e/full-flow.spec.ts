@@ -1,21 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Download, type Locator, type Page } from "@playwright/test";
+import {
+  clickAdminActionAndWait,
+  getAdminPassword,
+  goto,
+  HOSTED_REFRESH_TIMEOUT_MS,
+  loginAndTakeHost,
+} from "./admin-helpers";
 
 test.describe.configure({ mode: "serial" });
 
-function getAdminPassword() {
-  const password = process.env.E2E_ADMIN_PASSWORD;
-
-  if (!password) {
-    throw new Error("Missing E2E_ADMIN_PASSWORD from Playwright config.");
-  }
-
-  return password;
-}
-
 const ADMIN_PASSWORD = getAdminPassword();
 const FALLBACK_CHART_IMAGE_PATH = "/chart-images/fallback-card.svg";
-const HOSTED_REFRESH_TIMEOUT_MS = 30_000;
 const PRIVATE_CSV_FILENAME_PATTERN =
   /^e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv$/;
 
@@ -23,10 +19,6 @@ function expectRealCachedImagePath(source: string | null) {
   expect(source).toBeTruthy();
   expect(source).toContain("/chart-images/cache/");
   expect(source).not.toContain(FALLBACK_CHART_IMAGE_PATH);
-}
-
-async function goto(page: Page, path: string) {
-  await page.goto(path, { waitUntil: "domcontentloaded" });
 }
 
 async function readDownloadText(download: Download) {
@@ -54,35 +46,6 @@ function expectPrivateCsvContent(csv: string) {
   expect(csv).toContain("S16");
   expect(csv).toContain("S17");
   expect(lines.length).toBeGreaterThanOrEqual(2);
-}
-
-async function loginAndTakeHost(page: Page) {
-  await goto(page, "/coolguy69");
-  await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Log In" }).click();
-  await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
-  const releaseButton = page.getByRole("button", { name: "Release" });
-
-  if (await releaseButton.isEnabled()) {
-    await expect(page.getByText("Voting Controls")).toBeVisible();
-    return;
-  }
-
-  const takeHostButton = page.getByRole("button", { name: "Take Host Control" });
-
-  if ((await takeHostButton.count()) > 0 && (await takeHostButton.isEnabled())) {
-    await takeHostButton.click();
-  } else {
-    const forceHostForm = page.locator("form", {
-      has: page.getByRole("button", { name: "Force Host Takeover" }),
-    });
-
-    await forceHostForm.getByLabel("Audit reason").fill("e2e host takeover");
-    await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
-    await forceHostForm.getByRole("button", { name: "Force Host Takeover" }).click();
-  }
-  await expect(page.getByText("Voting Controls")).toBeVisible();
-  await expect(releaseButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 
 async function expectStageRows(page: Page) {
@@ -300,7 +263,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await page
     .getByPlaceholder("Bulk import start.gg usernames")
     .fill("Alpha\nBravo\nCharlie\nDelta");
-  await page.getByRole("button", { name: "Bulk Import" }).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Bulk Import" }));
   await expect(page.getByRole("cell", { name: "Alpha", exact: true })).toBeVisible();
 
   const stagePage = await page.context().newPage();
@@ -531,7 +494,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     ),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Release" }).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Release" }));
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });
 
@@ -602,6 +565,6 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   );
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(1);
 
-  await page.getByRole("button", { name: "Release" }).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Release" }));
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });
