@@ -3,6 +3,9 @@ import {
   formatBallotSaveFailureMessage,
   PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
   shouldShowFinalPhoneResults,
+  STAGE_PUBLIC_REFRESH_INTERVAL_MS,
+  VOTE_PAGE_REFRESH_INTERVAL_MS,
+  VOTER_PRESENCE_REFRESH_INTERVAL_MS,
   VOTE_LIVE_POLL_INTERVAL_MS,
 } from "./phone-view";
 
@@ -32,6 +35,9 @@ describe("phone result display", () => {
 
   it("uses light phone and public polling cadences", () => {
     expect(VOTE_LIVE_POLL_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
+    expect(VOTE_PAGE_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(8_000);
+    expect(STAGE_PUBLIC_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
     expect(PUBLIC_INSPECTION_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(10_000);
+    expect(VOTER_PRESENCE_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(45_000);
   });
 });

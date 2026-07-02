@@ -60,22 +60,32 @@ workflow.
 ## Data
 
 - [ ] `data/source/charts.csv` is the approved event chart export.
-- [ ] Chart CSV SHA-256 recorded: `TODO`.
-- [ ] Chart CSV row count recorded: `TODO`.
+- [ ] Chart CSV SHA-256 recorded: `8FADB13C6E3F153DF5DA3CBC0B62A753771B12E8A34086AA87A677F5EC8885F5`.
+- [ ] Chart CSV row count recorded: `4,571 source rows`.
 - [ ] `rtk npm run import:charts` completed.
 - [ ] `data/generated/chart-import-report.json` archived with SHA-256 from
-      `data/generated/chart-import-report.sha256`: `TODO`.
-- [ ] Import report reviewed or strict mode passed. Reviewer and date: `TODO`.
+      `data/generated/chart-import-report.sha256`:
+      `ae31f8388c96d7247deb4ae4b2164551f4eb5b643e6040bd430a2c44eb68dc40`.
+- [ ] Import report reviewed or strict mode passed. Current generated report:
+      `2026-07-02T13:59:55.671Z`, 4,426 imported charts, 9 repaired rows, 145 skipped
+      rows, 154 strict failures. Reviewer and date: `TODO`.
 - [ ] All required pools have at least 7 eligible charts.
 - [ ] Chart exclusions were reviewed.
 - [ ] `rtk npm run cache:chart-images` completed with at least 1 real cached image asset.
-- [ ] Image cache manifest identity recorded from `data/generated/image-assets.json`: `TODO`.
+- [ ] Image cache manifest identity recorded from `data/generated/image-assets.json`:
+      `F5D886138BEE349A88F942D1196F0BC219C5E2211BCFF0014497A437D76653E0`
+      with 639 cached assets and 0 fallback assets.
 - [ ] `rtk npm run verify:real-chart-images` completed.
-- [ ] Runtime catalog identity recorded from `rtk npm run verify:real-chart-images`: `TODO`.
+- [ ] Runtime catalog identity recorded from `rtk npm run verify:real-chart-images`:
+      `F5DC28CA048E69C33AF9CD97B0C566A87BAC1E386796C0743F028F1DBF2F2E2B`
+      for 4,426 runtime charts and 639 public PNG cache files.
 - [ ] `public/chart-images/cache` contains real cached image files.
-- [ ] Tournament logo renders from `public/brand/tournament-logo.png`.
+- [ ] Tournament logo source exists at `public/brand/tournament-logo.png`.
+- [ ] Tournament logo app rendition exists at `public/brand/tournament-logo-web.png`
+      and is used by `TournamentLogo`.
 - [ ] Tournament logo source size and optimized delivery/performance evidence recorded for phone
-      and projector routes: `TODO`.
+      and projector routes: source `2.28 MB` / web rendition `0.32 MB`; route transfer
+      evidence `TODO`.
 - [ ] Real cached artwork rendering was verified on `/stage`, `/vote`, `/charts`, and `/results`.
 
 ## Roster

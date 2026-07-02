@@ -595,7 +595,17 @@ export async function updateChartExclusionAction(formData: FormData) {
       affectedRecords: [{ type: "chart", id: before.id }],
       metadata: {
         chartKey,
+        chartId: before.id,
+        chartName: before.name,
+        chartNameKr: before.nameKr,
+        artist: before.artist,
+        label: before.label,
+        chartType: before.chartType,
+        level: before.level,
         displayDifficulty: before.displayDifficulty,
+        songKey: before.songKey,
+        sourceBgImg: before.sourceBgImg,
+        sourceRowNumber: before.sourceRowNumber,
         excluded: exclusion.excluded,
         updatedAt: exclusion.updatedAt,
       },
@@ -1157,10 +1167,12 @@ export async function downloadDebugSnapshotAction(formData: FormData) {
   const session = await requireActiveHost();
 
   await verifyDangerousActionPassword(getAdminPassword(formData));
+  const reason = getRequiredReason(formData);
   assertDebugSnapshotAllowed();
   audit(session, {
     action: "debug_snapshot_export",
     summary: "Downloaded redacted debug operational state snapshot.",
+    reason,
     dangerous: true,
     tournamentChanging: false,
   });

@@ -50,7 +50,8 @@ export function DebugSnapshotDownload({ action, disabled = false }: DebugSnapsho
         Redacted debug backup
       </p>
       <p className="mt-2 text-xs text-metal-300">
-        Requires active host control and password re-entry. Blocked while voting is active or paused.
+        Requires active host control, password re-entry, and an audit reason. Blocked while voting is
+        active or paused.
       </p>
       <input
         name="adminPassword"
@@ -58,6 +59,13 @@ export function DebugSnapshotDownload({ action, disabled = false }: DebugSnapsho
         required
         disabled={disabled || isPending}
         placeholder="Admin password"
+        className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+      />
+      <input
+        name="reason"
+        required
+        disabled={disabled || isPending}
+        placeholder="Audit reason"
         className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
       />
       <button

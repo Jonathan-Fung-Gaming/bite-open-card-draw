@@ -406,7 +406,6 @@ export class AdminPage {
   async verifyManualCsvDownload(roundNumber: number, savePath: string) {
     await this.loginAndTakeHost();
 
-    const expectedFilename = `round-${roundNumber}-private-ballots.csv`;
     const downloadPromise = this.page.waitForEvent("download", {
       timeout: 20_000,
     });
@@ -419,7 +418,11 @@ export class AdminPage {
     await download.saveAs(savePath);
     const csv = await readFile(savePath, "utf8");
 
-    expect(download.suggestedFilename()).toBe(expectedFilename);
+    expect(download.suggestedFilename()).toMatch(
+      new RegExp(
+        `^[a-zA-Z0-9._-]+-round-${roundNumber}-private-ballots-[0-9T-]+Z-[a-zA-Z0-9._-]+\\.csv$`,
+      ),
+    );
     expect(csv).toContain("player_startgg_username");
     expect(csv).toContain("selected_set_1_chart");
     expect(csv).toContain("selected_set_2_chart");
