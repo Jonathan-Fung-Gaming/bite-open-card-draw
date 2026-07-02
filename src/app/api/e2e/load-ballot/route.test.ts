@@ -33,6 +33,81 @@ describe("/api/e2e/load-ballot", () => {
     await expect(response.json()).resolves.toEqual({ error: "Not found." });
   });
 
+  it("is unavailable in production without a test token", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TOURNAMENT_TEST_ALLOW_E2E_ROUTES", "true");
+    vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
+    vi.stubEnv("TOURNAMENT_TEST_ROUTE_TOKEN", "test-token");
+
+    const response = await POST(
+      new Request("http://localhost/api/e2e/load-ballot", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          roundNumber: 1,
+          playerStartggUsername: "Alpha",
+          revision: 1,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Not found." });
+  });
+
+  it("is unavailable in Vercel production semantics even when NODE_ENV is not production", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("TOURNAMENT_TEST_ALLOW_E2E_ROUTES", "true");
+    vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
+    vi.stubEnv("TOURNAMENT_TEST_ROUTE_TOKEN", "test-token");
+
+    const response = await POST(
+      new Request("http://localhost/api/e2e/load-ballot", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-tournament-test-token": "test-token",
+        },
+        body: JSON.stringify({
+          roundNumber: 1,
+          playerStartggUsername: "Alpha",
+          revision: 1,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Not found." });
+  });
+
+  it("is unavailable in Vercel production semantics without a test token", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("TOURNAMENT_TEST_ALLOW_E2E_ROUTES", "true");
+    vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
+    vi.stubEnv("TOURNAMENT_TEST_ROUTE_TOKEN", "test-token");
+
+    const response = await POST(
+      new Request("http://localhost/api/e2e/load-ballot", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          roundNumber: 1,
+          playerStartggUsername: "Alpha",
+          revision: 1,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Not found." });
+  });
+
   it("requires the private test token outside production", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("TOURNAMENT_TEST_ALLOW_E2E_ROUTES", "true");

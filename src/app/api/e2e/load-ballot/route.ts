@@ -5,6 +5,7 @@ import { getTournamentEventId } from "@/lib/server/env";
 import { getTournamentStateBackend, withPersistedVotingState } from "@/lib/server/persistence";
 import { submitNormalizedPlayerBallot } from "@/lib/server/normalized-ballots";
 import { createServiceRoleSupabaseClient } from "@/lib/server/supabase";
+import { isE2eTestRouteAvailable } from "@/lib/server/test-route-safety";
 import { ROUND_SET_DEFINITIONS } from "@/lib/tournament";
 import {
   getRoundDrawRecords,
@@ -36,24 +37,6 @@ type LoadDrawnChartRow = {
   chart_id: string;
   draw_order: number;
 };
-
-function testRouteAvailable(request: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return false;
-  }
-
-  const token = process.env.TOURNAMENT_TEST_ROUTE_TOKEN;
-
-  if (!token || request.headers.get("x-tournament-test-token") !== token) {
-    return false;
-  }
-
-  return (
-    process.env.TOURNAMENT_TEST_ALLOW_E2E_ROUTES === "true" ||
-    (process.env.TOURNAMENT_STATE_BACKEND === "memory" &&
-      process.env.TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND === "true")
-  );
-}
 
 function parseRoundNumber(value: unknown) {
   if (value === 1 || value === 2 || value === 3 || value === 4) {
@@ -212,7 +195,7 @@ async function submitSupabaseLoadBallot(input: {
 }
 
 export async function POST(request: Request) {
-  if (!testRouteAvailable(request)) {
+  if (!isE2eTestRouteAvailable(request)) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 

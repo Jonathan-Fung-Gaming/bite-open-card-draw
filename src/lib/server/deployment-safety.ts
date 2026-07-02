@@ -1,4 +1,5 @@
 import "server-only";
+import { isProductionDeploymentEnv } from "@/lib/server/env";
 import { getTournamentStateBackend, type TournamentStateBackend } from "@/lib/server/persistence";
 
 const DISPOSABLE_REHEARSAL_EVENT_ID = /^(e2e|phase9|load|rehearsal)-[a-z0-9-]+$/i;
@@ -23,7 +24,7 @@ export function getDeploymentSafetySnapshot(): DeploymentSafetySnapshot {
   const explicitRehearsalControls =
     process.env.TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS === "true";
   const disposableEventId = eventId ? DISPOSABLE_REHEARSAL_EVENT_ID.test(eventId) : false;
-  const localMemoryMode = backend === "memory" && nodeEnv !== "production";
+  const localMemoryMode = backend === "memory" && !isProductionDeploymentEnv();
   const explicitDisposableRehearsal = explicitRehearsalControls && disposableEventId;
   const rehearsalAdminControlsAllowed = localMemoryMode || explicitDisposableRehearsal;
 

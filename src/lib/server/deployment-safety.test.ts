@@ -40,6 +40,15 @@ describe("deployment safety policy", () => {
     );
   });
 
+  it("blocks local memory rehearsal controls in Vercel production semantics", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("TOURNAMENT_STATE_BACKEND", "memory");
+    vi.stubEnv("TOURNAMENT_EVENT_ID", "local-dev");
+
+    expect(() => getDeploymentSafetySnapshot()).toThrow(/supabase is required in production/);
+  });
+
   it("allows explicit disposable Supabase rehearsal events", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
