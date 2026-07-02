@@ -312,6 +312,22 @@ Routine roster changes after voting opens apply to future rounds.
 
 Emergency current-round eligibility changes require password and audit reason.
 
+## Production-flow Playwright rehearsal
+
+The release-blocking Playwright full-tournament rehearsal must prove the elimination cadence with
+active voting-player counts of 48, 36, 24, and 12 across the four rounds:
+
+- Round 1 starts with 48 active voting players.
+- Before Round 2 opens voting, exactly 12 of the Round 1 voting players are marked
+  inactive/eliminated, leaving 36 active voting players.
+- Before Round 3 opens voting, exactly 12 more voting players are marked inactive/eliminated,
+  leaving 24 active voting players.
+- Before Round 4 opens voting, exactly 12 more voting players are marked inactive/eliminated,
+  leaving 12 active voting players for the last round.
+
+The Playwright evidence must verify the active roster count, round eligibility snapshot, public
+turnout denominator, ballot submission/export row counts, and private CSV output for each round.
+
 ## Private CSV export
 
 Export an admin/private ballot CSV saved to the host computer by browser download.

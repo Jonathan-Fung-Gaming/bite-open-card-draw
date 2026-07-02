@@ -134,6 +134,10 @@ After every phase, run all available checks:
 - build
 - e2e tests, once available
 
+Release-blocking Playwright full-tournament evidence must start Round 1 with 48 active voting
+players, remove exactly 12 voting players before each later round, and verify 36, 24, and 12 active
+voting players for Rounds 2, 3, and 4.
+
 If a check cannot run because the command does not exist yet, add a note explaining why.
 
 Do not leave TypeScript errors, failing tests, or obvious TODO holes in core tournament logic.

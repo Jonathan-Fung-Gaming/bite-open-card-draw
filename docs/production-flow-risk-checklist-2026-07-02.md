@@ -29,6 +29,16 @@ Original checklist validation note:
   Where the app needs future evidence, the item describes the product behavior to prove and allows
   manual, unit, integration, SQL, or future automation evidence.
 
+2026-07-03 superseding Playwright requirement:
+
+- Any prior four-round Playwright evidence that used the disposable 12-player rehearsal roster is
+  not sufficient for current release closure.
+- Current release-blocking Playwright evidence must start Round 1 with 48 active voting players,
+  remove exactly 12 voting players before each later round, and verify 36, 24, and 12 active voting
+  players for Rounds 2, 3, and 4.
+- The evidence must assert active roster counts, `/vote` eligibility, turnout denominators, submitted
+  ballot counts, round eligibility snapshots, and private CSV row counts of 48, 36, 24, and 12.
+
 ## Remediation Implementation Evidence - 2026-07-02
 
 This section records evidence from the implementation pass for

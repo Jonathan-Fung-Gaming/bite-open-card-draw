@@ -216,6 +216,32 @@ Those patterns are wrong for the stage preview and should be flagged.
 
 ---
 
+# 5.1 Production-flow Playwright rehearsal decisions
+
+| Area                    | Final decision                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| Release evidence scope  | The release-blocking Playwright rehearsal must cover all 4 rounds with active voting-player attrition. |
+| Round 1 voting players  | Start Round 1 with 48 active voting players.                                                           |
+| Round 2 voting players  | Remove exactly 12 Round 1 voting players before voting opens, leaving 36 active voting players.        |
+| Round 3 voting players  | Remove exactly 12 more voting players before voting opens, leaving 24 active voting players.           |
+| Round 4 voting players  | Remove exactly 12 more voting players before voting opens, leaving 12 active voting players.           |
+| Evidence required       | Verify active roster counts, round snapshots, turnout denominators, ballot rows, and private CSV rows. |
+
+## Validation checks
+
+- Confirm the production-flow Playwright full-tournament test starts Round 1 with 48 active voting
+  players.
+- Confirm the test marks exactly 12 active voting players inactive/eliminated before Round 2,
+  exactly 12 more before Round 3, and exactly 12 more before Round 4.
+- Confirm Round 2 has 36 active voting players, Round 3 has 24, and Round 4 has 12.
+- Confirm each round snapshots the expected active voting-player count when voting opens.
+- Confirm public turnout denominators and private CSV row counts match 48, 36, 24, and 12 for
+  Rounds 1 through 4.
+- Confirm smaller smoke or local practice tests are not treated as release-blocking production-flow
+  evidence for this requirement.
+
+---
+
 # 6. Chart-pool and data decisions
 
 | Area                 | Final decision                                                   |

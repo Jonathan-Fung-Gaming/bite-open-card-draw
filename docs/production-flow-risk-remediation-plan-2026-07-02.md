@@ -461,7 +461,7 @@ Grouped browser matrix:
 
 | Area | Evidence to collect | Issue IDs |
 | --- | --- | --- |
-| Full four-round production flow | Draw both sets, open voting, submit/edit ballots, close/compute, tiebreak reveal, final two-chart reveal | PFR-003, PFR-019 |
+| Full four-round production flow | Draw both sets, open voting, submit/edit ballots, close/compute, tiebreak reveal, final two-chart reveal, and verify 48 -> 36 -> 24 -> 12 active voting-player attrition | PFR-003, PFR-019 |
 | Route state and anti-spoiler | `/stage`, `/room`, `/vote`, `/charts`, `/results`, `/coolguy69` across pre-draw, voting, closed, computed, revealing, revealed, complete | PFR-007, PFR-022 |
 | Timer transitions | 10-minute window, below-75 extension, at/above-75 close, all-submitted final warning with edit, pause/resume, manual close, emergency reopen | PFR-019 |
 | Ballot negatives | Incomplete ballot, third ban, wrong draw ID, stale chart ID, no-bans-plus-bans, voting-before-both-sets-drawn | PFR-020 |
@@ -472,6 +472,12 @@ Grouped browser matrix:
 | Projector and mobile visuals | `/stage` at 1280x720, 1366x768, 1920x1080, narrow fallback; mobile `/vote`; no overlap; QR target `/room`; QR does not navigate stage | PFR-031, PFR-032 |
 | Load and polling | 100 eligible players, multiple edits, spectators/view-only traffic, request-rate evidence, no reliance solely on synthetic injection | PFR-005, PFR-030 |
 | Private CSV browser behavior | event-day target browser downloads CSV with expected unique filename and content | PFR-046 |
+
+As of 2026-07-03, the grouped Playwright closure evidence must start Round 1 with 48 active voting
+players, mark exactly 12 voting players inactive/eliminated before Round 2, exactly 12 more before
+Round 3, and exactly 12 more before Round 4. It must assert active roster counts, `/vote`
+eligibility, public turnout denominators, submitted ballot counts, round eligibility snapshots, and
+private CSV row counts of 48, 36, 24, and 12.
 
 Closure rules for this phase:
 
@@ -551,4 +557,5 @@ Before production use, the evidence set must prove:
 - Event chart CSV, import report, image cache, runtime catalog, logo asset, and deployed commit are
   frozen in release evidence.
 - One grouped production-like Playwright evidence window covers browser, route, admin, tiebreak,
-  visual, CSV download, and 100-player load behavior.
+  visual, CSV download, the 48 -> 36 -> 24 -> 12 voting-player attrition flow, and 100-player load
+  behavior.

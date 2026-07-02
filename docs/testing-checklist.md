@@ -31,7 +31,7 @@ enabled, and `adminActionsOnly=enabled` before any item can be treated as releas
 | Area                         | Required browser evidence                                                                                                                               | Issue IDs        |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
 | Production rehearsal command | `rtk npm run test:e2e:production-flow:validate` output plus the grouped browser command output and artifacts                                            | PFR-003, PFR-004 |
-| Full four-round flow         | Draw both sets, open voting, submit/edit ballots, close, compute, reveal, final two charts, private CSV download                                        | PFR-003, PFR-019 |
+| Full four-round flow         | Draw both sets, open voting, submit/edit ballots, close, compute, reveal, final two charts, private CSV download, and verify 48 -> 36 -> 24 -> 12 active voting-player attrition | PFR-003, PFR-019 |
 | Timer transitions            | 10-minute window, below-75 extension, at/above-75 close, all-submitted final warning with edit, pause/resume, manual close, emergency reopen            | PFR-019          |
 | Negative ballots             | Incomplete set, third ban, wrong draw id, stale chart id, no-bans-plus-bans, voting before both sets drawn                                              | PFR-020          |
 | Identity and revisions       | Duplicate active username, active second-device warning, latest valid ballot wins, failed edit preserves prior ballot, pre-submit username change       | PFR-021          |
@@ -43,6 +43,19 @@ enabled, and `adminActionsOnly=enabled` before any item can be treated as releas
 The synthetic load tool in `tests/load/load-rehearsal.spec.ts` is intentionally separate from the
 real player-route matrix. It may support API capacity debugging, but it does not close PFR-005 or
 PFR-030 by itself.
+
+## Production-Flow Attrition Requirement
+
+The release-blocking full-tournament Playwright test must use these active voting-player counts:
+
+- Round 1: 48 active voting players.
+- Round 2: 36 active voting players after exactly 12 Round 1 voting players are marked inactive.
+- Round 3: 24 active voting players after exactly 12 more voting players are marked inactive.
+- Round 4: 12 active voting players after exactly 12 more voting players are marked inactive.
+
+For each round, assert the admin active count, `/vote` eligibility, public turnout denominator,
+ballot submission count, private CSV row count, and round eligibility snapshot. A 12-player local
+practice rehearsal or one-round 100-player synthetic load test does not satisfy this requirement.
 
 ## Phase 1 Shell Tests
 
@@ -169,7 +182,8 @@ PFR-030 by itself.
 
 - Current round state drives `/stage`, `/vote`, `/charts`, and `/results`.
 - Admin can set and advance the current round.
-- Rehearsal mode loads a disposable 12-player roster.
+- Local operator rehearsal mode may load a disposable 12-player roster for practice, but release
+  Playwright evidence must use the 48, 36, 24, and 12 active voting-player progression.
 - Rehearsal reset clears operational state and returns to tournament mode.
 - Forced rehearsal tiebreak seeding is blocked outside rehearsal mode.
 - Deployment, data setup, event-day, and rehearsal workflows are documented.

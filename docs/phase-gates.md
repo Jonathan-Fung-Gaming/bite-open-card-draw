@@ -14,6 +14,10 @@ A phase is not complete until:
 8. The phase summary lists risks and assumptions.
 9. A manual review has checked the phase against `docs/product-spec.md`.
 
+For release-blocking Playwright evidence, the full-tournament rehearsal must verify the active
+voting-player progression of 48 in Round 1, 36 in Round 2, 24 in Round 3, and 12 in Round 4 after
+removing exactly 12 voting players before each later round.
+
 If any required check fails, Codex must stop and report the failure instead of continuing to later phases.
 
 If a command does not exist yet, Codex must say so and explain when it will be added.

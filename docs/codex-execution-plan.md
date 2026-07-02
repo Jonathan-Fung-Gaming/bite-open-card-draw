@@ -1577,6 +1577,20 @@ Using Playwright:
 - final two charts appear
 - CSV export downloads
 
+Production-flow full-tournament Playwright evidence must also prove the active voting-player
+elimination cadence:
+
+- Round 1 starts with 48 active voting players.
+- Before Round 2 voting opens, mark exactly 12 Round 1 voting players inactive/eliminated, leaving
+  36 active voting players.
+- Before Round 3 voting opens, mark exactly 12 more voting players inactive/eliminated, leaving 24
+  active voting players.
+- Before Round 4 voting opens, mark exactly 12 more voting players inactive/eliminated, leaving 12
+  active voting players for the last round.
+- For every round, assert the admin active count, `/vote` eligibility, public turnout denominator,
+  ballot submission count, private CSV row count, and round eligibility snapshot match the expected
+  48, 36, 24, or 12 count.
+
 ## Load-conscious testing
 
 Test at least:
@@ -1861,3 +1875,5 @@ These rules must remain true throughout the implementation:
 19. No reduced-motion UI should be added, but extreme flashing should still be avoided.
 20. The app must be lightweight and avoid unnecessary always-on player phone connections.
 21. Do not create GitHub Actions or `.github/workflows/*` until Phase 12.
+22. Release-blocking Playwright full-tournament evidence must use the 48 -> 36 -> 24 -> 12
+    active voting-player progression across Rounds 1 through 4.
