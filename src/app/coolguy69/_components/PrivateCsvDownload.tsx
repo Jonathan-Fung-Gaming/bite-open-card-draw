@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 type PrivateCsvDownloadProps = {
   roundNumber: 1 | 2 | 3 | 4;
   enabled: boolean;
+  disabledReason?: string | null;
   autoDownloadKey: string | null;
   action: (roundNumber: 1 | 2 | 3 | 4) => Promise<{
     filename: string;
@@ -28,6 +29,7 @@ function downloadTextFile(filename: string, text: string) {
 export function PrivateCsvDownload({
   roundNumber,
   enabled,
+  disabledReason,
   autoDownloadKey,
   action,
 }: PrivateCsvDownloadProps) {
@@ -91,7 +93,7 @@ export function PrivateCsvDownload({
       </button>
       {!enabled ? (
         <p className="mt-2 text-xs text-metal-300">
-          Available after the final two-chart reveal finishes on stage.
+          {disabledReason ?? "Available after the final two-chart reveal finishes on stage."}
         </p>
       ) : null}
       {message ? (

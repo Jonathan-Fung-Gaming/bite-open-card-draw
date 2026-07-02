@@ -12,6 +12,80 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Flow Risk Remediation - 2026-07-02
+
+Status: implementation pass complete for Phases 1 through 6 of
+`docs/production-flow-risk-remediation-plan-2026-07-02.md`. This did not close checklist items in
+`docs/production-flow-risk-checklist-2026-07-02.md`; Phase 7 grouped browser evidence and Phase 8
+release evidence are still required before production readiness can be claimed.
+
+### Issue IDs Addressed In Code
+
+- PFR-001, PFR-002, PFR-006 through PFR-018, PFR-020, PFR-021, PFR-025 through PFR-030, PFR-032
+  through PFR-049 received implementation, guard, test, or documentation updates.
+- PFR-003, PFR-005, PFR-019 through PFR-024, PFR-027 through PFR-033, and PFR-046 still require
+  the grouped Phase 7 browser evidence window for closure.
+- PFR-040 remains a release data issue until the real chart CSV is either cleaned or the generated
+  strict import report is reviewed and accepted with dated release evidence.
+
+### Changed Areas
+
+- Persistence/admin transactions: normalized mutation facade, blocked Supabase snapshot actions,
+  host-lock CAS persistence, admin scalar contracts, and Supabase eligibility/result SQL.
+- Voting and public UX: pause-safe in-progress ballots, early duplicate-device warning,
+  first-submit/edit failure copy, reroll recovery copy, lighter polling, non-navigating stage QR,
+  and final-state refresh stability.
+- Admin event safety: production/event rehearsal controls are server-guarded and hidden unless an
+  explicit disposable rehearsal event is configured; private CSV export is active-host gated,
+  audited, and uses event/round/timestamp/nonce filenames.
+- Data/export/assets: formula-safe private CSV, unambiguous chart IDs/difficulty in export,
+  original/latest ballot timestamps, strict chart level parsing, import reports/checksums, runtime
+  image verification, and release artifact checklist sections.
+- Rehearsal commands: explicit memory smoke, Supabase dev rehearsal, production-flow validation,
+  production-flow browser evidence, and synthetic API-load command profiles.
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 44 files / 214 tests.
+- `rtk npm run import:charts` - passed, 4,426 charts imported; 9 repaired rows and 145 skipped
+  malformed rows were reported for release review.
+- `rtk npm run import:charts -- --strict` - failed as intended with 154 strict issues, proving final
+  event imports fail closed instead of silently accepting repaired/skipped source data.
+- `rtk npm run verify:real-chart-images` - passed against
+  `data/generated/charts-with-images.json`, 639 public cache files, and 4,426 charts.
+- `rtk npm run cache:chart-images` - passed, 639 cached image assets and 0 fallbacks.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e:memory-dev-smoke -- --validate-env-only` - passed.
+- `rtk npm run test:e2e:production-flow:validate` - passed with disposable dummy Supabase-shaped
+  env values for validation only; no browser run or external Supabase mutation was performed.
+- `rtk git diff --check` - passed.
+
+### Manual Review
+
+- Product rules remain unchanged: four rounds, two chart sets per round, seven charts per set, one
+  round ballot covering both sets, explicit no-bans completion, backend draw/result/tiebreak
+  authority, and final two-chart reveal.
+- Security boundaries were tightened: production test flags fail closed, rehearsal/reset controls
+  are deployment guarded, private CSV export requires active host control, and public/player routes
+  still do not expose live chart counts before reveal.
+- Supabase production manual ballot, reopen, and reset now fail closed while normalized RPCs for
+  those operations remain migration-disabled. That avoids unsafe snapshot rewrites but leaves those
+  emergency workflows blocked in Supabase until real transactional RPCs are implemented.
+
+### Risks And Assumptions
+
+- Full Playwright/browser evidence was intentionally not run in this pass. Run the grouped
+  `rtk npm run test:e2e:production-flow` window with real disposable Supabase credentials before
+  checking off browser-dependent PFR items.
+- The current real chart CSV is not strict-clean. Release requires either corrected source data or
+  an approved import report with reviewer/date/commit evidence.
+- Live Supabase two-session evidence is still needed for host-lock CAS and production persistence
+  closure; current evidence is local/unit/fake-Supabase plus command validation.
+- Because Supabase manual ballot/reopen/reset fail closed, operators need a documented fallback or
+  implemented transactional RPCs before relying on those emergency workflows in production.
+
 ## Phase 9 Rehearsal Harness Refactor - 2026-07-02
 
 Status: complete for local validation. The full hosted four-round rehearsal remains an explicit

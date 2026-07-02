@@ -26,6 +26,7 @@ supabase/.temp/
 
 # Generated chart import/cache output
 data/generated/*.json
+data/generated/*.sha256
 
 # Logs
 *.log

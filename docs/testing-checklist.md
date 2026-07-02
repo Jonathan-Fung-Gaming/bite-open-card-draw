@@ -14,8 +14,35 @@ source of truth when older phase labels are stale.
 - `rtk npm audit --omit=dev`
 - `rtk git diff --check`
 - `rtk npm run build`
-- `rtk npm run test:e2e`
-- E2E uses Playwright and runs the full Round 1 smoke flow.
+- `rtk npm run test:e2e:memory-dev-smoke`
+- `rtk npm run test:e2e:production-flow:validate`
+- `rtk npm run test:e2e:production-flow` during the grouped Phase 7 browser evidence window only.
+- `rtk npm run test:load:api-injection` for the focused synthetic load tool.
+- E2E command names must make the backend/server profile clear. Memory/dev smoke is not production
+  release evidence.
+
+## Production-Flow Browser Matrix
+
+Use this matrix for the grouped Phase 7 Playwright evidence window. The command must validate as
+`profile=production-flow`, `backend=supabase`, production server mode, explicit disposable event id,
+admin session heartbeat enabled, host heartbeat enabled, vote polling enabled, public refresh
+enabled, and `adminActionsOnly=enabled` before any item can be treated as release evidence.
+
+| Area                         | Required browser evidence                                                                                                                               | Issue IDs        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Production rehearsal command | `rtk npm run test:e2e:production-flow:validate` output plus the grouped browser command output and artifacts                                            | PFR-003, PFR-004 |
+| Full four-round flow         | Draw both sets, open voting, submit/edit ballots, close, compute, reveal, final two charts, private CSV download                                        | PFR-003, PFR-019 |
+| Timer transitions            | 10-minute window, below-75 extension, at/above-75 close, all-submitted final warning with edit, pause/resume, manual close, emergency reopen            | PFR-019          |
+| Negative ballots             | Incomplete set, third ban, wrong draw id, stale chart id, no-bans-plus-bans, voting before both sets drawn                                              | PFR-020          |
+| Identity and revisions       | Duplicate active username, active second-device warning, latest valid ballot wins, failed edit preserves prior ballot, pre-submit username change       | PFR-021          |
+| Anti-spoiler and live counts | `/stage`, `/room`, `/vote`, `/charts`, `/results`, and `/coolguy69` across voting, closed, computed, revealing, revealed, and complete states           | PFR-022          |
+| Tiebreaks                    | 2-, 3-, 4-, and 5-plus-way least-ban ties, zero-ballot ties, non-minimum ties, alphabetized reveal, 5-second committed-winner reveal                    | PFR-023          |
+| Admin workflows              | Roster active/inactive/reactivate, emergency add, manual overwrite, reset, reroll, reopen, result override, password re-entry, summaries, audit rows    | PFR-024          |
+| Load and polling             | 100 eligible players, multiple edits, real `/room` to `/vote` player route behavior, spectators/view-only traffic, route polling, request-rate artifact | PFR-005, PFR-030 |
+
+The synthetic load tool in `tests/load/load-rehearsal.spec.ts` is intentionally separate from the
+real player-route matrix. It may support API capacity debugging, but it does not close PFR-005 or
+PFR-030 by itself.
 
 ## Phase 1 Shell Tests
 

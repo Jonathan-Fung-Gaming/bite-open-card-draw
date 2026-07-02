@@ -17,7 +17,11 @@ export function normalizeChartType(value: string): "s" | "d" {
 }
 
 export function parseChartLevel(value: string): number {
-  const level = Number.parseInt(value.trim(), 10);
+  if (!/^(?:0*[1-9]\d*)$/.test(value)) {
+    throw new Error(`Unsupported chart level: ${value}`);
+  }
+
+  const level = Number(value);
 
   if (!Number.isFinite(level) || level <= 0) {
     throw new Error(`Unsupported chart level: ${value}`);

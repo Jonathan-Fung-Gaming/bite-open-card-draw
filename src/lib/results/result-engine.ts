@@ -62,6 +62,15 @@ function sortResultRows(left: ResultChartRow, right: ResultChartRow) {
   return left.chart.name.localeCompare(right.chart.name);
 }
 
+export function filterBallotsByEligiblePlayers(
+  ballots: readonly RoundBallot[],
+  eligiblePlayers: readonly EligiblePlayerSnapshot[],
+) {
+  const eligiblePlayerIds = new Set(eligiblePlayers.map((player) => player.id));
+
+  return ballots.filter((ballot) => eligiblePlayerIds.has(ballot.playerId));
+}
+
 export function buildWheelSlots(candidates: DrawnChartSummary[], zeroBallotTiebreak = false) {
   if (zeroBallotTiebreak) {
     return [...candidates];
@@ -147,6 +156,7 @@ export function computeRoundResult(input: {
   randomIndex?: RandomIndex;
 }): RoundResultSnapshot {
   const draws = [...input.draws].sort((left, right) => left.setOrder - right.setOrder);
+  const countedBallots = filterBallotsByEligiblePlayers(input.ballots, input.eligiblePlayers);
 
   assertRoundDrawsReady(input.roundNumber, draws);
 
@@ -156,8 +166,8 @@ export function computeRoundResult(input: {
     computedAt: input.computedAt,
     eligiblePlayers: [...input.eligiblePlayers],
     sets: [
-      computeResultSet(draws[0] as DrawRecord, input.ballots, input.randomIndex),
-      computeResultSet(draws[1] as DrawRecord, input.ballots, input.randomIndex),
+      computeResultSet(draws[0] as DrawRecord, countedBallots, input.randomIndex),
+      computeResultSet(draws[1] as DrawRecord, countedBallots, input.randomIndex),
     ],
     revealPhase: "computed",
     revealPhaseStartedAt: input.computedAt,

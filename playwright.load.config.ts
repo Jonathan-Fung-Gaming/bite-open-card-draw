@@ -10,7 +10,10 @@ export default defineConfig({
   },
   fullyParallel: false,
   workers: 1,
-  reporter: [["list", { printSteps: true }], ["json", { outputFile: "test-results/load/results.json" }]],
+  reporter: [
+    ["list", { printSteps: true }],
+    ["json", { outputFile: "test-results/load/results.json" }],
+  ],
   use: {
     baseURL: e2eBaseURL,
     acceptDownloads: true,
@@ -20,12 +23,14 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "load-chromium",
+      name: "load-api-injection-chromium",
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    ...e2eWebServer,
-    timeout: 180_000,
-  },
+  webServer: e2eWebServer
+    ? {
+        ...e2eWebServer,
+        timeout: 180_000,
+      }
+    : undefined,
 });

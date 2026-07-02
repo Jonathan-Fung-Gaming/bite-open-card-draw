@@ -15,6 +15,8 @@ export type RoundBallot = {
   playerStartggUsername: string;
   choices: BallotSetChoice[];
   submittedAt: string;
+  firstSubmittedAt?: string | null;
+  lastRevisionAt?: string | null;
   revision: number;
   editTokenHash?: string | null;
   source: "player" | "manual_admin";

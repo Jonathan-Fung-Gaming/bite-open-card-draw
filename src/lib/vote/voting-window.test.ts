@@ -277,6 +277,65 @@ describe("voting window store", () => {
     expect(after.turnoutRatio).toBeCloseTo(1 / 3);
   });
 
+  it("recomputes all-submitted final warning when an emergency player is added", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players.slice(0, 2),
+      nowMs: 0,
+    });
+
+    store.advanceVoting(1, ["player-1", "player-2"], 5_000);
+    expect(snapshot(store, ["player-1", "player-2"], 5_000, players).status).toBe(
+      "final_30_seconds",
+    );
+
+    store.addEligiblePlayerToOpenRound({
+      roundNumber: 1,
+      player: players[2] ?? { id: "player-3", startggUsername: "Charlie" },
+      submittedPlayerIds: ["player-1", "player-2"],
+      nowMs: 6_000,
+    });
+
+    const after = snapshot(store, ["player-1", "player-2"], 6_000, players);
+
+    expect(after.status).toBe("voting_open");
+    expect(after.finalWarningStartedAt).toBeNull();
+    expect(after.eligibleCount).toBe(3);
+    expect(after.submittedCount).toBe(2);
+    expect(after.remainingMs).toBe(TEN_MINUTES_MS - 6_000);
+    expect(after.canSubmit).toBe(true);
+  });
+
+  it("blocks emergency eligibility changes after voting closes, compute, or reveal", () => {
+    const store = new VotingWindowStore();
+    const player = players[2] ?? { id: "player-3", startggUsername: "Charlie" };
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players.slice(0, 2),
+      nowMs: 0,
+    });
+    store.closeVoting(1, 1_000);
+
+    expect(() =>
+      store.addEligiblePlayerToOpenRound({ roundNumber: 1, player, nowMs: 1_500 }),
+    ).toThrow("Current-round eligibility can change only while voting is open or paused");
+
+    store.setResultsPhase(1, "results_computed");
+    expect(() =>
+      store.addEligiblePlayerToOpenRound({ roundNumber: 1, player, nowMs: 2_000 }),
+    ).toThrow("Current-round eligibility can change only while voting is open or paused");
+
+    store.setResultsPhase(1, "results_revealing");
+    expect(() =>
+      store.addEligiblePlayerToOpenRound({ roundNumber: 1, player, nowMs: 2_500 }),
+    ).toThrow("Current-round eligibility can change only while voting is open or paused");
+  });
+
   it("blocks manual ballots after results reveal", () => {
     const store = new VotingWindowStore();
 

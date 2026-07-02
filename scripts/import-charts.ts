@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   createFallbackChartRows,
   importChartRows,
-  parseChartCsv,
+  parseChartCsvWithReport,
 } from "../src/lib/charts/importer";
 import type { ChartExclusion } from "../src/lib/charts/types";
 
@@ -14,8 +15,16 @@ function readArg(name: string, fallback: string) {
   return arg ? arg.slice(prefix.length) : fallback;
 }
 
+function hasFlag(name: string) {
+  return process.argv.includes(`--${name}`);
+}
+
 function writeJson(filePath: string, value: unknown) {
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function sha256Text(value: string) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function isChartExclusion(value: unknown): value is ChartExclusion {
@@ -51,26 +60,43 @@ function readChartExclusions(filePath: string) {
 
 const sourcePath = readArg("source", "data/source/charts.csv");
 const outputDir = readArg("output-dir", "data/generated");
+const reviewedBy = readArg("reviewed-by", "");
 const absoluteSourcePath = path.resolve(process.cwd(), sourcePath);
 const absoluteOutputDir = path.resolve(process.cwd(), outputDir);
 const usedFixture = !existsSync(absoluteSourcePath);
 const exclusionsPath = path.join(absoluteOutputDir, "chart-exclusions.json");
+const strict = hasFlag("strict");
 
-const rows = usedFixture
-  ? createFallbackChartRows()
-  : parseChartCsv(readFileSync(absoluteSourcePath, "utf8"));
+const sourceText = usedFixture ? null : readFileSync(absoluteSourcePath, "utf8");
+const parsed = sourceText
+  ? parseChartCsvWithReport(sourceText)
+  : {
+      rows: createFallbackChartRows(),
+      repairedRows: [],
+      sourceSha256: null,
+    };
 
 mkdirSync(absoluteOutputDir, { recursive: true });
 
 const exclusions = readChartExclusions(exclusionsPath);
-const { charts, report } = importChartRows(rows, {
+const { charts, report } = importChartRows(parsed.rows, {
   sourcePath,
   usedFixture,
   exclusions,
+  strict,
+  sourceSha256: parsed.sourceSha256,
+  repairedRows: parsed.repairedRows,
+  reviewedBy: reviewedBy || null,
+  reviewedAt: reviewedBy ? new Date().toISOString() : null,
 });
 
 writeJson(path.join(absoluteOutputDir, "charts.json"), charts);
-writeJson(path.join(absoluteOutputDir, "chart-import-report.json"), report);
+const reportJson = `${JSON.stringify(report, null, 2)}\n`;
+writeFileSync(path.join(absoluteOutputDir, "chart-import-report.json"), reportJson);
+writeFileSync(
+  path.join(absoluteOutputDir, "chart-import-report.sha256"),
+  `${sha256Text(reportJson)}  chart-import-report.json\n`,
+);
 
 if (!existsSync(exclusionsPath)) {
   writeJson(exclusionsPath, []);
@@ -88,9 +114,29 @@ if (report.duplicateChartKeys.length > 0) {
   );
 }
 
+if (report.repairedRows.length > 0) {
+  console.log(
+    `Repaired ${report.repairedRows.length} source rows; review data/generated/chart-import-report.json before release.`,
+  );
+}
+
+if (report.skippedRows.length > 0) {
+  console.log(
+    `Skipped ${report.skippedRows.length} malformed source rows; review data/generated/chart-import-report.json before release.`,
+  );
+}
+
 if (report.poolsWithTooFewCharts.length > 0) {
   console.error(
     `Required pools with fewer than 7 eligible charts: ${report.poolsWithTooFewCharts.join(", ")}`,
   );
+  process.exitCode = 1;
+}
+
+if (strict && report.strictFailures.length > 0) {
+  console.error(`Strict chart import failed with ${report.strictFailures.length} issue(s):`);
+  for (const failure of report.strictFailures.slice(0, 10)) {
+    console.error(`- ${failure}`);
+  }
   process.exitCode = 1;
 }

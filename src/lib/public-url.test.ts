@@ -36,6 +36,17 @@ describe("public URL helpers", () => {
     expect(buildPublicRouteUrl("/room")).toBe("http://127.0.0.1:3100/room");
   });
 
+  it("fails closed when local public URL test flags are enabled in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://bite-open-card-draw.vercel.app");
+    vi.stubEnv("TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL", "true");
+    vi.stubEnv("TOURNAMENT_TEST_PUBLIC_SITE_URL", "http://127.0.0.1:3100");
+
+    expect(() => buildPublicRouteUrl("/room")).toThrow(
+      "TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL cannot be enabled",
+    );
+  });
+
   it("formats a short event URL for display below the QR code", () => {
     expect(formatShortEventUrl("https://event.example.com/room")).toBe("event.example.com/room");
     expect(formatShortEventUrl("/room")).toBe("/room");

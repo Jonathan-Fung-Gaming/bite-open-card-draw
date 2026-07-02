@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import { expectPrivateCsvExport } from "../phase9/fixtures/private-csv";
 
 function getAdminPassword() {
@@ -22,11 +22,19 @@ function getTestRouteHeaders() {
 
   return { "x-tournament-test-token": token };
 }
-const PLAYER_COUNT = 50;
-const LOAD_CONCURRENCY = Number(process.env.E2E_LOAD_CONCURRENCY ?? 3);
+function positiveIntegerEnv(name: string, fallback: number) {
+  const parsed = Number.parseInt(process.env[name] ?? "", 10);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const PLAYER_COUNT = positiveIntegerEnv("E2E_LOAD_PLAYER_COUNT", 100);
+const SPECTATOR_COUNT = positiveIntegerEnv("E2E_LOAD_SPECTATOR_COUNT", 12);
+const LOAD_CONCURRENCY = positiveIntegerEnv("E2E_LOAD_CONCURRENCY", 5);
 const LOAD_CHUNK_DELAY_MS = Number(process.env.E2E_LOAD_CHUNK_DELAY_MS ?? 750);
 const EDIT_EVERY_N_PLAYERS = 5;
 const HOSTED_REFRESH_TIMEOUT_MS = 90_000;
+const SPECTATOR_PATHS = ["/room", "/charts", "/results"] as const;
 
 function playerName(index: number) {
   return `Load Player ${String(index + 1).padStart(3, "0")}`;
@@ -166,6 +174,33 @@ async function expectAdminTextAfterNavigation(page: Page, baseURL: string, text:
     .toBe(true);
 }
 
+async function openSpectatorTraffic(browser: Browser, baseURL: string) {
+  const spectators = await Promise.all(
+    Array.from({ length: SPECTATOR_COUNT }, async (_, index) => {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      const path = SPECTATOR_PATHS[index % SPECTATOR_PATHS.length] ?? "/charts";
+
+      await goto(page, baseURL, path);
+
+      return { page, path };
+    }),
+  );
+
+  const roomSpectator = spectators.find((spectator) => spectator.path === "/room")?.page;
+  const chartsSpectator = spectators.find((spectator) => spectator.path === "/charts")?.page;
+  const resultsSpectator = spectators.find((spectator) => spectator.path === "/results")?.page;
+
+  if (!roomSpectator || !chartsSpectator || !resultsSpectator) {
+    throw new Error("Load rehearsal requires room, charts, and results spectator pages.");
+  }
+
+  await expect(roomSpectator.getByRole("link", { name: "View charts only" })).toBeVisible();
+  await expect(chartsSpectator.getByTestId("view-only-status")).toContainText("Voting open");
+  await expect(resultsSpectator.getByRole("heading", { name: "Round 1 Results" })).toBeVisible();
+
+  return { chartsSpectator, pages: spectators.map((spectator) => spectator.page) };
+}
+
 async function advanceRevealStep(page: Page, baseURL: string, settleMs: number) {
   await loginAndTakeHost(page, baseURL);
 
@@ -209,13 +244,25 @@ async function advanceToFinalReveal(page: Page, baseURL: string) {
     .toBe(true);
 }
 
-test("50-player sporadic browser rehearsal submits, edits, and exports final CSV", async ({
+test("100-player synthetic API load injection keeps public routes active and exports final CSV", async ({
   page,
   browser,
   request,
   baseURL,
 }) => {
   test.setTimeout(600_000);
+  test.info().annotations.push(
+    {
+      type: "PFR-005",
+      description:
+        "Focused synthetic /api/e2e/load-ballot injection; real player-route load remains separate Phase 7 evidence.",
+    },
+    {
+      type: "PFR-030",
+      description:
+        "Keeps stage and spectator routes active while 100 eligible players submit/edit.",
+    },
+  );
 
   if (!baseURL) {
     throw new Error("Missing Playwright baseURL.");
@@ -234,18 +281,10 @@ test("50-player sporadic browser rehearsal submits, edits, and exports final CSV
   await drawRoundAndOpenVoting(page);
 
   const stagePage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-  const roomSpectator = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  const chartsSpectator = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  const resultsSpectator = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
   await goto(stagePage, baseURL, "/stage");
   await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible();
-  await goto(roomSpectator, baseURL, "/room");
-  await expect(roomSpectator.getByRole("link", { name: "View charts only" })).toBeVisible();
-  await goto(chartsSpectator, baseURL, "/charts");
-  await expect(chartsSpectator.getByTestId("view-only-status")).toContainText("Voting open");
-  await goto(resultsSpectator, baseURL, "/results");
-  await expect(resultsSpectator.getByRole("heading", { name: "Round 1 Results" })).toBeVisible();
+  const spectatorTraffic = await openSpectatorTraffic(browser, baseURL);
 
   for (let index = 0; index < players.length; index += LOAD_CONCURRENCY) {
     const chunk = players.slice(index, index + LOAD_CONCURRENCY);
@@ -266,8 +305,8 @@ test("50-player sporadic browser rehearsal submits, edits, and exports final CSV
   await loginAndTakeHost(page, baseURL);
   await expect(page.getByText(`${PLAYER_COUNT} / ${PLAYER_COUNT}`)).toBeVisible();
 
-  await chartsSpectator.reload({ waitUntil: "domcontentloaded" });
-  await expect(chartsSpectator.getByTestId("view-only-status")).toContainText(
+  await spectatorTraffic.chartsSpectator.reload({ waitUntil: "domcontentloaded" });
+  await expect(spectatorTraffic.chartsSpectator.getByTestId("view-only-status")).toContainText(
     /Voting open|Final 30 seconds|Results being revealed/,
   );
 
@@ -307,9 +346,7 @@ test("50-player sporadic browser rehearsal submits, edits, and exports final CSV
   expect(csv).toContain("selected_set_2_chart");
 
   await stagePage.close();
-  await roomSpectator.close();
-  await chartsSpectator.close();
-  await resultsSpectator.close();
+  await Promise.all(spectatorTraffic.pages.map((spectatorPage) => spectatorPage.close()));
   await page.getByRole("button", { name: "Release" }).click();
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });

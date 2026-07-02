@@ -186,7 +186,13 @@ async function persistHostLockStateUnlocked(
     return;
   }
 
-  await repository.persistHostLock(stores.hostLockStore.exportSnapshot());
+  const baseline = hydrationBaselines.get(stores)?.hostLock ?? null;
+  const persisted = await repository.persistHostLock({
+    baseline,
+    current: stores.hostLockStore.exportSnapshot(),
+  });
+
+  stores.hostLockStore.importSnapshot(persisted);
   hydrationBaselines.set(stores, createOperationalStateSnapshot(stores));
 }
 

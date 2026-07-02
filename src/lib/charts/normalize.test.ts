@@ -28,6 +28,14 @@ describe("chart normalization", () => {
     expect(parseChartLevel("09")).toBe(9);
   });
 
+  it("rejects non-strict chart levels", () => {
+    expect(() => parseChartLevel("16x")).toThrow("Unsupported chart level");
+    expect(() => parseChartLevel(" 16 ")).toThrow("Unsupported chart level");
+    expect(() => parseChartLevel("")).toThrow("Unsupported chart level");
+    expect(() => parseChartLevel("16.5")).toThrow("Unsupported chart level");
+    expect(() => parseChartLevel("0")).toThrow("Unsupported chart level");
+  });
+
   it("marks only tournament pools as tournament scope", () => {
     expect(normalizeChartRow(rawRow, 2).tournamentScope).toBe(true);
     expect(normalizeChartRow({ ...rawRow, level: "09" }, 3).tournamentScope).toBe(false);

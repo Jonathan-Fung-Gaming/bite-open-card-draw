@@ -47,6 +47,10 @@ function decodeAdminSessionId(cookieValue: string) {
   return payload.sessionId;
 }
 
+function isAdminActionsOnly() {
+  return process.env.E2E_USE_ADMIN_ACTIONS_ONLY === "true";
+}
+
 export class AdminPage {
   constructor(
     readonly page: Page,
@@ -70,7 +74,10 @@ export class AdminPage {
       this.assertNoAdminError();
     }
 
-    return this.page.getByText("Host Lock", { exact: true }).isVisible().catch(() => false);
+    return this.page
+      .getByText("Host Lock", { exact: true })
+      .isVisible()
+      .catch(() => false);
   }
 
   async loginAndTakeHost() {
@@ -82,20 +89,23 @@ export class AdminPage {
       const releaseButton = this.page.getByRole("button", { name: "Release" });
 
       if (await releaseButton.isEnabled()) {
-        await this.installSupabaseHostLockForCurrentAdmin();
         await expect(this.page.getByText("Voting Controls")).toBeVisible();
         return;
       }
 
-      const installedSupabaseHost = await this.installSupabaseHostLockForCurrentAdmin();
+      const installedSupabaseHost = isAdminActionsOnly()
+        ? false
+        : await this.installSupabaseHostLockForCurrentAdmin();
 
       if (installedSupabaseHost) {
         await expect(this.page.getByText("Voting Controls")).toBeVisible();
         return;
       }
 
-      if (getSupabaseE2eConfig()) {
-        throw new Error("Supabase host lock direct install completed but admin page stayed inactive.");
+      if (getSupabaseE2eConfig() && !isAdminActionsOnly()) {
+        throw new Error(
+          "Supabase host lock direct install completed but admin page stayed inactive.",
+        );
       }
 
       const takeHostButton = this.page.getByRole("button", { name: "Take Host Control" });
@@ -190,10 +200,11 @@ export class AdminPage {
 
   async startRehearsalMode(reason: string) {
     if (
-      await installSupabaseRehearsalState({
+      !isAdminActionsOnly() &&
+      (await installSupabaseRehearsalState({
         adminSessionId: await this.getCurrentAdminSessionId(),
         reason,
-      })
+      }))
     ) {
       await this.expectSupabaseRehearsalMode();
       return;
@@ -235,7 +246,7 @@ export class AdminPage {
   }
 
   async setCurrentRound(roundNumber: number) {
-    if (await setSupabaseCurrentRound(roundNumber)) {
+    if (!isAdminActionsOnly() && (await setSupabaseCurrentRound(roundNumber))) {
       await this.goto();
       return;
     }
@@ -261,11 +272,16 @@ export class AdminPage {
       .getByText(`Round ${roundNumber} - Set ${setOrder}`, { exact: true })
       .locator("xpath=ancestor::section[1]");
 
-    await clickServerAction(this.page, setSection.getByRole("button", { name: "Draw Set" }), 5_000, {
-      requireServerActionResponse: true,
-      responseTimeoutMs: 60_000,
-      submitForm: true,
-    });
+    await clickServerAction(
+      this.page,
+      setSection.getByRole("button", { name: "Draw Set" }),
+      5_000,
+      {
+        requireServerActionResponse: true,
+        responseTimeoutMs: 60_000,
+        submitForm: true,
+      },
+    );
 
     if (await expectSupabaseRoundSetDrawReady(roundNumber, setOrder)) {
       await this.goto();
@@ -300,7 +316,10 @@ export class AdminPage {
 
   async openVoting() {
     await this.loginAndTakeHost();
-    await clickServerAction(this.page, this.page.getByRole("button", { name: "Open Voting", exact: true }));
+    await clickServerAction(
+      this.page,
+      this.page.getByRole("button", { name: "Open Voting", exact: true }),
+    );
   }
 
   async closeVoting() {
@@ -351,7 +370,9 @@ export class AdminPage {
           throw new Error(`Round ${roundNumber} is in unknown reveal phase ${currentPhase}.`);
         }
 
-        console.log(`[phase9] round ${roundNumber}: advance reveal ${currentPhase} -> ${nextPhase}`);
+        console.log(
+          `[phase9] round ${roundNumber}: advance reveal ${currentPhase} -> ${nextPhase}`,
+        );
         await this.clickNextRevealStep();
         await expectSupabaseRevealPhase(roundNumber, nextPhase);
         await waitForSupabaseTiebreakRevealIfNeeded(roundNumber, nextPhase);
@@ -386,10 +407,9 @@ export class AdminPage {
     await this.loginAndTakeHost();
 
     const expectedFilename = `round-${roundNumber}-private-ballots.csv`;
-    const downloadPromise = this.page
-      .waitForEvent("download", {
-        timeout: 20_000,
-      });
+    const downloadPromise = this.page.waitForEvent("download", {
+      timeout: 20_000,
+    });
     const downloadButton = this.page.getByRole("button", { name: "Download private ballot CSV" });
 
     await expect(downloadButton).toBeEnabled({ timeout: HOSTED_ACTION_TIMEOUT_MS });
@@ -439,6 +459,10 @@ export class AdminPage {
   }
 
   private async installSupabaseHostLockForCurrentAdmin() {
+    if (isAdminActionsOnly()) {
+      return false;
+    }
+
     if (!(await this.visit())) {
       return false;
     }

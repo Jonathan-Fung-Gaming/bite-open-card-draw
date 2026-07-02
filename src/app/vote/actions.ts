@@ -17,7 +17,7 @@ import {
   getVotingRoundSnapshot,
   revalidateTournamentViews,
 } from "@/lib/server/voting-round";
-import type { SubmitRoundBallotInput } from "@/lib/vote/ballot";
+import { type SubmitRoundBallotInput, validateRoundBallot } from "@/lib/vote/ballot";
 import {
   BALLOT_EDIT_TOKEN_MAX_LENGTH,
   buildPublicBallotLookup,
@@ -140,6 +140,18 @@ export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInpu
   });
 
   const editTokenHash = hashBallotEditToken(input.editToken);
+  await hydrateTournamentState();
+  const activeDraws = getRoundDrawRecords(input.roundNumber);
+
+  validateRoundBallot(
+    {
+      roundNumber: input.roundNumber,
+      playerId: input.playerId,
+      playerStartggUsername: input.playerStartggUsername ?? input.playerId,
+      choices: input.choices,
+    },
+    activeDraws,
+  );
 
   if (getTournamentStateBackend() === "supabase") {
     const ballot = await submitNormalizedPlayerBallot({
@@ -194,6 +206,7 @@ export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInpu
       snapshot.serverNow,
       { source: "player", editTokenHash },
     );
+    adminState.rosterStore.markTournamentHistory(player.id, snapshot.serverNow);
 
     adminState.votingWindowStore.advanceVoting(
       input.roundNumber,

@@ -1,10 +1,54 @@
 import { z } from "zod";
 
-const uuidSchema = z.string().uuid();
-const roundNumberSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
-const setOrderSchema = z.union([z.literal(1), z.literal(2)]);
+export const uuidSchema = z.string().uuid();
+export const roundNumberSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+]);
+export const setOrderSchema = z.union([z.literal(1), z.literal(2)]);
 const passwordSchema = z.string().min(1);
 const reasonSchema = z.string().trim().min(1);
+
+function coerceIntegerFormValue(value: unknown) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    return /^\d+$/.test(trimmed) ? Number(trimmed) : value;
+  }
+
+  return value;
+}
+
+export const roundNumberInputSchema = z.preprocess(coerceIntegerFormValue, roundNumberSchema);
+export const setOrderInputSchema = z.preprocess(coerceIntegerFormValue, setOrderSchema);
+export const durationMinutesInputSchema = z.preprocess(
+  coerceIntegerFormValue,
+  z.number().int().min(1).max(10),
+);
+export const overrideResultTargetInputSchema = z
+  .string()
+  .trim()
+  .transform((value, context) => {
+    const [setOrderValue, chartIdValue, extraValue] = value.split("|");
+    const setOrder = setOrderInputSchema.safeParse(setOrderValue);
+    const chartId = uuidSchema.safeParse(chartIdValue);
+
+    if (extraValue !== undefined || !setOrder.success || !chartId.success) {
+      context.addIssue({
+        code: "custom",
+        message: "Result target must include set order and chart id.",
+      });
+
+      return z.NEVER;
+    }
+
+    return {
+      setOrder: setOrder.data,
+      chartId: chartId.data,
+    };
+  });
 
 export const adminLoginInputSchema = z.object({
   password: passwordSchema,
@@ -47,58 +91,58 @@ export const setPlayerActiveStatusInputSchema = z.object({
 
 export const addPlayerToCurrentRoundEligibilityInputSchema = z.object({
   playerId: uuidSchema,
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
   adminPassword: passwordSchema,
   reason: reasonSchema,
 });
 
 export const drawRoundSetInputSchema = z.object({
-  roundNumber: roundNumberSchema,
-  setOrder: setOrderSchema,
+  roundNumber: roundNumberInputSchema,
+  setOrder: setOrderInputSchema,
 });
 
 export const rerollOneChartInputSchema = z.object({
-  roundNumber: roundNumberSchema,
-  setOrder: setOrderSchema,
+  roundNumber: roundNumberInputSchema,
+  setOrder: setOrderInputSchema,
   drawnChartId: uuidSchema,
   adminPassword: passwordSchema,
   reason: reasonSchema,
 });
 
 export const rerollRoundSetInputSchema = z.object({
-  roundNumber: roundNumberSchema,
-  setOrder: setOrderSchema,
+  roundNumber: roundNumberInputSchema,
+  setOrder: setOrderInputSchema,
   adminPassword: passwordSchema,
   reason: reasonSchema,
 });
 
 export const rerollFullRoundInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
   adminPassword: passwordSchema,
   reason: reasonSchema,
 });
 
 export const openVotingWindowInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
 });
 
 export const pauseVotingWindowInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
 });
 
 export const resumeVotingWindowInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
 });
 
 export const reopenVotingWindowInputSchema = z.object({
-  roundNumber: roundNumberSchema,
-  durationMinutes: z.number().int().min(1).max(10),
+  roundNumber: roundNumberInputSchema,
+  durationMinutes: durationMinutesInputSchema,
   adminPassword: passwordSchema,
   reason: reasonSchema,
 });
 
 export const submitBallotInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
   playerId: uuidSchema,
   editTokenHash: z.string().trim().min(1).optional(),
   choices: z
@@ -120,45 +164,45 @@ export const manualBallotOverrideInputSchema = submitBallotInputSchema.extend({
 });
 
 export const closeVotingWindowInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
 });
 
 export const resetRoundInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
   adminPassword: passwordSchema,
   reason: reasonSchema,
 });
 
 export const computeResultsInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
   adminSessionId: uuidSchema.optional(),
 });
 
 export const commitTiebreakInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
   drawId: uuidSchema,
   roundSetId: uuidSchema,
   candidateChartIds: z.array(uuidSchema).min(2),
 });
 
 export const markResultsRevealedInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
 });
 
 export const advanceResultRevealInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
 });
 
 export const overrideResultInputSchema = z.object({
-  roundNumber: roundNumberSchema,
-  setOrder: setOrderSchema,
+  roundNumber: roundNumberInputSchema,
+  setOrder: setOrderInputSchema,
   chartId: uuidSchema,
   adminPassword: passwordSchema,
   reason: reasonSchema,
 });
 
 export const setCurrentRoundInputSchema = z.object({
-  roundNumber: roundNumberSchema,
+  roundNumber: roundNumberInputSchema,
 });
 
 export const advanceCurrentRoundInputSchema = z.object({});

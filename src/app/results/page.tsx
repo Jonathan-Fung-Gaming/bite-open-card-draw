@@ -114,7 +114,6 @@ export default async function ResultsPage() {
 
   return (
     <main className="min-h-screen">
-      <ResultsAutoRefresh />
       <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Results revealed" />
       <section className="mx-auto grid max-w-6xl gap-5 px-5 py-5">
         <PublicResultSummary result={result} />

@@ -166,6 +166,28 @@ export class RosterStore {
     return updated;
   }
 
+  markTournamentHistory(playerId: string, now = new Date().toISOString()) {
+    const player = this.players.get(playerId);
+
+    if (!player) {
+      throw new Error("Player not found.");
+    }
+
+    if (player.hasTournamentHistory && player.updatedAt === now) {
+      return player;
+    }
+
+    const updated = {
+      ...player,
+      hasTournamentHistory: true,
+      updatedAt: now,
+    };
+
+    this.players.set(playerId, updated);
+
+    return updated;
+  }
+
   addPlayerToCurrentRoundEligibility(input: {
     playerId: string;
     roundNumber: 1 | 2 | 3 | 4;

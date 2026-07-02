@@ -56,19 +56,28 @@ export type ChartDuplicate = {
   duplicateSourceRowNumber: number;
 };
 
+export type ChartImportRowDiagnostic = {
+  sourceRowNumber: number;
+  reason: string;
+};
+
 export type ChartImportReport = {
   sourcePath: string;
   usedFixture: boolean;
   generatedAt: string;
+  sourceSha256: string | null;
+  strictMode: boolean;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
   totalSourceRows: number;
   importedCharts: number;
-  skippedRows: Array<{
-    sourceRowNumber: number;
-    reason: string;
-  }>;
+  repairedRows: ChartImportRowDiagnostic[];
+  skippedRows: ChartImportRowDiagnostic[];
+  outOfScopeRows: ChartImportRowDiagnostic[];
   duplicateChartKeys: ChartDuplicate[];
   poolCounts: Record<RequiredChartPool, number>;
   poolsWithTooFewCharts: RequiredChartPool[];
+  strictFailures: string[];
 };
 
 export type ChartExclusion = {

@@ -4,8 +4,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Json } from "@/lib/db/database.types";
 import {
   executeNormalizedTransactionalMutation,
+  NORMALIZED_ALL_RUNTIME_RPC_NAMES,
+  NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES,
+  NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATIONS,
+  NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS,
   NORMALIZED_RUNTIME_RPC_NAMES,
   NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS,
+  assertNormalizedTransactionalMutationImplemented,
+  type NormalizedBlockedTransactionalMutationName,
+  type NormalizedRuntimeMutationName,
   type NormalizedTransactionalMutationName,
 } from "@/lib/server/transactions/normalized-runtime";
 
@@ -29,8 +36,12 @@ type RpcCall = {
   };
 };
 
-const requiredMutationNames: NormalizedTransactionalMutationName[] = [
+const implementedMutationNames: NormalizedTransactionalMutationName[] = [
   "submitBallot",
+  "computeResults",
+];
+
+const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
   "manualBallotOverride",
   "claimActiveVoterPresence",
   "touchActiveVoterPresence",
@@ -48,7 +59,6 @@ const requiredMutationNames: NormalizedTransactionalMutationName[] = [
   "rerollRoundSet",
   "rerollFullRound",
   "postVoteRerollInvalidation",
-  "computeResults",
   "advanceResultReveal",
   "markResultsRevealed",
   "overrideResult",
@@ -59,6 +69,11 @@ const requiredMutationNames: NormalizedTransactionalMutationName[] = [
   "adminSessionRevoke",
 ];
 
+const allMutationNames: NormalizedRuntimeMutationName[] = [
+  ...implementedMutationNames,
+  ...blockedMutationNames,
+];
+
 function readMigrations() {
   const migrationsDirectory = path.join(process.cwd(), "supabase/migrations");
 
@@ -67,6 +82,19 @@ function readMigrations() {
     .sort()
     .map((fileName) => readFileSync(path.join(migrationsDirectory, fileName), "utf8"))
     .join("\n");
+}
+
+function latestRpcDefinition(migrations: string, rpcName: string) {
+  const matches = [
+    ...migrations.matchAll(
+      new RegExp(
+        `create or replace function public\\.${rpcName}\\s*\\(\\s*p_event_id text,\\s*p_payload jsonb\\s*\\)[\\s\\S]*?(?=\\ncreate or replace function public\\.|\\nrevoke execute on function public\\.|$)`,
+        "gi",
+      ),
+    ),
+  ];
+
+  return matches.at(-1)?.[0] ?? "";
 }
 
 function createMockRpcClient(
@@ -103,20 +131,51 @@ describe("normalized runtime transactional mutations", () => {
   });
 
   it("defines every required transactional mutation", () => {
-    expect(Object.keys(NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS)).toEqual(requiredMutationNames);
-    expect(Object.keys(NORMALIZED_RUNTIME_RPC_NAMES)).toEqual(requiredMutationNames);
+    expect(Object.keys(NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS)).toEqual(
+      implementedMutationNames,
+    );
+    expect(Object.keys(NORMALIZED_RUNTIME_RPC_NAMES)).toEqual(implementedMutationNames);
+    expect(Object.keys(NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS)).toEqual(
+      blockedMutationNames,
+    );
+    expect(Object.keys(NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES)).toEqual(blockedMutationNames);
+    expect(Object.keys(NORMALIZED_ALL_RUNTIME_RPC_NAMES)).toEqual(allMutationNames);
   });
 
-  it("has a Supabase RPC function for every transactional mutation", () => {
+  it("has a Supabase RPC function for every implemented or blocked transactional mutation", () => {
     const migrations = readMigrations();
 
-    for (const rpcName of Object.values(NORMALIZED_RUNTIME_RPC_NAMES)) {
+    for (const rpcName of Object.values(NORMALIZED_ALL_RUNTIME_RPC_NAMES)) {
       expect(migrations).toMatch(
         new RegExp(
           `function public\\.${rpcName}\\s*\\(\\s*p_event_id text,\\s*p_payload jsonb\\s*\\)`,
           "i",
         ),
       );
+    }
+  });
+
+  it("blocks runtime mutations whose latest migration body is still disabled", () => {
+    const migrations = readMigrations();
+
+    expect(Object.keys(NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATIONS)).toEqual(blockedMutationNames);
+
+    for (const [name, rpcName] of Object.entries(NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES)) {
+      const definition = latestRpcDefinition(migrations, rpcName);
+
+      expect(definition, `${name} should have a migration definition`).not.toBe("");
+      expect(definition, `${name} should remain explicitly blocked`).toContain(
+        "normalized_runtime_transaction_disabled",
+      );
+      expect(() =>
+        assertNormalizedTransactionalMutationImplemented(name as NormalizedRuntimeMutationName),
+      ).toThrow(/currently disabled in migrations/);
+    }
+  });
+
+  it("does not mark implemented runtime mutations as blocked", () => {
+    for (const name of implementedMutationNames) {
+      expect(() => assertNormalizedTransactionalMutationImplemented(name)).not.toThrow();
     }
   });
 
@@ -163,8 +222,8 @@ describe("normalized runtime transactional mutations", () => {
     vi.stubEnv("TOURNAMENT_EVENT_ID", "env-event");
 
     await executeNormalizedTransactionalMutation(
-      "adminSessionLogout",
-      { sessionId: uuidA },
+      "computeResults",
+      { roundNumber: 1 },
       { supabase: createMockRpcClient(calls) },
     );
 
@@ -176,8 +235,12 @@ describe("normalized runtime transactional mutations", () => {
 
     await expect(
       executeNormalizedTransactionalMutation(
-        "claimActiveVoterPresence",
-        { playerId: uuidA, deviceId: "short", expiresAt: "not-a-date" },
+        "submitBallot",
+        {
+          roundNumber: 1,
+          playerId: "not-a-uuid",
+          choices: [],
+        },
         {
           eventId: "event-a",
           supabase: createMockRpcClient(calls),
@@ -191,8 +254,8 @@ describe("normalized runtime transactional mutations", () => {
   it("surfaces Supabase RPC errors", async () => {
     await expect(
       executeNormalizedTransactionalMutation(
-        "adminSessionLogout",
-        { sessionId: uuidA },
+        "computeResults",
+        { roundNumber: 1 },
         {
           eventId: "event-a",
           supabase: createMockRpcClient([], {
@@ -201,7 +264,7 @@ describe("normalized runtime transactional mutations", () => {
           }),
         },
       ),
-    ).rejects.toThrow(/adminSessionLogout failed: transaction failed/);
+    ).rejects.toThrow(/computeResults failed: transaction failed/);
   });
 
   it("rejects placeholder commit acknowledgements that do not prove rows changed", async () => {
@@ -245,6 +308,7 @@ describe("normalized runtime transactional mutations", () => {
     expect(migrations).not.toContain("least(v_closes_at, p_now + interval '30 seconds')");
     expect(submitFunction).toContain("normalized_apply_voting_deadline_locked");
     expect(submitFunction).toContain("Voting is not open for ballot changes.");
+    expect(submitFunction).toContain("has_tournament_history = true");
     expect(submitFunction).toContain("pg_advisory_xact_lock");
     expect(submitFunction).toContain("v_now + interval '30 seconds'");
     expect(submitFunction).not.toContain("least(coalesce(closes_at");
@@ -255,6 +319,8 @@ describe("normalized runtime transactional mutations", () => {
     expect(computeFunction).toContain("insert into public.result_snapshots");
     expect(computeFunction).toContain("insert into public.result_rows");
     expect(computeFunction).toContain("insert into public.tiebreaks");
+    expect(computeFunction).toContain("join public.round_player_eligibility as eligibility");
+    expect(computeFunction).toContain("eligibility.player_id is not null");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_ack");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_disabled");
   });
@@ -287,7 +353,7 @@ describe("normalized runtime transactional mutations", () => {
   it("locks down tournament-changing RPC execute privileges", () => {
     const migrations = readMigrations();
 
-    for (const rpcName of Object.values(NORMALIZED_RUNTIME_RPC_NAMES)) {
+    for (const rpcName of Object.values(NORMALIZED_ALL_RUNTIME_RPC_NAMES)) {
       expect(migrations).toMatch(
         new RegExp(
           `revoke execute on function public\\.${rpcName}\\s*\\(text, jsonb\\) from public, anon, authenticated`,

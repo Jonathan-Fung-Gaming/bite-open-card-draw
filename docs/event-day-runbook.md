@@ -4,9 +4,10 @@ Use this checklist on the event machine before players arrive and before every r
 
 ## Remediation Gate
 
-- Review `docs/remediation-plan-2026-06-28.md` before resuming implementation or release prep.
-- Do not treat the app as event-ready until every item in `docs/remediation-issue-checklist.md` is
-  closed with evidence and its final closure gate passes.
+- Review `docs/production-flow-risk-remediation-plan-2026-07-02.md` and
+  `docs/production-flow-risk-checklist-2026-07-02.md` before release prep.
+- Do not treat the app as event-ready until every production-flow risk item is closed with dated
+  evidence or explicitly accepted as event-day risk by the tournament owner.
 - When docs disagree, follow `docs/product-spec.md` and
   `docs/pump_open_stage_repo_validation_checklist.md` over stale execution-plan text.
 
@@ -14,6 +15,14 @@ Use this checklist on the event machine before players arrive and before every r
 
 - Run `rtk npm run lint`, `rtk npm run typecheck`, `rtk npm run test`, and
   `rtk npm run build` on the release branch.
+- Run `rtk npm run test:e2e:production-flow:validate` with the intended disposable Supabase
+  rehearsal event before the grouped browser evidence window. Confirm the output says
+  `profile=production-flow`, `backend=supabase`, production server mode, explicit disposable
+  `eventId`, `adminSessionHeartbeat=enabled`, `hostHeartbeat=enabled`,
+  `voteLivePolling=enabled`, `publicRouteRefresh=enabled`, and `adminActionsOnly=enabled`.
+- Run `rtk npm run test:e2e:production-flow` only as the grouped Phase 7 browser evidence command.
+  Do not substitute `rtk npm run test:e2e`, `rtk npm run test:phase9:full`, or
+  `rtk npm run test:load:api-injection` as production-flow closure evidence.
 - Confirm production environment variables are set in Vercel and not committed to Git.
 - Confirm Supabase migrations are applied.
 - Confirm `TOURNAMENT_STATE_BACKEND=supabase` and a stable `TOURNAMENT_EVENT_ID` are configured for
@@ -32,6 +41,10 @@ Use this checklist on the event machine before players arrive and before every r
 - Confirm the player roster has been imported and reviewed.
 - Run a complete four-round rehearsal against hosted Supabase persistent state. Local rehearsal mode
   is useful for operator practice, but it is not production release evidence.
+- Confirm the production-flow browser evidence covers the PFR matrix in `docs/testing-checklist.md`,
+  including timer transitions, negative ballots, same-username behavior, anti-spoiler/live-count
+  privacy, tiebreak edge cases, admin workflows, 100 eligible players, real player-route behavior,
+  spectator/view-only traffic, and request-rate artifacts.
 - During rehearsal, confirm private CSV auto-download and manual CSV download after final reveal.
 - Reset rehearsal data and confirm `Tournament mode` before importing or using real event data.
 
