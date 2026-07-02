@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { withNormalizedEventPersistenceLock } from "@/lib/server/normalized-operational-state";
 import { executeNormalizedTransactionalMutation } from "@/lib/server/transactions/normalized-runtime";
 
 const normalizedComputeResultsSchema = z.object({
@@ -16,10 +17,12 @@ export async function computeNormalizedResults(input: {
   roundNumber: 1 | 2 | 3 | 4;
   adminSessionId: string;
 }): Promise<NormalizedComputeResults> {
-  const result = await executeNormalizedTransactionalMutation("computeResults", {
-    roundNumber: input.roundNumber,
-    adminSessionId: input.adminSessionId,
-  });
+  const result = await withNormalizedEventPersistenceLock(() =>
+    executeNormalizedTransactionalMutation("computeResults", {
+      roundNumber: input.roundNumber,
+      adminSessionId: input.adminSessionId,
+    }),
+  );
 
   return normalizedComputeResultsSchema.parse(result);
 }

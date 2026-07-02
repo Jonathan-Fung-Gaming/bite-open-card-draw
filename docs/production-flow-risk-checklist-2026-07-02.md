@@ -80,6 +80,43 @@ Issue evidence links from this pass:
 | PFR-031 | No new projector screenshot evidence was collected in this pass. | Still deferred to Phase 7 browser/manual projector evidence. |
 | PFR-046 | Manual button remains and export path is hardened; no target-browser download evidence was collected. | Still deferred to Phase 7 or dated target-browser manual evidence. |
 
+## Remediation Implementation Evidence - 2026-07-03
+
+This section records the local remediation pass for the remaining checklist items. It does not close
+items whose stated evidence requires live Supabase interleavings, two browser/admin sessions,
+target-browser download proof, projector/mobile screenshots, or the grouped production-flow
+Playwright run.
+
+Commands and results:
+
+| Command or step | Result | Notes |
+| --- | --- | --- |
+| `rtk npm run test -- src/lib/vote/ballot.test.ts src/lib/vote/phone-view.test.ts src/lib/round/round-state.test.ts src/lib/server/admin-actions.test.ts src/lib/admin/audit.test.ts` | Pass | 5 files / 38 Vitest tests passed. |
+| `rtk npm run test -- src/lib/server/normalized-rpc-locking.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/admin/host-lock.test.ts src/lib/server/admin-actions.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts` | Pass | 7 files / 48 Vitest tests passed. |
+| `rtk npm run test -- src/lib/vote/ballot.test.ts src/lib/vote/phone-view.test.ts src/lib/round/round-state.test.ts src/lib/admin/audit.test.ts` | Pass | Follow-up focused gate, 4 files / 29 Vitest tests passed. |
+| `rtk npm run lint` | Pass | Full ESLint gate passed. |
+| `rtk npm run typecheck` | Pass | Full TypeScript gate passed. |
+| `rtk npm run test` | Pass | Full Vitest gate passed, 45 files / 221 tests. |
+| `rtk npm run build` | Pass | Next.js production build completed. |
+| `rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-asset-audit.ps1` | Pass | Regenerated `docs/asset-audit.md` with current logo, runtime catalog, manifest, and cache identities. |
+| `rtk git diff --check` | Pass | No whitespace errors. |
+| `rtk npm run verify:real-chart-images` | Pass | Subagent-run verification reported runtime catalog/image cache consistency for 4,426 charts and 639 cached PNG assets. |
+| Playwright browser run | Not run | Not necessary for local code/test/doc changes; live/browser evidence remains explicitly open below. |
+
+Issue evidence from this pass:
+
+| Issue IDs | Evidence recorded | Closure status |
+| --- | --- | --- |
+| PFR-001 | `submitNormalizedPlayerBallot` and `computeNormalizedResults` now acquire the same normalized event persistence lock as snapshot saves before running Supabase RPC mutations. Covered by `src/lib/server/normalized-rpc-locking.test.ts` plus existing normalized runtime/persistence tests. | Implementation risk reduced; not fully closed until live Supabase interleaving evidence proves ballots/results/CSV agree under concurrent admin/player mutations. |
+| PFR-007 | `/results` now uses `resolvePublicRouteState()` so the latest previous final result stays addressable after advancing to a not-started future round. Covered by `src/lib/round/round-state.test.ts`. | Closed for local route-state implementation evidence; browser transition evidence remains in the production readiness evidence checklist. |
+| PFR-018, PFR-038 | Private CSV export remains host-lock gated and audited; the Phase 9 helper now accepts collision-resistant filenames instead of the old fixed `round-N-private-ballots.csv` name. | Implementation/evidence helper fixed; two-admin target-browser proof remains open. |
+| PFR-020, PFR-030 | Added explicit server-side ballot validation tests for both-sets-drawn and duplicate chart bans; expanded polling cadence coverage for voter page, live poll, stage/public inspection, and presence refresh intervals. | Local coverage strengthened. |
+| PFR-024 | Dangerous debug snapshot export now requires an audit reason in addition to password re-entry and active host control. Covered by `src/lib/server/admin-actions.test.ts`. | Local gap fixed; full admin workflow matrix remains open for browser/live evidence. |
+| PFR-029, PFR-033 | `/charts` now mirrors reroll invalidation/revote copy; final `/vote`, `/charts`, and `/results` branches still omit auto-refresh once final results are rendered. | Local source evidence strengthened; final-state scroll/focus browser evidence remains open. |
+| PFR-043 | Added `public/brand/tournament-logo-web.png` and switched `TournamentLogo` to the optimized app rendition while preserving the required source logo at `public/brand/tournament-logo.png`; asset audit now records source/web dimensions and bytes. | Implementation fixed; route transfer/performance evidence remains open. |
+| PFR-047 | Chart exclusion audits now store stable display snapshot metadata: chart ID/key/name/Korean name, artist, label, type, level, difficulty, song key, source image URL, and source row. Covered by `src/lib/admin/audit.test.ts` and `src/lib/server/admin-actions.test.ts`. | Closed for local audit clarity evidence. |
+| PFR-041, PFR-042 | `docs/release-checklist.md` and `docs/asset-audit.md` now record current chart CSV, import report, runtime catalog, image manifest, and cache artifact identities. | Artifact identity docs updated; final release commit/date/operator gates remain unchecked. |
+
 ## Blocking / Must Fix Before Production
 
 - [ ] **Blocking: Production persistence uses incompatible locking paths for ballots, results, and
@@ -100,7 +137,9 @@ Issue evidence links from this pass:
   - Evidence needed: concurrent Supabase integration evidence where a player submits while an admin
     computes results and while a separate admin snapshot mutation persists; final ballot table,
     result snapshot, public result, and private CSV must agree.
-  - Verified Evidence: PFR-001: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-001: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above for commands, artifacts, implementation locking, and remaining live-Supabase
+    closure status.
 
 - [ ] **Blocking: Supabase host-lock persistence is not compare-and-swap protected.**
   - Area: admin host lock, multi-instance production safety.
@@ -180,7 +219,7 @@ Issue evidence links from this pass:
     and that public routes do not silently jump during an active round.
   - Verified Evidence: PFR-006: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Mutable current-round routing can split public screens or hide just-finished results.**
+- [x] **High: Mutable current-round routing can split public screens or hide just-finished results.**
   - Area: public route consistency.
   - References: `src/app/stage/page.tsx:113`, `src/app/vote/page.tsx:19`,
     `src/app/vote/page.tsx:107`, `src/app/charts/page.tsx:64`,
@@ -194,7 +233,7 @@ Issue evidence links from this pass:
     provide explicit previous-round result access after advancement.
   - Evidence needed: route-state matrix showing what each public route displays before, during, and
     after round advancement.
-  - Verified Evidence: PFR-007: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-007: See Remediation Implementation Evidence - 2026-07-03 above.
 
 - [x] **High: Rehearsal reset controls are visible in the production admin UX and lack a deployment
   guard.**
@@ -333,7 +372,7 @@ Issue evidence links from this pass:
     event deployment.
   - Verified Evidence: PFR-017: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Private CSV download is admin-session gated but not host-lock gated.**
+- [x] **High: Private CSV download is admin-session gated but not host-lock gated.**
   - Area: admin permissions, data export.
   - References: `src/app/coolguy69/actions.ts:966`, `src/app/coolguy69/page.tsx:724`.
   - Current risk: any valid admin session can request the private CSV after final reveal, even if it
@@ -342,7 +381,9 @@ Issue evidence links from this pass:
   - Expected behavior: decide explicitly whether read-only admins may export private player data. If
     the host is the only intended exporter, require active host lock.
   - Evidence needed: permission policy and two-admin-session evidence for allowed/denied export.
-  - Verified Evidence: PFR-018: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-018: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above for commands, artifacts, host-gated export implementation, future evidence
+    helper alignment, and remaining two-admin/browser closure status.
 
 ## High Priority Browser/Rehearsal Design Gaps
 
@@ -421,7 +462,9 @@ Issue evidence links from this pass:
     authority, password where dangerous, reason/summary where required, and should leave an audit
     trail.
   - Evidence needed: admin action matrix with allowed, rejected, and audited outcomes.
-  - Verified Evidence: PFR-024: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-024: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above for commands, artifacts, debug snapshot reason hardening, and remaining full
+    admin workflow matrix closure status.
 
 ## Medium Priority App And UX Issues
 
@@ -657,7 +700,9 @@ Issue evidence links from this pass:
   - Expected behavior: logo asset readiness should include size/performance evidence for phone and
     projector routes.
   - Evidence needed: optimized asset size target and route performance evidence for the logo.
-  - Verified Evidence: PFR-043: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-043: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above for commands, artifacts, optimized logo rendition evidence, and remaining
+    route-level performance closure status.
 
 ## Lower Priority / Operational Hardening
 
@@ -691,7 +736,7 @@ Issue evidence links from this pass:
   - Evidence needed: manual target-browser evidence that the file appears with expected content.
   - Verified Evidence: PFR-046: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Low: Chart exclusion audit can lose clarity if source CSV later removes or renames a chart.**
+- [x] **Low: Chart exclusion audit can lose clarity if source CSV later removes or renames a chart.**
   - Area: chart exclusions, audit.
   - References: `src/app/coolguy69/actions.ts`, `src/lib/server/normalized-operational-state.ts`.
   - Current risk: exclusions are tied to chart keys and current chart metadata. If source data later
@@ -699,7 +744,7 @@ Issue evidence links from this pass:
   - Expected behavior: audit records for exclusions should preserve enough display metadata to
     explain what was excluded even after data changes.
   - Evidence needed: exclusion audit evidence after fixture catalog rename/removal.
-  - Verified Evidence: PFR-047: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-047: See Remediation Implementation Evidence - 2026-07-03 above.
 
 - [x] **Low: Rehearsal reset UI copy understates persistence risk.**
   - Area: admin UX copy.

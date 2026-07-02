@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { BallotSetChoice } from "@/lib/vote/ballot";
+import { withNormalizedEventPersistenceLock } from "@/lib/server/normalized-operational-state";
 import { executeNormalizedTransactionalMutation } from "@/lib/server/transactions/normalized-runtime";
 
 const normalizedSubmitBallotResultSchema = z.object({
@@ -21,17 +22,19 @@ export async function submitNormalizedPlayerBallot(input: {
   choices: BallotSetChoice[];
   editTokenHash?: string | null;
 }): Promise<NormalizedSubmitBallotResult> {
-  const result = await executeNormalizedTransactionalMutation("submitBallot", {
-    roundNumber: input.roundNumber,
-    playerId: input.playerId,
-    editTokenHash: input.editTokenHash ?? undefined,
-    choices: input.choices.map((choice) => ({
-      drawId: choice.drawId,
-      roundSetId: choice.roundSetId,
-      noBans: choice.noBans,
-      bannedChartIds: choice.bannedChartIds,
-    })),
-  });
+  const result = await withNormalizedEventPersistenceLock(() =>
+    executeNormalizedTransactionalMutation("submitBallot", {
+      roundNumber: input.roundNumber,
+      playerId: input.playerId,
+      editTokenHash: input.editTokenHash ?? undefined,
+      choices: input.choices.map((choice) => ({
+        drawId: choice.drawId,
+        roundSetId: choice.roundSetId,
+        noBans: choice.noBans,
+        bannedChartIds: choice.bannedChartIds,
+      })),
+    }),
+  );
 
   return normalizedSubmitBallotResultSchema.parse(result);
 }

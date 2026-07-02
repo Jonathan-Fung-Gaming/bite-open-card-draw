@@ -637,7 +637,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     );
   }
 
-  private async withEventPersistenceLock<T>(callback: () => Promise<T>) {
+  async withEventPersistenceLock<T>(callback: () => Promise<T>) {
     const lockToken = await this.acquireEventPersistenceLock();
 
     try {
@@ -1465,4 +1465,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       status,
     }));
   }
+}
+
+export async function withNormalizedEventPersistenceLock<T>(callback: () => Promise<T>) {
+  return new NormalizedOperationalStateRepository().withEventPersistenceLock(callback);
 }

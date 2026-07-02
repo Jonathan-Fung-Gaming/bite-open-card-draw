@@ -384,6 +384,15 @@ describe("ballot validation and store", () => {
     ).toThrow(/Both chart sets/);
   });
 
+  it("rejects ballot submission before both sets are drawn", () => {
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    expect(() => validateRoundBallot(input, [draws[0]!])).toThrow(
+      /Both chart sets must be drawn/,
+    );
+  });
+
   it("rejects third bans server-side", () => {
     const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
     const input = validBallotInput(draws);
@@ -424,6 +433,28 @@ describe("ballot validation and store", () => {
         draws,
       ),
     ).toThrow(/outside the drawn set/);
+  });
+
+  it("rejects duplicate chart bans server-side", () => {
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+    const chartId = draws[0]!.charts[0]!.id;
+
+    expect(() =>
+      validateRoundBallot(
+        {
+          ...input,
+          choices: [
+            {
+              ...input.choices[0]!,
+              bannedChartIds: [chartId, chartId],
+            },
+            input.choices[1]!,
+          ],
+        },
+        draws,
+      ),
+    ).toThrow(/Duplicate chart bans/);
   });
 
   it("rejects no-bans plus bans combinations server-side", () => {

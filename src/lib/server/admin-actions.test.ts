@@ -88,6 +88,44 @@ describe("admin action production safeguards", () => {
     expect(pageSource).toContain("Take host control to download the private ballot CSV.");
   });
 
+  it("records stable chart display metadata for exclusion audits", () => {
+    const actionsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
+      "utf8",
+    );
+
+    expect(actionsSource).toContain(
+      'action: excluded ? "chart_exclusion_add" : "chart_exclusion_remove"',
+    );
+    expect(actionsSource).toContain("chartId: before.id");
+    expect(actionsSource).toContain("chartName: before.name");
+    expect(actionsSource).toContain("chartNameKr: before.nameKr");
+    expect(actionsSource).toContain("artist: before.artist");
+    expect(actionsSource).toContain("label: before.label");
+    expect(actionsSource).toContain("chartType: before.chartType");
+    expect(actionsSource).toContain("level: before.level");
+    expect(actionsSource).toContain("songKey: before.songKey");
+    expect(actionsSource).toContain("sourceBgImg: before.sourceBgImg");
+    expect(actionsSource).toContain("sourceRowNumber: before.sourceRowNumber");
+  });
+
+  it("requires an audit reason for dangerous debug snapshot exports", () => {
+    const actionsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
+      "utf8",
+    );
+    const debugSnapshotSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/_components/DebugSnapshotDownload.tsx"),
+      "utf8",
+    );
+
+    expect(actionsSource).toContain("const reason = getRequiredReason(formData)");
+    expect(actionsSource).toContain('action: "debug_snapshot_export"');
+    expect(actionsSource).toContain("reason,");
+    expect(debugSnapshotSource).toContain('name="reason"');
+    expect(debugSnapshotSource).toContain('placeholder="Audit reason"');
+  });
+
   it("uses shared mutation contracts for critical scalar parsing", () => {
     const actionsSource = readFileSync(
       path.join(process.cwd(), "src/app/coolguy69/actions.ts"),

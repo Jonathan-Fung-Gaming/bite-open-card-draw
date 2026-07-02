@@ -3,6 +3,7 @@ import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import { getRoundDrawRecords, getVotingRoundSnapshot } from "@/lib/server/voting-round";
+import { resolvePublicRouteState } from "@/lib/round/round-state";
 import { shouldShowFinalPhoneResults } from "@/lib/vote/phone-view";
 import { formatVotingStatusLabel, formatVotingTime } from "@/lib/vote/voting-window";
 import { ResultsAutoRefresh } from "./ResultsAutoRefresh";
@@ -84,8 +85,24 @@ function pendingResultsCopy(
 export default async function ResultsPage() {
   await hydrateTournamentState();
 
-  const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
+  const { currentRound } = adminState.roundStateStore.getSnapshot();
   const nowMs = await getAuthoritativeNowMs();
+  const routeRounds = ([1, 2, 3, 4] as const).map((roundNumber) => {
+    const roundSnapshot = getVotingRoundSnapshot(roundNumber, nowMs);
+    const roundResult = adminState.resultStore.getRoundResult(roundNumber);
+
+    return {
+      roundNumber,
+      status: roundSnapshot.status,
+      hasFinalResult: roundResult?.revealPhase === "final",
+    };
+  });
+  const routeState = resolvePublicRouteState({
+    route: "/results",
+    currentRound,
+    rounds: routeRounds,
+  });
+  const roundNumber = routeState.roundNumber;
   const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
   const bothSetsDrawn = getRoundDrawRecords(roundNumber).length === 2;
   const result = adminState.resultStore.getRoundResult(roundNumber);
@@ -114,7 +131,10 @@ export default async function ResultsPage() {
 
   return (
     <main className="min-h-screen">
-      <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Results revealed" />
+      <RoundHeader
+        title={`ROUND ${roundNumber} FINAL CHARTS`}
+        status={routeState.showPreviousRoundResult ? "Previous round results" : "Results revealed"}
+      />
       <section className="mx-auto grid max-w-6xl gap-5 px-5 py-5">
         <PublicResultSummary result={result} />
       </section>

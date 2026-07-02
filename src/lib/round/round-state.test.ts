@@ -108,4 +108,20 @@ describe("round state store", () => {
       showPreviousRoundResult: false,
     });
   });
+
+  it("lets the results route keep showing the latest previous final result after advancing", () => {
+    const rounds = [
+      { roundNumber: 1 as const, status: "results_revealed" as const, hasFinalResult: true },
+      { roundNumber: 2 as const, status: "not_started" as const, hasFinalResult: false },
+      { roundNumber: 3 as const, status: "not_started" as const, hasFinalResult: false },
+    ];
+
+    expect(
+      resolvePublicRouteState({ route: "/results", currentRound: 3, rounds }),
+    ).toMatchObject({
+      roundNumber: 1,
+      source: "previous_round_result",
+      showPreviousRoundResult: true,
+    });
+  });
 });

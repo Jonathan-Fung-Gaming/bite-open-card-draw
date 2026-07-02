@@ -17,7 +17,7 @@ export function TournamentLogo({ className, priority = false, size = "standard" 
       )}
     >
       <Image
-        src="/brand/tournament-logo.png"
+        src="/brand/tournament-logo-web.png"
         alt="Pump It Up Open Stage tournament logo"
         fill
         priority={priority}

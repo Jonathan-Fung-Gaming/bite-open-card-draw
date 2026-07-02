@@ -38,6 +38,15 @@ function chartsStatus(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean) {
     };
   }
 
+  if (snapshot.status === "ready_to_vote") {
+    return {
+      label: formatVotingStatusLabel(snapshot.status),
+      detail:
+        "Both chart sets are drawn. Waiting for the host to open voting. If charts were rerolled after voting started, prior ballots were invalidated and players must submit again when voting reopens.",
+      timerText: null,
+    };
+  }
+
   if (
     snapshot.status === "voting_closed" ||
     snapshot.status === "results_computed" ||

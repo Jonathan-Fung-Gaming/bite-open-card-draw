@@ -12,6 +12,49 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Flow Risk Follow-Up - 2026-07-03
+
+Status: local code, test, and documentation follow-up completed for several remaining items in
+`docs/production-flow-risk-checklist-2026-07-02.md`. This pass did not run Playwright; live
+Supabase, two-browser, target-download, load, and projector/mobile visual evidence remains required
+where the checklist says so.
+
+### Changes
+
+- Serialized app-level Supabase ballot submission and result-compute RPC calls with the same
+  normalized event persistence lock used by snapshot persistence.
+- Wired `/results` through the public route-state resolver so previous final results stay
+  addressable after advancing to a not-started future round.
+- Added chart-exclusion audit snapshot metadata that preserves chart identity/display fields after
+  future catalog changes.
+- Required an audit reason for the password-gated debug snapshot export.
+- Added `public/brand/tournament-logo-web.png` and switched `TournamentLogo` to the optimized app
+  rendition while keeping the required source logo at `public/brand/tournament-logo.png`.
+- Updated Phase 9 CSV download helper expectations for collision-resistant private CSV filenames.
+- Updated asset/release docs with current chart CSV, import report, runtime catalog, image manifest,
+  cache, and logo asset identities.
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/vote/ballot.test.ts src/lib/vote/phone-view.test.ts src/lib/round/round-state.test.ts src/lib/server/admin-actions.test.ts src/lib/admin/audit.test.ts` - passed, 5 files / 38 tests.
+- `rtk npm run test -- src/lib/server/normalized-rpc-locking.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/admin/host-lock.test.ts src/lib/server/admin-actions.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts` - passed, 7 files / 48 tests.
+- `rtk npm run test -- src/lib/vote/ballot.test.ts src/lib/vote/phone-view.test.ts src/lib/round/round-state.test.ts src/lib/admin/audit.test.ts` - passed, 4 files / 29 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 45 files / 221 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed.
+- `rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-asset-audit.ps1` - passed.
+- Playwright was not run because the local changes were covered by unit/source/build checks and the
+  remaining Playwright items require a deliberate live Supabase/browser evidence window.
+
+### Remaining Risks
+
+- PFR-001 still needs live Supabase interleaving evidence after the lock-wrapper implementation.
+- PFR-002, PFR-003, PFR-018, PFR-021 through PFR-024, PFR-031, PFR-033, PFR-043, PFR-046, and the
+  production readiness evidence checklist still need the specified live/browser/manual evidence.
+- PFR-040 still requires either a cleaned event CSV or dated acceptance of the strict import report.
+
 ## Production Flow Risk Remediation - 2026-07-02
 
 Status: implementation pass complete for Phases 1 through 6 of
