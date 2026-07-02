@@ -60,6 +60,24 @@ function isSessionActive(row: AdminSessionRow, now = Date.now()) {
   return !row.revoked_at && Date.parse(row.expires_at) > now;
 }
 
+function tokenCarriesSessionId(token: string, sessionId: string) {
+  const [encodedPayload] = token.split(".");
+
+  if (!encodedPayload) {
+    return false;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as {
+      sessionId?: unknown;
+    };
+
+    return payload.sessionId === sessionId;
+  } catch {
+    return false;
+  }
+}
+
 export function shouldUseNormalizedAdminSessions() {
   return getTournamentStateBackend() === "supabase";
 }
@@ -91,7 +109,11 @@ export class NormalizedAdminSessionStore {
   }
 
   async validate(session: AdminSessionPayload, token: string, now = Date.now()) {
-    const row = await this.findByToken(token);
+    const row =
+      (await this.findByToken(token)) ??
+      (tokenCarriesSessionId(token, session.sessionId)
+        ? await this.findBySessionId(session.sessionId)
+        : null);
 
     return Boolean(row && row.id === session.sessionId && isSessionActive(row, now));
   }
@@ -103,7 +125,11 @@ export class NormalizedAdminSessionStore {
     refreshedToken: string;
     now?: number;
   }) {
-    const row = await this.findByToken(input.currentToken);
+    const row =
+      (await this.findByToken(input.currentToken)) ??
+      (tokenCarriesSessionId(input.currentToken, input.currentSession.sessionId)
+        ? await this.findBySessionId(input.currentSession.sessionId)
+        : null);
     const now = input.now ?? Date.now();
 
     if (!row || row.id !== input.currentSession.sessionId || !isSessionActive(row, now)) {
@@ -126,7 +152,11 @@ export class NormalizedAdminSessionStore {
   }
 
   async revoke(session: AdminSessionPayload, token: string, now = Date.now()) {
-    const row = await this.findByToken(token);
+    const row =
+      (await this.findByToken(token)) ??
+      (tokenCarriesSessionId(token, session.sessionId)
+        ? await this.findBySessionId(session.sessionId)
+        : null);
 
     if (!row || row.id !== session.sessionId) {
       return;
@@ -153,6 +183,21 @@ export class NormalizedAdminSessionStore {
       .select("*")
       .eq("event_id", this.eventId)
       .eq("session_token_hash", hashAdminSessionToken(token))
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Could not load normalized admin session: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  private async findBySessionId(sessionId: string) {
+    const { data, error } = await this.supabase
+      .from("admin_sessions")
+      .select("*")
+      .eq("event_id", this.eventId)
+      .eq("id", sessionId)
       .maybeSingle();
 
     if (error) {

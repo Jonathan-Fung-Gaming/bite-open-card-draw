@@ -27,10 +27,25 @@ export class StagePage {
   }
 
   async expectFinalCharts(roundNumber: number) {
-    await expect(
-      this.page.getByRole("heading", { name: `ROUND ${roundNumber} FINAL CHARTS` }),
-    ).toBeVisible({
-      timeout: HOSTED_REFRESH_TIMEOUT_MS,
-    });
+    await expect
+      .poll(
+        async () => {
+          await this.reload();
+
+          const headingVisible = await this.page
+            .getByRole("heading", { name: `ROUND ${roundNumber} FINAL CHARTS` })
+            .isVisible()
+            .catch(() => false);
+          const finalCardCount = await this.page
+            .getByTestId("stage-final-chart-list")
+            .getByTestId("stage-chart-card")
+            .count()
+            .catch(() => 0);
+
+          return headingVisible && finalCardCount === 2;
+        },
+        { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+      )
+      .toBe(true);
   }
 }

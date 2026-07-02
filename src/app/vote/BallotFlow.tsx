@@ -336,6 +336,10 @@ export function BallotFlow({
   }, [loadExistingBallot, players]);
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true") {
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function poll() {
@@ -402,6 +406,10 @@ export function BallotFlow({
   }, [confirmed, draws, players.length, roundNumber, router, savedAt, selectedPlayerId]);
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true") {
+      return undefined;
+    }
+
     if (!confirmed || !selectedPlayer || !liveCanSubmit) {
       return undefined;
     }

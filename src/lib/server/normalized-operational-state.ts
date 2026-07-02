@@ -378,7 +378,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       players.length > 0 ||
       draws.length > 0 ||
       ballots.length > 0 ||
-      resultSnapshots.length > 0;
+      resultSnapshots.length > 0 ||
+      hostLocks.length > 0;
 
     if (!hasRuntimeRows) {
       return null;
@@ -619,7 +620,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.saveRoundPlayerEligibility(snapshot),
       this.upsertResultSnapshots(snapshot),
       this.upsertTiebreaks(snapshot),
-      this.saveDraws(snapshot),
       this.saveAdminActions(snapshot),
       this.savePresence(snapshot),
       this.saveHostLockOnlyUnlocked(snapshot.hostLock),

@@ -714,7 +714,6 @@ describe("normalized operational state repository", () => {
     expect(supabase.operations.some((operation) => operation.operation === "select")).toBe(false);
     expect(supabase.rpcCalls.map((call) => call.functionName)).toEqual([
       "normalized_acquire_event_persistence_lock",
-      "normalized_replace_draw_state",
       "normalized_release_event_persistence_lock",
     ]);
     expect(writeTables).toContain("result_snapshots");
@@ -724,6 +723,8 @@ describe("normalized operational state repository", () => {
     expect(writeTables).not.toContain("ballots");
     expect(writeTables).not.toContain("ballot_choices");
     expect(writeTables).not.toContain("ballot_revisions");
+    expect(writeTables).not.toContain("draws");
+    expect(writeTables).not.toContain("drawn_charts");
     expect(writeTables).not.toContain("result_rows");
     expect(supabase.rows.get("result_snapshots")?.[0]).toMatchObject({
       round_number: 1,

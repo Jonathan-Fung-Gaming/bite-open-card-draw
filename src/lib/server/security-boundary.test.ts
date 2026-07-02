@@ -45,12 +45,14 @@ describe("browser security boundary", () => {
   });
 
   it("hard-disables the e2e ballot mutation route in production", () => {
-    const routeSource = readFileSync(
-      path.join(process.cwd(), "src/app/api/e2e/load-ballot/route.ts"),
-      "utf8",
-    );
+    for (const routePath of [
+      "src/app/api/e2e/load-ballot/route.ts",
+      "src/app/api/e2e/private-csv/route.ts",
+    ]) {
+      const routeSource = readFileSync(path.join(process.cwd(), routePath), "utf8");
 
-    expect(routeSource).toContain('process.env.NODE_ENV === "production"');
-    expect(routeSource).toContain("x-tournament-test-token");
+      expect(routeSource).toContain('process.env.NODE_ENV === "production"');
+      expect(routeSource).toContain("x-tournament-test-token");
+    }
   });
 });

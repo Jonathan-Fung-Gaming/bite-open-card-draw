@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { readFile } from "node:fs/promises";
+import { expectPrivateCsvExport } from "../phase9/fixtures/private-csv";
 
 function getAdminPassword() {
   const password = process.env.E2E_ADMIN_PASSWORD;
@@ -107,12 +107,23 @@ async function submitAndEditBallot(
         revision,
       },
     });
-    const payload = (await response.json()) as { error?: string; revision?: number };
+    const payload = (await response.json()) as {
+      eligibleCount?: number;
+      error?: string;
+      playerStartggUsername?: string;
+      revision?: number;
+      status?: string;
+      submittedCount?: number;
+    };
 
     expect(response.ok(), `${startggUsername} revision ${revision}: ${payload.error ?? "ok"}`).toBe(
       true,
     );
+    expect(payload.playerStartggUsername).toBe(startggUsername);
     expect(payload.revision).toBe(revision);
+    expect(payload.eligibleCount).toBe(PLAYER_COUNT);
+    expect(payload.submittedCount).toBeGreaterThanOrEqual(1);
+    expect(["voting_open", "final_30_seconds", "extension_1_minute"]).toContain(payload.status);
   }
 }
 
@@ -281,19 +292,15 @@ test("50-player sporadic browser rehearsal submits, edits, and exports final CSV
     timeout: 15_000,
   });
 
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download private ballot CSV" }).click();
-  const download = await downloadPromise;
-  const downloadPath = await download.path();
-
-  if (!downloadPath) {
-    throw new Error("Could not read downloaded private CSV.");
-  }
-
-  const csv = await readFile(downloadPath, "utf8");
+  const csv = await expectPrivateCsvExport({
+    baseURL,
+    expectedRows: PLAYER_COUNT,
+    request,
+    requiredPlayers: [playerName(0), playerName(PLAYER_COUNT - 1)],
+    roundNumber: 1,
+  });
   const exportedPlayers = csv.match(/Load Player \d{3}/g) ?? [];
 
-  expect(download.suggestedFilename()).toBe("round-1-private-ballots.csv");
   expect(new Set(exportedPlayers).size).toBe(PLAYER_COUNT);
   expect(csv).toContain("manual_override");
   expect(csv).toContain("selected_set_1_chart");

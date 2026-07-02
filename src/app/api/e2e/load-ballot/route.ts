@@ -86,6 +86,20 @@ async function submitSupabaseLoadBallot(input: {
 }) {
   const eventId = getTournamentEventId();
   const supabase = createServiceRoleSupabaseClient();
+  const { data: runtimeState, error: runtimeError } = await supabase
+    .from("event_runtime_state")
+    .select("rehearsal_mode")
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (runtimeError) {
+    throw new Error(`Could not load synthetic load runtime state: ${runtimeError.message}`);
+  }
+
+  if (!(runtimeState as { rehearsal_mode?: boolean } | null)?.rehearsal_mode) {
+    return { error: "Synthetic load ballots are only available in rehearsal mode.", statusCode: 403 as const };
+  }
+
   const { data: player, error: playerError } = await supabase
     .from("players")
     .select("id,startgg_username")
@@ -147,6 +161,10 @@ async function submitSupabaseLoadBallot(input: {
       .map((drawnChart) => drawnChart.chart_id);
     const useEditedBan = input.revision === 2 && drawIndex === 0;
 
+    if (chartIds.length !== 7) {
+      return null;
+    }
+
     if (useEditedBan && !chartIds[0]) {
       throw new Error("Synthetic load draw has no chart to ban.");
     }
@@ -160,10 +178,21 @@ async function submitSupabaseLoadBallot(input: {
     };
   });
 
+  if (choices.some((choice) => !choice)) {
+    return {
+      error: "Each active chart set must have exactly 7 drawn charts before synthetic voting.",
+      statusCode: 409 as const,
+    };
+  }
+
+  const validatedChoices = choices.filter((choice): choice is NonNullable<typeof choice> =>
+    Boolean(choice),
+  );
+
   return submitNormalizedPlayerBallot({
     roundNumber: input.roundNumber,
     playerId: loadPlayer.id,
-    choices,
+    choices: validatedChoices,
     editTokenHash: hashBallotEditToken(`e2e-load:${input.roundNumber}:${loadPlayer.id}`),
   });
 }
@@ -194,6 +223,13 @@ export async function POST(request: Request) {
     }
 
     const response = await withPersistedVotingState(async () => {
+      if (!adminState.roundStateStore.getSnapshot().rehearsalMode) {
+        return {
+          error: "Synthetic load ballots are only available in rehearsal mode.",
+          statusCode: 403 as const,
+        };
+      }
+
       const nowMs = await getAuthoritativeNowMs();
       adminState.votingWindowStore.advanceVoting(
         roundNumber,
@@ -215,6 +251,14 @@ export async function POST(request: Request) {
       }
 
       const draws = getRoundDrawRecords(roundNumber);
+
+      if (draws.length !== 2 || draws.some((draw) => draw.charts.length !== 7)) {
+        return {
+          error: "Each chart set must have exactly 7 drawn charts before synthetic voting.",
+          statusCode: 409 as const,
+        };
+      }
+
       const choices = draws.map((draw, drawIndex) => {
         const useEditedBan = revision === 2 && drawIndex === 0;
 

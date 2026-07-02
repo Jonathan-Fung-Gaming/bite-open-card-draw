@@ -12,7 +12,7 @@ export function HostHeartbeat({ active }: HostHeartbeatProps) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!active) {
+    if (!active || process.env.NEXT_PUBLIC_E2E_DISABLE_HOST_HEARTBEAT === "true") {
       return;
     }
 

@@ -98,7 +98,7 @@ describe("normalized admin session store", () => {
     ).resolves.toBe(false);
   });
 
-  it("slides expiry, rotates the stored token hash, and rejects revoked sessions", async () => {
+  it("slides expiry, accepts prior signed tokens for the active session, and rejects revoked sessions", async () => {
     const supabase = new FakeAdminSessionSupabaseClient();
     const store = new NormalizedAdminSessionStore({
       eventId: "phase-6-test",
@@ -132,7 +132,7 @@ describe("normalized admin session store", () => {
     });
     await expect(
       store.validate(session.payload, session.token, Date.parse("2026-06-29T00:05:01.000Z")),
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
     await expect(
       store.validate(refreshed.payload, refreshed.token, Date.parse("2026-06-29T00:05:01.000Z")),
     ).resolves.toBe(true);
@@ -145,6 +145,9 @@ describe("normalized admin session store", () => {
 
     await expect(
       store.validate(refreshed.payload, refreshed.token, Date.parse("2026-06-29T00:06:01.000Z")),
+    ).resolves.toBe(false);
+    await expect(
+      store.validate(session.payload, session.token, Date.parse("2026-06-29T00:06:01.000Z")),
     ).resolves.toBe(false);
     expect(supabase.rows[0]?.revoked_at).toBe("2026-06-29T00:06:00.000Z");
   });

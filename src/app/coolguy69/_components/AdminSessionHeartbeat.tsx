@@ -11,6 +11,10 @@ export function AdminSessionHeartbeat() {
   const lastRefreshAt = useRef(0);
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT === "true") {
+      return;
+    }
+
     const refreshAfterActivity = () => {
       const now = Date.now();
 

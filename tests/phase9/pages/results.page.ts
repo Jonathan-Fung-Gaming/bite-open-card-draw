@@ -12,9 +12,28 @@ export class ResultsPage {
   }
 
   async expectFinalCharts(roundNumber: number) {
-    await this.page.reload({ waitUntil: "domcontentloaded" });
-    await expect(
-      this.page.getByRole("heading", { name: `ROUND ${roundNumber} FINAL CHARTS` }),
-    ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    await expect
+      .poll(
+        async () => {
+          await this.page.reload({ waitUntil: "domcontentloaded" });
+
+          const headingVisible = await this.page
+            .getByRole("heading", { name: `ROUND ${roundNumber} FINAL CHARTS` })
+            .isVisible()
+            .catch(() => false);
+          const selectedCardCount = await this.page
+            .getByTestId("stage-chart-card")
+            .count()
+            .catch(() => 0);
+          const fullCountsVisible = await this.page
+            .getByText("Full ban counts", { exact: true })
+            .isVisible()
+            .catch(() => false);
+
+          return headingVisible && selectedCardCount === 2 && fullCountsVisible;
+        },
+        { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+      )
+      .toBe(true);
   }
 }
