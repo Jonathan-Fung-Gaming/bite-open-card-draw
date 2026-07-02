@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -10,24 +11,58 @@ const SERVER_SECRET_NAMES = [
   "TOURNAMENT_TEST_ROUTE_TOKEN",
 ] as const;
 
-const CLIENT_ENTRYPOINTS = [
-  "src/app/coolguy69/_components/AdminInactivityTimer.tsx",
-  "src/app/coolguy69/_components/AdminSessionHeartbeat.tsx",
-  "src/app/coolguy69/_components/HostHeartbeat.tsx",
-  "src/app/coolguy69/_components/ManualBallotForm.tsx",
-  "src/app/coolguy69/_components/PrivateCsvDownload.tsx",
-  "src/app/vote/BallotFlow.tsx",
-  "src/components/CountdownTimer.tsx",
-];
+function sourceFiles(root: string): string[] {
+  return readdirSync(root).flatMap((entry) => {
+    const absolutePath = path.join(root, entry);
+    const stats = statSync(absolutePath);
+
+    if (stats.isDirectory()) {
+      return sourceFiles(absolutePath);
+    }
+
+    return /\.(ts|tsx)$/.test(entry) ? [absolutePath] : [];
+  });
+}
+
+function clientComponentFiles() {
+  return sourceFiles(path.join(process.cwd(), "src")).filter((absolutePath) => {
+    const source = readFileSync(absolutePath, "utf8");
+
+    return /^\s*["']use client["'];/m.test(source);
+  });
+}
 
 describe("browser security boundary", () => {
-  it("does not reference server-only secret names from client components", () => {
-    for (const relativePath of CLIENT_ENTRYPOINTS) {
-      const source = readFileSync(path.join(process.cwd(), relativePath), "utf8");
+  it("does not reference server-only secret names from any client component", () => {
+    const clients = clientComponentFiles();
+
+    expect(clients.length).toBeGreaterThan(0);
+
+    for (const absolutePath of clients) {
+      const source = readFileSync(absolutePath, "utf8");
+      const relativePath = path.relative(process.cwd(), absolutePath);
 
       for (const secretName of SERVER_SECRET_NAMES) {
         expect(source, `${relativePath} should not reference ${secretName}`).not.toContain(secretName);
       }
+    }
+  });
+
+  it("does not import server-only modules from client components", () => {
+    const clients = clientComponentFiles();
+
+    expect(clients.length).toBeGreaterThan(0);
+
+    for (const absolutePath of clients) {
+      const source = readFileSync(absolutePath, "utf8");
+      const relativePath = path.relative(process.cwd(), absolutePath);
+
+      expect(source, `${relativePath} should not import server modules`).not.toContain(
+        "@/lib/server",
+      );
+      expect(source, `${relativePath} should not import server-only`).not.toContain(
+        "server-only",
+      );
     }
   });
 
@@ -45,14 +80,21 @@ describe("browser security boundary", () => {
   });
 
   it("hard-disables the e2e ballot mutation route in production", () => {
+    const helperSource = readFileSync(
+      path.join(process.cwd(), "src/lib/server/test-route-safety.ts"),
+      "utf8",
+    );
+
+    expect(helperSource).toContain("isProductionDeploymentEnv");
+    expect(helperSource).toContain("x-tournament-test-token");
+
     for (const routePath of [
       "src/app/api/e2e/load-ballot/route.ts",
       "src/app/api/e2e/private-csv/route.ts",
     ]) {
       const routeSource = readFileSync(path.join(process.cwd(), routePath), "utf8");
 
-      expect(routeSource).toContain('process.env.NODE_ENV === "production"');
-      expect(routeSource).toContain("x-tournament-test-token");
+      expect(routeSource).toContain("isE2eTestRouteAvailable");
     }
   });
 });

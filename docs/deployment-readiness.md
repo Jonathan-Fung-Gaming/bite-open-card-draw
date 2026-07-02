@@ -27,7 +27,8 @@ TOURNAMENT_STATE_BACKEND=supabase
 Generate `ADMIN_PASSWORD_HASH` with the supported `scrypt:v1:<salt_hex>:<hash_hex>` format. Store the plaintext shared admin password outside the repo.
 
 Do not configure `TOURNAMENT_TEST_ROUTE_TOKEN` in production. It is only for non-production e2e
-helpers, and `/api/e2e/load-ballot` is hard-disabled when `NODE_ENV=production`.
+helpers, and `/api/e2e/load-ballot` plus `/api/e2e/private-csv` are hard-disabled when either
+`NODE_ENV=production` or `VERCEL_ENV=production`.
 
 ## Build Verification
 

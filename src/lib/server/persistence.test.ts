@@ -98,6 +98,20 @@ describe("server persistence safety", () => {
     expect(getTournamentStateBackend()).toBe("supabase");
   });
 
+  it("rejects memory or missing tournament state backend in Vercel production semantics", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "production");
+
+    vi.stubEnv("TOURNAMENT_STATE_BACKEND", "");
+    expect(() => getTournamentStateBackend()).toThrow(/supabase/);
+
+    vi.stubEnv("TOURNAMENT_STATE_BACKEND", "memory");
+    expect(() => getTournamentStateBackend()).toThrow(/supabase/);
+
+    vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
+    expect(getTournamentStateBackend()).toBe("supabase");
+  });
+
   it("requires an event id before initializing Supabase-backed runtime persistence", () => {
     vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3000");

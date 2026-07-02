@@ -2432,3 +2432,62 @@ Status: complete.
 - Reset or replace the production `TOURNAMENT_EVENT_ID` before the real tournament so Phase 9
   rehearsal data cannot be confused with event data.
 - Re-run final release gates after any additional code/configuration changes.
+
+## Production Readiness Remediation Phase 1 - Fail-Closed Security Primitives
+
+Status: complete.
+
+### Scope
+
+- PRC-006: closed for route handler behavior. Test-only e2e routes now use shared production
+  deployment semantics and return 404 when either `NODE_ENV=production` or
+  `VERCEL_ENV=production`.
+- PRC-030: closed for `/api/e2e/private-csv` route-level security coverage.
+- PRC-031: closed for direct authoritative-clock boundary coverage.
+- PRC-032: closed. Admin and host cookies use `Secure` under production deployment semantics.
+- PRC-034: guarded. The route handlers fail closed, but deployed route probes remain required in
+  the later production-flow/deployed-evidence phase because the route files still ship in the app
+  tree.
+
+### Changed Files
+
+- Added `docs/phase-1-fail-closed-security-primitives-plan-2026-07-03.md`.
+- Updated `docs/deployment-readiness.md`.
+- Added shared e2e route guard `src/lib/server/test-route-safety.ts`.
+- Updated `/api/e2e/load-ballot` and `/api/e2e/private-csv` to use the shared guard.
+- Updated admin cookie, deployment-safety, and backend-selection production checks to use
+  centralized production deployment semantics.
+- Added focused tests for e2e route denial, private CSV export gating, secure cookies,
+  authoritative database time, Vercel production backend safety, and client secret/import
+  boundaries.
+
+### Checks Run
+
+- `rtk npm run test -- src/app/api/e2e/load-ballot/route.test.ts src/app/api/e2e/private-csv/route.test.ts src/lib/server/authoritative-clock.test.ts src/lib/server/admin-auth.test.ts src/lib/server/deployment-safety.test.ts src/lib/server/persistence.test.ts src/lib/server/security-boundary.test.ts`
+  - passed, 7 files / 38 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 50 files / 263 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk rg -n 'SUPABASE_SERVICE_ROLE_KEY|SESSION_SECRET|ADMIN_PASSWORD_HASH|TOURNAMENT_TEST_ROUTE_TOKEN' .next/static`
+  - no matches in generated browser chunks.
+
+### Manual Review
+
+- Product rules were unchanged. No draw, ballot, result, roster, admin dangerous-action, or stage
+  reveal behavior was modified.
+- Test-only route denial remains 404 for unavailable test surfaces.
+- Non-production e2e and memory rehearsal helper behavior remains available only with the private
+  test token plus explicit test/rehearsal flags.
+- No `.github/workflows/*` files were added or changed in this phase.
+- `docs/phase-1-fail-closed-security-primitives-plan-2026-07-03.md` was reviewed against the source
+  remediation plan and corrected before implementation completed.
+
+### Risks And Assumptions
+
+- `/api/e2e/load-ballot` and `/api/e2e/private-csv` still appear in the Next app route tree, so the
+  later deployed production route probe must still verify 404 responses with and without a token.
+- Existing repository CI workflow files predate this phase and were not changed.
+- The generated bundle scan was run after the local production build from this phase; rerun it after
+  future build or bundling changes.

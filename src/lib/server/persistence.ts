@@ -12,7 +12,7 @@ import {
   MemoryOperationalStateRepository,
   type OperationalStateRepository,
 } from "@/lib/persistence/repository";
-import { getTournamentEventId } from "@/lib/server/env";
+import { getTournamentEventId, isProductionDeploymentEnv } from "@/lib/server/env";
 import { NormalizedOperationalStateRepository } from "@/lib/server/normalized-operational-state";
 
 export type TournamentStateBackend = "memory" | "supabase";
@@ -57,14 +57,14 @@ export function getTournamentStateBackend(): TournamentStateBackend {
   const configuredBackend = process.env.TOURNAMENT_STATE_BACKEND;
 
   if (configuredBackend === "supabase" || configuredBackend === "memory") {
-    if (process.env.NODE_ENV === "production" && configuredBackend !== "supabase") {
+    if (isProductionDeploymentEnv() && configuredBackend !== "supabase") {
       throw new Error("TOURNAMENT_STATE_BACKEND=supabase is required in production.");
     }
 
     return configuredBackend;
   }
 
-  if (process.env.NODE_ENV === "production") {
+  if (isProductionDeploymentEnv()) {
     throw new Error("TOURNAMENT_STATE_BACKEND must be explicitly set to supabase in production.");
   }
 

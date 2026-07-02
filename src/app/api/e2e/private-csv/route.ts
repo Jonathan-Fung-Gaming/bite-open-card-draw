@@ -2,26 +2,9 @@ import { NextResponse } from "next/server";
 import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import { adminState } from "@/lib/server/admin-state";
 import { hydrateTournamentState } from "@/lib/server/persistence";
+import { isE2eTestRouteAvailable } from "@/lib/server/test-route-safety";
 
 export const dynamic = "force-dynamic";
-
-function testRouteAvailable(request: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return false;
-  }
-
-  const token = process.env.TOURNAMENT_TEST_ROUTE_TOKEN;
-
-  if (!token || request.headers.get("x-tournament-test-token") !== token) {
-    return false;
-  }
-
-  return (
-    process.env.TOURNAMENT_TEST_ALLOW_E2E_ROUTES === "true" ||
-    (process.env.TOURNAMENT_STATE_BACKEND === "memory" &&
-      process.env.TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND === "true")
-  );
-}
 
 function parseRoundNumber(value: string | null) {
   const roundNumber = Number(value);
@@ -48,7 +31,7 @@ function memoryPrivateCsvExportAllowed() {
 }
 
 export async function GET(request: Request) {
-  if (!testRouteAvailable(request)) {
+  if (!isE2eTestRouteAvailable(request)) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
