@@ -88,6 +88,8 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 async function expectNoVerticalOverflow(page: Page) {
+  const viewport = page.viewportSize();
+
   await expect
     .poll(async () =>
       page.evaluate(
@@ -95,6 +97,11 @@ async function expectNoVerticalOverflow(page: Page) {
           Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) -
           window.innerHeight,
       ),
+      {
+        message: `Expected no vertical overflow for ${viewport?.width ?? "unknown"}x${
+          viewport?.height ?? "unknown"
+        } projector viewport`,
+      },
     )
     .toBeLessThanOrEqual(4);
 }
