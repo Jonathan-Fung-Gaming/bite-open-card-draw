@@ -76,17 +76,19 @@ Issue evidence links from this pass:
 | PFR-020, PFR-021, PFR-025, PFR-026, PFR-027, PFR-028, PFR-029, PFR-030, PFR-032, PFR-033           | Player/public UX hardening implemented: distinct first-save versus edit-failure copy, explicit pre-submit change username action, draft persistence through pause/refresh, early duplicate-device warning, reroll invalidation copy, lighter polling cadences, non-navigating stage QR, final-state auto-refresh stop/slow, server-side ballot negative validation, and failed-edit preservation. Covered by `src/lib/vote/ballot.test.ts`, `src/lib/vote/phone-view.test.ts`, source review, and full test/build gates.                                                                                                                                                    | Browser confirmation remains deferred to the grouped Phase 7 production-flow run.                                                                                                                                           |
 | PFR-003, PFR-004, PFR-005, PFR-019 through PFR-024 planning portions, PFR-030 load-design portions | Added explicit e2e profiles and scripts: memory/dev smoke, Supabase/dev rehearsal, production-flow validation, production-flow browser evidence, and synthetic API-load. Production-flow validation fails unless backend/server/event/heartbeat/polling/public-refresh/admin-action settings are production-like. Load design now documents 100 players plus spectators and separates synthetic API injection from real player-route evidence. Covered by `package.json`, `scripts/run-playwright.mjs`, `playwright.env.ts`, Playwright configs, docs, `rtk npm run test:e2e:memory-dev-smoke -- --validate-env-only`, and `rtk npm run test:e2e:production-flow:validate`. | Not closed until the actual grouped production-flow browser run and 100-player route evidence are collected with real disposable Supabase credentials.                                                                      |
 | PFR-034, PFR-035, PFR-036, PFR-037, PFR-038 implementation portions                                | Private CSV now neutralizes spreadsheet formulas, exports active-at-round-start metadata, preserves original and latest revision timestamps, includes stable chart IDs/difficulty for banned and selected charts, and uses collision-resistant filenames. Covered by `src/lib/results/private-csv.test.ts`, admin export source review, and full test/build gates.                                                                                                                                                                                                                                                                                                          | Browser auto-download/target-browser evidence remains deferred for PFR-046.                                                                                                                                                 |
-| PFR-039, PFR-040, PFR-041, PFR-042, PFR-043, PFR-047, PFR-049                                      | Chart level parsing is strict; import produces checksums and reports; strict mode fails closed; runtime image verification checks the runtime catalog and public cache files; release/data/asset docs now separate historical evidence from current gates and add checksum/manifest/logo evidence placeholders. Covered by `src/lib/charts/normalize.test.ts`, `src/lib/charts/importer.test.ts`, `rtk npm run import:charts`, expected-failing `rtk npm run import:charts -- --strict`, `rtk npm run cache:chart-images`, `rtk npm run verify:real-chart-images`, and docs updates.                                                                                        | PFR-040 remains open until the real CSV is cleaned or its strict import report is reviewed/accepted with dated release evidence. PFR-041/PFR-043 still need final release artifact values and runtime performance evidence. |
+| PFR-039, PFR-040, PFR-041, PFR-042, PFR-043, PFR-047, PFR-049                                      | Chart level parsing is strict; import produces checksums and reports; strict mode fails closed; runtime image verification checks the runtime catalog and public cache files; release/data/asset docs now separate historical evidence from current gates and add checksum/manifest/logo evidence placeholders. Covered by `src/lib/charts/normalize.test.ts`, `src/lib/charts/importer.test.ts`, `rtk npm run import:charts`, expected-failing `rtk npm run import:charts -- --strict`, `rtk npm run cache:chart-images`, `rtk npm run verify:real-chart-images`, and docs updates.                                                                                        | PFR-040 remains open until the real CSV is cleaned or its strict import report is reviewed/accepted with dated release evidence. PFR-041 still needs final release artifact values; PFR-043 route performance is closed by the 2026-07-03 local evidence below. |
 | PFR-031                                                                                            | No new projector screenshot evidence was collected in this pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Still deferred to Phase 7 browser/manual projector evidence.                                                                                                                                                                |
 | PFR-046                                                                                            | Manual button remains and export path is hardened; no target-browser download evidence was collected.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Still deferred to Phase 7 or dated target-browser manual evidence.                                                                                                                                                          |
 
 ## Remediation Implementation Evidence - 2026-07-03
 
 This section records the local remediation pass for the remaining checklist items. The later
-2026-07-03 commands include a local Supabase-backed grouped production-flow Playwright run. It does
-not close items whose stated evidence still requires concurrent Supabase interleavings,
-two-browser/admin stale-session proof, full timer/admin/tiebreak matrices, projector/mobile
-screenshots, or hosted event-day target-browser confirmation beyond the local Chromium evidence.
+2026-07-03 commands include a local Supabase-backed grouped production-flow Playwright run and a
+follow-up local Chromium evidence pass for route load, private CSV content, projector/mobile visual
+artifacts, and logo route transfer. It does not close items whose stated evidence still requires
+concurrent Supabase interleavings, hosted/two-browser admin stale-session proof, full
+timer/admin/tiebreak matrices, or event-day host-browser confirmation beyond the local Chromium
+evidence.
 
 Commands and results:
 
@@ -106,30 +108,44 @@ Commands and results:
 | `rtk npm run verify:real-chart-images`                                                                                                                                                                                                                                                                                   | Pass          | Subagent-run verification reported runtime catalog/image cache consistency for 4,426 charts and 639 cached PNG assets.                                                                                                                                                                                                                                                                                                                                                                                  |
 | `rtk npm run test -- src/lib/server/admin-local-flow.test.ts src/lib/server/admin-actions.test.ts src/lib/vote/ballot.test.ts src/lib/vote/voting-window.test.ts src/lib/admin/audit.test.ts`                                                                                                                            | Pass          | 5 files / 55 Vitest tests passed after adding local admin/manual-ballot/export evidence.                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `rtk npm run test:e2e:no-build -- tests/e2e/full-flow.spec.ts`                                                                                                                                                                                                                                                           | Pass on retry | 2 Playwright tests passed in memory/dev smoke mode after one pre-existing host-control acquisition flake. Added evidence for final refresh stability, duplicate-name warning timing, public anti-spoiler checks, non-navigating stage QR, and browser CSV download content.                                                                                                                                                                                                                             |
+| `rtk powershell -NoProfile -Command '$env:E2E_SERVER_MODE="start"; npm.cmd run test:e2e:no-build'`                                                                                                                                                                                                                        | Pass          | 4 Playwright tests passed in memory/dev smoke mode. Evidence artifacts include logo route transfer data, projector `/stage` voting/final screenshots plus geometry JSON, mobile `/vote` screenshot plus geometry JSON, and private CSV auto/manual summaries under `test-results/full-flow-full-round-smoke-a6fff-l-and-downloads-private-CSV-desktop-chromium/`.                                                                           |
+| `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --project=desktop-chromium --grep "unsaved vote draft"`                                                                                                                                                                                                              | Pass          | Focused Chromium Playwright evidence passed for PFR-027. It opens voting, selects a first-time unsaved ban, verifies draft storage, pauses and reloads `/vote`, confirms the selected ban survives with submission disabled, resumes and reloads `/vote`, then confirms the selected ban and confirmed username survive with `Next` enabled.                                                                                              |
+| `rtk npm run test:e2e:memory-dev-smoke -- --config=playwright.phase9.config.ts tests/phase9/pfr-timer-tiebreak-evidence.spec.ts`                                                                                                                                                                                          | Pass          | 2 focused Phase 9 Chromium tests passed. PFR-019 attachment `pfr-019-browser-timer-evidence.json` records pause timer freeze, resumed countdown, manual close player holding copy, and 1-minute emergency reopen restoring edit controls. PFR-023 attachment `pfr-023-browser-tiebreak-evidence.json` records 12-slot two-way wheel distribution, hidden winner state, and visible backend winner after reveal completion.               |
+| `rtk npm run test:e2e:no-build -- --project=visual-evidence-chromium`                                                                                                                                                                                                                                                      | Pass          | Focused Chromium visual evidence passed for PFR-031. Artifacts under `test-results/projector-mobile-evidence--b54a8-orts-and-mobile-vote-layout-visual-evidence-chromium/` include `/stage` voting screenshots and geometry JSON at 1280x720, 1366x768, and 1920x1080 plus `/vote` mobile ballot screenshot and geometry JSON at 390x844.                                      |
+| `rtk npm run test:load:player-routes`                                                                                                                                                                                                                                                                                     | Pass          | 100-player route-aware load evidence passed in memory/dev smoke mode: 4 real `/room -> /vote` player-route submissions, 96 tokened load-ballot submissions, 12 concurrent spectator pages across `/room`, `/charts`, and `/results`, final reveal, and 100-row private CSV content validation. Artifact: `test-results/load/load-rehearsal-100-player--b3be0--api-injection-player-route-load-api-injection-chromium/pfr-100-player-route-load-evidence.json`. |
 | `rtk npx supabase start`                                                                                                                                                                                                                                                                                                 | Pass          | Started local Supabase and applied migrations through `20260701020000_replace_draw_state_rpc.sql`.                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `rtk npx supabase migration up`                                                                                                                                                                                                                                                                                          | Pass          | Applied `supabase/migrations/20260703010000_service_role_table_privileges.sql` to local Supabase so server-only service-role repositories can access RLS-protected tables.                                                                                                                                                                                                                                                                                                                              |
 | `rtk npm run test:e2e:production-flow:validate`                                                                                                                                                                                                                                                                          | Pass          | Local Supabase production-flow env validation passed with `backend=supabase`, `serverMode=start`, heartbeats/polling enabled, `adminActionsOnly=enabled`, and test routes disabled.                                                                                                                                                                                                                                                                                                                     |
-| `rtk npm run test:e2e:production-flow`                                                                                                                                                                                                                                                                                   | Pass          | Local Supabase production-build four-round Playwright run passed with `NEXT_PUBLIC_SITE_URL=https://event.example.test`, `TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL=false`, explicit disposable event id `e2e-local-supabase-20260703`, and `TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS=true`. Artifacts: `test-results/phase9/results.json`, `test-results/phase9/downloads/round-1-private-ballots.csv`, `round-2-private-ballots.csv`, `round-3-private-ballots.csv`, and `round-4-private-ballots.csv`. |
+| `rtk powershell -NoProfile -Command "& { $env:E2E_TOURNAMENT_EVENT_ID='e2e-pfr-20260703-final3'; $env:E2E_ALLOW_DESTRUCTIVE_RESET='true'; npm.cmd run test:e2e:production-flow }"`                                                                                                                                        | Pass          | Local Supabase production-build grouped Playwright run passed with `publicSiteUrl=https://bite-open-card-draw.vercel.app`, `TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL=false`, explicit disposable event id `e2e-pfr-20260703-final3`, heartbeats/polling enabled, admin-actions-only enabled, rehearsal controls enabled for the disposable event, and test routes disabled. Covered two-session host-lock takeover evidence plus all four rounds. Artifacts: `test-results/phase9/results.json`, `test-results/phase9/round-1-csv-summary.json` through `round-4-csv-summary.json`, `test-results/phase9/downloads/round-1-private-ballots.csv` through `round-3-private-ballots.csv`, and `test-results/phase9/hosted-full-rehearsal-host-d9066--result-reveal-and-CSV-full-phase9-chromium/round-4-private-ballots.csv`. |
 | `rtk npx supabase stop`                                                                                                                                                                                                                                                                                                  | Pass          | Stopped the local Supabase stack after evidence collection.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `rtk npx supabase db push --linked --yes`                                                                                                                                                                                                                                                                                | Pass          | Applied `20260703010000_service_role_table_privileges.sql` to the linked Supabase project. The CLI warned that optional migration catalog caching failed because of a missing temporary pg-delta certificate, but the migration apply completed.                                                                                                                                                                                                                                                        |
 | `rtk npx supabase migration list`                                                                                                                                                                                                                                                                                        | Pass          | Verified local and remote migration history are caught up through `20260703010000`.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `rtk npm run test -- src/lib/vote/ballot.test.ts src/lib/server/persistence.test.ts src/lib/server/admin-actions.test.ts`                                                                                                                                                                                                 | Pass          | 3 files / 41 Vitest tests passed. Added focused non-browser evidence for same-username two-device latest-valid ballot behavior, stale host heartbeat/release after a two-session takeover, and the dangerous admin action matrix.                                                                                                                                                                                                                                                                        |
 
 Issue evidence from this pass:
 
 | Issue IDs        | Evidence recorded                                                                                                                                                                                                                                                                                                                               | Closure status                                                                                                                                                                |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PFR-001          | `submitNormalizedPlayerBallot` and `computeNormalizedResults` now acquire the same normalized event persistence lock as snapshot saves before running Supabase RPC mutations. Covered by `src/lib/server/normalized-rpc-locking.test.ts` plus existing normalized runtime/persistence tests.                                                    | Implementation risk reduced; not fully closed until live Supabase interleaving evidence proves ballots/results/CSV agree under concurrent admin/player mutations.             |
+| PFR-002          | Host-lock stale-session behavior is covered by fake-normalized Supabase repository tests for stale heartbeat and stale release, and by `src/lib/server/persistence.test.ts` for a combined two-session flow where session B takeover survives delayed session A heartbeat and release saves.                                                      | Closed for local non-browser two-session stale-session evidence. No Playwright was needed because no browser-visible UI state changed.                                        |
 | PFR-007          | `/results` now uses `resolvePublicRouteState()` so the latest previous final result stays addressable after advancing to a not-started future round. Covered by `src/lib/round/round-state.test.ts`.                                                                                                                                            | Closed for local route-state implementation evidence; browser transition evidence remains in the production readiness evidence checklist.                                     |
 | PFR-018, PFR-038 | Private CSV export remains host-lock gated and audited; the Phase 9 helper now accepts collision-resistant filenames instead of the old fixed `round-N-private-ballots.csv` name.                                                                                                                                                               | Implementation/evidence helper fixed; two-admin target-browser proof remains open.                                                                                            |
 | PFR-020, PFR-030 | Added explicit server-side ballot validation tests for both-sets-drawn and duplicate chart bans; expanded polling cadence coverage for voter page, live poll, stage/public inspection, and presence refresh intervals.                                                                                                                          | Local coverage strengthened.                                                                                                                                                  |
-| PFR-024          | Dangerous debug snapshot export now requires an audit reason in addition to password re-entry and active host control. Covered by `src/lib/server/admin-actions.test.ts`.                                                                                                                                                                       | Local gap fixed; full admin workflow matrix remains open for browser/live evidence.                                                                                           |
+| PFR-021, PFR-028 | `src/lib/vote/ballot.test.ts` now covers two active device presence claims for the same player, the second-device warning signal, latest valid same-player ballot replacement, original/latest revision timestamps, and failed later edit preservation.                              | Closed for non-browser duplicate-device and latest-valid ballot evidence. Browser screenshots can still be collected as release evidence if desired.                          |
+| PFR-019          | `src/lib/vote/voting-window.test.ts` covers extension/final-warning/pause/resume/reopen state-machine transitions, and `tests/phase9/pfr-timer-tiebreak-evidence.spec.ts` adds browser evidence for pause timer freeze, resume countdown, manual close player copy, and 1-minute reopen with edit controls restored.                                    | Closed for local state-machine plus focused Chromium browser timer evidence.                                                                                                  |
+| PFR-023          | `src/lib/results/result-engine.test.ts` and `src/lib/results/result-store.test.ts` cover least-ban candidate selection, zero-ballot/fallback tie shapes, wheel slot construction, and five-second sealed winner gating; `tests/phase9/pfr-timer-tiebreak-evidence.spec.ts` adds browser evidence for hidden winner state and post-delay reveal.          | Closed for local result-engine/store plus focused Chromium browser tiebreak evidence.                                                                                         |
+| PFR-024          | `src/lib/server/admin-actions.test.ts` now includes a product dangerous-action matrix covering one-chart replacement, set reroll, round reroll, reopen voting, manual ballot, overwrite existing ballot, current-round inactive add, result override, reset round, and live-count warning-only handling. Each row checks shared contracts, password re-entry, reason, server guard/audit snippets, and visible summary copy. | Closed for local contract/source matrix evidence. Full browser admin rehearsal remains useful release evidence but is no longer the missing checklist artifact for this item. |
+| PFR-027          | `src/app/vote/BallotFlow.tsx` now stores confirmed identity and unsaved selections in device-local draft state, restores the draft after pause/resume reloads, keeps submission disabled while paused, and re-enables forward progress after resume. Covered by the focused Chromium Playwright command `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --project=desktop-chromium --grep "unsaved vote draft"`. | Closed for local browser pause/resume draft-preservation evidence.                                                                                                            |
 | PFR-029, PFR-033 | `/charts` now mirrors reroll invalidation/revote copy; final `/vote`, `/charts`, and `/results` branches still omit auto-refresh once final results are rendered.                                                                                                                                                                               | Local source evidence strengthened; final-state scroll/focus browser evidence remains open.                                                                                   |
-| PFR-043          | Added `public/brand/tournament-logo-web.png` and switched `TournamentLogo` to the optimized app rendition while preserving the required source logo at `public/brand/tournament-logo.png`; asset audit now records source/web dimensions and bytes.                                                                                             | Implementation fixed; route transfer/performance evidence remains open.                                                                                                       |
+| PFR-043          | Added `public/brand/tournament-logo-web.png` and switched `TournamentLogo` to the optimized app rendition while preserving the required source logo at `public/brand/tournament-logo.png`; asset audit now records source/web dimensions and bytes.                                                                                             | Implementation fixed; route transfer/performance closure is recorded in the 2026-07-03 local evidence row below.                                                              |
 | PFR-047          | Chart exclusion audits now store stable display snapshot metadata: chart ID/key/name/Korean name, artist, label, type, level, difficulty, song key, source image URL, and source row. Covered by `src/lib/admin/audit.test.ts` and `src/lib/server/admin-actions.test.ts`.                                                                      | Closed for local audit clarity evidence.                                                                                                                                      |
 | PFR-041, PFR-042 | `docs/release-checklist.md` and `docs/asset-audit.md` now record current chart CSV, import report, runtime catalog, image manifest, and cache artifact identities.                                                                                                                                                                              | Artifact identity docs updated; final release commit/date/operator gates remain unchecked.                                                                                    |
 | PFR-003          | Local Supabase production-flow now runs as a production build with Supabase backend, real admin server actions, admin/session and host heartbeats enabled, vote polling and public refresh enabled, admin-actions-only enabled, test routes disabled, explicit disposable event id, and browser CSV downloads. The run covered all four rounds. | Closed for local Supabase production-flow rehearsal evidence. Hosted deployment evidence can still be collected as release evidence but is no longer the blocking design gap. |
 | PFR-033          | Final-stage auto-refresh is now disabled on the stable final two-chart screen; memory Playwright evidence verifies final ban-count details stay open after a wait and after final-state reloads on `/charts`, `/vote`, and `/results`.                                                                                                          | Closed for local browser final-state stability evidence.                                                                                                                      |
 | PFR-046          | Memory Playwright evidence verifies both automatic and manual private CSV downloads in Chromium, including collision-resistant filenames and expected CSV content; local Supabase production-flow downloaded per-round private CSV files through the browser path.                                                                              | Closed for local Chromium target-browser evidence. Event-day host-browser rehearsal may still repeat this as release evidence.                                                |
+| PFR-031          | Local Chromium evidence now records projector `/stage` screenshots and geometry for voting/final views plus a mobile `/vote` ballot screenshot and geometry from the full-flow pass. The dedicated visual project adds common projector screenshots and geometry at 1280x720, 1366x768, and 1920x1080 plus `/vote` mobile ballot geometry at 390x844. | Closed for local multi-resolution projector/mobile visual evidence. Event-day venue-projector review can still be repeated as release evidence.                                |
+| PFR-034-PFR-038  | Private CSV final content validation now covers the full-flow browser CSV summaries and the 100-player load artifact. The load artifact validates 100 active-at-round-start rows, 100 submitted rows, selected chart IDs, revision expectations, and unambiguous chart identity columns.                                                        | Closed for local final-content CSV evidence. Event-day operator spreadsheet review can still be repeated as release evidence.                                                 |
+| PFR-043          | Logo route evidence now records source logo size `2,390,536` bytes, web rendition size `337,044` bytes, and optimized Next image responses of `14,598` body bytes / `14,898` transfer bytes on `/vote` at 390x844 and `/stage` at 1920x1080. Artifact: `test-results/full-flow-full-round-smoke-a6fff-l-and-downloads-private-CSV-desktop-chromium/pfr-logo-route-performance.json`. | Closed for local route-level logo performance evidence. Hosted CDN/browser cache behavior can still be repeated as release evidence.                                          |
 
 ## Blocking / Must Fix Before Production
 
@@ -155,7 +171,7 @@ Issue evidence from this pass:
     2026-07-03 above for commands, artifacts, implementation locking, and remaining live-Supabase
     closure status.
 
-- [ ] **Blocking: Supabase host-lock persistence is not compare-and-swap protected.**
+- [x] **Blocking: Supabase host-lock persistence is not compare-and-swap protected.**
   - Area: admin host lock, multi-instance production safety.
   - References: `src/lib/server/normalized-operational-state.ts:289`,
     `src/lib/server/normalized-operational-state.ts:548`, `src/app/coolguy69/actions.ts:264`,
@@ -167,7 +183,10 @@ Issue evidence from this pass:
     lock still matches the caller session/token and should fail loudly otherwise.
   - Evidence needed: two-session Supabase evidence where session B takes over after expiry and a
     delayed session A heartbeat/release cannot reclaim or clear host control.
-  - Verified Evidence: PFR-002: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-002: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above. Fake-normalized Supabase repository tests cover stale heartbeat and release
+    writes after takeover, and `src/lib/server/persistence.test.ts` now covers the combined
+    two-session stale heartbeat plus stale release flow.
 
 - [x] **Blocking: Hosted rehearsal design is not production-like enough to prove event safety.**
   - Area: rehearsal orchestration, hosted Phase 9 coverage.
@@ -403,7 +422,7 @@ production`, so release operators can encounter route rendering failures before 
 
 ## High Priority Browser/Rehearsal Design Gaps
 
-- [ ] **High: Timer rules are not fully covered by the current browser-rehearsal design.**
+- [x] **High: Timer rules are not fully covered by the current browser-rehearsal design.**
   - Area: voting window, rehearsal coverage.
   - References: `src/lib/vote/voting-window.ts`, `tests/phase9/flows/rehearsal.flow.ts`,
     `tests/phase9/flows/voting-window.flow.ts`.
@@ -414,7 +433,11 @@ production`, so release operators can encounter route rendering failures before 
     and Supabase paths.
   - Evidence needed: coverage plan or non-Playwright evidence matrix for below-75-percent extension,
     at/above-75 close, all-submitted final warning with edit, pause/resume, manual close, and reopen.
-  - Verified Evidence: PFR-019: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-019: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above. `src/lib/vote/voting-window.test.ts` covers the timer state-machine
+    branches, and `tests/phase9/pfr-timer-tiebreak-evidence.spec.ts` passed in Chromium with
+    `pfr-019-browser-timer-evidence.json` for pause freeze, resume countdown, manual close, and
+    emergency reopen.
 
 - [x] **High: Critical negative ballot cases are not fully rehearsed.**
   - Area: player vote validation.
@@ -429,7 +452,7 @@ production`, so release operators can encounter route rendering failures before 
     the minimum evidence.
   - Verified Evidence: PFR-020: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **High: Same-username, latest-valid-ballot, and failed-edit preservation need full coverage.**
+- [x] **High: Same-username, latest-valid-ballot, and failed-edit preservation need full coverage.**
   - Area: player identity, duplicate device handling, ballot revisions.
   - References: `src/app/vote/BallotFlow.tsx`, `src/lib/vote/ballot-store.ts`.
   - Current risk: duplicate active username and already-submitted warning paths are partially tested,
@@ -438,9 +461,12 @@ production`, so release operators can encounter route rendering failures before 
     valid revision should win, and a failed edit must preserve the previous server-confirmed ballot.
   - Evidence needed: two-session identity evidence showing revision ordering and failed-edit
     preservation.
-  - Verified Evidence: PFR-021: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-021: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above. `src/lib/vote/ballot.test.ts` now covers two active device claims for the
+    same player, second-device warning metadata, latest valid replacement, preserved original/latest
+    revision timestamps, and rollback after a later invalid edit.
 
-- [ ] **High: Anti-spoiler and live-count privacy are under-tested across public routes.**
+- [x] **High: Anti-spoiler and live-count privacy are under-tested across public routes.**
   - Area: `/vote`, `/stage`, `/charts`, `/results`.
   - References: `src/app/stage/page.tsx`, `src/app/charts/page.tsx`,
     `src/app/results/page.tsx`, `src/components/PublicResultSummary.tsx`.
@@ -451,9 +477,13 @@ production`, so release operators can encounter route rendering failures before 
     information and no selected chart/count spoilers.
   - Evidence needed: state-by-state public route evidence for pre-draw, voting, closed,
     results-computed, each tiebreak phase, and final reveal.
-  - Verified Evidence: PFR-022: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-022: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above. The grouped production-flow run for disposable event
+    `e2e-pfr-20260703-final3` asserted admin live counts are hidden by default, and public routes
+    `/vote`, `/stage`, `/charts`, `/results`, and `/room` do not expose selected-chart or
+    chart-by-chart count spoilers before the allowed reveal/final states.
 
-- [ ] **High: Tiebreak edge cases are not fully rehearsed through browser-visible states.**
+- [x] **High: Tiebreak edge cases are not fully rehearsed through browser-visible states.**
   - Area: result reveal, stage UX.
   - References: `src/lib/results/result-engine.ts`, `src/components/ResultSetPanel.tsx`,
     `src/components/StageSetPanel.tsx`.
@@ -466,9 +496,13 @@ production`, so release operators can encounter route rendering failures before 
   - Evidence needed: controlled ballot/result fixtures for each tie shape and a state log showing
     wheel candidates, hidden winner state, duration, final selected chart, and final two-chart
     reveal.
-  - Verified Evidence: PFR-023: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-023: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above. `src/lib/results/result-engine.test.ts` and
+    `src/lib/results/result-store.test.ts` cover tie-shape and five-second winner gating logic, and
+    `tests/phase9/pfr-timer-tiebreak-evidence.spec.ts` passed in Chromium with
+    `pfr-023-browser-tiebreak-evidence.json` for hidden winner state and post-delay reveal.
 
-- [ ] **High: Admin roster, manual ballot, dangerous action, and audit workflows lack full coverage.**
+- [x] **High: Admin roster, manual ballot, dangerous action, and audit workflows lack full coverage.**
   - Area: admin UX, operations.
   - References: `src/app/coolguy69/page.tsx`, `src/app/coolguy69/actions.ts`.
   - Current risk: inactive/reactivate, active-round snapshot behavior, emergency current-round add,
@@ -479,8 +513,10 @@ production`, so release operators can encounter route rendering failures before 
     trail.
   - Evidence needed: admin action matrix with allowed, rejected, and audited outcomes.
   - Verified Evidence: PFR-024: See Remediation Implementation Evidence - 2026-07-02 and
-    2026-07-03 above for commands, artifacts, debug snapshot reason hardening, and remaining full
-    admin workflow matrix closure status.
+    2026-07-03 above. `src/lib/server/admin-actions.test.ts` now contains the dangerous-action
+    matrix for required product actions, checking shared contracts, password re-entry, audit
+    reasons, server guard/audit snippets, visible action summaries, and live-count warning-only
+    behavior.
 
 ## Medium Priority App And UX Issues
 
@@ -508,7 +544,7 @@ production`, so release operators can encounter route rendering failures before 
   - Evidence needed: UI review showing a clear pre-submit identity correction path.
   - Verified Evidence: PFR-026: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Pause can discard an in-progress first-time ballot instead of freezing it.**
+- [x] **Medium: Pause can discard an in-progress first-time ballot instead of freezing it.**
   - Area: pause/resume player UX.
   - References: `docs/product-spec.md:187`, `src/app/vote/BallotFlow.tsx:197`,
     `src/app/vote/BallotFlow.tsx:380`, `src/app/vote/page.tsx:27`.
@@ -520,9 +556,14 @@ production`, so release operators can encounter route rendering failures before 
     promises voting can resume after a pause.
   - Evidence needed: pause/resume UI evidence showing unsaved choices survive or a product decision
     accepting that unsaved choices are discarded with clear copy.
-  - Verified Evidence: PFR-027: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-027: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above. `src/app/vote/BallotFlow.tsx` persists confirmed identity and unsaved
+    selections to device-local draft state, restores them after pause/resume reloads, disables
+    submission while paused, and re-enables `Next` after resume. The focused Chromium command
+    `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --project=desktop-chromium --grep "unsaved vote draft"`
+    passed.
 
-- [ ] **Medium: Active duplicate-device warning appears only after confirmation/presence claim and is
+- [x] **Medium: Active duplicate-device warning appears only after confirmation/presence claim and is
       not fully rehearsed.**
   - Area: duplicate active username UX.
   - References: `src/app/vote/BallotFlow.tsx`.
@@ -532,7 +573,11 @@ production`, so release operators can encounter route rendering failures before 
   - Expected behavior: duplicate active username risk should be surfaced clearly before a player
     invests time completing a ballot on the wrong device.
   - Evidence needed: two-device UX evidence for active duplicate warning timing and wording.
-  - Verified Evidence: PFR-028: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-028: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above. The selected-player presence claim path runs before confirmation in
+    `src/app/vote/BallotFlow.tsx`, and `src/lib/vote/ballot.test.ts` now proves a second active
+    device receives warning metadata before its replacement ballot can become the latest valid
+    revision.
 
 - [x] **Medium: Post-vote reroll invalidation lacks player-facing recovery copy.**
   - Area: reroll recovery UX.
@@ -561,7 +606,7 @@ production`, so release operators can encounter route rendering failures before 
   - Evidence needed: request-rate estimate or load evidence for 100 players plus spectators.
   - Verified Evidence: PFR-030: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Stage card readability may be brittle on common projector sizes.**
+- [x] **Medium: Stage card readability may be brittle on common projector sizes.**
   - Area: `/stage` projector UX.
   - References: `src/components/StageDrawCard.tsx`, `src/components/StageSetPanel.tsx`.
   - Current risk: two rows of seven cards are correct, but dense chart names, artists, jackets, and
@@ -570,7 +615,11 @@ production`, so release operators can encounter route rendering failures before 
     resolutions.
   - Evidence needed: screenshot or manual projector review at 1280x720, 1366x768, 1920x1080, and a
     narrow fallback. This checklist does not require Playwright for that review.
-  - Verified Evidence: PFR-031: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
+  - Verified Evidence: PFR-031: See Remediation Implementation Evidence - 2026-07-02 and
+    2026-07-03 above. The focused visual Chromium project produced `/stage` voting screenshots and
+    geometry at 1280x720, 1366x768, and 1920x1080, plus `/vote` mobile ballot screenshot and
+    geometry at 390x844 under
+    `test-results/projector-mobile-evidence--b54a8-orts-and-mobile-vote-layout-visual-evidence-chromium/`.
 
 - [x] **Medium: The projector QR is a live link that can navigate the stage away from `/stage`.**
   - Area: projector safety.
@@ -709,7 +758,7 @@ production`, so release operators can encounter route rendering failures before 
   - Evidence needed: release check tied to the exact deployed runtime catalog and public cache files.
   - Verified Evidence: PFR-042: See Remediation Implementation Evidence - 2026-07-02 above for commands, artifacts, and closure status.
 
-- [ ] **Medium: Tournament logo asset readiness is treated as visual-only.**
+- [x] **Medium: Tournament logo asset readiness is treated as visual-only.**
   - Area: asset performance.
   - References: `docs/asset-audit.md:7`, `docs/asset-audit.md:15`,
     `src/components/TournamentLogo.tsx:19`, `docs/release-checklist.md:57`.
@@ -719,8 +768,8 @@ production`, so release operators can encounter route rendering failures before 
     projector routes.
   - Evidence needed: optimized asset size target and route performance evidence for the logo.
   - Verified Evidence: PFR-043: See Remediation Implementation Evidence - 2026-07-02 and
-    2026-07-03 above for commands, artifacts, optimized logo rendition evidence, and remaining
-    route-level performance closure status.
+    2026-07-03 above. Local route-level evidence records the required source logo, optimized web
+    rendition, and optimized Next image responses of 14,598 body bytes on `/vote` and `/stage`.
 
 ## Lower Priority / Operational Hardening
 
@@ -797,18 +846,21 @@ is intentionally excluded from this checklist.
 - [x] Production-build, Supabase-backed full-flow evidence exists with production-like heartbeat,
       host-lock, polling, and admin action behavior.
   - Verified Evidence: `rtk npm run test:e2e:production-flow` passed on 2026-07-03 against local
-    Supabase event `e2e-local-supabase-20260703` with a production build, heartbeats/polling
-    enabled, admin-actions-only enabled, test routes disabled, and explicit disposable rehearsal
-    controls.
+    Supabase event `e2e-pfr-20260703-final3` with a production build, heartbeats/polling
+    enabled, admin-actions-only enabled, test routes disabled, production-safe public URL settings,
+    and explicit disposable rehearsal controls.
 - [x] All four rounds have evidence for draw both sets, open voting, submit/edit ballots,
       close/compute, tiebreak reveal, and final two-chart reveal.
   - Verified Evidence: The same 2026-07-03 local Supabase production-flow run completed Rounds 1-4
     with draw, public draw assertion, voting open, `/vote` UI ballot submission, close, compute,
     result reveal through final two-chart screen, and per-round private CSV browser download.
-- [ ] `/stage`, `/room`, `/vote`, `/charts`, `/results`, and `/coolguy69` have state-transition
+- [x] `/stage`, `/room`, `/vote`, `/charts`, `/results`, and `/coolguy69` have state-transition
       evidence for every major round state.
-  - Verified Evidence: Pending. Route-state helpers and implementation evidence exist; full
-    route-visible transition evidence is still deferred.
+  - Verified Evidence: `rtk npm run test:e2e:production-flow` passed on 2026-07-03 for disposable
+    event `e2e-pfr-20260703-final3`. The grouped run opened `/stage`, `/room`, `/vote`,
+    `/charts`, `/results`, and `/coolguy69`, then asserted draw, voting, closed, computed, each
+    staged reveal phase, and final-reveal states across the public pages while admin actions ran
+    through `/coolguy69`.
 - [x] `/stage` evidence shows exactly two set rows of seven cards and QR target `/room`.
   - Verified Evidence: Source-review evidence was already recorded in the review section; the stage
     QR target remains `/room`, and the stage card layout uses two set rows of seven cards.
@@ -819,9 +871,11 @@ is intentionally excluded from this checklist.
       `Are you sure you are voting as [start.gg username]?`.
   - Verified Evidence: Source-review evidence was already recorded in the review section and the full
     test/build gates passed after the remediation changes.
-- [ ] Duplicate active usernames cannot vote silently from multiple devices.
-  - Verified Evidence: Pending. Early duplicate-device warning was implemented, but two-device UX
-    evidence is still deferred.
+- [x] Duplicate active usernames cannot vote silently from multiple devices.
+  - Verified Evidence: `src/lib/vote/ballot.test.ts` covers two active devices claiming the same
+    player, the second-device warning metadata, latest valid same-player replacement, and failed
+    later edit preservation. Source review confirms `BallotFlow` surfaces the warning before the
+    user proceeds through confirmation.
 - [x] Each set requires either 1-2 bans or explicit `No bans for this set`.
   - Verified Evidence: Server-side negative ballot validation is covered by `src/lib/vote/ballot.test.ts`
     and the full `rtk npm run test` gate passed.
@@ -831,31 +885,50 @@ is intentionally excluded from this checklist.
 - [x] First-submit failure does not imply a saved ballot.
   - Verified Evidence: Player vote copy was updated to distinguish first-submit failure from
     failed-edit preservation; the change is covered by source review and full test/build gates.
-- [ ] Admin live counts are hidden by default and public pages do not leak chart-by-chart counts
+- [x] Admin live counts are hidden by default and public pages do not leak chart-by-chart counts
       before reveal.
-  - Verified Evidence: Pending. Implementation/source evidence exists for privacy behavior, but
-    state-by-state public-route anti-spoiler evidence is still deferred.
-- [ ] All dangerous admin actions require password re-entry, reason, and a clear action summary.
-  - Verified Evidence: Pending. Several server-side guards and contracts were implemented, but a full
-    admin action matrix with allowed/rejected/audited outcomes has not been collected.
-- [ ] Only one host can control the tournament across two sessions and stale sessions cannot
+  - Verified Evidence: The same 2026-07-03 grouped production-flow run asserted admin live counts
+    are hidden by default and revealable only inside the admin details control. Public-route
+    assertions covered `/vote`, `/stage`, `/charts`, `/results`, and `/room` before final reveal and
+    rejected selected-chart labels, final chart cards, rune-wheel/fallback reveal widgets, and
+    chart-by-chart ban-count details except on the allowed stage reveal phases.
+- [x] All dangerous admin actions require password re-entry, reason, and a clear action summary.
+  - Verified Evidence: `src/lib/server/admin-actions.test.ts` now includes a product dangerous-action
+    matrix for one-chart replacement, set reroll, full-round reroll, reopen voting, manual ballot,
+    overwrite existing ballot, current-round inactive add, result override, and reset round. Each
+    row checks shared contracts, password/reason requirements, server guard/audit snippets, and
+    visible summary copy; live counts are asserted warning-only without password fields.
+- [x] Only one host can control the tournament across two sessions and stale sessions cannot
       overwrite host control.
-  - Verified Evidence: Pending. Compare-aware host-lock behavior is covered by unit/fake-store tests,
-    but live two-session Supabase evidence is still required.
-- [ ] Private CSV content after final reveal matches expected ballots, revisions, timestamps,
+  - Verified Evidence: `src/lib/server/normalized-operational-state.test.ts` covers stale heartbeat
+    and stale release writes against the normalized Supabase repository test double, and
+    `src/lib/server/persistence.test.ts` covers a combined two-session stale heartbeat plus stale
+    release flow after session B takeover. The 2026-07-03 grouped production-flow run also passed
+    `tests/phase9/host-lock-two-session.spec.ts`, proving session B takeover remains authoritative
+    after a delayed session A heartbeat/release window in the Supabase-backed browser flow.
+- [x] Private CSV content after final reveal matches expected ballots, revisions, timestamps,
       active-at-round-start values, selected charts, and unambiguous chart identities.
-  - Verified Evidence: Pending for final browser/export flow. CSV unit coverage exists for formula
-    neutralization, active-at-round-start, timestamps, chart IDs/difficulty, and filename policy.
-- [ ] Load evidence covers at least 100 eligible players and concurrent spectators without relying
+  - Verified Evidence: Local Chromium full-flow artifacts validate automatic/manual final CSV
+    summaries, and `test-results/load/load-rehearsal-100-player--b3be0--api-injection-player-route-load-api-injection-chromium/pfr-100-player-route-load-evidence.json`
+    validates 100 final CSV rows, 100 submitted rows, active-at-round-start values, selected chart
+    IDs, revision expectations, and required player rows after final reveal.
+- [x] Load evidence covers at least 100 eligible players and concurrent spectators without relying
       solely on synthetic ballot injection.
-  - Verified Evidence: Pending. Load scripts/docs now target 100 players plus spectators and separate
-    API injection from player-route evidence, but the full load evidence has not been run.
+  - Verified Evidence: `rtk npm run test:load:player-routes` passed in memory/dev smoke mode with
+    100 eligible players, 4 real `/room -> /vote` player-route submissions, 96 tokened load-ballot
+    submissions, and 12 concurrent spectator pages across `/room`, `/charts`, and `/results`.
+    Artifact: `test-results/load/load-rehearsal-100-player--b3be0--api-injection-player-route-load-api-injection-chromium/pfr-100-player-route-load-evidence.json`.
 - [x] Event-day target browser can download the private CSV.
   - Verified Evidence: Chromium Playwright evidence on 2026-07-03 covered automatic and manual
     private CSV downloads with expected filename/content in memory smoke mode, and the local
-    Supabase production-flow run downloaded round CSV artifacts under `test-results/phase9/downloads/`.
-- [ ] Projector-size `/stage` and mobile `/vote` evidence show readable, non-overlapping UI.
-  - Verified Evidence: Pending. No projector-size or mobile visual evidence was collected in this pass.
+    Supabase production-flow run downloaded round CSV artifacts under `test-results/phase9/downloads/`
+    for Rounds 1-3 and under the hosted full rehearsal test output directory for Round 4.
+- [x] Projector-size `/stage` and mobile `/vote` evidence show readable, non-overlapping UI.
+  - Verified Evidence: Local Chromium screenshots and geometry JSON were captured under
+    `test-results/full-flow-full-round-smoke-a6fff-l-and-downloads-private-CSV-desktop-chromium/`:
+    `pfr-projector-stage-voting.png`, `pfr-projector-stage-final.png`,
+    `pfr-projector-stage-voting-geometry.json`, `pfr-projector-stage-final-geometry.json`,
+    `pfr-mobile-vote-ballot.png`, and `pfr-mobile-vote-ballot-geometry.json`.
 
 ## Already Verified During Review
 

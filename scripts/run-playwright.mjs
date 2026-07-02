@@ -205,6 +205,10 @@ function collectProductionFlowValidationErrors(config) {
     errors.push("external production-flow mode requires E2E_BASE_URL.");
   }
 
+  if (config.allowLocalPublicUrl === "true") {
+    errors.push("TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL must be false for production-flow.");
+  }
+
   if (config.disableAdminSessionHeartbeat === "true") {
     errors.push("admin session heartbeat must be enabled.");
   }
@@ -229,6 +233,10 @@ function collectProductionFlowValidationErrors(config) {
     errors.push("E2E_USE_ADMIN_ACTIONS_ONLY=true is required for production-flow rehearsal.");
   }
 
+  if (config.allowRehearsalAdminControls !== "true") {
+    errors.push("TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS=true is required for production-flow rehearsal.");
+  }
+
   return [...errors, ...collectSupabaseValidationErrors(config)];
 }
 
@@ -251,6 +259,7 @@ function printEnvironmentSummary(config) {
       `backend=${config.backend}`,
       `serverMode=${config.serverMode}`,
       `baseURL=${config.baseURL}`,
+      `publicSiteUrl=${config.publicSiteUrl}`,
       `eventId=${config.eventId ?? "(none)"}`,
       `build=${config.skipBuild ? "skipped" : "enabled"}`,
       `adminSessionHeartbeat=${enabledLabel(config.disableAdminSessionHeartbeat)}`,
@@ -259,6 +268,7 @@ function printEnvironmentSummary(config) {
       `publicRouteRefresh=${enabledLabel(config.disablePublicRefresh)}`,
       `phase9BallotMode=${config.phase9BallotMode ?? "(default)"}`,
       `adminActionsOnly=${config.useAdminActionsOnly === "true" ? "enabled" : "disabled"}`,
+      `rehearsalControls=${config.allowRehearsalAdminControls === "true" ? "enabled" : "disabled"}`,
       `testRoutes=${config.allowE2eRoutes === "true" ? "enabled" : "disabled"}`,
     ].join(" "),
   );
@@ -318,10 +328,21 @@ const e2ePhase9BallotMode = process.env.E2E_PHASE9_BALLOT_MODE || defaults.phase
 const e2eAllowE2eRoutes = process.env.TOURNAMENT_TEST_ALLOW_E2E_ROUTES ?? defaults.allowE2eRoutes;
 const e2eAllowMemoryBackend =
   process.env.TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND ?? defaults.allowMemoryBackend;
+const isProductionFlowLocalStart =
+  requestedProfile === "production-flow" && e2eServerMode === "start" && isLocalUrl(e2eBaseURL);
 const e2eAllowLocalPublicUrl =
-  process.env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL ?? (isLocalUrl(e2eBaseURL) ? "true" : "false");
+  process.env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL ??
+  (isProductionFlowLocalStart ? "false" : isLocalUrl(e2eBaseURL) ? "true" : "false");
 const e2eUseAdminActionsOnly =
   process.env.E2E_USE_ADMIN_ACTIONS_ONLY ?? defaults.useAdminActionsOnly;
+const e2eAllowRehearsalAdminControls =
+  process.env.TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS ??
+  (requestedProfile === "production-flow" || requestedProfile === "supabase-dev-rehearsal"
+    ? "true"
+    : "false");
+const e2ePublicSiteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (isProductionFlowLocalStart ? "https://event.example.test" : e2eBaseURL);
 const hostedSupabaseUrl =
   process.env.E2E_NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const hostedSupabaseAnonKey =
@@ -333,6 +354,7 @@ const runConfig = {
   backend: e2eTournamentStateBackend,
   serverMode: e2eServerMode,
   baseURL: e2eBaseURL,
+  publicSiteUrl: e2ePublicSiteUrl,
   eventId: e2eTournamentEventId,
   skipBuild,
   disableAdminSessionHeartbeat: e2eDisableAdminSessionHeartbeat,
@@ -341,8 +363,10 @@ const runConfig = {
   disablePublicRefresh: e2eDisablePublicRefresh,
   phase9BallotMode: e2ePhase9BallotMode,
   useAdminActionsOnly: e2eUseAdminActionsOnly,
+  allowRehearsalAdminControls: e2eAllowRehearsalAdminControls,
   allowE2eRoutes: e2eAllowE2eRoutes,
   allowMemoryBackend: e2eAllowMemoryBackend,
+  allowLocalPublicUrl: e2eAllowLocalPublicUrl,
   supabaseUrl: hostedSupabaseUrl,
   supabaseAnonKey: hostedSupabaseAnonKey,
   supabaseServiceRoleKey: hostedSupabaseServiceRoleKey,
@@ -380,12 +404,13 @@ const env = sanitizeEnv({
   NEXT_PUBLIC_E2E_DISABLE_PUBLIC_REFRESH: e2eDisablePublicRefresh,
   TOURNAMENT_STATE_BACKEND: e2eTournamentStateBackend,
   TOURNAMENT_EVENT_ID: e2eTournamentEventId,
-  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || e2eBaseURL,
+  NEXT_PUBLIC_SITE_URL: e2ePublicSiteUrl,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "local-anon-key",
   TOURNAMENT_TEST_ALLOW_E2E_ROUTES: e2eAllowE2eRoutes,
   TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND: e2eAllowMemoryBackend,
   TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL: e2eAllowLocalPublicUrl,
+  TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS: e2eAllowRehearsalAdminControls,
   TOURNAMENT_TEST_PUBLIC_SITE_URL: process.env.TOURNAMENT_TEST_PUBLIC_SITE_URL || e2eBaseURL,
   TOURNAMENT_TEST_ROUTE_TOKEN: e2eTestRouteToken,
 });

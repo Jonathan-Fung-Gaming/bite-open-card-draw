@@ -27,6 +27,10 @@ type AdminSessionCookiePayload = {
   sessionId?: unknown;
 };
 
+type AdvanceRevealOptions = {
+  afterRevealPhase?: (phase: string) => Promise<void>;
+};
+
 const HOST_TOKEN_COOKIE_MAX_AGE_MS = 30 * 60_000;
 
 function decodeAdminSessionId(cookieValue: string) {
@@ -81,15 +85,23 @@ export class AdminPage {
   }
 
   async loginAndTakeHost() {
+    const hostControlIsActive = async () =>
+      (await this.page
+        .getByText("Host control active", { exact: true })
+        .first()
+        .isVisible()
+        .catch(() => false)) &&
+      (await this.page
+        .getByRole("button", { name: "Release" })
+        .isEnabled()
+        .catch(() => false));
+
     for (let attempt = 0; attempt < 5; attempt += 1) {
       if (!(await this.visit())) {
         continue;
       }
 
-      const releaseButton = this.page.getByRole("button", { name: "Release" });
-
-      if (await releaseButton.isEnabled()) {
-        await expect(this.page.getByText("Voting Controls")).toBeVisible();
+      if (await hostControlIsActive()) {
         return;
       }
 
@@ -111,7 +123,10 @@ export class AdminPage {
       const takeHostButton = this.page.getByRole("button", { name: "Take Host Control" });
 
       if ((await takeHostButton.count()) > 0 && (await takeHostButton.isEnabled())) {
-        await takeHostButton.click();
+        await clickServerAction(this.page, takeHostButton, 5_000, {
+          requireServerActionResponse: true,
+          responseTimeoutMs: 60_000,
+        });
       } else {
         const forceHostForm = this.page.locator("form", {
           has: this.page.getByRole("button", { name: "Force Host Takeover" }),
@@ -123,7 +138,15 @@ export class AdminPage {
 
         await forceHostForm.getByLabel("Audit reason").fill("phase9 host takeover");
         await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
-        await forceHostForm.getByRole("button", { name: "Force Host Takeover" }).click();
+        await clickServerAction(
+          this.page,
+          forceHostForm.getByRole("button", { name: "Force Host Takeover" }),
+          5_000,
+          {
+            requireServerActionResponse: true,
+            responseTimeoutMs: 60_000,
+          },
+        );
       }
 
       await this.page.waitForTimeout(3_000);
@@ -134,18 +157,26 @@ export class AdminPage {
               return false;
             }
 
-            return this.page.getByRole("button", { name: "Release" }).isEnabled();
+            return hostControlIsActive();
           },
           { timeout: HOSTED_ACTION_TIMEOUT_MS },
         )
         .toBe(true);
-      await expect(this.page.getByText("Voting Controls")).toBeVisible();
       return;
     }
 
-    await expect(this.page.getByRole("button", { name: "Release" })).toBeEnabled({
+    await expect
+      .poll(async () => hostControlIsActive(), { timeout: HOSTED_ACTION_TIMEOUT_MS })
+      .toBe(true);
+  }
+
+  async expectActiveHostForEvidence() {
+    await this.visit();
+    await expect(this.page.getByText("Host control active", { exact: true }).first()).toBeVisible({
       timeout: HOSTED_ACTION_TIMEOUT_MS,
     });
+    await expect(this.page.getByRole("button", { name: "Release" })).toBeEnabled();
+    await expect(this.page.getByText("Voting Controls")).toBeVisible();
   }
 
   async expectTextAfterNavigation(text: string | RegExp) {
@@ -343,7 +374,7 @@ export class AdminPage {
     await clickServerAction(this.page, nextButton);
   }
 
-  async advanceToFinalReveal(roundNumber: number) {
+  async advanceToFinalReveal(roundNumber: number, options: AdvanceRevealOptions = {}) {
     const targetPhases = [
       "computed",
       "set_1_counts",
@@ -375,6 +406,7 @@ export class AdminPage {
         );
         await this.clickNextRevealStep();
         await expectSupabaseRevealPhase(roundNumber, nextPhase);
+        await options.afterRevealPhase?.(nextPhase);
         await waitForSupabaseTiebreakRevealIfNeeded(roundNumber, nextPhase);
       }
     }
@@ -390,6 +422,8 @@ export class AdminPage {
       if (!(await expectSupabaseRevealPhase(roundNumber, phase))) {
         await this.expectRevealPhaseAfterNavigation(phase.replaceAll("_", " "));
       }
+
+      await options.afterRevealPhase?.(phase);
 
       if (phase === "set_1_resolved" || phase === "set_2_resolved") {
         await this.page.waitForTimeout(6_000);
@@ -426,6 +460,12 @@ export class AdminPage {
     expect(csv).toContain("player_startgg_username");
     expect(csv).toContain("selected_set_1_chart");
     expect(csv).toContain("selected_set_2_chart");
+
+    return {
+      csv,
+      filename: download.suggestedFilename(),
+      savePath,
+    };
   }
 
   async releaseHost() {
@@ -459,6 +499,70 @@ export class AdminPage {
       .getByText(phase, { exact: true })
       .isVisible()
       .catch(() => false);
+  }
+
+  async getSessionIdForEvidence() {
+    return this.getCurrentAdminSessionId();
+  }
+
+  async forceHostTakeover(reason: string) {
+    await this.visit();
+
+    const forceHostForm = this.page.locator("form", {
+      has: this.page.getByRole("button", { name: "Force Host Takeover" }),
+    });
+
+    await expect(forceHostForm).toHaveCount(1);
+    await forceHostForm.getByLabel("Audit reason").fill(reason);
+    await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+    await clickServerAction(
+      this.page,
+      forceHostForm.getByRole("button", { name: "Force Host Takeover" }),
+      5_000,
+      {
+        requireServerActionResponse: true,
+        responseTimeoutMs: 60_000,
+      },
+    );
+    await expect(this.page.getByRole("button", { name: "Release" })).toBeEnabled({
+      timeout: HOSTED_ACTION_TIMEOUT_MS,
+    });
+  }
+
+  async expectReadOnlyHostForEvidence() {
+    await this.visit();
+    await expect(this.page.getByRole("button", { name: "Release" })).toBeDisabled({
+      timeout: HOSTED_ACTION_TIMEOUT_MS,
+    });
+  }
+
+  async expectLiveCountsHiddenByDefaultAndRevealable() {
+    await this.loginAndTakeHost();
+
+    const liveCounts = this.page.locator("details", { hasText: "Show live counts" });
+    const liveCountRows = liveCounts.locator("ol li");
+
+    await expect(liveCounts).toHaveCount(1);
+    await expect
+      .poll(async () => liveCounts.evaluate((element) => (element as HTMLDetailsElement).open))
+      .toBe(false);
+    await expect(liveCountRows.first()).toBeHidden();
+    await expect(liveCounts.locator("input[type='password']")).toHaveCount(0);
+
+    await liveCounts.locator("summary").click();
+    await expect
+      .poll(async () => liveCounts.evaluate((element) => (element as HTMLDetailsElement).open))
+      .toBe(true);
+    await expect(liveCountRows.first()).toBeVisible();
+
+    await this.goto();
+    const refreshedLiveCounts = this.page.locator("details", { hasText: "Show live counts" });
+
+    await expect
+      .poll(async () =>
+        refreshedLiveCounts.evaluate((element) => (element as HTMLDetailsElement).open),
+      )
+      .toBe(false);
   }
 
   private async installSupabaseHostLockForCurrentAdmin() {
@@ -502,9 +606,7 @@ export class AdminPage {
       .catch(() => false);
 
     if (!releaseEnabled && getSupabaseE2eConfig()) {
-      const hostCookie = (await this.page.context().cookies(this.baseURL)).find(
-        (cookie) => cookie.name === HOST_TOKEN_COOKIE,
-      );
+      const hostCookie = await this.getContextCookie(HOST_TOKEN_COOKIE);
       const hostLockDebug = await getSupabaseHostLockDebug(sessionId, hostToken);
 
       throw new Error(
@@ -516,11 +618,22 @@ export class AdminPage {
   }
 
   private async getCurrentAdminSessionId() {
-    const adminCookie = (await this.page.context().cookies(this.baseURL)).find(
-      (cookie) => cookie.name === ADMIN_SESSION_COOKIE,
-    );
+    const adminCookie = await this.getContextCookie(ADMIN_SESSION_COOKIE);
 
     return adminCookie ? decodeAdminSessionId(adminCookie.value) : null;
+  }
+
+  private async getContextCookie(name: string) {
+    const urlCookies = await this.page.context().cookies(this.baseURL);
+    const urlCookie = urlCookies.find((cookie) => cookie.name === name);
+
+    if (urlCookie) {
+      return urlCookie;
+    }
+
+    const allCookies = await this.page.context().cookies();
+
+    return allCookies.find((cookie) => cookie.name === name) ?? null;
   }
 
   private assertNoAdminError() {

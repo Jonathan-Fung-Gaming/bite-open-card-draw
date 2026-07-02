@@ -2,6 +2,7 @@ import { expect } from "@playwright/test";
 import { createHash, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { HOSTED_REFRESH_TIMEOUT_MS } from "./phase9-env";
+import { parsePrivateCsv } from "./private-csv";
 import { normalizeStartggUsername } from "../../../src/lib/admin/roster";
 import { TIEBREAK_REVEAL_DURATION_MS } from "../../../src/lib/results/reveal-timing";
 import { ROUND_SET_DEFINITIONS } from "../../../src/lib/tournament";
@@ -14,10 +15,14 @@ type SupabaseE2eConfig = {
 
 type BallotRow = {
   id: string;
-  player_id: string;
-  latest_revision_number: number;
-  submitted: boolean;
   invalidated_at: string | null;
+  last_revision_at: string | null;
+  latest_revision_number: number;
+  manual_override: boolean;
+  player_id: string;
+  replaced_existing_ballot: boolean;
+  submitted: boolean;
+  submitted_at: string | null;
 };
 
 type BallotChoiceRow = {
@@ -36,6 +41,28 @@ type DrawRow = {
 type PlayerRow = {
   id: string;
   startgg_username: string;
+};
+
+type EligibilityRow = {
+  active_at_round_start: boolean;
+  player_id: string;
+};
+
+type ResultSnapshotRow = {
+  final_revealed_at: string | null;
+  id: string;
+  reveal_phase: string;
+};
+
+type ResultRow = {
+  chart_id: string;
+  is_selected: boolean;
+  round_set_id: string;
+};
+
+type AdminActionRow = {
+  action_type: string;
+  reason: string | null;
 };
 
 type RevealState = {
@@ -270,6 +297,220 @@ export async function getSupabaseHostLockDebug(sessionId: string, hostToken: str
     releasedAt: row?.released_at ?? null,
     tokenHashMatches: row?.host_token_hash === createHash("sha256").update(hostToken).digest("hex"),
   };
+}
+
+export async function expectSupabaseHostLockOwnedBy(sessionId: string) {
+  const config = getSupabaseE2eConfig();
+
+  if (!config) {
+    return false;
+  }
+
+  const supabase = createSupabaseServiceClient(config);
+
+  await expect
+    .poll(
+      async () => {
+        const { data, error } = await supabase
+          .from("host_locks")
+          .select("owner_session_id,released_at")
+          .eq("event_id", config.eventId)
+          .eq("lock_name", "tournament-host")
+          .maybeSingle();
+
+        if (error) {
+          throw new Error(`Could not load e2e host lock owner: ${error.message}`);
+        }
+
+        const row = data as { owner_session_id?: string | null; released_at?: string | null } | null;
+
+        return `${row?.owner_session_id ?? "none"}|${row?.released_at ? "released" : "active"}`;
+      },
+      { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+    )
+    .toBe(`${sessionId}|active`);
+
+  return true;
+}
+
+export async function expectSupabaseAdminActionsRecorded(expectedActions: readonly string[]) {
+  const config = getSupabaseE2eConfig();
+
+  if (!config) {
+    return false;
+  }
+
+  const supabase = createSupabaseServiceClient(config);
+
+  await expect
+    .poll(
+      async () => {
+        const { data, error } = await supabase
+          .from("admin_actions")
+          .select("action_type,reason")
+          .eq("event_id", config.eventId);
+
+        if (error) {
+          throw new Error(`Could not load e2e admin action audit rows: ${error.message}`);
+        }
+
+        const actions = new Set(((data ?? []) as AdminActionRow[]).map((row) => row.action_type));
+
+        return expectedActions.every((action) => actions.has(action));
+      },
+      { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+    )
+    .toBe(true);
+
+  return true;
+}
+
+export async function expectSupabaseFinalCsvMatchesDatabase(input: {
+  csv: string;
+  expectedSubmittedPlayers: Record<string, number>;
+  roundNumber: number;
+}) {
+  const config = getSupabaseE2eConfig();
+
+  if (!config) {
+    return false;
+  }
+
+  const supabase = createSupabaseServiceClient(config);
+  const records = parsePrivateCsv(input.csv);
+  const submittedRecords = records.filter((record) => record.submitted === "true");
+  const [
+    { data: result, error: resultError },
+    { data: eligibility, error: eligibilityError },
+    { data: ballots, error: ballotsError },
+  ] = await Promise.all([
+    supabase
+      .from("result_snapshots")
+      .select("id,reveal_phase,final_revealed_at")
+      .eq("event_id", config.eventId)
+      .eq("round_number", input.roundNumber)
+      .maybeSingle(),
+    supabase
+      .from("round_player_eligibility")
+      .select("player_id,active_at_round_start")
+      .eq("event_id", config.eventId)
+      .eq("round_number", input.roundNumber),
+    supabase
+      .from("ballots")
+      .select(
+        "id,player_id,submitted,submitted_at,last_revision_at,latest_revision_number,manual_override,replaced_existing_ballot,invalidated_at",
+      )
+      .eq("event_id", config.eventId)
+      .eq("round_number", input.roundNumber)
+      .is("invalidated_at", null),
+  ]);
+
+  if (resultError) {
+    throw new Error(`Could not load e2e final result snapshot: ${resultError.message}`);
+  }
+
+  if (eligibilityError) {
+    throw new Error(`Could not load e2e eligibility rows: ${eligibilityError.message}`);
+  }
+
+  if (ballotsError) {
+    throw new Error(`Could not load e2e ballot rows: ${ballotsError.message}`);
+  }
+
+  const resultRow = result as ResultSnapshotRow | null;
+
+  expect(resultRow?.reveal_phase).toBe("final");
+  expect(resultRow?.final_revealed_at).toBeTruthy();
+  expect(records.length).toBe(((eligibility ?? []) as EligibilityRow[]).length);
+  expect(submittedRecords.length).toBe(Object.keys(input.expectedSubmittedPlayers).length);
+
+  const playerIds = [
+    ...new Set([
+      ...((eligibility ?? []) as EligibilityRow[]).map((row) => row.player_id),
+      ...((ballots ?? []) as BallotRow[]).map((row) => row.player_id),
+    ]),
+  ];
+  const { data: players, error: playersError } = await supabase
+    .from("players")
+    .select("id,startgg_username")
+    .eq("event_id", config.eventId)
+    .in("id", playerIds);
+
+  if (playersError) {
+    throw new Error(`Could not load e2e player rows for CSV reconciliation: ${playersError.message}`);
+  }
+
+  const playerNameById = new Map(
+    ((players ?? []) as PlayerRow[]).map((player) => [player.id, player.startgg_username]),
+  );
+  const eligibilityByPlayer = new Map(
+    ((eligibility ?? []) as EligibilityRow[]).map((row) => [
+      row.player_id,
+      row.active_at_round_start,
+    ]),
+  );
+  const recordByPlayer = new Map(records.map((record) => [record.player_startgg_username, record]));
+
+  for (const [playerId, activeAtRoundStart] of eligibilityByPlayer) {
+    const name = playerNameById.get(playerId);
+
+    expect(name, `Missing player row for eligible player ${playerId}`).toBeTruthy();
+    expect(recordByPlayer.get(name ?? "")?.player_active_at_round_start).toBe(
+      String(activeAtRoundStart),
+    );
+  }
+
+  for (const ballot of (ballots ?? []) as BallotRow[]) {
+    const playerName = playerNameById.get(ballot.player_id);
+    const record = recordByPlayer.get(playerName ?? "");
+
+    expect(playerName, `Missing player for ballot ${ballot.id}`).toBeTruthy();
+    expect(record, `Missing CSV record for ${playerName}`).toBeTruthy();
+    expect(record?.submitted).toBe(String(ballot.submitted));
+    expect(Number(record?.ballot_revision)).toBe(ballot.latest_revision_number);
+    expect(Date.parse(record?.submitted_at ?? "")).toBe(Date.parse(ballot.submitted_at ?? ""));
+    expect(Date.parse(record?.last_revision_at ?? "")).toBe(
+      Date.parse(ballot.last_revision_at ?? ""),
+    );
+    expect(record?.manual_override).toBe(String(ballot.manual_override));
+    expect(record?.replaced_existing_ballot).toBe(String(ballot.replaced_existing_ballot));
+  }
+
+  for (const [playerName, expectedRevision] of Object.entries(input.expectedSubmittedPlayers)) {
+    const record = recordByPlayer.get(playerName);
+
+    expect(record, `CSV should include submitted player ${playerName}`).toBeTruthy();
+    expect(record?.submitted).toBe("true");
+    expect(Number(record?.ballot_revision)).toBe(expectedRevision);
+  }
+
+  const { data: resultRows, error: resultRowsError } = await supabase
+    .from("result_rows")
+    .select("round_set_id,chart_id,is_selected")
+    .eq("event_id", config.eventId)
+    .eq("result_snapshot_id", resultRow?.id ?? "");
+
+  if (resultRowsError) {
+    throw new Error(`Could not load e2e result rows for CSV reconciliation: ${resultRowsError.message}`);
+  }
+
+  const selectedRows = ((resultRows ?? []) as ResultRow[])
+    .filter((row) => row.is_selected)
+    .sort((left, right) => left.round_set_id.localeCompare(right.round_set_id));
+
+  expect((resultRows ?? [])).toHaveLength(14);
+  expect(selectedRows).toHaveLength(2);
+
+  const selectedSetOneChartIds = new Set(records.map((record) => record.selected_set_1_chart_id));
+  const selectedSetTwoChartIds = new Set(records.map((record) => record.selected_set_2_chart_id));
+
+  expect(selectedSetOneChartIds.size).toBe(1);
+  expect(selectedSetTwoChartIds.size).toBe(1);
+  expect([...selectedSetOneChartIds, ...selectedSetTwoChartIds].sort()).toEqual(
+    selectedRows.map((row) => row.chart_id).sort(),
+  );
+
+  return true;
 }
 
 export async function expectSupabaseRoundDrawsReady(roundNumber: number) {

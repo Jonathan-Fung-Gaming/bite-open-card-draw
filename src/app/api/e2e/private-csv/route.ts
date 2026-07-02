@@ -33,6 +33,20 @@ function parseRoundNumber(value: string | null) {
   throw new Error("roundNumber must be 1, 2, 3, or 4.");
 }
 
+function memoryPrivateCsvExportAllowed() {
+  if (adminState.roundStateStore.getSnapshot().rehearsalMode) {
+    return true;
+  }
+
+  const eventId = process.env.TOURNAMENT_EVENT_ID ?? "";
+
+  return (
+    process.env.TOURNAMENT_STATE_BACKEND === "memory" &&
+    process.env.TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND === "true" &&
+    /^(e2e|load)-[a-z0-9-]+$/i.test(eventId)
+  );
+}
+
 export async function GET(request: Request) {
   if (!testRouteAvailable(request)) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
@@ -43,9 +57,12 @@ export async function GET(request: Request) {
 
     await hydrateTournamentState();
 
-    if (!adminState.roundStateStore.getSnapshot().rehearsalMode) {
+    if (!memoryPrivateCsvExportAllowed()) {
       return NextResponse.json(
-        { error: "Private CSV e2e export is only available in rehearsal mode." },
+        {
+          error:
+            "Private CSV e2e export is only available in rehearsal mode or disposable memory e2e mode.",
+        },
         { status: 403 },
       );
     }

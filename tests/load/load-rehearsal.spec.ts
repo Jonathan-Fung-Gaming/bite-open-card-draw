@@ -1,5 +1,16 @@
-import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
-import { expectPrivateCsvExport } from "../phase9/fixtures/private-csv";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Browser,
+  type Locator,
+  type Page,
+} from "@playwright/test";
+import { writeJsonEvidence } from "../e2e/evidence-artifacts";
+import {
+  expectPrivateCsvExport,
+  expectPrivateCsvFinalContent,
+} from "../phase9/fixtures/private-csv";
 
 function getAdminPassword() {
   const password = process.env.E2E_ADMIN_PASSWORD;
@@ -29,6 +40,14 @@ function positiveIntegerEnv(name: string, fallback: number) {
 }
 
 const PLAYER_COUNT = positiveIntegerEnv("E2E_LOAD_PLAYER_COUNT", 100);
+const ROUTE_PLAYER_COUNT = Math.min(
+  positiveIntegerEnv("E2E_LOAD_ROUTE_PLAYER_COUNT", 4),
+  PLAYER_COUNT,
+);
+const ROUTE_PLAYER_CONCURRENCY = Math.min(
+  positiveIntegerEnv("E2E_LOAD_ROUTE_PLAYER_CONCURRENCY", 1),
+  ROUTE_PLAYER_COUNT,
+);
 const SPECTATOR_COUNT = positiveIntegerEnv("E2E_LOAD_SPECTATOR_COUNT", 12);
 const LOAD_CONCURRENCY = positiveIntegerEnv("E2E_LOAD_CONCURRENCY", 5);
 const LOAD_CHUNK_DELAY_MS = Number(process.env.E2E_LOAD_CHUNK_DELAY_MS ?? 750);
@@ -44,8 +63,116 @@ function route(baseURL: string, path: string) {
   return new URL(path, baseURL).toString();
 }
 
+async function clickAdminActionAndWait(page: Page, target: Locator) {
+  const responsePromise = page
+    .waitForResponse(
+      (response) => {
+        const url = new URL(response.url());
+
+        return url.pathname === "/coolguy69" && response.request().method() === "POST";
+      },
+      { timeout: 60_000 },
+    )
+    .catch(() => null);
+
+  await target.click();
+  const response = await responsePromise;
+
+  if (response && response.status() >= 400) {
+    throw new Error(`Admin action returned HTTP ${response.status()}.`);
+  }
+
+  await page.waitForLoadState("domcontentloaded", { timeout: 10_000 }).catch(() => undefined);
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
+
+  const actionError = new URL(page.url()).searchParams.get("error");
+
+  if (actionError) {
+    throw new Error(actionError);
+  }
+}
+
 async function goto(page: Page, baseURL: string, path: string) {
-  await page.goto(route(baseURL, path), { waitUntil: "domcontentloaded" });
+  const targetUrl = route(baseURL, path);
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+      return;
+    } catch (error) {
+      lastError = error;
+
+      if (!(error instanceof Error) || !error.message.includes("interrupted by another navigation")) {
+        throw error;
+      }
+
+      await page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => undefined);
+
+      if (new URL(page.url()).pathname === path) {
+        return;
+      }
+
+      await page.waitForTimeout(250);
+    }
+  }
+
+  throw lastError;
+}
+
+async function submitAdminFormAndWait(page: Page, form: Locator) {
+  const responsePromise = page
+    .waitForResponse(
+      (response) => {
+        const url = new URL(response.url());
+
+        return url.pathname === "/coolguy69" && response.request().method() === "POST";
+      },
+      { timeout: 60_000 },
+    )
+    .catch(() => null);
+
+  await form.evaluate((element) => {
+    (element as HTMLFormElement).requestSubmit();
+  });
+  const response = await responsePromise;
+
+  if (response && response.status() >= 400) {
+    throw new Error(`Admin action returned HTTP ${response.status()}.`);
+  }
+
+  await page.waitForLoadState("domcontentloaded", { timeout: 10_000 }).catch(() => undefined);
+
+  const actionError = new URL(page.url()).searchParams.get("error");
+
+  if (actionError) {
+    throw new Error(actionError);
+  }
+}
+
+async function releaseButtonIsEnabled(page: Page) {
+  const releaseButton = page.getByRole("button", { name: "Release" });
+
+  if ((await releaseButton.count()) === 0) {
+    return false;
+  }
+
+  return releaseButton.isEnabled().catch(() => false);
+}
+
+async function waitForActiveHost(page: Page, timeout = HOSTED_REFRESH_TIMEOUT_MS) {
+  try {
+    await expect
+      .poll(async () => releaseButtonIsEnabled(page), {
+        intervals: [250, 500, 1_000],
+        timeout,
+      })
+      .toBe(true);
+    await expect(page.getByText("Voting Controls")).toBeVisible();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function loginAndTakeHost(page: Page, baseURL: string) {
@@ -54,45 +181,74 @@ async function loginAndTakeHost(page: Page, baseURL: string) {
 
   if ((await passwordInput.count()) > 0) {
     await passwordInput.fill(ADMIN_PASSWORD);
-    await page.getByRole("button", { name: "Log In" }).click();
+    await clickAdminActionAndWait(page, page.getByRole("button", { name: "Log In" }));
   }
 
   await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
-  const releaseButton = page.getByRole("button", { name: "Release" });
 
-  if (await releaseButton.isEnabled()) {
-    await expect(page.getByText("Voting Controls")).toBeVisible();
+  if (await waitForActiveHost(page, 1_000)) {
     return;
   }
 
-  const takeHostButton = page.getByRole("button", { name: "Take Host Control" });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const takeHostButton = page.getByRole("button", { name: "Take Host Control" });
 
-  if ((await takeHostButton.count()) > 0 && (await takeHostButton.isEnabled())) {
-    await takeHostButton.click();
-  } else {
-    const forceHostForm = page.locator("form", {
-      has: page.getByRole("button", { name: "Force Host Takeover" }),
-    });
+    if ((await takeHostButton.count()) > 0 && (await takeHostButton.isEnabled())) {
+      await clickAdminActionAndWait(page, takeHostButton);
+    } else {
+      const forceHostButton = page.getByRole("button", { name: "Force Host Takeover" });
+      const forceHostForm = page.locator("form", {
+        has: forceHostButton,
+      });
 
-    await forceHostForm.getByLabel("Audit reason").fill("load e2e host takeover");
-    await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
-    await forceHostForm.getByRole("button", { name: "Force Host Takeover" }).click();
+      await expect(forceHostButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+      await forceHostForm.getByLabel("Audit reason").fill("load e2e host takeover");
+      await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+      await clickAdminActionAndWait(page, forceHostButton);
+    }
+
+    if (await waitForActiveHost(page, 8_000)) {
+      return;
+    }
+
+    await goto(page, baseURL, "/coolguy69");
   }
 
-  await expect(page.getByText("Voting Controls")).toBeVisible();
-  await expect(releaseButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect(page.getByRole("button", { name: "Release" })).toBeEnabled({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 }
 
-async function drawRoundAndOpenVoting(page: Page) {
-  await page.getByRole("button", { name: "Draw Set" }).nth(0).click();
+function drawSetForm(page: Page, setIndex: number) {
+  return page
+    .locator("form", {
+      has: page.getByRole("button", { name: "Draw Set" }),
+    })
+    .nth(setIndex);
+}
+
+async function drawRoundAndOpenVoting(page: Page, baseURL: string) {
+  await expect(drawSetForm(page, 0).getByRole("button", { name: "Draw Set" })).toBeEnabled({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await submitAdminFormAndWait(page, drawSetForm(page, 0));
   await expect(page.getByText(/Version 1/).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
-  await page.getByRole("button", { name: "Draw Set" }).nth(1).click();
+
+  await expect(drawSetForm(page, 1).getByRole("button", { name: "Draw Set" })).toBeEnabled({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await submitAdminFormAndWait(page, drawSetForm(page, 1));
   await expect(page.getByText("ready to vote")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
-  await page.getByRole("button", { name: "Open Voting", exact: true }).click();
+
+  await loginAndTakeHost(page, baseURL);
+  const openVotingButton = page.getByRole("button", { name: "Open Voting", exact: true });
+
+  await expect(openVotingButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await openVotingButton.click();
   await expect(page.getByText("voting open")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -153,6 +309,70 @@ async function submitLoadChunk(
   );
 }
 
+async function submitNoBanVoteThroughPlayerRoute(
+  browser: Browser,
+  baseURL: string,
+  startggUsername: string,
+) {
+  const routePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const startedAt = Date.now();
+
+  try {
+    await goto(routePage, baseURL, "/room");
+    await routePage.getByRole("link", { name: "I am a player voting" }).click();
+    await expect(routePage).toHaveURL(/\/vote/);
+    await routePage.getByLabel("Select your start.gg username").selectOption({
+      label: startggUsername,
+    });
+    await expect(
+      routePage.getByText(`Are you sure you are voting as ${startggUsername}?`),
+    ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    const confirmButton = routePage.getByRole("button", { name: "Confirm" });
+
+    await expect(confirmButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    await confirmButton.click();
+    await expect(routePage.getByTestId("ballot-chart-card")).toHaveCount(7, {
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
+    await routePage.getByLabel("No bans for this set").check();
+    await routePage.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(routePage.getByTestId("ballot-chart-card")).toHaveCount(7, {
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
+    await routePage.getByLabel("No bans for this set").check();
+    await routePage.getByRole("button", { name: "Review" }).click();
+    await routePage.getByRole("button", { name: "Submit Ballot" }).click();
+    await expect(routePage.getByText("Ballot Saved")).toBeVisible({
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
+
+    return {
+      durationMs: Date.now() - startedAt,
+      playerStartggUsername: startggUsername,
+      route: "/room -> /vote",
+      submitted: true,
+    };
+  } finally {
+    await routePage.close().catch(() => undefined);
+  }
+}
+
+async function submitPlayerRouteBallots(browser: Browser, baseURL: string, players: string[]) {
+  const results: Array<Awaited<ReturnType<typeof submitNoBanVoteThroughPlayerRoute>>> = [];
+
+  for (let index = 0; index < players.length; index += ROUTE_PLAYER_CONCURRENCY) {
+    const chunk = players.slice(index, index + ROUTE_PLAYER_CONCURRENCY);
+
+    results.push(
+      ...(await Promise.all(
+        chunk.map((player) => submitNoBanVoteThroughPlayerRoute(browser, baseURL, player)),
+      )),
+    );
+  }
+
+  return results;
+}
+
 async function expectAdminTextAfterNavigation(page: Page, baseURL: string, text: string | RegExp) {
   await expect
     .poll(
@@ -167,11 +387,19 @@ async function expectAdminTextAfterNavigation(page: Page, baseURL: string, text:
           await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
         }
 
-        return page.getByText(text).isVisible();
+        return page.getByText(text, typeof text === "string" ? { exact: true } : undefined)
+          .first()
+          .isVisible();
       },
       { timeout: HOSTED_REFRESH_TIMEOUT_MS },
     )
     .toBe(true);
+}
+
+async function expectActivePlayerCount(page: Page, count: number) {
+  await expect(page.getByText(`Active ${count}`, { exact: true }).first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 }
 
 async function openSpectatorTraffic(browser: Browser, baseURL: string) {
@@ -244,18 +472,18 @@ async function advanceToFinalReveal(page: Page, baseURL: string) {
     .toBe(true);
 }
 
-test("100-player synthetic API load injection keeps public routes active and exports final CSV", async ({
+test("100-player route-aware load keeps public routes active and exports final CSV @api-injection @player-route", async ({
   page,
   browser,
   request,
   baseURL,
-}) => {
+}, testInfo) => {
   test.setTimeout(600_000);
   test.info().annotations.push(
     {
       type: "PFR-005",
       description:
-        "Focused synthetic /api/e2e/load-ballot injection; real player-route load remains separate Phase 7 evidence.",
+        "100 eligible players with spectator traffic; representative players submit through /room -> /vote before API load completion.",
     },
     {
       type: "PFR-030",
@@ -269,35 +497,42 @@ test("100-player synthetic API load injection keeps public routes active and exp
   }
 
   const players = Array.from({ length: PLAYER_COUNT }, (_, index) => playerName(index));
+  const routePlayers = players.slice(0, ROUTE_PLAYER_COUNT);
+  const apiPlayers = players.slice(ROUTE_PLAYER_COUNT);
 
   await loginAndTakeHost(page, baseURL);
-  await page.getByPlaceholder("Bulk import start.gg usernames").fill(players.join("\n"));
-  await page.getByRole("button", { name: "Bulk Import" }).click();
-  await expect(page.getByRole("cell", { name: playerName(0), exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("cell", { name: playerName(PLAYER_COUNT - 1), exact: true }),
-  ).toBeVisible();
+  const bulkImportForm = page.locator("form", {
+    has: page.getByPlaceholder("Bulk import start.gg usernames"),
+  });
 
-  await drawRoundAndOpenVoting(page);
+  await bulkImportForm.getByPlaceholder("Bulk import start.gg usernames").fill(players.join("\n"));
+  await submitAdminFormAndWait(page, bulkImportForm);
+  await expectActivePlayerCount(page, PLAYER_COUNT);
+
+  await loginAndTakeHost(page, baseURL);
+  await drawRoundAndOpenVoting(page, baseURL);
 
   const stagePage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 
   await goto(stagePage, baseURL, "/stage");
   await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible();
   const spectatorTraffic = await openSpectatorTraffic(browser, baseURL);
+  const routeSubmissionResults = await submitPlayerRouteBallots(browser, baseURL, routePlayers);
 
-  for (let index = 0; index < players.length; index += LOAD_CONCURRENCY) {
-    const chunk = players.slice(index, index + LOAD_CONCURRENCY);
-    await submitLoadChunk(request, baseURL, chunk, index);
+  for (let index = 0; index < apiPlayers.length; index += LOAD_CONCURRENCY) {
+    const chunk = apiPlayers.slice(index, index + LOAD_CONCURRENCY);
+    const submittedCount = ROUTE_PLAYER_COUNT + index + chunk.length;
 
-    if ((index + chunk.length) % 10 === 0 || index + chunk.length === players.length) {
+    await submitLoadChunk(request, baseURL, chunk, ROUTE_PLAYER_COUNT + index);
+
+    if (submittedCount % 10 === 0 || submittedCount === players.length) {
       await stagePage.reload({ waitUntil: "domcontentloaded" });
       await expect(
         stagePage.locator("header").getByText(/Voting open|Final 30 seconds|Voting closed/),
       ).toBeVisible();
     }
 
-    if (index + chunk.length < players.length) {
+    if (submittedCount < players.length) {
       await page.waitForTimeout(LOAD_CHUNK_DELAY_MS);
     }
   }
@@ -331,10 +566,26 @@ test("100-player synthetic API load injection keeps public routes active and exp
     timeout: 15_000,
   });
 
+  const expectedRevisionByPlayer = new Map<string, number>([
+    [playerName(0), 1],
+    [
+      playerName(PLAYER_COUNT - 1),
+      PLAYER_COUNT > ROUTE_PLAYER_COUNT && PLAYER_COUNT % EDIT_EVERY_N_PLAYERS === 0 ? 2 : 1,
+    ],
+  ]);
   const csv = await expectPrivateCsvExport({
     baseURL,
     expectedRows: PLAYER_COUNT,
+    expectedRevisionByPlayer,
+    expectedSubmittedRows: PLAYER_COUNT,
     request,
+    requiredPlayers: [playerName(0), playerName(PLAYER_COUNT - 1)],
+    roundNumber: 1,
+  });
+  const csvSummary = expectPrivateCsvFinalContent(csv, {
+    expectedRevisionByPlayer,
+    expectedRows: PLAYER_COUNT,
+    expectedSubmittedRows: PLAYER_COUNT,
     requiredPlayers: [playerName(0), playerName(PLAYER_COUNT - 1)],
     roundNumber: 1,
   });
@@ -344,6 +595,19 @@ test("100-player synthetic API load injection keeps public routes active and exp
   expect(csv).toContain("manual_override");
   expect(csv).toContain("selected_set_1_chart");
   expect(csv).toContain("selected_set_2_chart");
+  await writeJsonEvidence(testInfo, "pfr-100-player-route-load-evidence.json", {
+    apiInjectionPlayerCount: apiPlayers.length,
+    csvBytes: Buffer.byteLength(csv, "utf8"),
+    csvFilename: "round-1-private-ballots.csv",
+    csvSummary,
+    generatedAt: new Date().toISOString(),
+    playerCount: PLAYER_COUNT,
+    routePlayerConcurrency: ROUTE_PLAYER_CONCURRENCY,
+    routePlayerCount: routePlayers.length,
+    routeSubmissions: routeSubmissionResults,
+    spectatorCount: SPECTATOR_COUNT,
+    spectatorPaths: SPECTATOR_PATHS,
+  });
 
   await stagePage.close();
   await Promise.all(spectatorTraffic.pages.map((spectatorPage) => spectatorPage.close()));

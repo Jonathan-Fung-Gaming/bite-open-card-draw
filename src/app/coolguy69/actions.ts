@@ -1098,6 +1098,7 @@ export async function advanceResultRevealAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not advance result reveal.");
   }
 
+  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 

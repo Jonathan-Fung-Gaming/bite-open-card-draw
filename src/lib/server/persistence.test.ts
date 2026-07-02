@@ -331,4 +331,51 @@ describe("server persistence safety", () => {
       heartbeatAt: 1_200,
     });
   });
+
+  it("keeps a two-session host takeover after delayed stale heartbeat and release saves", async () => {
+    const repository = new MemoryOperationalStateRepository();
+    await seedOpenVotingRound(repository);
+    const initialHost = createAdminStateStores();
+    const staleHeartbeatWriter = createAdminStateStores();
+    const staleReleaseWriter = createAdminStateStores();
+    const takeoverWriter = createAdminStateStores();
+
+    await hydrateTournamentState(initialHost, repository);
+    initialHost.hostLockStore.acquire("session-a", "host-token-a", 0);
+    await persistTournamentState(initialHost, repository);
+
+    await hydrateTournamentState(staleHeartbeatWriter, repository);
+    await hydrateTournamentState(staleReleaseWriter, repository);
+    await hydrateTournamentState(takeoverWriter, repository);
+
+    expect(staleHeartbeatWriter.hostLockStore.refresh("session-a", "host-token-a", 1_000)).toBe(
+      true,
+    );
+    expect(staleReleaseWriter.hostLockStore.release("session-a", "host-token-a", 1_100)).toMatchObject(
+      {
+        released: true,
+        outcome: "released",
+      },
+    );
+    takeoverWriter.hostLockStore.acquire("session-b", "host-token-b", 1_200, { force: true });
+
+    await persistTournamentState(takeoverWriter, repository);
+    await persistTournamentState(staleHeartbeatWriter, repository);
+    await persistTournamentState(staleReleaseWriter, repository);
+
+    const restored = createAdminStateStores();
+
+    await hydrateTournamentState(restored, repository);
+
+    expect(restored.hostLockStore.getSnapshot("session-b", 1_201)).toMatchObject({
+      status: "active",
+      ownerSessionId: "session-b",
+      heartbeatAt: 1_200,
+    });
+    expect(restored.hostLockStore.getSnapshot("session-a", 1_201)).toMatchObject({
+      status: "readonly",
+      ownerSessionId: "session-b",
+      heartbeatAt: 1_200,
+    });
+  });
 });

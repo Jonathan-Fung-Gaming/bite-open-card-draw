@@ -1,5 +1,12 @@
 import type { APIRequestContext, Browser, Page, TestInfo } from "@playwright/test";
-import { expectPublicDrawState, expectPublicFinalReveal } from "../assertions/public-ui.assert";
+import {
+  expectPublicClosedState,
+  expectPublicComputedState,
+  expectPublicDrawState,
+  expectPublicFinalReveal,
+  expectPublicRevealPhaseState,
+  expectPublicVotingState,
+} from "../assertions/public-ui.assert";
 import { submitRehearsalBallots } from "./ballot-submission.flow";
 import { drawRound } from "./draw-round.flow";
 import { computeAndRevealRoundResults, verifyRoundCsvExport } from "./results-reveal.flow";
@@ -8,31 +15,43 @@ import { createSupabasePhase9Diagnostics } from "../fixtures/supabase-state";
 import { AdminPage } from "../pages/admin.page";
 import { ChartsPage } from "../pages/charts.page";
 import { ResultsPage } from "../pages/results.page";
+import { RoomPage } from "../pages/room.page";
 import { StagePage } from "../pages/stage.page";
+import { VotePage } from "../pages/vote.page";
 
 export type RehearsalPublicPages = {
   charts: ChartsPage;
   results: ResultsPage;
+  room: RoomPage;
   stage: StagePage;
+  vote: VotePage;
   close: () => Promise<void>;
 };
 
 export async function openRehearsalPublicPages(browser: Browser, baseURL: string) {
   const stageRawPage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const roomRawPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const voteRawPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const chartsRawPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const resultsRawPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const publicPages: RehearsalPublicPages = {
     stage: new StagePage(stageRawPage, baseURL),
+    room: new RoomPage(roomRawPage, baseURL),
+    vote: new VotePage(voteRawPage, baseURL),
     charts: new ChartsPage(chartsRawPage, baseURL),
     results: new ResultsPage(resultsRawPage, baseURL),
     close: async () => {
       await stageRawPage.close();
+      await roomRawPage.close();
+      await voteRawPage.close();
       await chartsRawPage.close();
       await resultsRawPage.close();
     },
   };
 
   await publicPages.stage.goto();
+  await publicPages.room.goto();
+  await publicPages.vote.goto();
   await publicPages.charts.goto();
   await publicPages.results.goto();
 
@@ -65,12 +84,31 @@ export async function runHostedRound({
   console.log(`[phase9] round ${roundNumber}: open voting`);
   await openVotingForRound(adminPage, roundNumber);
   await submitRehearsalBallots({ baseURL, browser, roundNumber });
+  console.log(`[phase9] round ${roundNumber}: assert admin live counts are gated`);
+  await adminPage.expectLiveCountsHiddenByDefaultAndRevealable();
+  console.log(`[phase9] round ${roundNumber}: assert public voting privacy`);
+  await expectPublicVotingState(publicPages, roundNumber);
   console.log(`[phase9] round ${roundNumber}: close voting`);
   await closeVotingForRound(adminPage, roundNumber);
+  console.log(`[phase9] round ${roundNumber}: assert public closed privacy`);
+  await expectPublicClosedState(publicPages, roundNumber);
   console.log(`[phase9] round ${roundNumber}: compute and reveal`);
-  await computeAndRevealRoundResults(adminPage, roundNumber);
+  await computeAndRevealRoundResults(adminPage, roundNumber, {
+    afterComputed: async () => {
+      console.log(`[phase9] round ${roundNumber}: assert public computed privacy`);
+      await expectPublicComputedState(publicPages, roundNumber);
+    },
+    afterRevealPhase: async (phase) => {
+      if (phase === "final") {
+        return;
+      }
+
+      console.log(`[phase9] round ${roundNumber}: assert public ${phase} privacy`);
+      await expectPublicRevealPhaseState(publicPages, roundNumber, phase);
+    },
+  });
   console.log(`[phase9] round ${roundNumber}: assert final reveal`);
-  await expectPublicFinalReveal(publicPages.stage, publicPages.results, roundNumber);
+  await expectPublicFinalReveal(publicPages, roundNumber);
   console.log(`[phase9] round ${roundNumber}: verify CSV`);
   await verifyRoundCsvExport({
     adminPage,
@@ -172,10 +210,12 @@ export async function attachRehearsalDiagnostics(options: {
     contentType: "application/json",
   });
 
-  await attachScreenshot(testInfo, "phase9-admin.png", adminPage.page);
+    await attachScreenshot(testInfo, "phase9-admin.png", adminPage.page);
 
   if (publicPages) {
     await attachScreenshot(testInfo, "phase9-stage.png", publicPages.stage.page);
+    await attachScreenshot(testInfo, "phase9-room.png", publicPages.room.page);
+    await attachScreenshot(testInfo, "phase9-vote.png", publicPages.vote.page);
     await attachScreenshot(testInfo, "phase9-charts.png", publicPages.charts.page);
     await attachScreenshot(testInfo, "phase9-results.png", publicPages.results.page);
   }
