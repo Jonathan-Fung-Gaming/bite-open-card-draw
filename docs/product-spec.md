@@ -215,6 +215,8 @@ For 3 tied charts, repeat each chart 4 times.
 For 4 tied charts, repeat each chart 3 times.
 
 If 5 or more charts tie, use a simple fallback reveal. Do not build a special complex edge-case animation.
+This includes zero-ballot seven-way least-ban ties; the backend still commits the selected winner
+before the fallback reveal starts.
 
 ## Final reveal
 

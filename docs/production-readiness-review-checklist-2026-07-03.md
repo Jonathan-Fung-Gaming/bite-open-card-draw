@@ -173,14 +173,14 @@ Checks run during this review:
   - Suggested tests: inactive before open, inactive after open, emergency current-round add, then
     next-round dropdown verification.
 
-- [ ] **PRC-018 - Medium - Zero-ballot / 7-way tiebreak behavior conflicts between docs.**
+- [x] **PRC-018 - Medium - Zero-ballot / 7-way tiebreak behavior conflicts between docs.**
   - Files: `src/lib/results/result-engine.ts`,
     `src/lib/server/normalized-operational-state.ts`,
     `src/lib/results/result-engine.test.ts`.
-  - Current risk: zero ballots use a 7-slot wheel while normal 5+ ties fall back. Product spec says
-    5+ ties use simple fallback; validation checklist mentions zero-ballot spinner among all 7.
-  - Expected: one documented final behavior.
-  - Suggested tests: zero-submission result path in memory and Supabase hydration.
+  - Closure: Phase 0 locks the product-spec behavior. Zero-ballot seven-way ties are 5+ ties and
+    use the fallback reveal with the backend-committed winner; no seven-slot wheel is built.
+  - Evidence: `docs/product-spec.md`, `docs/pump_open_stage_repo_validation_checklist.md`,
+    `docs/admin-action-policy.md`, `src/lib/results/result-engine.test.ts`.
 
 - [ ] **PRC-019 - Medium - Results are sorted least-to-most but not progressively revealed
   chart-by-chart.**
@@ -204,13 +204,11 @@ Checks run during this review:
   - Suggested tests: authenticated admin HTML before opening contains no chart-by-chart live count
     values.
 
-- [ ] **PRC-022 - Medium - Dangerous-action password policy is ambiguous for host controls.**
+- [x] **PRC-022 - Medium - Dangerous-action password policy is ambiguous for host controls.**
   - Files: `src/app/coolguy69/page.tsx`, `src/app/coolguy69/actions.ts`.
-  - Current risk: open/pause/resume/close voting, compute results, reveal/advance, and set/advance
-    round require active host and audit, but not password re-entry.
-  - Expected: either re-auth all tournament-changing actions or document the narrower dangerous
-    action policy.
-  - Suggested tests: product-policy matrix for password-required versus host-only actions.
+  - Closure: Phase 0 documents the narrower product policy. Routine host controls remain
+    active-host-only plus audit; password-required dangerous actions are classified separately.
+  - Evidence: `docs/admin-action-policy.md` and `src/lib/admin/action-policy.test.ts`.
 
 - [ ] **PRC-023 - Low - Post-complete missing-result phone state can fall through to generic
   pre-vote copy.**

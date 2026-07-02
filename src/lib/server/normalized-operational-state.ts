@@ -236,11 +236,7 @@ function fallbackChartSummary(chartId: string, displayDifficulty = "S16"): Drawn
   };
 }
 
-function buildWheelSlots(candidates: DrawnChartSummary[], zeroBallotTiebreak = false) {
-  if (zeroBallotTiebreak) {
-    return [...candidates];
-  }
-
+function buildWheelSlots(candidates: DrawnChartSummary[]) {
   if (candidates.length < 2 || candidates.length > 4) {
     return [];
   }
@@ -1386,7 +1382,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
               (chartId) => charts.get(chartId) ?? fallbackChartSummary(chartId, set.displayLabel),
             ) ?? [];
           const zeroBallotTiebreak = tiebreak?.decision_source === "server_zero_ballot";
-          const wheelSlots = buildWheelSlots(candidates, zeroBallotTiebreak);
+          const wheelSlots = buildWheelSlots(candidates);
 
           return {
             drawId: firstRow.draw_id,

@@ -116,7 +116,7 @@ Those patterns are wrong for the stage preview and should be flagged.
 | Pause behavior              | Host pause freezes both the timer and voting/editing.                                              |
 | Resume behavior             | Host resume continues the countdown and allows voting/editing again.                               |
 | Emergency reopen            | Admin can reopen voting in an emergency with password confirmation and a chosen reopen duration.   |
-| Zero ballots                | If zero ballots happen, use a spinner among all 7 charts for each chart set separately.            |
+| Zero ballots                | If zero ballots create a 7-way least-ban tie, use the same simple fallback reveal as other 5+ ties. |
 
 ## Validation checks
 

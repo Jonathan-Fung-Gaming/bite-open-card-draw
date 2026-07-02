@@ -210,13 +210,13 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
     `src/lib/results/result-engine.ts:93`, `src/components/ResultSetPanel.tsx:115`.
   - Current behavior: zero ballots make all 7 charts tie for fewest bans; because
     5+ ties have no wheel slots, the UI uses fallback reveal.
-  - Expected behavior: zero ballots should use a spinner among all 7 charts for each
-    chart set separately.
-  - Suggested fix: special-case zero-ballot sets with a 7-chart spinner/fallback
-    selector that still uses a precommitted backend winner.
-  - Suggested tests: zero ballots in both sets; verify each set has 7 tiebreak
-    candidates and a backend-decided winner reveal.
-  - Closure evidence: fixed in Phase 4 with a backend-decided seven-chart zero-ballot wheel.
+  - Expected behavior at the time: zero ballots were expected to use an all-chart special reveal for
+    each chart set.
+  - Superseded behavior: Phase 0 of the 2026-07-03 production-readiness plan follows
+    `docs/product-spec.md`; zero-ballot seven-way ties use the same fallback reveal as other 5+
+    least-ban ties.
+  - Closure evidence: superseded by `docs/admin-action-policy.md` and
+    `src/lib/results/result-engine.test.ts`.
 
 - [x] CR-010 - Failed rerolls can mutate draw history before replacement succeeds.
   - Severity: Medium.
