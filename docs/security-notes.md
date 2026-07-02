@@ -65,3 +65,10 @@ The latest valid submitted ballot for a player counts.
 No changes are allowed after results reveal except through an explicit correction workflow.
 
 Manual ballots after close but before reveal must be marked as overrides in export.
+
+## Production-flow test data
+
+Release-blocking Playwright rehearsal must use disposable test data and must not run against the real
+tournament event namespace. The full-tournament rehearsal must verify 48 active voting players in
+Round 1, then 36, 24, and 12 after exactly 12 voting players are removed before each later round.
+Any test-only route or token used to create this evidence must remain unavailable in production.

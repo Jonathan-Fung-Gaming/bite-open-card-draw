@@ -26,7 +26,8 @@ The Phase 9 Playwright rehearsal is split into reusable page objects and flows u
 - `rtk npm run test:e2e:production-flow` is the release-evidence browser command for Phase 7. It
   requires Supabase, an explicit disposable event id, production server mode, enabled admin session
   heartbeat, enabled host heartbeat, enabled vote polling, enabled public refresh, and UI ballot
-  submission.
+  submission. It must also prove the 48 -> 36 -> 24 -> 12 active voting-player progression across
+  all four rounds.
 
 Use memory/dev smoke after routine changes. Use the production-flow command only during the grouped
 Phase 7 browser evidence window, after Phase 1 through Phase 6 remediation checks pass.
@@ -62,6 +63,10 @@ the admin action being rehearsed.
 
 ## Start Rehearsal
 
+This local operator rehearsal flow is for practice. It does not satisfy the release-blocking
+production-flow Playwright requirement unless the test data is explicitly expanded to 48 active
+voting players for Round 1 and reduced to 36, 24, and 12 before Rounds 2, 3, and 4.
+
 1. Open `/coolguy69`.
 2. Log in.
 3. Take host control.
@@ -70,6 +75,18 @@ the admin action being rehearsed.
 6. Confirm the rehearsal roster contains `Rehearsal Player 01` through `Rehearsal Player 12`.
 
 Starting rehearsal resets roster, draws, ballots, voting windows, and results while preserving the active host lock.
+
+## Production-Flow Playwright Roster
+
+The required release Playwright rehearsal must use this active voting-player progression:
+
+1. Round 1 starts with 48 active voting players.
+2. Before Round 2, mark exactly 12 Round 1 voting players inactive/eliminated, leaving 36.
+3. Before Round 3, mark exactly 12 more voting players inactive/eliminated, leaving 24.
+4. Before Round 4, mark exactly 12 more voting players inactive/eliminated, leaving 12.
+
+For each round, verify admin active counts, `/vote` eligibility, public turnout denominators,
+submitted ballot counts, round eligibility snapshots, and private CSV row counts.
 
 ## Four-Round Rehearsal Flow
 

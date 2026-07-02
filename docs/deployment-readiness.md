@@ -4,7 +4,7 @@
 
 - Vercel project linked to this repository.
 - Supabase project with migrations applied through
-  `20260701010000_production_readiness_transactions.sql`.
+  `20260703010000_service_role_table_privileges.sql`.
 - Production environment variables configured in Vercel project settings only.
 
 Do not commit `.env`, `.env.local`, Supabase service-role keys, Vercel tokens, session secrets, or plaintext admin passwords.
@@ -38,6 +38,7 @@ rtk npm run lint
 rtk npm run typecheck
 rtk npm run test
 rtk npm run test:e2e
+rtk npm run test:e2e:production-flow
 rtk npm run test:load
 rtk npm run test:phase9
 rtk npm run test:phase9:full
@@ -63,8 +64,7 @@ Do not use the release for tournament operation until:
   rehearsal id, including `phase9-e2e-2026-06-30-prod-23`,
   `phase9-load-2026-06-30-prod-07`, or `phase9-fourround-2026-06-30-prod-05`, for the real
   tournament.
-- Supabase migrations are applied through
-  `20260701010000_production_readiness_transactions.sql`.
+- Supabase migrations are applied through `20260703010000_service_role_table_privileges.sql`.
 - `TOURNAMENT_TEST_ROUTE_TOKEN` is absent from production environment variables.
 - `rtk npm run cache:chart-images` produces at least one non-fallback cached artwork file and
   `public/chart-images/cache` or the chosen controlled storage has real files.
@@ -72,6 +72,11 @@ Do not use the release for tournament operation until:
   tournament operation.
 - Private CSV auto-download and the manual admin CSV download have both been verified after a final
   reveal.
+- The release-blocking production-flow Playwright rehearsal has verified Round 1 starts with 48
+  active voting players, then exactly 12 voting players are removed before each later round so
+  Rounds 2, 3, and 4 use 36, 24, and 12 active voting players.
+- The same rehearsal has verified the per-round active count, turnout denominator, eligibility
+  snapshot, submitted ballot count, and private CSV row count.
 - `docs/remediation-issue-checklist.md` has every row checked with evidence and its final closure
   gate passes.
 

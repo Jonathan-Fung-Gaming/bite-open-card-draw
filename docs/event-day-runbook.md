@@ -23,6 +23,11 @@ Use this checklist on the event machine before players arrive and before every r
 - Run `rtk npm run test:e2e:production-flow` only as the grouped Phase 7 browser evidence command.
   Do not substitute `rtk npm run test:e2e`, `rtk npm run test:phase9:full`, or
   `rtk npm run test:load:api-injection` as production-flow closure evidence.
+- Confirm the grouped production-flow Playwright run starts Round 1 with 48 active voting players,
+  marks exactly 12 voting players inactive before Round 2, exactly 12 more before Round 3, and
+  exactly 12 more before Round 4, leaving active voting-player counts of 48, 36, 24, and 12.
+- Confirm each round's active count, turnout denominator, eligibility snapshot, submitted ballot
+  count, and private CSV row count match the expected 48, 36, 24, or 12 count.
 - Confirm production environment variables are set in Vercel and not committed to Git.
 - Confirm Supabase migrations are applied.
 - Confirm `TOURNAMENT_STATE_BACKEND=supabase` and a stable `TOURNAMENT_EVENT_ID` are configured for

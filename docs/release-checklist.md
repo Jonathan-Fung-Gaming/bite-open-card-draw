@@ -25,6 +25,8 @@ workflow.
       step, result, and artifact path where applicable.
 - [ ] Historical evidence above has not been treated as current release evidence unless rerun or
       linked with current release metadata.
+- [ ] Release-blocking Playwright evidence includes the 48 -> 36 -> 24 -> 12 active voting-player
+      progression across Rounds 1 through 4.
 - [ ] Current release commit recorded: `TODO`.
 - [ ] Current release branch recorded: `TODO`.
 - [ ] Deployed commit recorded: `TODO`.
@@ -125,6 +127,11 @@ workflow.
 - [ ] Rune-wheel tiebreak reveal was tested in rehearsal.
 - [ ] Full four-round rehearsal completed against hosted Supabase persistent state with an approved
       disposable `TOURNAMENT_EVENT_ID`.
+- [ ] The four-round rehearsal started Round 1 with 48 active voting players, removed exactly 12
+      voting players before each later round, and verified 36, 24, and 12 active voting players for
+      Rounds 2, 3, and 4.
+- [ ] The four-round rehearsal private CSVs were checked for 48, 36, 24, and 12 round rows and
+      matching submitted-ballot counts.
 - [ ] Private CSV auto-download was tested.
 - [ ] Manual `Download private ballot CSV` was tested.
 - [ ] Private CSV filename includes event id, round, timestamp, and collision-resistant suffix.
@@ -139,6 +146,7 @@ workflow.
 - [ ] `rtk npm run typecheck`
 - [ ] `rtk npm run test`
 - [ ] `rtk npm run test:e2e`
+- [ ] `rtk npm run test:e2e:production-flow`
 - [ ] `rtk npm run test:load`
 - [ ] `rtk npm run test:phase9`
 - [ ] `rtk npm run test:phase9:full`
