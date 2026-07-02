@@ -343,6 +343,7 @@ export async function takeHostControlAction(formData: FormData) {
   }
 
   revalidatePath("/coolguy69");
+  redirect("/coolguy69");
 }
 
 export async function refreshHostLockAction() {
@@ -409,6 +410,7 @@ export async function releaseHostControlAction() {
   await persistTournamentState();
   await clearHostTokenCookie();
   revalidatePath("/coolguy69");
+  redirect("/coolguy69");
 }
 
 async function requireActiveHost() {

@@ -221,9 +221,9 @@ export default async function StagePage() {
           status={stageStatus(snapshot, view.bothSetsDrawn)}
           compact
         />
-        <section className="grid gap-3 px-5 py-3 lg:px-8">
+        <section className="grid gap-2 px-5 py-2 lg:px-8">
           <div
-            className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] xl:grid-cols-[minmax(0,1fr)_320px]"
+            className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] xl:grid-cols-[minmax(0,1fr)_320px]"
             data-testid="stage-voting-band"
           >
             <CountdownTimer
@@ -237,7 +237,7 @@ export default async function StagePage() {
             />
             <QRPanel compact />
           </div>
-          <div className="grid gap-3" data-testid="stage-chart-rows">
+          <div className="grid gap-2" data-testid="stage-chart-rows">
             {view.sets.map(({ set, draw, revealStartsAt }) => (
               <StageSetPanel
                 key={set.displayLabel}

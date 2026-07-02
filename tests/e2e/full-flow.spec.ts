@@ -325,7 +325,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(page.getByText("voting closed")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
-  await expect(phonePage.getByText("Voting is closed.")).toBeVisible({ timeout: 7000 });
+  await expect(phonePage.getByText("Voting is closed.")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await expect(phonePage.getByText("Results are being revealed on stage.")).toBeVisible();
   await page.getByRole("button", { name: "Compute Results" }).click();
   await expect(page.getByText("results computed")).toBeVisible({
@@ -348,7 +350,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await advanceRevealAndWaitForAdminPhase(page, "final");
   const privateCsvDownload = await privateCsvDownloadPromise;
 
-  expect(privateCsvDownload.suggestedFilename()).toBe("round-1-private-ballots.csv");
+  expect(privateCsvDownload.suggestedFilename()).toMatch(
+    /^e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv$/,
+  );
 
   await expect(
     page
@@ -391,7 +395,11 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   const downloadButton = page.getByRole("button", { name: "Download private ballot CSV" });
   await expect(downloadButton).toBeEnabled();
   await downloadButton.click();
-  await expect(page.getByText("Downloaded round-1-private-ballots.csv.")).toBeVisible();
+  await expect(
+    page.getByText(
+      /^Downloaded e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv\.$/,
+    ),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Release" }).click();
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();

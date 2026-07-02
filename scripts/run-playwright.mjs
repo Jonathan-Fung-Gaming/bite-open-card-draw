@@ -300,7 +300,11 @@ const skipBuild =
   process.env.E2E_SKIP_BUILD === "1" ||
   e2eServerMode === "dev" ||
   e2eServerMode === "external";
-const e2eTournamentEventId = process.env.E2E_TOURNAMENT_EVENT_ID || process.env.TOURNAMENT_EVENT_ID;
+const explicitTournamentEventId =
+  process.env.E2E_TOURNAMENT_EVENT_ID || process.env.TOURNAMENT_EVENT_ID;
+const e2eTournamentEventId =
+  explicitTournamentEventId ||
+  (e2eTournamentStateBackend === "memory" ? `e2e-${requestedProfile}` : undefined);
 const e2eDisableAdminSessionHeartbeat =
   process.env.NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT ??
   defaults.disableAdminSessionHeartbeat;

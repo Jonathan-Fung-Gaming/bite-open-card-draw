@@ -106,6 +106,7 @@ export default async function VotePage() {
 
   return (
     <main className="min-h-screen">
+      <VoteAutoRefresh />
       <RoundHeader
         title="Player Ballot"
         status={`${formatVotingStatusLabel(snapshot.status)} - Round ${roundNumber}`}

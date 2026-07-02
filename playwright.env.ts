@@ -105,7 +105,8 @@ const hostedSupabaseServiceRoleKey =
   process.env.E2E_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 const explicitE2eTournamentEventId = process.env.E2E_TOURNAMENT_EVENT_ID;
 const e2eTournamentEventId =
-  explicitE2eTournamentEventId ?? (isSupabaseE2e ? undefined : process.env.TOURNAMENT_EVENT_ID);
+  explicitE2eTournamentEventId ??
+  (isSupabaseE2e ? undefined : process.env.TOURNAMENT_EVENT_ID ?? `e2e-${e2eProfile}`);
 const e2ePhase9BallotMode = process.env.E2E_PHASE9_BALLOT_MODE ?? profileDefaults.phase9BallotMode;
 const e2eDisableAdminSessionHeartbeat =
   process.env.NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT ??
