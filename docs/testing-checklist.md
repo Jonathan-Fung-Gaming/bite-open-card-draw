@@ -139,6 +139,7 @@ practice rehearsal or one-round 100-player synthetic load test does not satisfy 
 - Tied least-ban charts use backend-decided tiebreaks.
 - 2-4 chart least-ban ties show a 12-slot rune wheel.
 - 5+ chart least-ban ties use the plain fallback reveal.
+- Zero-ballot seven-way least-ban ties use the plain fallback reveal.
 - `/results` stays closed/revealing until the final stage reveal finishes.
 
 ## Admin Tests

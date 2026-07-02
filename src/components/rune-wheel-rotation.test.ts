@@ -15,7 +15,7 @@ describe("rune wheel final rotation", () => {
     expect(normalizedPointerAngle(12, 11)).toBe(0);
   });
 
-  it("also lands non-12 zero-ballot wheels on the committed winner", () => {
+  it("can still align a non-12 wheel if a caller provides one", () => {
     expect(normalizedPointerAngle(7, 4)).toBeCloseTo(0, 8);
   });
 

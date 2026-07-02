@@ -160,7 +160,7 @@ describe("result engine", () => {
     ).toThrow(/exactly 7 charts/);
   });
 
-  it("uses a seven-chart wheel for true zero-ballot sets", () => {
+  it("uses the 5+ fallback reveal for true zero-ballot seven-way ties", () => {
     const setOneCharts = Array.from({ length: 7 }, (_, index) =>
       chart(`a-${index}`, `Alpha ${index}`),
     );
@@ -185,15 +185,14 @@ describe("result engine", () => {
     expect(result.sets[0].zeroBallotTiebreak).toBe(true);
     expect(result.sets[0].tiebreakCandidateIds).toHaveLength(7);
     expect(result.sets[0].selectedChart.id).toBe("a-3");
-    expect(result.sets[0].wheelSupported).toBe(true);
-    expect(result.sets[0].wheelSlots.map((slot) => slot.id)).toEqual(
-      setOneCharts.map((candidate) => candidate.id),
-    );
+    expect(result.sets[0].wheelSupported).toBe(false);
+    expect(result.sets[0].wheelSlots).toEqual([]);
     expect(result.sets[1].selectedChart.id).toBe("b-3");
-    expect(result.sets[1].wheelSlots).toHaveLength(7);
+    expect(result.sets[1].wheelSupported).toBe(false);
+    expect(result.sets[1].wheelSlots).toEqual([]);
   });
 
-  it("keeps non-zero 5+ least-ban ties on the fallback reveal", () => {
+  it("keeps every 5+ least-ban tie on the fallback reveal", () => {
     const setOneCharts = Array.from({ length: 7 }, (_, index) =>
       chart(`a-${index}`, `Alpha ${index}`),
     );

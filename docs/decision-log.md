@@ -32,5 +32,5 @@
 - Selected songs are blocked from later rounds.
 - Same song should not be drawn in both sets of the same round.
 - Normal tiebreak wheel handles 2, 3, or 4 tied charts.
-- 5+ chart least-ban tie uses simple fallback reveal.
+- 5+ chart least-ban tie uses simple fallback reveal, including zero-ballot seven-way ties.
 - No reduced-motion UI toggle.

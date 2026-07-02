@@ -12,6 +12,64 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 0 - Policy And Decision Lock - 2026-07-03
+
+Status: complete.
+
+### Acceptance Criteria
+
+- PRC-018 is closed by aligning `docs/product-spec.md` and
+  `docs/pump_open_stage_repo_validation_checklist.md`: zero-ballot seven-way least-ban ties use the
+  same fallback reveal as other 5+ ties, with the backend winner committed before reveal.
+- PRC-022 is closed with an explicit admin action policy matrix in
+  `src/lib/admin/action-policy.ts` and `docs/admin-action-policy.md`.
+- Password-required dangerous actions are tested for password re-entry, audit reason, and dangerous
+  audit coverage.
+- Active-host-only tournament actions are tested for active host control, audit coverage, and no
+  password re-entry expansion.
+
+### Changed Files
+
+- `src/lib/admin/action-policy.ts`
+- `src/lib/admin/action-policy.test.ts`
+- `src/lib/results/result-engine.ts`
+- `src/lib/results/result-engine.test.ts`
+- `src/lib/server/normalized-operational-state.ts`
+- `src/components/rune-wheel-rotation.test.ts`
+- `docs/admin-action-policy.md`
+- `docs/product-spec.md`
+- `docs/pump_open_stage_repo_validation_checklist.md`
+- `docs/production-readiness-review-checklist-2026-07-03.md`
+- `docs/testing-checklist.md`
+- `docs/decision-log.md`
+- `docs/comprehensive-review-checklist-2026-06-30.md`
+- `docs/phase-status.md`
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/admin/action-policy.test.ts src/lib/server/admin-actions.test.ts src/lib/results/result-engine.test.ts src/components/rune-wheel-rotation.test.ts` - passed, 4 files / 30 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 47 files / 242 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk git diff --check` - passed.
+
+### Manual Review
+
+- Product rules remain unchanged except for resolving the documented conflict in favor of
+  `docs/product-spec.md`: 2-, 3-, and 4-way least-ban ties use the 12-slot rune wheel; 5+ ties,
+  including zero-ballot seven-way ties, use fallback reveal.
+- Routine host controls such as open, pause, resume, close, compute, reveal, and round advancement
+  remain active-host-only plus audit.
+- Dangerous actions listed in the product policy remain password-reentry guarded with audit reasons.
+
+### Risks And Assumptions
+
+- Historical docs still contain older remediation context, but current source-of-truth docs and the
+  2026-07-03 checklist now point to the Phase 0 fallback decision.
+- Full production-flow Supabase evidence remains deferred to the later production-readiness phases.
+
 ## Production Flow Risk Follow-Up - 2026-07-03
 
 Status: local code, test, and documentation follow-up completed for several remaining items in
@@ -2009,8 +2067,9 @@ Status: complete.
 - CR-004: closed. Selected-song blocks are synchronized from all computed result snapshots, not only
   final reveals, so future draws after compute but before final stage reveal exclude prior selected
   songs.
-- CR-009: closed. True zero-ballot sets now use a backend-decided seven-chart wheel; non-zero 5+
-  least-ban ties still use the documented fallback reveal.
+- CR-009: superseded by the 2026-07-03 production-readiness Phase 0 decision lock. True
+  zero-ballot seven-way ties now use the same fallback reveal as other 5+ least-ban ties, with a
+  backend-decided winner committed before reveal.
 - CR-010: closed. Draw records are planned and validated before active history is superseded, and
   full-round rerolls commit only after both replacement sets are planned successfully.
 - CR-011: closed. One-chart rerolls exclude the exact target chart and prefer a different song,

@@ -71,11 +71,7 @@ export function filterBallotsByEligiblePlayers(
   return ballots.filter((ballot) => eligiblePlayerIds.has(ballot.playerId));
 }
 
-export function buildWheelSlots(candidates: DrawnChartSummary[], zeroBallotTiebreak = false) {
-  if (zeroBallotTiebreak) {
-    return [...candidates];
-  }
-
+export function buildWheelSlots(candidates: DrawnChartSummary[]) {
   if (candidates.length < 2 || candidates.length > 4) {
     return [];
   }
@@ -117,7 +113,7 @@ export function computeResultSet(
   const selectedChart = tiebreakUsed
     ? (leastBannedCharts[randomIndex(leastBannedCharts.length)] as DrawnChartSummary)
     : (leastBannedCharts[0] as DrawnChartSummary);
-  const wheelSlots = buildWheelSlots(leastBannedCharts, zeroBallotTiebreak);
+  const wheelSlots = buildWheelSlots(leastBannedCharts);
 
   return {
     drawId: draw.id,
