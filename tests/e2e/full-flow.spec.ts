@@ -1,5 +1,18 @@
-import { readFile } from "node:fs/promises";
-import { expect, test, type Download, type Locator, type Page } from "@playwright/test";
+import { readFile, stat } from "node:fs/promises";
+import {
+  expect,
+  test,
+  type Browser,
+  type Download,
+  type Locator,
+  type Page,
+  type TestInfo,
+} from "@playwright/test";
+import {
+  captureEvidenceScreenshot,
+  writeJsonEvidence,
+} from "./evidence-artifacts";
+import { expectPrivateCsvFinalContent } from "../phase9/fixtures/private-csv";
 import {
   clickAdminActionAndWait,
   getAdminPassword,
@@ -12,8 +25,26 @@ test.describe.configure({ mode: "serial" });
 
 const ADMIN_PASSWORD = getAdminPassword();
 const FALLBACK_CHART_IMAGE_PATH = "/chart-images/fallback-card.svg";
+const LOGO_ALT_TEXT = "Pump It Up Open Stage tournament logo";
+const LOGO_ROUTE_BYTE_LIMIT = 400_000;
+const BALLOT_DRAFT_STORAGE_KEY = "bite-open-card-draw:ballot-drafts:v1";
 const PRIVATE_CSV_FILENAME_PATTERN =
   /^e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv$/;
+
+type EvidenceBox = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+type LogoResponseEvidence = {
+  bodyBytes: number | null;
+  contentType: string | null;
+  decodedUrl: string;
+  status: number;
+  url: string;
+};
 
 function expectRealCachedImagePath(source: string | null) {
   expect(source).toBeTruthy();
@@ -29,23 +60,6 @@ async function readDownloadText(download: Download) {
   }
 
   return readFile(path, "utf8");
-}
-
-function expectPrivateCsvContent(csv: string) {
-  const lines = csv.trimEnd().split(/\r?\n/);
-  const header = lines[0]?.split(",") ?? [];
-
-  expect(header).toContain("round_number");
-  expect(header).toContain("player_startgg_username");
-  expect(header).toContain("submitted");
-  expect(header).toContain("selected_set_1_chart");
-  expect(header).toContain("selected_set_2_chart");
-  expect(header).toContain("set_1_tiebreak_used");
-  expect(header).toContain("set_2_tiebreak_used");
-  expect(csv).toContain("Alpha");
-  expect(csv).toContain("S16");
-  expect(csv).toContain("S17");
-  expect(lines.length).toBeGreaterThanOrEqual(2);
 }
 
 async function expectStageRows(page: Page) {
@@ -149,6 +163,265 @@ async function expectNoStageVerticalScroll(page: Page) {
     .toBeLessThanOrEqual(4);
 }
 
+function toEvidenceBox(box: NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>): EvidenceBox {
+  return {
+    height: Math.round(box.height * 100) / 100,
+    width: Math.round(box.width * 100) / 100,
+    x: Math.round(box.x * 100) / 100,
+    y: Math.round(box.y * 100) / 100,
+  };
+}
+
+function intersectionArea(left: EvidenceBox, right: EvidenceBox) {
+  const width = Math.max(
+    0,
+    Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x),
+  );
+  const height = Math.max(
+    0,
+    Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y),
+  );
+
+  return width * height;
+}
+
+async function collectLocatorBoxes(locator: Locator) {
+  const boxes: Array<EvidenceBox & { index: number }> = [];
+
+  for (let index = 0; index < (await locator.count()); index += 1) {
+    const box = await locator.nth(index).boundingBox();
+
+    expect(box).not.toBeNull();
+    boxes.push({ index, ...toEvidenceBox(box!) });
+  }
+
+  return boxes;
+}
+
+function expectNoBoxOverlap(boxes: Array<EvidenceBox & { index: number }>, label: string) {
+  for (let leftIndex = 0; leftIndex < boxes.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < boxes.length; rightIndex += 1) {
+      const left = boxes[leftIndex]!;
+      const right = boxes[rightIndex]!;
+
+      expect(
+        intersectionArea(left, right),
+        `${label} ${left.index} should not overlap ${label} ${right.index}`,
+      ).toBeLessThanOrEqual(1);
+    }
+  }
+}
+
+async function collectStageProjectorGeometry(page: Page) {
+  const entries = {
+    chartRows: page.getByTestId("stage-chart-rows"),
+    qr: page.getByTestId("room-qr-link"),
+    timer: page.getByTestId("stage-countdown-display"),
+    votingBand: page.getByTestId("stage-voting-band"),
+  };
+  const boxes: Record<string, EvidenceBox> = {};
+
+  for (const [name, locator] of Object.entries(entries)) {
+    const box = await locator.boundingBox();
+
+    expect(box, `${name} should have a projector bounding box`).not.toBeNull();
+    boxes[name] = toEvidenceBox(box!);
+  }
+
+  expect(intersectionArea(boxes.qr!, boxes.timer!)).toBeLessThanOrEqual(1);
+  expect(boxes.votingBand!.y + boxes.votingBand!.height).toBeLessThanOrEqual(
+    boxes.chartRows!.y + 1,
+  );
+
+  return boxes;
+}
+
+async function collectMobileVoteGeometry(page: Page) {
+  const viewport = page.viewportSize();
+  const cards = await collectLocatorBoxes(page.getByTestId("ballot-chart-card"));
+  const bodyOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+
+  expect(viewport).not.toBeNull();
+  expect(cards).toHaveLength(7);
+  expectNoBoxOverlap(cards, "mobile ballot card");
+
+  for (const card of cards) {
+    expect(card.x).toBeGreaterThanOrEqual(0);
+    expect(card.x + card.width).toBeLessThanOrEqual((viewport?.width ?? 0) + 1);
+  }
+
+  return {
+    bodyOverflow,
+    cards,
+    viewport,
+  };
+}
+
+async function expectCenteredSeventhCard(page: Page) {
+  const viewport = page.viewportSize();
+  const cards = page.getByTestId("ballot-chart-card");
+  const sixthBox = await cards.nth(5).boundingBox();
+  const seventhBox = await cards.nth(6).boundingBox();
+
+  expect(viewport).not.toBeNull();
+  expect(sixthBox).not.toBeNull();
+  expect(seventhBox).not.toBeNull();
+  expect(seventhBox!.y).toBeGreaterThan(sixthBox!.y);
+  expect(Math.abs(seventhBox!.x + seventhBox!.width / 2 - viewport!.width / 2)).toBeLessThanOrEqual(
+    8,
+  );
+  expect(seventhBox!.width).toBeGreaterThan(120);
+}
+
+function decodeUrl(url: string) {
+  try {
+    return decodeURIComponent(url);
+  } catch {
+    return url;
+  }
+}
+
+function isLogoUrl(url: string) {
+  return decodeUrl(url).includes("tournament-logo");
+}
+
+function isWebLogoUrl(url: string) {
+  return decodeUrl(url).includes("/brand/tournament-logo-web.png");
+}
+
+function isSourceLogoUrl(url: string) {
+  const decodedUrl = decodeUrl(url);
+
+  return (
+    decodedUrl.includes("/brand/tournament-logo.png") &&
+    !decodedUrl.includes("/brand/tournament-logo-web.png")
+  );
+}
+
+async function collectLogoRoutePerformanceEvidence(
+  browser: Browser,
+  baseURL: string | undefined,
+  testInfo: TestInfo,
+) {
+  if (!baseURL) {
+    throw new Error("Missing Playwright baseURL for logo route performance evidence.");
+  }
+
+  const sourceLogo = await stat("public/brand/tournament-logo.png");
+  const webLogo = await stat("public/brand/tournament-logo-web.png");
+  const routeTargets = [
+    {
+      name: "phone-vote",
+      path: "/vote",
+      viewport: { height: 844, width: 390 },
+    },
+    {
+      name: "projector-stage",
+      path: "/stage",
+      viewport: { height: 1080, width: 1920 },
+    },
+  ];
+  const routes = [];
+
+  for (const target of routeTargets) {
+    const context = await browser.newContext({
+      baseURL,
+      isMobile: target.name.startsWith("phone"),
+      viewport: target.viewport,
+    });
+    const routePage = await context.newPage();
+    const logoResponses: LogoResponseEvidence[] = [];
+    const responseReads: Promise<void>[] = [];
+
+    routePage.on("response", (response) => {
+      if (!isLogoUrl(response.url())) {
+        return;
+      }
+
+      responseReads.push(
+        response
+          .body()
+          .then((body) => {
+            logoResponses.push({
+              bodyBytes: body.length,
+              contentType: response.headers()["content-type"] ?? null,
+              decodedUrl: decodeUrl(response.url()),
+              status: response.status(),
+              url: response.url(),
+            });
+          })
+          .catch(() => {
+            logoResponses.push({
+              bodyBytes: null,
+              contentType: response.headers()["content-type"] ?? null,
+              decodedUrl: decodeUrl(response.url()),
+              status: response.status(),
+              url: response.url(),
+            });
+          }),
+      );
+    });
+
+    await goto(routePage, target.path);
+    await expect(routePage.getByAltText(LOGO_ALT_TEXT).first()).toBeVisible();
+    await routePage.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
+    await Promise.all(responseReads);
+
+    const resourceEntries = await routePage.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .filter((entry) => decodeURIComponent(entry.name).includes("tournament-logo"))
+        .map((entry) => {
+          const resource = entry as PerformanceResourceTiming;
+
+          return {
+            decodedName: decodeURIComponent(resource.name),
+            durationMs: Math.round(resource.duration * 100) / 100,
+            encodedBodySize: resource.encodedBodySize,
+            transferSize: resource.transferSize,
+          };
+        }),
+    );
+    const webLogoEvidenceCount =
+      logoResponses.filter((response) => isWebLogoUrl(response.decodedUrl)).length +
+      resourceEntries.filter((entry) => isWebLogoUrl(entry.decodedName)).length;
+
+    expect(webLogoEvidenceCount, `${target.name} should request the optimized logo`).toBeGreaterThan(
+      0,
+    );
+    expect(
+      logoResponses.filter((response) => isSourceLogoUrl(response.decodedUrl)),
+      `${target.name} should not request the large source logo`,
+    ).toHaveLength(0);
+
+    for (const response of logoResponses.filter((entry) => isWebLogoUrl(entry.decodedUrl))) {
+      if (response.bodyBytes !== null) {
+        expect(response.bodyBytes).toBeLessThanOrEqual(LOGO_ROUTE_BYTE_LIMIT);
+      }
+    }
+
+    routes.push({
+      logoResponses,
+      resourceEntries,
+      route: target.path,
+      routeName: target.name,
+      viewport: target.viewport,
+    });
+
+    await context.close();
+  }
+
+  await writeJsonEvidence(testInfo, "pfr-logo-route-performance.json", {
+    generatedAt: new Date().toISOString(),
+    routeByteLimit: LOGO_ROUTE_BYTE_LIMIT,
+    routes,
+    sourceLogoBytes: sourceLogo.size,
+    webLogoBytes: webLogo.size,
+  });
+}
+
 async function waitForVisibleTiebreakReveal(page: Page, expectedPanelCount: number) {
   const tiebreakPanels = page
     .getByTestId("rune-wheel")
@@ -249,8 +522,11 @@ async function expectFinalBanCountDetailsRemainOpenAfterWait(page: Page) {
 test("full round smoke flow reaches final reveal and downloads private CSV", async ({
   page,
   browser,
-}) => {
+  baseURL,
+}, testInfo) => {
   test.setTimeout(150_000);
+
+  await collectLogoRoutePerformanceEvidence(browser, baseURL, testInfo);
 
   await goto(page, "/stage");
   await expect(page.getByText("Round 1 Draw")).toBeVisible();
@@ -317,6 +593,14 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   });
   await expectReadableVotingAccess(stagePage);
   await expectNoStageVerticalScroll(stagePage);
+  const stageVotingGeometry = await collectStageProjectorGeometry(stagePage);
+
+  await captureEvidenceScreenshot(testInfo, "pfr-projector-stage-voting.png", stagePage);
+  await writeJsonEvidence(
+    testInfo,
+    "pfr-projector-stage-voting-geometry.json",
+    stageVotingGeometry,
+  );
 
   const mobileChartsPage = await page.context().newPage();
   await mobileChartsPage.setViewportSize({ width: 390, height: 844 });
@@ -337,6 +621,12 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await goto(phonePage, "/vote");
   await phonePage.getByLabel("Select your start.gg username").selectOption({ label: "Alpha" });
   await phonePage.getByRole("button", { name: "Confirm" }).click();
+  await expect(phonePage.getByTestId("ballot-chart-card")).toHaveCount(7);
+  await expectCenteredSeventhCard(phonePage);
+  const mobileVoteGeometry = await collectMobileVoteGeometry(phonePage);
+
+  await captureEvidenceScreenshot(testInfo, "pfr-mobile-vote-ballot.png", phonePage);
+  await writeJsonEvidence(testInfo, "pfr-mobile-vote-ballot-geometry.json", mobileVoteGeometry);
   await expectRenderedRealBackgroundImage(phonePage.getByTestId("ballot-chart-card").first());
   await expect(phonePage.getByTestId("ban-selection-counter")).toHaveText("0/2 bans selected");
   const ballotCards = phonePage.getByTestId("ballot-chart-card");
@@ -420,20 +710,30 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await advanceRevealAndWaitForAdminPhase(page, "final");
   const privateCsvDownload = await privateCsvDownloadPromise;
   const privateCsvText = await readDownloadText(privateCsvDownload);
+  const csvExpectation = {
+    expectedRevisionByPlayer: { Alpha: 2 },
+    expectedRows: 4,
+    expectedSubmittedRows: 1,
+    requiredPlayers: ["Alpha", "Bravo", "Charlie", "Delta"],
+    roundNumber: 1,
+  };
+  const privateCsvSummary = expectPrivateCsvFinalContent(privateCsvText, csvExpectation);
 
   expect(privateCsvDownload.suggestedFilename()).toMatch(PRIVATE_CSV_FILENAME_PATTERN);
-  expectPrivateCsvContent(privateCsvText);
+  await writeJsonEvidence(testInfo, "pfr-private-csv-auto-summary.json", privateCsvSummary);
 
   await expect(
     page
       .locator("section", { hasText: "Result Reveal Controls" })
       .getByText("final", { exact: true }),
   ).toBeVisible();
+  await goto(stagePage, "/stage");
+  await goto(chartsPage, "/charts");
   await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
-    timeout: 7000,
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expect(chartsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
-    timeout: 7000,
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expectRenderedRealStageImage(chartsPage);
   await expectFinalBanCountDetailsRemainOpenAfterWait(chartsPage);
@@ -441,6 +741,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(chartsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
   await expectFinalBanCountDetailsRemainOpenAfterWait(chartsPage);
   await chartsPage.close();
+  await goto(phonePage, "/vote");
   await expect(phonePage.getByText("Full ban counts")).toBeVisible({ timeout: 7000 });
   await expectRenderedRealBackgroundImage(phonePage.getByTestId("phone-final-chart-card").first());
   await expectFinalBanCountDetailsRemainOpenAfterWait(phonePage);
@@ -457,6 +758,14 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   expect((await finalStageCards.first().boundingBox())?.height).toBeGreaterThan(300);
   expect((await finalStageCards.nth(1).boundingBox())?.height).toBeGreaterThan(300);
   await expectRenderedRealStageImage(page);
+  const finalStageGeometry = {
+    cards: await collectLocatorBoxes(finalStageCards),
+    viewport: page.viewportSize(),
+  };
+
+  expectNoBoxOverlap(finalStageGeometry.cards, "final stage card");
+  await captureEvidenceScreenshot(testInfo, "pfr-projector-stage-final.png", page);
+  await writeJsonEvidence(testInfo, "pfr-projector-stage-final-geometry.json", finalStageGeometry);
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
   await expect(
@@ -484,10 +793,11 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await downloadButton.click();
   const manualCsvDownload = await manualCsvDownloadPromise;
   const manualCsvText = await readDownloadText(manualCsvDownload);
+  const manualCsvSummary = expectPrivateCsvFinalContent(manualCsvText, csvExpectation);
 
   expect(manualCsvDownload.suggestedFilename()).toMatch(PRIVATE_CSV_FILENAME_PATTERN);
-  expectPrivateCsvContent(manualCsvText);
   expect(manualCsvText).toBe(privateCsvText);
+  await writeJsonEvidence(testInfo, "pfr-private-csv-manual-summary.json", manualCsvSummary);
   await expect(
     page.getByText(
       /^Downloaded e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv\.$/,
@@ -496,6 +806,75 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Release" }));
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
+});
+
+test("unsaved vote draft survives pause and resume reloads", async ({ page }) => {
+  test.setTimeout(120_000);
+
+  await loginAndTakeHost(page);
+  const rehearsalForm = page.locator("form", {
+    has: page.getByRole("button", { name: "Start Rehearsal" }),
+  });
+
+  await rehearsalForm.getByPlaceholder("Admin password").fill(ADMIN_PASSWORD);
+  await rehearsalForm.getByPlaceholder("Audit reason").fill("e2e pause draft preservation");
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Start Rehearsal" }));
+  await expect(page.getByText("Rehearsal mode")).toBeVisible();
+
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(0));
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(1));
+  await expect(page.getByText("ready to vote")).toBeVisible();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Open Voting", exact: true }));
+  await expect(page.getByText("voting open")).toBeVisible();
+
+  const phonePage = await page.context().newPage();
+
+  await goto(phonePage, "/vote");
+  await phonePage
+    .getByLabel("Select your start.gg username")
+    .selectOption({ label: "Rehearsal Player 01" });
+  await phonePage.getByRole("button", { name: "Confirm" }).click();
+  await expect(phonePage.getByTestId("ballot-chart-card")).toHaveCount(7);
+  const firstCard = phonePage.getByTestId("ballot-chart-card").first();
+
+  await firstCard.click();
+  await expect(firstCard).toHaveAttribute("aria-pressed", "true");
+  await expect(phonePage.getByTestId("ban-selection-counter")).toHaveText("1/2 bans selected");
+  await expect
+    .poll(() =>
+      phonePage.evaluate(
+        (storageKey) => window.localStorage.getItem(storageKey) ?? "",
+        BALLOT_DRAFT_STORAGE_KEY,
+      ),
+    )
+    .toContain("bannedChartIds");
+
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Pause" }));
+  await expect(page.getByText("voting paused")).toBeVisible();
+  await phonePage.reload({ waitUntil: "domcontentloaded" });
+  await expect(
+    phonePage.getByText("Voting is paused. Your selections on this phone are still here"),
+  ).toBeVisible();
+  await expect(phonePage.getByTestId("ban-selection-counter")).toHaveText("1/2 bans selected");
+  await expect(phonePage.getByTestId("ballot-chart-card").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(phonePage.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Resume" }));
+  await expect(page.getByText("voting open")).toBeVisible();
+  await phonePage.reload({ waitUntil: "domcontentloaded" });
+  await expect(phonePage.getByText("Voting as Rehearsal Player 01")).toBeVisible();
+  await expect(phonePage.getByTestId("ban-selection-counter")).toHaveText("1/2 bans selected");
+  await expect(phonePage.getByTestId("ballot-chart-card").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(phonePage.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+
+  await phonePage.close();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Release" }));
 });
 
 test("stage tiebreak wheel hides the winner until the five-second reveal completes", async ({
@@ -511,7 +890,7 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
     .getByPlaceholder("Audit reason")
     .fill("e2e rehearsal tiebreak");
   await page.getByRole("button", { name: "Start Rehearsal" }).click();
-  await expect(page.getByText("Rehearsal mode")).toBeVisible();
+  await expect(page.getByText("Rehearsal mode", { exact: true }).first()).toBeVisible();
 
   const stagePage = await page.context().newPage();
   await goto(stagePage, "/stage");

@@ -364,6 +364,9 @@ export function BallotFlow({
             setMessage(
               "Restored unsaved ballot selections from this device. Review them before submitting.",
             );
+            if (options.autoConfirmExisting) {
+              setConfirmed(true);
+            }
           } else {
             setChoices(emptyChoices(draws));
             setStep(0);
@@ -457,7 +460,10 @@ export function BallotFlow({
 
     initializedIdentityRef.current = true;
     setSelectedPlayerId(rememberedPlayer.id);
-    void loadExistingBallot(rememberedPlayer.id, { autoConfirmExisting: true });
+    void loadExistingBallot(rememberedPlayer.id, {
+      autoConfirmExisting: true,
+      resetWhenMissing: true,
+    });
   }, [loadExistingBallot, players]);
 
   useEffect(() => {
@@ -846,6 +852,7 @@ export function BallotFlow({
               return;
             }
 
+            rememberIdentity(selectedPlayer);
             setConfirmed(true);
           }}
           type="button"

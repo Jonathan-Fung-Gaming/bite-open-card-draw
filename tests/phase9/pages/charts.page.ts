@@ -11,8 +11,12 @@ export class ChartsPage {
     await goto(this.page, this.baseURL, "/charts");
   }
 
-  async expectViewOnlyMode() {
+  async reload() {
     await this.page.reload({ waitUntil: "domcontentloaded" });
+  }
+
+  async expectViewOnlyMode() {
+    await this.reload();
     await expect(this.page.getByTestId("view-only-status")).toBeVisible();
     await expect(this.page.getByLabel("Select your start.gg username")).toHaveCount(0);
   }

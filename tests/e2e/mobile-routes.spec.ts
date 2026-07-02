@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  captureEvidenceScreenshot,
+  writeJsonEvidence,
+} from "./evidence-artifacts";
+import {
   getAdminPassword,
   goto,
   HOSTED_REFRESH_TIMEOUT_MS,
@@ -30,6 +34,57 @@ async function expectCenteredSeventhCard(page: Page) {
     8,
   );
   expect(seventhBox!.width).toBeGreaterThan(120);
+}
+
+function intersectionArea(
+  left: { height: number; width: number; x: number; y: number },
+  right: { height: number; width: number; x: number; y: number },
+) {
+  const width = Math.max(
+    0,
+    Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x),
+  );
+  const height = Math.max(
+    0,
+    Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y),
+  );
+
+  return width * height;
+}
+
+async function collectMobileBallotGeometry(page: Page) {
+  const viewport = page.viewportSize();
+  const cards = page.getByTestId("ballot-chart-card");
+  const cardBoxes = [];
+
+  for (let index = 0; index < (await cards.count()); index += 1) {
+    const box = await cards.nth(index).boundingBox();
+
+    expect(box).not.toBeNull();
+    cardBoxes.push({
+      height: Math.round(box!.height * 100) / 100,
+      index,
+      width: Math.round(box!.width * 100) / 100,
+      x: Math.round(box!.x * 100) / 100,
+      y: Math.round(box!.y * 100) / 100,
+    });
+  }
+
+  for (let leftIndex = 0; leftIndex < cardBoxes.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < cardBoxes.length; rightIndex += 1) {
+      expect(intersectionArea(cardBoxes[leftIndex]!, cardBoxes[rightIndex]!)).toBeLessThanOrEqual(
+        1,
+      );
+    }
+  }
+
+  return {
+    cardBoxes,
+    horizontalOverflow: await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    ),
+    projectViewport: viewport,
+  };
 }
 
 async function startRehearsalMode(page: Page) {
@@ -107,6 +162,21 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   await expect(page.getByTestId("ballot-chart-card")).toHaveCount(7);
   await expectCenteredSeventhCard(page);
   await expectNoHorizontalOverflow(page);
+  const ballotGeometry = await collectMobileBallotGeometry(page);
+
+  await captureEvidenceScreenshot(
+    testInfo,
+    `pfr-${testInfo.project.name}-mobile-vote-ballot.png`,
+    page,
+  );
+  await writeJsonEvidence(
+    testInfo,
+    `pfr-${testInfo.project.name}-mobile-vote-ballot-geometry.json`,
+    {
+      ...ballotGeometry,
+      project: testInfo.project.name,
+    },
+  );
 
   await page.getByLabel("No bans for this set").check();
   await page.getByRole("button", { name: "Next", exact: true }).click();

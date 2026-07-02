@@ -83,9 +83,11 @@ workflow.
 - [ ] Tournament logo source exists at `public/brand/tournament-logo.png`.
 - [ ] Tournament logo app rendition exists at `public/brand/tournament-logo-web.png`
       and is used by `TournamentLogo`.
-- [ ] Tournament logo source size and optimized delivery/performance evidence recorded for phone
-      and projector routes: source `2.28 MB` / web rendition `0.32 MB`; route transfer
-      evidence `TODO`.
+- [x] Tournament logo source size and optimized delivery/performance evidence recorded for phone
+      and projector routes: source `2,390,536` bytes / web rendition `337,044` bytes; local
+      Chromium route evidence on 2026-07-03 recorded optimized Next image responses of `14,598`
+      body bytes / `14,898` transfer bytes for `/vote` at 390x844 and `/stage` at 1920x1080.
+      Artifact: `test-results/full-flow-full-round-smoke-a6fff-l-and-downloads-private-CSV-desktop-chromium/pfr-logo-route-performance.json`.
 - [ ] Real cached artwork rendering was verified on `/stage`, `/vote`, `/charts`, and `/results`.
 
 ## Roster

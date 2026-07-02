@@ -220,6 +220,89 @@ describe("ballot validation and store", () => {
     expect(afterExpiry.hasOtherActiveDevice).toBe(false);
   });
 
+  it("warns a second active device and keeps only the latest valid same-player ballot", () => {
+    const store = new BallotStore();
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    const firstDevicePresence = store.claimVoterPresence({
+      roundNumber: 1,
+      playerId: input.playerId,
+      deviceId: "phone-a",
+      nowMs: 1_000,
+    });
+    const secondDevicePresence = store.claimVoterPresence({
+      roundNumber: 1,
+      playerId: input.playerId,
+      deviceId: "phone-b",
+      nowMs: 2_000,
+    });
+
+    const phoneABallot = store.submit(input, draws, "2026-07-03T00:01:00.000Z", {
+      editTokenHash: "phone-a-token",
+    });
+    const phoneBChoices = [
+      {
+        ...input.choices[0]!,
+        noBans: true,
+        bannedChartIds: [],
+      },
+      {
+        ...input.choices[1]!,
+        bannedChartIds: [draws[1]!.charts[1]!.id],
+      },
+    ];
+    const phoneBBallot = store.submit(
+      {
+        ...input,
+        choices: phoneBChoices,
+      },
+      draws,
+      "2026-07-03T00:01:05.000Z",
+      { editTokenHash: "phone-b-token" },
+    );
+
+    expect(firstDevicePresence.hasOtherActiveDevice).toBe(false);
+    expect(secondDevicePresence).toMatchObject({
+      hasOtherActiveDevice: true,
+      otherActiveDeviceCount: 1,
+    });
+    expect(phoneBBallot.id).toBe(phoneABallot.id);
+    expect(phoneBBallot.revision).toBe(2);
+    expect(phoneBBallot.editTokenHash).toBe("phone-b-token");
+    expect(store.listForRound(1)).toHaveLength(1);
+    expect(store.get(1, input.playerId)).toMatchObject({
+      submittedAt: "2026-07-03T00:01:05.000Z",
+      firstSubmittedAt: "2026-07-03T00:01:00.000Z",
+      choices: phoneBChoices,
+    });
+
+    expect(() =>
+      store.submit(
+        {
+          ...input,
+          choices: [
+            {
+              ...input.choices[0]!,
+              bannedChartIds: ["stale-chart-id"],
+            },
+            input.choices[1]!,
+          ],
+        },
+        draws,
+        "2026-07-03T00:01:10.000Z",
+        { editTokenHash: "phone-a-token" },
+      ),
+    ).toThrow(/outside the drawn set/);
+
+    expect(store.get(1, input.playerId)).toMatchObject({
+      submittedAt: "2026-07-03T00:01:05.000Z",
+      revision: 2,
+      editTokenHash: "phone-b-token",
+      choices: phoneBChoices,
+    });
+  });
+
   it("marks post-close manual ballots as overrides for export", () => {
     const store = new BallotStore();
     const draws = [draw("set-1", "S16", "16"), draw("set-2", "S17", "17")];

@@ -18,7 +18,11 @@ export async function goto(page: Page, path: string) {
   try {
     await page.goto(path, { waitUntil: "domcontentloaded" });
   } catch (error) {
-    if (error instanceof Error && error.message.includes("interrupted by another navigation")) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("interrupted by another navigation") ||
+        error.message.includes("net::ERR_ABORTED"))
+    ) {
       await page.goto(path, { waitUntil: "domcontentloaded" });
       return;
     }

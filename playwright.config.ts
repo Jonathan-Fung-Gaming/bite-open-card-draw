@@ -31,6 +31,11 @@ export default defineConfig({
       testMatch: /mobile-routes\.spec\.ts/,
       use: { ...devices["iPhone 13"] },
     },
+    {
+      name: "visual-evidence-chromium",
+      testMatch: /projector-mobile-evidence\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
   ],
   webServer: e2eWebServer,
 });

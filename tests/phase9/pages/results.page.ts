@@ -11,11 +11,15 @@ export class ResultsPage {
     await goto(this.page, this.baseURL, "/results");
   }
 
+  async reload() {
+    await this.page.reload({ waitUntil: "domcontentloaded" });
+  }
+
   async expectFinalCharts(roundNumber: number) {
     await expect
       .poll(
         async () => {
-          await this.page.reload({ waitUntil: "domcontentloaded" });
+          await this.reload();
 
           const headingVisible = await this.page
             .getByRole("heading", { name: `ROUND ${roundNumber} FINAL CHARTS` })

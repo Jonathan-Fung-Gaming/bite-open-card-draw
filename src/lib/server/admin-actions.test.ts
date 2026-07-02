@@ -1,6 +1,21 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { MUTATION_CONTRACTS, type MutationName } from "./mutation-contracts";
+
+const UUID_A = "00000000-0000-4000-8000-000000000001";
+const UUID_B = "00000000-0000-4000-8000-000000000002";
+const UUID_C = "00000000-0000-4000-8000-000000000003";
+const UUID_D = "00000000-0000-4000-8000-000000000004";
+
+function getActionBlock(source: string, actionName: string) {
+  const start = source.indexOf(`export async function ${actionName}`);
+  const next = source.indexOf("\nexport async function", start + 1);
+
+  expect(start).toBeGreaterThanOrEqual(0);
+
+  return next === -1 ? source.slice(start) : source.slice(start, next);
+}
 
 describe("admin action production safeguards", () => {
   it("requires password and reason for forced host takeover", () => {
@@ -35,6 +50,22 @@ describe("admin action production safeguards", () => {
       "Ignored release host control request because this session is not the active host.",
     );
     expect(actionsSource).toContain("releaseOutcome");
+  });
+
+  it("persists final reveal state before public route revalidation", () => {
+    const actionsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
+      "utf8",
+    );
+    const block = getActionBlock(actionsSource, "advanceResultRevealAction");
+    const persistIndex = block.indexOf("await persistTournamentState();");
+    const revalidateIndex = block.indexOf("revalidateTournamentViews(revalidatePath)");
+
+    expect(block).toContain('if (result.revealPhase === "final")');
+    expect(block).toContain('setResultsPhase(roundNumber, "results_revealed")');
+    expect(persistIndex).toBeGreaterThanOrEqual(0);
+    expect(revalidateIndex).toBeGreaterThanOrEqual(0);
+    expect(persistIndex).toBeLessThan(revalidateIndex);
   });
 
   it("binds emergency inactive-player eligibility to the authoritative current round", () => {
@@ -243,6 +274,265 @@ describe("admin action production safeguards", () => {
     expect(manualBallotSource).toContain("Confirm replacement below before saving.");
     expect(manualBallotSource).toContain('name="reason"');
     expect(manualBallotSource).toContain('name="adminPassword"');
+  });
+
+  it("covers the product dangerous-action matrix with contracts, summaries, password re-entry, reasons, and audits", () => {
+    const actionsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
+      "utf8",
+    );
+    const pageSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/page.tsx"),
+      "utf8",
+    );
+    const manualBallotSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/_components/ManualBallotForm.tsx"),
+      "utf8",
+    );
+    const visibleAdminSource = `${pageSource}\n${manualBallotSource}`;
+    const ballotChoices = [
+      {
+        drawId: UUID_B,
+        roundSetId: UUID_C,
+        noBans: true,
+        bannedChartIds: [],
+      },
+      {
+        drawId: UUID_C,
+        roundSetId: UUID_D,
+        noBans: true,
+        bannedChartIds: [],
+      },
+    ];
+    const dangerousActions: Array<{
+      productRule: string;
+      contractName: MutationName;
+      validInput: Record<string, unknown>;
+      serverActionName: string;
+      auditAction: string;
+      visibleSummarySnippets: string[];
+      guardSnippets?: string[];
+    }> = [
+      {
+        productRule: "replace one chart",
+        contractName: "rerollOneChart",
+        validInput: {
+          roundNumber: 1,
+          setOrder: 1,
+          drawnChartId: UUID_A,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "rerollOneChartAction",
+        auditAction: 'action: "reroll_one_chart"',
+        visibleSummarySnippets: [
+          "You are about to reroll this chart.",
+          "replace only this chart",
+          "invalidate any submitted ballots",
+        ],
+        guardSnippets: ["invalidateRoundVotingForReroll"],
+      },
+      {
+        productRule: "reroll one chart set",
+        contractName: "rerollRoundSet",
+        validInput: {
+          roundNumber: 1,
+          setOrder: 1,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "rerollRoundSetAction",
+        auditAction: 'action: "reroll_round_set"',
+        visibleSummarySnippets: [
+          "You are about to reroll Round",
+          "replace all currently drawn charts for this set",
+          "voting window",
+        ],
+        guardSnippets: ["invalidateRoundVotingForReroll"],
+      },
+      {
+        productRule: "reroll a full round",
+        contractName: "rerollFullRound",
+        validInput: {
+          roundNumber: 1,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "rerollFullRoundAction",
+        auditAction: 'action: "reroll_full_round"',
+        visibleSummarySnippets: [
+          "You are about to reroll a full round.",
+          "replace both currently drawn sets",
+          "clear any computed result",
+        ],
+        guardSnippets: ["invalidateRoundVotingForReroll"],
+      },
+      {
+        productRule: "reopen voting",
+        contractName: "reopenVotingWindow",
+        validInput: {
+          roundNumber: 1,
+          durationMinutes: 3,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "reopenVotingAction",
+        auditAction: 'action: "emergency_reopen_voting"',
+        visibleSummarySnippets: [
+          "reopen Round",
+          "invalidate any computed unrevealed result",
+          "allow ballot edits for the chosen duration",
+        ],
+        guardSnippets: [
+          'assertSupabaseTransactionalMutationImplemented("reopenVotingWindow")',
+          'result && result.revealPhase !== "computed"',
+        ],
+      },
+      {
+        productRule: "manually enter a ballot",
+        contractName: "manualBallotOverride",
+        validInput: {
+          roundNumber: 1,
+          playerId: UUID_A,
+          choices: ballotChoices,
+          replaceExistingBallot: false,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "manualBallotAction",
+        auditAction: 'action: "manual_ballot"',
+        visibleSummarySnippets: [
+          "You are about to manually enter a ballot.",
+          "may change the",
+          "round result",
+        ],
+        guardSnippets: [
+          'assertSupabaseTransactionalMutationImplemented("manualBallotOverride")',
+          "canAcceptManualBallot",
+        ],
+      },
+      {
+        productRule: "overwrite an existing ballot",
+        contractName: "manualBallotOverride",
+        validInput: {
+          roundNumber: 1,
+          playerId: UUID_A,
+          choices: ballotChoices,
+          replaceExistingBallot: true,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "manualBallotAction",
+        auditAction: 'action: "manual_ballot"',
+        visibleSummarySnippets: [
+          "manually replace a ballot for",
+          "Confirm replacement below before saving.",
+          "Replace existing ballot for",
+        ],
+        guardSnippets: [
+          "existing && !replaceExisting",
+          "replacedExistingBallot: Boolean(existing)",
+        ],
+      },
+      {
+        productRule: "add inactive player to current round",
+        contractName: "addPlayerToCurrentRoundEligibility",
+        validInput: {
+          roundNumber: 1,
+          playerId: UUID_A,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "addInactivePlayerToCurrentRoundAction",
+        auditAction: 'action: "current_round_eligibility_add"',
+        visibleSummarySnippets: [
+          "add an inactive player to current round eligibility",
+          "make that player eligible for the selected current round",
+          "Audit reason",
+        ],
+        guardSnippets: [
+          "Inactive players can only be added to the current round.",
+          "isCurrentRoundEligibilityChangeAllowed",
+        ],
+      },
+      {
+        productRule: "override a result",
+        contractName: "overrideResult",
+        validInput: {
+          roundNumber: 1,
+          setOrder: 1,
+          chartId: UUID_A,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "overrideResultAction",
+        auditAction: 'action: "result_correction_override"',
+        visibleSummarySnippets: [
+          "override a Round",
+          "change the committed selected chart",
+          "Override Result",
+        ],
+        guardSnippets: [
+          "Results must be computed before a result correction.",
+          "assertNoFutureSelectedSongConflicts",
+        ],
+      },
+      {
+        productRule: "reset a round",
+        contractName: "resetRound",
+        validInput: {
+          roundNumber: 1,
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "resetRoundAction",
+        auditAction: 'action: "reset_round"',
+        visibleSummarySnippets: [
+          "reset a round",
+          "clear that round's draws, ballots, voting window, result snapshot, and reveal state",
+          "Reset Round",
+        ],
+        guardSnippets: ['assertSupabaseTransactionalMutationImplemented("resetRound")'],
+      },
+    ];
+
+    for (const row of dangerousActions) {
+      const parsed = MUTATION_CONTRACTS[row.contractName].safeParse(row.validInput);
+      const missingPassword = MUTATION_CONTRACTS[row.contractName].safeParse({
+        ...row.validInput,
+        adminPassword: "",
+      });
+      const missingReason = MUTATION_CONTRACTS[row.contractName].safeParse({
+        ...row.validInput,
+        reason: "",
+      });
+      const block = getActionBlock(actionsSource, row.serverActionName);
+
+      expect(parsed.success, row.productRule).toBe(true);
+      expect(missingPassword.success, row.productRule).toBe(false);
+      expect(missingReason.success, row.productRule).toBe(false);
+      expect(block, row.productRule).toContain(
+        "verifyDangerousActionPassword(getAdminPassword(formData))",
+      );
+      expect(block, row.productRule).toContain("const reason = getRequiredReason(formData)");
+      expect(block, row.productRule).toContain(row.auditAction);
+      expect(block, row.productRule).toContain("dangerous: true");
+
+      for (const snippet of row.guardSnippets ?? []) {
+        expect(block, `${row.productRule}: ${snippet}`).toContain(snippet);
+      }
+
+      for (const snippet of row.visibleSummarySnippets) {
+        expect(visibleAdminSource, `${row.productRule}: ${snippet}`).toContain(snippet);
+      }
+    }
+
+    const liveCountsStart = pageSource.indexOf("Show live counts");
+    const liveCountsBlock = pageSource.slice(liveCountsStart, liveCountsStart + 800);
+
+    expect(liveCountsStart).toBeGreaterThanOrEqual(0);
+    expect(liveCountsBlock).toContain("warning does not require another");
+    expect(liveCountsBlock).not.toContain('name="adminPassword"');
   });
 
   it("records stable chart display metadata for exclusion audits", () => {

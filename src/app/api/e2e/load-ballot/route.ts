@@ -79,6 +79,20 @@ function parseRevision(value: unknown) {
   throw new Error("revision must be 1 or 2.");
 }
 
+function memorySyntheticLoadAllowed() {
+  if (adminState.roundStateStore.getSnapshot().rehearsalMode) {
+    return true;
+  }
+
+  const eventId = process.env.TOURNAMENT_EVENT_ID ?? "";
+
+  return (
+    process.env.TOURNAMENT_STATE_BACKEND === "memory" &&
+    process.env.TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND === "true" &&
+    /^(e2e|load)-[a-z0-9-]+$/i.test(eventId)
+  );
+}
+
 async function submitSupabaseLoadBallot(input: {
   roundNumber: 1 | 2 | 3 | 4;
   playerStartggUsername: string;
@@ -223,9 +237,10 @@ export async function POST(request: Request) {
     }
 
     const response = await withPersistedVotingState(async () => {
-      if (!adminState.roundStateStore.getSnapshot().rehearsalMode) {
+      if (!memorySyntheticLoadAllowed()) {
         return {
-          error: "Synthetic load ballots are only available in rehearsal mode.",
+          error:
+            "Synthetic load ballots are only available in rehearsal mode or disposable memory e2e mode.",
           statusCode: 403 as const,
         };
       }
