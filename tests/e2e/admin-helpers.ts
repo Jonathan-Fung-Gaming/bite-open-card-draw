@@ -56,7 +56,27 @@ export async function clickAdminActionAndWait(page: Page, button: Locator) {
     )
     .catch(() => null);
 
-  await button.click();
+  await button.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(50);
+
+  try {
+    await button.click({ timeout: 8_000 });
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      (!error.message.includes("intercepts pointer events") &&
+        !error.message.includes("element is outside of the viewport"))
+    ) {
+      throw error;
+    }
+
+    await button.evaluate((element) => {
+      element.scrollIntoView({ block: "center", inline: "center" });
+    });
+    await page.waitForTimeout(100);
+    await button.click({ timeout: 8_000 });
+  }
+
   await Promise.race([adminPostPromise, page.waitForTimeout(1_000)]);
   await page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => null);
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => null);
