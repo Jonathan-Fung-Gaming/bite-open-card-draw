@@ -50,7 +50,21 @@ export const ADMIN_ACTION_POLICIES = [
     audited: false,
     dangerousAudit: false,
     tournamentChanging: false,
-    rationale: "Clears local admin and host cookies without changing tournament state.",
+    rationale:
+      "Best-effort releases host control, then clears local admin and host cookies without changing tournament state.",
+  },
+  {
+    serverAction: "expireAdminSessionAction",
+    classification: "read-only or sensitive disclosure action",
+    requiresAdminSession: false,
+    requiresActiveHost: false,
+    requiresPasswordReentry: false,
+    requiresAuditReason: false,
+    audited: false,
+    dangerousAudit: false,
+    tournamentChanging: false,
+    rationale:
+      "Best-effort inactivity cleanup releases host control before clearing expired admin cookies.",
   },
   {
     serverAction: "refreshAdminSessionAction",

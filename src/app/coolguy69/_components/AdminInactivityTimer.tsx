@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { expireAdminSessionAction } from "../actions";
 import { ADMIN_SESSION_REFRESHED_EVENT } from "./AdminSessionHeartbeat";
 
 type AdminInactivityTimerProps = {
@@ -8,6 +9,7 @@ type AdminInactivityTimerProps = {
 };
 
 export function AdminInactivityTimer({ expiresAt }: AdminInactivityTimerProps) {
+  const expiredCleanupStarted = useRef(false);
   const [currentExpiresAt, setCurrentExpiresAt] = useState(expiresAt);
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
     Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)),
@@ -50,7 +52,16 @@ export function AdminInactivityTimer({ expiresAt }: AdminInactivityTimerProps) {
       return;
     }
 
-    window.location.assign("/coolguy69");
+    if (expiredCleanupStarted.current) {
+      return;
+    }
+
+    expiredCleanupStarted.current = true;
+    void expireAdminSessionAction()
+      .catch(() => undefined)
+      .finally(() => {
+        window.location.assign("/coolguy69");
+      });
   }, [remainingSeconds]);
 
   const minutes = Math.floor(remainingSeconds / 60);

@@ -55,6 +55,18 @@ function reconcileByKey<T>(
   return [...merged.values()];
 }
 
+function unionByKey<T>(items: readonly T[][], keyFor: (item: T) => string) {
+  const merged = new Map<string, T>();
+
+  for (const group of items) {
+    for (const item of group) {
+      merged.set(keyFor(item), item);
+    }
+  }
+
+  return [...merged.values()];
+}
+
 function ballotKey(ballot: RoundBallot) {
   return `${ballot.roundNumber}:${ballot.playerId}`;
 }
@@ -141,10 +153,8 @@ export function mergeOperationalStateSnapshots({
   merged.savedAt = current.savedAt;
 
   merged.audit.records = sortByCreatedAtDesc(
-    reconcileByKey(
-      baseline.audit.records,
-      current.audit.records,
-      latest.audit.records,
+    unionByKey(
+      [baseline.audit.records, latest.audit.records, current.audit.records],
       (record) => record.id,
     ),
   );

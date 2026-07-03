@@ -1,5 +1,32 @@
 import type { ChartExclusion, NormalizedChart } from "./types";
 
+function exclusionTime(exclusion: ChartExclusion) {
+  const parsed = Date.parse(exclusion.updatedAt);
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function normalizeChartExclusionState(
+  exclusions: readonly ChartExclusion[],
+): ChartExclusion[] {
+  const latestByChartKey = new Map<string, ChartExclusion>();
+
+  for (const exclusion of exclusions) {
+    const existing = latestByChartKey.get(exclusion.chartKey);
+
+    if (!existing || exclusionTime(exclusion) >= exclusionTime(existing)) {
+      latestByChartKey.set(exclusion.chartKey, {
+        ...exclusion,
+        reason: exclusion.reason.trim(),
+      });
+    }
+  }
+
+  return [...latestByChartKey.values()].sort((left, right) =>
+    left.chartKey.localeCompare(right.chartKey),
+  );
+}
+
 export function upsertChartExclusion(
   exclusions: readonly ChartExclusion[],
   chartKey: string,
@@ -11,7 +38,9 @@ export function upsertChartExclusion(
     throw new Error("Chart exclusion reason is required.");
   }
 
-  const next = exclusions.filter((exclusion) => exclusion.chartKey !== chartKey);
+  const next = normalizeChartExclusionState(exclusions).filter(
+    (exclusion) => exclusion.chartKey !== chartKey,
+  );
 
   next.push({
     chartKey,
@@ -28,7 +57,7 @@ export function applyChartExclusions(
   exclusions: readonly ChartExclusion[],
 ): NormalizedChart[] {
   const activeExclusions = new Map(
-    exclusions
+    normalizeChartExclusionState(exclusions)
       .filter((exclusion) => exclusion.excluded)
       .map((exclusion) => [exclusion.chartKey, exclusion.reason]),
   );
@@ -48,7 +77,12 @@ export function overlayChartExclusionOverrides(
   charts: readonly NormalizedChart[],
   exclusions: readonly ChartExclusion[],
 ): NormalizedChart[] {
-  const overrides = new Map(exclusions.map((exclusion) => [exclusion.chartKey, exclusion]));
+  const overrides = new Map(
+    normalizeChartExclusionState(exclusions).map((exclusion) => [
+      exclusion.chartKey,
+      exclusion,
+    ]),
+  );
 
   return charts.map((chart) => {
     const override = overrides.get(chart.chartKey);

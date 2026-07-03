@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyChartExclusions,
   getEligibleTournamentCharts,
+  normalizeChartExclusionState,
   upsertChartExclusion,
 } from "./exclusions";
 import { buildChartKey, normalizeChartRow, normalizeKeyPart, parseChartLevel } from "./normalize";
@@ -58,5 +59,33 @@ describe("chart normalization", () => {
     const restored = applyChartExclusions([chart], reIncluded);
 
     expect(getEligibleTournamentCharts(restored)).toHaveLength(1);
+  });
+
+  it("normalizes duplicate exclusion rows to the latest current state", () => {
+    const chart = normalizeChartRow(rawRow, 2);
+    const normalized = normalizeChartExclusionState([
+      {
+        chartKey: chart.chartKey,
+        excluded: true,
+        reason: "old exclusion",
+        updatedAt: "2026-07-03T00:00:01.000Z",
+      },
+      {
+        chartKey: chart.chartKey,
+        excluded: false,
+        reason: "restored",
+        updatedAt: "2026-07-03T00:00:02.000Z",
+      },
+    ]);
+
+    expect(normalized).toEqual([
+      {
+        chartKey: chart.chartKey,
+        excluded: false,
+        reason: "restored",
+        updatedAt: "2026-07-03T00:00:02.000Z",
+      },
+    ]);
+    expect(getEligibleTournamentCharts(applyChartExclusions([chart], normalized))).toHaveLength(1);
   });
 });

@@ -64,6 +64,24 @@ describe("host lock store", () => {
     expect(store.getSnapshot("session-a", 1001).status).toBe("active");
   });
 
+  it("allows another admin to acquire immediately after a valid release", () => {
+    const store = new HostLockStore();
+
+    store.acquire("session-a", "token-a", 1000);
+    expect(store.release("session-a", "token-a", 1001)).toMatchObject({
+      released: true,
+      outcome: "released",
+    });
+
+    const acquired = store.acquire("session-b", "token-b", 1002);
+
+    expect(acquired.takeover).toBe(false);
+    expect(store.getSnapshot("session-b", 1002)).toMatchObject({
+      status: "active",
+      ownerSessionId: "session-b",
+    });
+  });
+
   it("keeps a newer takeover when a stale session heartbeat is persisted later", () => {
     const originalStore = new HostLockStore();
 

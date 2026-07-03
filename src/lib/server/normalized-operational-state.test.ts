@@ -44,14 +44,16 @@ class FakeNormalizedSupabaseClient {
 
         return { error: null };
       },
-      upsert: async (input: StoredRow[] | StoredRow) => {
+      upsert: async (input: StoredRow[] | StoredRow, options?: { onConflict?: string }) => {
         this.operations.push({ operation: "upsert", table });
         const rows = Array.isArray(input) ? input : [input];
         const existing = this.rows.get(table) ?? [];
 
         for (const row of this.cloneRows(rows)) {
           const keyColumns =
-            table === "host_locks"
+            options?.onConflict
+              ? options.onConflict.split(",").map((column) => column.trim())
+              : table === "host_locks"
               ? ["event_id", "lock_name"]
               : table === "event_runtime_state"
                 ? ["event_id"]
@@ -211,6 +213,104 @@ function chartsFor(level: string, startRow: number, prefix: string) {
 }
 
 describe("normalized operational state repository", () => {
+  it("preserves concurrent partial admin audit rows append-only", async () => {
+    const supabase = new FakeNormalizedSupabaseClient();
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "audit-append-only-test",
+      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
+      now: () => "2026-07-03T00:00:00.000Z",
+    });
+    const baselineStores = createAdminStateStores();
+    const firstWriter = createAdminStateStores();
+    const secondWriter = createAdminStateStores();
+    const baseline = createOperationalStateSnapshot(
+      baselineStores,
+      "2026-07-03T00:00:00.000Z",
+    );
+    const firstAudit = firstWriter.auditStore.record({
+      sessionId: "session-a",
+      action: "pause_voting",
+      summary: "Paused voting for Round 1.",
+      metadata: { roundNumber: 1 },
+      now: "2026-07-03T00:00:01.000Z",
+    });
+    const secondAudit = secondWriter.auditStore.record({
+      sessionId: "session-b",
+      action: "resume_voting",
+      summary: "Resumed voting for Round 1.",
+      metadata: { roundNumber: 1 },
+      now: "2026-07-03T00:00:02.000Z",
+    });
+
+    await repository.persistVotingAdminState({
+      baseline,
+      current: createOperationalStateSnapshot(firstWriter, "2026-07-03T00:00:01.000Z"),
+    });
+    await repository.persistVotingAdminState({
+      baseline,
+      current: createOperationalStateSnapshot(secondWriter, "2026-07-03T00:00:02.000Z"),
+    });
+
+    expect(
+      supabase.operations.some(
+        (operation) => operation.operation === "delete" && operation.table === "admin_actions",
+      ),
+    ).toBe(false);
+    expect(supabase.rows.get("admin_actions")?.map((row) => row.id).sort()).toEqual(
+      [firstAudit.id, secondAudit.id].sort(),
+    );
+  });
+
+  it("stores one current chart exclusion row while audit records preserve every change", async () => {
+    const supabase = new FakeNormalizedSupabaseClient();
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "chart-exclusion-current-state-test",
+      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
+      now: () => "2026-07-03T00:00:00.000Z",
+    });
+    const stores = createAdminStateStores();
+    const [targetChart] = chartsFor("16", 10, "S16");
+
+    stores.drawStateStore.setChartsForTest([targetChart!, ...chartsFor("16", 20, "S16")]);
+
+    const changes = [
+      { excluded: true, reason: "event rule exclusion", action: "chart_exclusion_add" },
+      { excluded: false, reason: "metadata fixed", action: "chart_exclusion_remove" },
+      { excluded: true, reason: "late event rule exclusion", action: "chart_exclusion_add" },
+    ] as const;
+
+    for (const [index, change] of changes.entries()) {
+      stores.drawStateStore.updateChartExclusion({
+        chartKey: targetChart!.chartKey,
+        excluded: change.excluded,
+        reason: change.reason,
+      });
+      stores.auditStore.record({
+        sessionId: "session-a",
+        action: change.action,
+        summary: `${change.action} ${targetChart!.name}`,
+        reason: change.reason,
+        affectedRecords: [{ type: "chart", id: targetChart!.id }],
+        dangerous: true,
+        now: `2026-07-03T00:00:0${index + 1}.000Z`,
+      });
+    }
+
+    await repository.save(createOperationalStateSnapshot(stores, "2026-07-03T00:00:04.000Z"));
+
+    expect(supabase.rows.get("chart_exclusions")).toHaveLength(1);
+    expect(supabase.rows.get("chart_exclusions")?.[0]).toMatchObject({
+      event_id: "chart-exclusion-current-state-test",
+      excluded: true,
+      reason: "late event rule exclusion",
+    });
+    expect(supabase.rows.get("admin_actions")?.map((row) => row.action_type)).toEqual([
+      "chart_exclusion_add",
+      "chart_exclusion_remove",
+      "chart_exclusion_add",
+    ]);
+  });
+
   it("round-trips runtime state through normalized tables instead of tournament_state_snapshots", async () => {
     const supabase = new FakeNormalizedSupabaseClient();
     const repository = new NormalizedOperationalStateRepository({
@@ -282,6 +382,11 @@ describe("normalized operational state repository", () => {
 
     await repository.save(createOperationalStateSnapshot(stores, "2026-06-29T00:03:00.000Z"));
 
+    expect(
+      supabase.operations.some(
+        (operation) => operation.operation === "delete" && operation.table === "admin_actions",
+      ),
+    ).toBe(false);
     expect(supabase.touchedTables).not.toContain("tournament_state_snapshots");
     expect(supabase.touchedTables).not.toContain("admin_sessions");
     expect(supabase.rpcCalls.map((call) => call.functionName)).toContain(
@@ -431,6 +536,46 @@ describe("normalized operational state repository", () => {
       "normalized_acquire_event_persistence_lock",
       "normalized_release_event_persistence_lock",
     ]);
+  });
+
+  it("persists host lock release so another admin can acquire without force", async () => {
+    const supabase = new FakeNormalizedSupabaseClient();
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "host-release-test",
+      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
+      now: () => "2026-06-30T00:00:00.000Z",
+    });
+    const stores = createAdminStateStores();
+
+    stores.hostLockStore.acquire("session-a", "host-token-a", 0);
+    await repository.persistHostLock({
+      baseline: null,
+      current: stores.hostLockStore.exportSnapshot(),
+    });
+
+    const releaseBaseline = stores.hostLockStore.exportSnapshot();
+    expect(stores.hostLockStore.release("session-a", "host-token-a", 1_000)).toMatchObject({
+      released: true,
+      outcome: "released",
+    });
+
+    await repository.persistHostLock({
+      baseline: releaseBaseline,
+      current: stores.hostLockStore.exportSnapshot(),
+    });
+
+    expect(supabase.rows.get("host_locks")).toHaveLength(0);
+
+    const acquireBaseline = stores.hostLockStore.exportSnapshot();
+    stores.hostLockStore.acquire("session-b", "host-token-b", 1_001);
+    await repository.persistHostLock({
+      baseline: acquireBaseline,
+      current: stores.hostLockStore.exportSnapshot(),
+    });
+
+    expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
+      owner_session_id: "session-b",
+    });
   });
 
   it("does not let a stale persisted heartbeat overwrite a newer Supabase host takeover", async () => {
@@ -738,6 +883,9 @@ describe("normalized operational state repository", () => {
     const writeTables = supabase.operations
       .filter((operation) => operation.operation !== "select")
       .map((operation) => operation.table);
+    const deletedTables = supabase.operations
+      .filter((operation) => operation.operation === "delete")
+      .map((operation) => operation.table);
 
     expect(
       supabase.operations
@@ -747,6 +895,7 @@ describe("normalized operational state repository", () => {
     expect(writeTables).toContain("admin_actions");
     expect(writeTables).toContain("host_locks");
     expect(writeTables).toContain("voting_windows");
+    expect(deletedTables).not.toContain("admin_actions");
     expect(writeTables).not.toContain("charts");
     expect(writeTables).not.toContain("players");
     expect(writeTables).not.toContain("draws");
@@ -840,6 +989,9 @@ describe("normalized operational state repository", () => {
     const writeTables = supabase.operations
       .filter((operation) => operation.operation !== "select")
       .map((operation) => operation.table);
+    const deletedTables = supabase.operations
+      .filter((operation) => operation.operation === "delete")
+      .map((operation) => operation.table);
 
     expect(
       supabase.operations
@@ -854,6 +1006,7 @@ describe("normalized operational state repository", () => {
     expect(writeTables).toContain("voting_windows");
     expect(writeTables).toContain("admin_actions");
     expect(writeTables).toContain("host_locks");
+    expect(deletedTables).not.toContain("admin_actions");
     expect(writeTables).not.toContain("ballots");
     expect(writeTables).not.toContain("ballot_choices");
     expect(writeTables).not.toContain("ballot_revisions");

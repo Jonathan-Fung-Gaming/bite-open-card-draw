@@ -91,6 +91,39 @@ describe("draw state store", () => {
     expect(reIncludedDraw.charts[0]?.chartKey).toBe(target?.chartKey);
   });
 
+  it("keeps one latest exclusion state per chart key", () => {
+    const charts = chartsFor("16", 8, 2, "S16");
+    const store = new DrawStateStore(() => 0);
+    const [target] = charts;
+
+    store.setChartsForTest(charts);
+    store.updateChartExclusion({
+      chartKey: target?.chartKey ?? "",
+      excluded: true,
+      reason: "event exclusion",
+    });
+    store.updateChartExclusion({
+      chartKey: target?.chartKey ?? "",
+      excluded: false,
+      reason: "metadata fixed",
+    });
+    store.updateChartExclusion({
+      chartKey: target?.chartKey ?? "",
+      excluded: true,
+      reason: "late event exclusion",
+    });
+
+    const [exclusion] = store.getChartExclusions();
+
+    expect(store.getChartExclusions()).toHaveLength(1);
+    expect(exclusion).toMatchObject({
+      chartKey: target?.chartKey,
+      excluded: true,
+      reason: "late event exclusion",
+    });
+    expect(exclusion?.updatedAt).toEqual(expect.any(String));
+  });
+
   it("does not supersede the active draw when a set reroll cannot be drawn", () => {
     const store = new DrawStateStore(() => 0);
     store.setChartsForTest(chartsFor("16", 7, 2, "S16"));

@@ -12,6 +12,71 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 5 - Audit, Exclusion, And Host-Lock Persistence - 2026-07-03
+
+Status: implemented and locally verified. The new Supabase migration must be applied to every target
+Supabase project before relying on `(event_id, chart_id)` chart-exclusion upserts there.
+
+### Acceptance Criteria
+
+- PRC-005 is closed in local source/runtime wiring: normalized persistence no longer deletes
+  `admin_actions` during full, voting-admin, or result-admin save paths.
+- Admin audit rows are persisted append-only/idempotently with `upsert` by audit `id`, and local
+  snapshot merging now unions audit rows instead of treating missing current rows as deletes.
+- PRC-029 is closed for current-state storage: chart exclusions remain latest-only by design, are
+  defensively normalized by chart key, and persist through `upsert` on `(event_id, chart_id)`.
+- A new migration removes duplicate chart-exclusion rows by latest `updated_at`/`created_at` before
+  adding the `chart_exclusions_event_chart_unique` constraint.
+- PRC-033 is closed for normal browser operation: logout and inactivity expiry now attempt
+  best-effort host-lock release before clearing cookies or redirecting. Host-lock TTL remains the
+  fallback if the cleanup request never reaches the server.
+- Expired admin session cookies still cannot authenticate admin actions; the cleanup-only decoder is
+  scoped to host-lock release and cookie cleanup.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `src/app/coolguy69/_components/AdminInactivityTimer.tsx`
+- `src/app/coolguy69/actions.ts`
+- `src/lib/admin/action-policy.ts`
+- `src/lib/admin/session.ts`
+- `src/lib/charts/exclusions.ts`
+- `src/lib/draw/draw-state.ts`
+- `src/lib/persistence/merge.ts`
+- `src/lib/server/admin-auth.ts`
+- `src/lib/server/normalized-operational-state.ts`
+- `supabase/migrations/20260703050000_audit_exclusion_host_lock_persistence.sql`
+- Focused tests under `src/lib/**`.
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/server/normalized-operational-state.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts src/lib/admin/host-lock.test.ts src/lib/charts/normalize.test.ts src/lib/draw/draw-state.test.ts src/lib/db/schema.test.ts src/lib/admin/session.test.ts src/lib/server/admin-auth.test.ts src/lib/server/admin-actions.test.ts`
+  - passed, 10 files / 84 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 51 files / 290 tests.
+- `rtk npm run build` - passed.
+- `rtk powershell -NoProfile -Command "& { $env:E2E_TOURNAMENT_EVENT_ID='e2e-memory-dev-smoke'; $env:TOURNAMENT_EVENT_ID='e2e-memory-dev-smoke'; npm.cmd run test:e2e }"`
+  - passed, 6 Playwright tests.
+- `rtk npm run test:phase9:supabase-dev` - failed in the existing direct Supabase fixture setup
+  after the fixture wrote `start_rehearsal_mode`: the page showed rehearsal mode but active roster
+  stayed at 0. This appears tied to the Supabase-dev fixture/stale in-memory persistence path, not
+  the Phase 5 migration; production-flow env validation below still passed.
+- `rtk npm run test:e2e:production-flow:validate` - passed.
+- `rtk git diff --check` - passed.
+
+### Manual Review
+
+- Product rules remain unchanged: no tournament rules, voting rules, result rules, dangerous-action
+  password policy, or route behavior changed.
+- Audit persistence is append-only; chart exclusions intentionally keep one current state and rely
+  on admin audit rows for history.
+- Host-lock release on logout/inactivity is best-effort only and cannot grant tournament mutation
+  authority to expired sessions.
+- No browser code imports service-role keys, session secrets, password hashes, or plaintext admin
+  passwords.
+- No `.github/workflows/*` files were added or changed.
+
 ## Production Readiness Remediation Phase 4 - Supabase Emergency Admin Workflows - 2026-07-03
 
 Status: implemented and locally verified. Hosted/disposable Supabase rehearsal remains blocked by

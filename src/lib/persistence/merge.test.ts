@@ -17,6 +17,38 @@ function snapshotWithHostLock(
 }
 
 describe("operational state merge", () => {
+  it("unions audit rows instead of treating missing rows as deletions", () => {
+    const baselineStores = createAdminStateStores();
+    const latestStores = createAdminStateStores();
+    const currentStores = createAdminStateStores();
+    const baseline = createOperationalStateSnapshot(
+      baselineStores,
+      "2026-07-03T00:00:00.000Z",
+    );
+    const latestAudit = latestStores.auditStore.record({
+      sessionId: "session-a",
+      action: "pause_voting",
+      summary: "Paused voting for Round 1.",
+      now: "2026-07-03T00:00:01.000Z",
+    });
+    const currentAudit = currentStores.auditStore.record({
+      sessionId: "session-b",
+      action: "resume_voting",
+      summary: "Resumed voting for Round 1.",
+      now: "2026-07-03T00:00:02.000Z",
+    });
+
+    const merged = mergeOperationalStateSnapshots({
+      baseline,
+      latest: createOperationalStateSnapshot(latestStores, "2026-07-03T00:00:01.000Z"),
+      current: createOperationalStateSnapshot(currentStores, "2026-07-03T00:00:02.000Z"),
+    });
+
+    expect(merged.audit.records.map((record) => record.id).sort()).toEqual(
+      [latestAudit.id, currentAudit.id].sort(),
+    );
+  });
+
   it("keeps a newly acquired host lock when the latest persisted state has no lock", () => {
     const baseline = snapshotWithHostLock(null, 0);
     const current = snapshotWithHostLock("session-a", 1_000);

@@ -112,7 +112,7 @@ const EVENT_TABLE_DELETE_BATCHES: readonly (readonly TableName[])[] = [
     "voting_windows",
   ],
   ["result_snapshots", "ballots"],
-  ["admin_actions", "players", "event_runtime_state"],
+  ["players", "event_runtime_state"],
 ];
 
 const EVENT_LOCK_TTL_MS = 30_000;
@@ -574,7 +574,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     await Promise.all([
       this.deleteEventRows("active_voter_presence"),
       this.deleteEventRows("round_player_eligibility"),
-      this.deleteEventRows("admin_actions"),
     ]);
 
     await Promise.all([
@@ -592,7 +591,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     await Promise.all([
       this.deleteEventRows("active_voter_presence"),
       this.deleteEventRows("round_player_eligibility"),
-      this.deleteEventRows("admin_actions"),
     ]);
 
     await Promise.all([
@@ -795,7 +793,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
   }
 
   private async saveAdminActions(snapshot: OperationalStateSnapshot) {
-    await this.insertMany(
+    await this.upsertMany(
       "admin_actions",
       snapshot.audit.records.map((record) => ({
         id: record.id,
@@ -814,6 +812,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
           sessionId: record.sessionId,
         } as Json,
       })),
+      { onConflict: "id" },
     );
   }
 
@@ -852,7 +851,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
   private async saveChartExclusions(snapshot: OperationalStateSnapshot) {
     const chartsByKey = new Map(loadRuntimeCharts().map((chart) => [chart.chartKey, chart]));
 
-    await this.insertMany(
+    await this.upsertMany(
       "chart_exclusions",
       (snapshot.draw.chartExclusions ?? []).map((exclusion) => ({
         id: deterministicUuid(`${this.eventId}:chart-exclusion:${exclusion.chartKey}`),
@@ -863,6 +862,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         created_at: exclusion.updatedAt,
         updated_at: exclusion.updatedAt,
       })),
+      { onConflict: "event_id,chart_id" },
     );
   }
 
