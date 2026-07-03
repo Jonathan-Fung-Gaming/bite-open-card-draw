@@ -181,6 +181,96 @@ export class AdminPage {
     await expect(this.page.getByText("Voting Controls")).toBeVisible();
   }
 
+  async expectActiveCount(count: number) {
+    await expect
+      .poll(
+        async () => {
+          if (!(await this.visit())) {
+            return null;
+          }
+
+          return this.page.getByTestId("admin-active-player-count").getAttribute("data-count");
+        },
+        { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+      )
+      .toBe(String(count));
+  }
+
+  async expectVotingEligibleCount(count: number) {
+    await expect
+      .poll(
+        async () => {
+          if (!(await this.visit())) {
+            return null;
+          }
+
+          return this.page.getByTestId("admin-voting-eligible-count").getAttribute("data-count");
+        },
+        { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+      )
+      .toBe(String(count));
+  }
+
+  async markPlayersInactive(names: readonly string[]) {
+    await this.loginAndTakeHost();
+
+    for (const name of names) {
+      await this.visit();
+      const row = this.rosterRow(name);
+
+      await expect(row).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+
+      if ((await row.getAttribute("data-active")) === "false") {
+        continue;
+      }
+
+      await clickServerAction(this.page, row.getByRole("button", { name: "Mark Inactive" }), 0, {
+        requireServerActionResponse: true,
+        responseTimeoutMs: 60_000,
+        submitForm: true,
+      });
+
+      await expect
+        .poll(
+          async () => {
+            await this.visit();
+            return this.rosterRow(name).getAttribute("data-active");
+          },
+          { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+        )
+        .toBe("false");
+    }
+  }
+
+  async addInactivePlayerToCurrentRound(name: string, reason: string) {
+    await this.loginAndTakeHost();
+
+    const eligibilityForm = this.page.locator("form", {
+      has: this.page.getByRole("button", { name: "Confirm Eligibility Change" }),
+    });
+
+    await expect(eligibilityForm.getByRole("button", { name: "Confirm Eligibility Change" }))
+      .toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    await eligibilityForm.locator("select[name='playerId']").selectOption({ label: name });
+    await eligibilityForm.locator("textarea[name='reason']").fill(reason);
+    await eligibilityForm.locator("input[name='adminPassword']").fill(ADMIN_PASSWORD);
+    await expect(eligibilityForm.getByTestId("dangerous-action-summary")).toContainText(
+      "add an inactive player to current round eligibility",
+    );
+    await expect(eligibilityForm.getByTestId("dangerous-action-summary")).toContainText(name);
+
+    await clickServerAction(
+      this.page,
+      eligibilityForm.getByRole("button", { name: "Confirm Eligibility Change" }),
+      0,
+      {
+        requireServerActionResponse: true,
+        responseTimeoutMs: 60_000,
+        submitForm: true,
+      },
+    );
+  }
+
   async expectTextAfterNavigation(text: string | RegExp) {
     await expect
       .poll(
@@ -647,6 +737,12 @@ export class AdminPage {
     const allCookies = await this.page.context().cookies();
 
     return allCookies.find((cookie) => cookie.name === name) ?? null;
+  }
+
+  private rosterRow(name: string) {
+    return this.page.getByTestId("admin-roster-row").filter({
+      has: this.page.getByText(name, { exact: true }),
+    });
   }
 
   private assertNoAdminError() {

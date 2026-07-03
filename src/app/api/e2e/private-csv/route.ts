@@ -62,6 +62,13 @@ export async function GET(request: Request) {
     const csv = generatePrivateBallotCsv({
       result,
       ballots: adminState.ballotStore.listForRound(roundNumber),
+      roundEligibility: adminState.rosterStore
+        .listCurrentRoundEligibility()
+        .filter((entry) => entry.roundNumber === roundNumber)
+        .map((entry) => ({
+          playerId: entry.playerId,
+          activeAtRoundStart: false,
+        })),
     });
 
     return NextResponse.json({

@@ -580,7 +580,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
                   Ballots submitted
                 </p>
-                <p className="mt-2 text-3xl font-black text-white">
+                <p
+                  className="mt-2 text-3xl font-black text-white"
+                  data-count={votingSnapshot.eligibleCount}
+                  data-testid="admin-voting-eligible-count"
+                >
                   {votingSnapshot.submittedCount} / {votingSnapshot.eligibleCount}
                 </p>
               </div>
@@ -1061,7 +1065,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </p>
                 <h2 className="mt-1 text-2xl font-black uppercase text-white">Players</h2>
               </div>
-              <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm text-metal-300">
+              <p
+                className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm text-metal-300"
+                data-count={activeCount}
+                data-testid="admin-active-player-count"
+              >
                 Active {activeCount}
               </p>
             </div>
@@ -1113,7 +1121,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </thead>
                 <tbody>
                   {players.map((player) => (
-                    <tr key={player.id} className="border-t border-metal-700 bg-black/20">
+                    <tr
+                      key={player.id}
+                      className="border-t border-metal-700 bg-black/20"
+                      data-active={player.active ? "true" : "false"}
+                      data-player-username={player.startggUsername}
+                      data-testid="admin-roster-row"
+                    >
                       <td className="p-3 font-semibold text-white">{player.startggUsername}</td>
                       <td className="p-3 text-metal-300">
                         {player.active ? "Active" : "Inactive"}

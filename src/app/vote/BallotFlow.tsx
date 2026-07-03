@@ -1042,6 +1042,8 @@ export function BallotFlow({
                 index === 6 ? "col-span-2 mx-auto w-[calc((100%_-_0.75rem)/2)] min-w-0" : "",
               )}
               data-chart-image-path={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
+              data-chart-id={chart.id}
+              data-chart-name={chart.name}
               data-testid="ballot-chart-card"
               style={{
                 backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.86)), url(${
