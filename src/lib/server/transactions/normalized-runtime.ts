@@ -69,6 +69,24 @@ const postVoteRerollInvalidationInputSchema = z.object({
   reason: z.string().trim().min(1),
 });
 
+const normalizedManualBallotOverrideInputSchema = manualBallotOverrideInputSchema
+  .omit({ adminPassword: true })
+  .extend({
+    adminSessionId: uuidSchema,
+  });
+
+const normalizedReopenVotingWindowInputSchema = reopenVotingWindowInputSchema
+  .omit({ adminPassword: true })
+  .extend({
+    adminSessionId: uuidSchema,
+  });
+
+const normalizedResetRoundInputSchema = resetRoundInputSchema
+  .omit({ adminPassword: true })
+  .extend({
+    adminSessionId: uuidSchema,
+  });
+
 const adminSessionCreateInputSchema = z.object({
   sessionTokenHash: z.string().trim().min(16),
   expiresAt: isoDateTimeSchema,
@@ -87,10 +105,12 @@ export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   submitBallot: submitBallotInputSchema,
   computeResults: computeResultsInputSchema,
   advanceVotingTimer: advanceVotingTimerInputSchema,
+  manualBallotOverride: normalizedManualBallotOverrideInputSchema,
+  reopenVotingWindow: normalizedReopenVotingWindowInputSchema,
+  resetRound: normalizedResetRoundInputSchema,
 } as const;
 
 export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
-  manualBallotOverride: manualBallotOverrideInputSchema,
   claimActiveVoterPresence: activeVoterPresenceInputSchema,
   touchActiveVoterPresence: activeVoterPresenceInputSchema,
   acquireHostLock: acquireHostLockInputSchema,
@@ -100,7 +120,6 @@ export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   pauseVotingWindow: pauseVotingWindowInputSchema,
   resumeVotingWindow: resumeVotingWindowInputSchema,
   closeVotingWindow: closeVotingWindowInputSchema,
-  reopenVotingWindow: reopenVotingWindowInputSchema,
   drawRoundSet: drawRoundSetInputSchema,
   rerollOneChart: rerollOneChartInputSchema,
   rerollRoundSet: rerollRoundSetInputSchema,
@@ -109,7 +128,6 @@ export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   advanceResultReveal: advanceResultRevealInputSchema,
   markResultsRevealed: markResultsRevealedInputSchema,
   overrideResult: overrideResultInputSchema,
-  resetRound: resetRoundInputSchema,
   adminSessionCreate: adminSessionCreateInputSchema,
   adminSessionTouch: adminSessionTouchInputSchema,
   adminSessionLogout: adminSessionEndInputSchema,
@@ -132,10 +150,12 @@ export const NORMALIZED_RUNTIME_RPC_NAMES = {
   submitBallot: "normalized_submit_ballot",
   computeResults: "normalized_compute_results",
   advanceVotingTimer: "normalized_advance_voting_timer",
+  manualBallotOverride: "normalized_manual_ballot_override",
+  reopenVotingWindow: "normalized_reopen_voting_window",
+  resetRound: "normalized_reset_round",
 } as const satisfies Record<NormalizedTransactionalMutationName, NormalizedRuntimeRpcName>;
 
 export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
-  manualBallotOverride: "normalized_manual_ballot_override",
   claimActiveVoterPresence: "normalized_claim_voter_presence",
   touchActiveVoterPresence: "normalized_touch_voter_presence",
   acquireHostLock: "normalized_acquire_host_lock",
@@ -145,7 +165,6 @@ export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
   pauseVotingWindow: "normalized_pause_voting_window",
   resumeVotingWindow: "normalized_resume_voting_window",
   closeVotingWindow: "normalized_close_voting_window",
-  reopenVotingWindow: "normalized_reopen_voting_window",
   drawRoundSet: "normalized_draw_round_set",
   rerollOneChart: "normalized_reroll_one_chart",
   rerollRoundSet: "normalized_reroll_round_set",
@@ -154,7 +173,6 @@ export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
   advanceResultReveal: "normalized_advance_result_reveal",
   markResultsRevealed: "normalized_mark_results_revealed",
   overrideResult: "normalized_override_result",
-  resetRound: "normalized_reset_round",
   adminSessionCreate: "normalized_create_admin_session",
   adminSessionTouch: "normalized_touch_admin_session",
   adminSessionLogout: "normalized_logout_admin_session",

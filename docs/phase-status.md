@@ -12,6 +12,91 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 4 - Supabase Emergency Admin Workflows - 2026-07-03
+
+Status: implemented and locally verified. Hosted/disposable Supabase rehearsal remains blocked by
+missing local Supabase rehearsal environment variables, and the new migration must be applied to the
+target Supabase project before these workflows are available in Supabase mode.
+
+### Acceptance Criteria
+
+- PRC-004 is closed in local source/runtime wiring: Supabase mode no longer falls through to
+  snapshot-style persistence for manual ballot override, emergency reopen, or reset round.
+- `manualBallotOverride`, `reopenVotingWindow`, and `resetRound` are implemented normalized
+  transaction mutations with sanitized server-side payloads.
+- The normalized payload schemas omit `adminPassword` and require the verified `adminSessionId`.
+- `/coolguy69` still verifies dangerous-action passwords in application code before invoking the
+  normalized RPC wrappers.
+- New service-role SQL RPC definitions replace the disabled stubs for:
+  - `normalized_manual_ballot_override`
+  - `normalized_reopen_voting_window`
+  - `normalized_reset_round`
+- Manual ballot override SQL validates eligibility, completed choices, replacement confirmation,
+  revision updates, audit rows, manual override export fields, and computed-but-unrevealed result
+  invalidation after successful validation.
+- Emergency reopen SQL validates duration/reason/session, clears unrevealed computed results, and
+  reopens the existing voting window without deleting ballots.
+- Reset SQL clears target-round ballots, choices, revisions, results, tiebreaks, voting window,
+  round eligibility, presence, draws, and drawn charts while preserving players, audit rows, host
+  lock, chart catalog, exclusions, and other rounds.
+
+### Changed Files
+
+- `docs/phase-4-supabase-emergency-admin-workflows-plan-2026-07-03.md`
+- `docs/phase-status.md`
+- `src/app/coolguy69/actions.ts`
+- `src/lib/server/normalized-admin-workflows.ts`
+- `src/lib/server/admin-actions.test.ts`
+- `src/lib/server/transactions/normalized-runtime.ts`
+- `src/lib/server/transactions/normalized-runtime.test.ts`
+- `supabase/migrations/20260703040000_supabase_emergency_admin_workflows.sql`
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/admin-actions.test.ts`
+  - passed, 2 files / 33 tests.
+- `rtk npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/results/private-csv.test.ts src/lib/server/admin-actions.test.ts`
+  - passed, 4 files / 47 tests.
+- `rtk npm run test -- src/lib/vote/voting-window.test.ts src/lib/vote/ballot.test.ts src/lib/server/admin-local-flow.test.ts src/lib/server/mutation-contracts.test.ts src/lib/admin/action-policy.test.ts src/lib/db/schema.test.ts src/lib/server/authoritative-clock.test.ts`
+  - passed, 7 files / 71 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 51 files / 280 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed.
+- `rtk npm run test:e2e` - first run had one existing timing-sensitive tiebreak-wheel assertion
+  miss the pre-reveal window; rerun passed, 6 Playwright tests.
+- `rtk npm run test:phase9` - passed, one-round memory smoke rehearsal.
+- `rtk npm run test:phase9:supabase-dev` - not run; environment validation failed because
+  `E2E_TOURNAMENT_EVENT_ID` is unset and `E2E_ALLOW_DESTRUCTIVE_RESET=true` is not configured.
+- `rtk npm run test:e2e:production-flow:validate` - not run; environment validation failed for the
+  same missing disposable Supabase settings.
+- `rtk npx supabase db lint --linked` - passed, no schema errors found.
+
+### Manual Review
+
+- Product rules remain unchanged: dangerous manual ballot, reopen, and reset actions still require
+  active host control, password re-entry, action summaries, and audit reasons.
+- Password verification remains in server-side application code. The normalized RPC payloads and
+  SQL tests intentionally do not include `adminPassword`.
+- Browser code still receives no service-role key, admin password hash, session secret, plaintext
+  password, or direct tournament-changing RPC access.
+- Supabase server actions now return after normalized RPC calls and do not call
+  `persistTournamentState()`, avoiding the unsafe snapshot rewrite path for PRC-004.
+- Manual ballot override invalidates unrevealed computed results only after payload validation and
+  ballot persistence. Failed validation should leave computed results intact.
+- Reset scope is round-limited and audit-preserving.
+- No `.github/workflows/*` files were added or changed.
+
+### Risks And Assumptions
+
+- SQL source tests verify the migration shape, service-role grants, and disabled-stub removal, but
+  disposable Supabase execution is still required once the rehearsal environment is configured.
+- The new migration must be applied to any target Supabase project before relying on these
+  workflows in Supabase mode.
+- Supabase reset deletes current `round_player_eligibility` rows for the target round because they
+  are round-scoped state. Memory mode behavior was intentionally left unchanged in this phase.
+
 ## Production Readiness Remediation Phase 3 - Durable Timer Transitions - 2026-07-03
 
 Status: implemented and locally verified. Hosted/disposable Supabase rehearsal remains blocked by

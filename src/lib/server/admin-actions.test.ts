@@ -232,6 +232,7 @@ describe("admin action production safeguards", () => {
       "await verifyDangerousActionPassword(getAdminPassword(formData))",
     );
     expect(reopenSource).toContain("const reason = getRequiredReason(formData)");
+    expect(reopenSource).toContain("reopenNormalizedVotingWindow({");
     expect(reopenSource).toContain('result && result.revealPhase !== "computed"');
     expect(reopenSource).toContain("adminState.resultStore.clearRoundResult(roundNumber)");
     expect(reopenSource).toContain(
@@ -588,18 +589,56 @@ describe("admin action production safeguards", () => {
     expect(actionsSource).not.toContain('split("|")');
   });
 
-  it("blocks snapshot-backed Supabase admin mutations whose normalized RPCs are disabled", () => {
+  it("routes implemented Supabase emergency workflows through normalized RPCs", () => {
     const actionsSource = readFileSync(
       path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
       "utf8",
     );
+    const wrapperSource = readFileSync(
+      path.join(process.cwd(), "src/lib/server/normalized-admin-workflows.ts"),
+      "utf8",
+    );
+    const workflows = [
+      {
+        actionName: "manualBallotAction",
+        wrapperCall: "submitNormalizedManualBallotOverride({",
+        rpcName: '"manualBallotOverride"',
+      },
+      {
+        actionName: "reopenVotingAction",
+        wrapperCall: "reopenNormalizedVotingWindow({",
+        rpcName: '"reopenVotingWindow"',
+      },
+      {
+        actionName: "resetRoundAction",
+        wrapperCall: "resetNormalizedRound({",
+        rpcName: '"resetRound"',
+      },
+    ];
 
-    expect(actionsSource).toContain(
-      'assertSupabaseTransactionalMutationImplemented("manualBallotOverride")',
-    );
-    expect(actionsSource).toContain(
-      'assertSupabaseTransactionalMutationImplemented("reopenVotingWindow")',
-    );
-    expect(actionsSource).toContain('assertSupabaseTransactionalMutationImplemented("resetRound")');
+    for (const workflow of workflows) {
+      const block = getActionBlock(actionsSource, workflow.actionName);
+      const supabaseBranch = block.indexOf('getTournamentStateBackend() === "supabase"');
+      const passwordCheck = block.indexOf(
+        "await verifyDangerousActionPassword(getAdminPassword(formData))",
+        supabaseBranch,
+      );
+      const wrapperCall = block.indexOf(workflow.wrapperCall, passwordCheck);
+      const revalidate = block.indexOf("revalidateTournamentViews(revalidatePath)", wrapperCall);
+      const branchReturn = block.indexOf("return;", revalidate);
+      const snapshotPersist = block.indexOf("await persistTournamentState();");
+
+      expect(supabaseBranch, workflow.actionName).toBeGreaterThanOrEqual(0);
+      expect(passwordCheck, workflow.actionName).toBeGreaterThan(supabaseBranch);
+      expect(wrapperCall, workflow.actionName).toBeGreaterThan(passwordCheck);
+      expect(revalidate, workflow.actionName).toBeGreaterThan(wrapperCall);
+      expect(branchReturn, workflow.actionName).toBeGreaterThan(revalidate);
+      expect(snapshotPersist, workflow.actionName).toBeGreaterThan(branchReturn);
+      expect(wrapperSource, workflow.actionName).toContain(
+        `executeNormalizedTransactionalMutation(${workflow.rpcName}`,
+      );
+    }
+
+    expect(wrapperSource).not.toContain("adminPassword");
   });
 });
