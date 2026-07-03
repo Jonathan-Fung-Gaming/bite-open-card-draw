@@ -42,6 +42,33 @@ describe("chart importer", () => {
     expect(report.duplicateChartKeys).toHaveLength(1);
   });
 
+  it("rejects CSV headers with extra columns", () => {
+    const csv = [
+      "name,name_kr,artist,label,type,level,bg_img,notes",
+      "Song,Song,Artist,s,s,16,https://example.com/a.png,extra",
+    ].join("\n");
+
+    expect(() => parseChartCsv(csv)).toThrow("header must exactly match");
+  });
+
+  it("rejects CSV headers with misordered columns", () => {
+    const csv = [
+      "name,artist,name_kr,label,type,level,bg_img",
+      "Song,Artist,Song,s,s,16,https://example.com/a.png",
+    ].join("\n");
+
+    expect(() => parseChartCsv(csv)).toThrow("header order mismatch");
+  });
+
+  it("rejects unexpected trailing row columns after bg_img", () => {
+    const csv = [
+      "name,name_kr,artist,label,type,level,bg_img",
+      "Song,Song,Artist,s,s,16,https://example.com/a.png,unexpected",
+    ].join("\n");
+
+    expect(() => parseChartCsv(csv)).toThrow("unexpected extra columns after bg_img");
+  });
+
   it("applies chart exclusions before required pool validation", () => {
     const rows = createFallbackChartRows();
     const { charts: baseline } = importChartRows(rows, {
@@ -111,6 +138,7 @@ describe("chart importer", () => {
       repairedRows: parsed.repairedRows,
       reviewedBy: "release captain",
       reviewedAt: "2026-07-02T00:00:00.000Z",
+      reviewedCommit: "abcdef1234567890",
     });
 
     expect(report.repairedRows).toEqual([
@@ -121,6 +149,7 @@ describe("chart importer", () => {
     ]);
     expect(report.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(report.reviewedBy).toBe("release captain");
+    expect(report.reviewedCommit).toBe("abcdef1234567890");
   });
 
   it("strict mode reports malformed levels and duplicate repairs as failures", () => {

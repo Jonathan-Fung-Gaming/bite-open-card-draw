@@ -35,9 +35,12 @@ Fill these values for the current release commit before tournament use.
 - Total public cache size: 209721036 bytes (200.01 MB)
 - Largest public cache file size: 651394 bytes (636.1 KB)
 - Verification command/date/commit: rtk npm run verify:real-chart-images / TODO date / TODO commit
+- Combined release data gate: rtk npm run verify:release-data / TODO date / TODO commit
 
 rtk npm run verify:real-chart-images must validate the same runtime catalog source and public
-cache paths that the deployed app uses, not only generated image metadata.
+cache paths that the deployed app uses, not only generated image metadata. rtk npm run
+verify:release-data must pass before release closure so the image manifest/runtime catalog hashes are
+tied to the import report and source CSV evidence.
 
 ## Phase 5 Logo Performance Evidence Placeholders
 

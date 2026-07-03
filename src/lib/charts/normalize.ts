@@ -40,7 +40,17 @@ export function normalizeKeyPart(value: string): string {
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-");
 
-  return normalized || "unknown";
+  if (normalized) {
+    return normalized;
+  }
+
+  const unicodeSource = value.normalize("NFKC").trim();
+
+  if (!unicodeSource) {
+    return "unknown";
+  }
+
+  return `unicode-${createHash("sha256").update(unicodeSource).digest("hex").slice(0, 16)}`;
 }
 
 export function buildSongKey(name: string, artist: string): string {

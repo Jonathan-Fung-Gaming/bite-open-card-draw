@@ -46,6 +46,7 @@ rtk npm run test:phase9:full
 rtk npm run import:charts
 rtk npm run cache:chart-images
 rtk npm run verify:real-chart-images
+rtk npm run verify:release-data
 rtk npm audit --omit=dev
 rtk npm run build
 ```
@@ -131,24 +132,31 @@ local demos, or single-process development only.
 3. Confirm the output says `Imported ... charts` and prints required pool counts with every
    required pool at 7 or more. If it prints `Required pools with fewer than 7 eligible charts`,
    stop and repair the CSV or exclusions before drawing.
-4. Run `rtk npm run cache:chart-images` for remote artwork caching. Expected success output is
+4. If `rtk npm run import:charts -- --strict` fails because repaired or skipped diagnostics remain,
+   rerun the import with explicit review evidence:
+   `rtk npm run import:charts -- --reviewed-by=<reviewer> --reviewed-commit=<commit>`.
+   The report must include `reviewedBy`, ISO `reviewedAt`, and `reviewedCommit`.
+5. Run `rtk npm run cache:chart-images` for remote artwork caching. Expected success output is
    `Prepared ... image assets: N cached, M using fallback /chart-images/fallback-card.svg`.
    `N` must be greater than 0 before claiming real cached artwork is ready.
-5. Run `rtk npm run verify:real-chart-images`; it must report non-fallback cached image assets and
+6. Run `rtk npm run verify:real-chart-images`; it must report non-fallback cached image assets and
    chart assignments before release closure.
-6. If remote fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only` and
+7. Run `rtk npm run verify:release-data`; it must pass with either strict-clean import artifacts or
+   signed diagnostics and must report matching source CSV, import report, runtime catalog, and image
+   manifest hashes.
+8. If remote fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only` and
    explicitly accept fallback artwork for rehearsal only. This does not close the real-image
    remediation items.
-7. Confirm `public/chart-images/cache` contains real cached image files before relying on deployed
+9. Confirm `public/chart-images/cache` contains real cached image files before relying on deployed
    non-fallback artwork. Runtime can derive deterministic cache paths from source `bg_img` when those
    public files exist.
-8. Log in to `/coolguy69`.
-9. Take host control.
-10. Review chart exclusions in `Chart Eligibility`; every exclusion or re-inclusion requires admin
+10. Log in to `/coolguy69`.
+11. Take host control.
+12. Review chart exclusions in `Chart Eligibility`; every exclusion or re-inclusion requires admin
     password re-entry and an audit reason, and required pools must stay at 7 eligible charts or more.
-11. Bulk import start.gg usernames.
-12. Mark inactive/eliminated players before opening voting.
-13. Confirm duplicate active usernames are blocked.
+13. Bulk import start.gg usernames.
+14. Mark inactive/eliminated players before opening voting.
+15. Confirm duplicate active usernames are blocked.
 
 ## Free-Tier Notes
 

@@ -62,15 +62,46 @@ export function parseChartCsvWithReport(csvText: string): ParsedChartCsv {
 }
 
 export function validateChartCsvHeader(header: readonly string[]) {
-  const missing = EXPECTED_CHART_CSV_COLUMNS.filter((column, index) => header[index] !== column);
+  if (header.length !== EXPECTED_CHART_CSV_COLUMNS.length) {
+    throw new Error(
+      `Chart CSV header must exactly match ${EXPECTED_CHART_CSV_COLUMNS.join(
+        ", ",
+      )}; found ${header.length} columns: ${header.join(", ")}`,
+    );
+  }
 
-  if (missing.length > 0) {
-    throw new Error(`Chart CSV missing required columns: ${missing.join(", ")}`);
+  const mismatches = EXPECTED_CHART_CSV_COLUMNS.flatMap((column, index) =>
+    header[index] === column
+      ? []
+      : [`column ${index + 1} expected ${column} but found ${header[index] ?? "<missing>"}`],
+  );
+
+  if (mismatches.length > 0) {
+    throw new Error(`Chart CSV header order mismatch: ${mismatches.join("; ")}`);
   }
 }
 
 function joinCsvParts(parts: readonly string[]) {
   return parts.join(", ").trim();
+}
+
+function looksLikeRepairableRowTail(
+  label: string | undefined,
+  type: string | undefined,
+  level: string | undefined,
+  bgImg: string | undefined,
+) {
+  const normalizedType = type?.trim().toLowerCase();
+
+  return (
+    Boolean(label?.trim()) &&
+    (normalizedType === "s" ||
+      normalizedType === "d" ||
+      normalizedType === "single" ||
+      normalizedType === "double") &&
+    /^(?:0*[1-9]\d*)$/.test(level ?? "") &&
+    /^https?:\/\//i.test(bgImg?.trim() ?? "")
+  );
 }
 
 function repairRawChartRecord(
@@ -96,7 +127,20 @@ function repairRawChartRecord(
     };
   }
 
+  if (record.length !== 9) {
+    throw new Error(
+      `Chart CSV row ${sourceRowNumber} has unexpected extra columns after bg_img or an unrecognized repair shape.`,
+    );
+  }
+
   const [label, type, level, bgImg] = record.slice(-4);
+
+  if (!looksLikeRepairableRowTail(label, type, level, bgImg)) {
+    throw new Error(
+      `Chart CSV row ${sourceRowNumber} has unexpected extra columns after bg_img or an unrecognized repair shape.`,
+    );
+  }
+
   const leading = record.slice(0, -4);
   let best: {
     score: number;
@@ -137,6 +181,12 @@ function repairRawChartRecord(
 
   if (!best) {
     throw new Error(`Chart CSV row ${sourceRowNumber} could not be repaired.`);
+  }
+
+  if (best.row.name !== best.row.name_kr) {
+    throw new Error(
+      `Chart CSV row ${sourceRowNumber} has an unrecognized repair shape; only mirrored title repairs are supported.`,
+    );
   }
 
   return {
@@ -189,6 +239,7 @@ export function importChartRows(
     strict?: boolean;
     reviewedBy?: string | null;
     reviewedAt?: string | null;
+    reviewedCommit?: string | null;
   },
 ): {
   charts: NormalizedChart[];
@@ -261,6 +312,7 @@ export function importChartRows(
       strictMode: options.strict ?? false,
       reviewedBy: options.reviewedBy ?? null,
       reviewedAt: options.reviewedAt ?? null,
+      reviewedCommit: options.reviewedCommit ?? null,
       totalSourceRows: rows.length,
       importedCharts: charts.length,
       repairedRows,

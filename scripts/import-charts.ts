@@ -61,6 +61,8 @@ function readChartExclusions(filePath: string) {
 const sourcePath = readArg("source", "data/source/charts.csv");
 const outputDir = readArg("output-dir", "data/generated");
 const reviewedBy = readArg("reviewed-by", "");
+const reviewedAt = readArg("reviewed-at", "");
+const reviewedCommit = readArg("reviewed-commit", "");
 const absoluteSourcePath = path.resolve(process.cwd(), sourcePath);
 const absoluteOutputDir = path.resolve(process.cwd(), outputDir);
 const usedFixture = !existsSync(absoluteSourcePath);
@@ -87,7 +89,8 @@ const { charts, report } = importChartRows(parsed.rows, {
   sourceSha256: parsed.sourceSha256,
   repairedRows: parsed.repairedRows,
   reviewedBy: reviewedBy || null,
-  reviewedAt: reviewedBy ? new Date().toISOString() : null,
+  reviewedAt: reviewedAt || (reviewedBy ? new Date().toISOString() : null),
+  reviewedCommit: reviewedCommit || null,
 });
 
 writeJson(path.join(absoluteOutputDir, "charts.json"), charts);
