@@ -1,4 +1,4 @@
-import type { DrawStateStore } from "@/lib/draw/draw-state";
+import type { DrawRecord, DrawStateStore } from "@/lib/draw/draw-state";
 import type { ResultStore } from "@/lib/results/result-store";
 import type { RoundResultSnapshot } from "./result-engine";
 
@@ -12,10 +12,126 @@ export type FutureSelectedSongConflict = {
   chartName: string;
 };
 
+export type PriorSelectedSongBlock = {
+  songKey: string;
+  selectedInRoundNumber: RoundNumber;
+  chartId: string;
+  chartName: string;
+};
+
+export type PriorSelectedSongDrawConflict = {
+  roundNumber: RoundNumber;
+  setOrder: 1 | 2;
+  displayLabel: string;
+  chartId: string;
+  chartName: string;
+  songKey: string;
+  selectedInRoundNumber: RoundNumber;
+};
+
 export function selectedSongKeysFromResults(results: readonly RoundResultSnapshot[]) {
   return [
     ...new Set(results.flatMap((result) => result.sets.map((set) => set.selectedChart.songKey))),
   ].sort();
+}
+
+export function selectedSongBlocksFromResultsBeforeRound(
+  results: readonly RoundResultSnapshot[],
+  roundNumber: RoundNumber,
+) {
+  const blocks = new Map<string, PriorSelectedSongBlock>();
+
+  for (const result of results) {
+    if (result.roundNumber >= roundNumber) {
+      continue;
+    }
+
+    for (const set of result.sets) {
+      const selected = set.selectedChart;
+
+      if (!blocks.has(selected.songKey)) {
+        blocks.set(selected.songKey, {
+          songKey: selected.songKey,
+          selectedInRoundNumber: result.roundNumber,
+          chartId: selected.id,
+          chartName: selected.name,
+        });
+      }
+    }
+  }
+
+  return [...blocks.values()].sort(
+    (left, right) =>
+      left.selectedInRoundNumber - right.selectedInRoundNumber ||
+      left.chartName.localeCompare(right.chartName) ||
+      left.songKey.localeCompare(right.songKey),
+  );
+}
+
+export function selectedSongBlocksFromResultStoreBeforeRound(
+  resultStore: ResultStore,
+  roundNumber: RoundNumber,
+) {
+  return selectedSongBlocksFromResultsBeforeRound(resultStore.exportSnapshot().results, roundNumber);
+}
+
+export function findPriorSelectedSongDrawConflicts(input: {
+  roundNumber: RoundNumber;
+  draws: readonly DrawRecord[];
+  priorSelectedSongBlocks: readonly PriorSelectedSongBlock[];
+}) {
+  const blocksBySongKey = new Map(
+    input.priorSelectedSongBlocks.map((block) => [block.songKey, block]),
+  );
+  const conflicts: PriorSelectedSongDrawConflict[] = [];
+
+  for (const draw of input.draws) {
+    if (draw.roundNumber !== input.roundNumber || draw.supersededAt) {
+      continue;
+    }
+
+    for (const chart of draw.charts) {
+      const block = blocksBySongKey.get(chart.songKey);
+
+      if (!block) {
+        continue;
+      }
+
+      conflicts.push({
+        roundNumber: draw.roundNumber,
+        setOrder: draw.setOrder,
+        displayLabel: draw.displayLabel,
+        chartId: chart.id,
+        chartName: chart.name,
+        songKey: chart.songKey,
+        selectedInRoundNumber: block.selectedInRoundNumber,
+      });
+    }
+  }
+
+  return conflicts.sort(
+    (left, right) =>
+      left.roundNumber - right.roundNumber ||
+      left.setOrder - right.setOrder ||
+      left.chartName.localeCompare(right.chartName) ||
+      left.chartId.localeCompare(right.chartId),
+  );
+}
+
+export function assertNoPriorSelectedSongDrawConflicts(
+  input: Parameters<typeof findPriorSelectedSongDrawConflicts>[0],
+) {
+  const conflicts = findPriorSelectedSongDrawConflicts(input);
+
+  if (conflicts.length === 0) {
+    return;
+  }
+
+  const firstConflict = conflicts[0] as PriorSelectedSongDrawConflict;
+
+  throw new Error(
+    `Round ${firstConflict.roundNumber} ${firstConflict.displayLabel} includes ${firstConflict.chartName}, which was selected in Round ${firstConflict.selectedInRoundNumber}. Reroll or reset the affected future draw before opening voting or computing results.`,
+  );
 }
 
 export function syncSelectedSongBlocksFromResultStore(

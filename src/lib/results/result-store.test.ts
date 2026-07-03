@@ -93,6 +93,7 @@ describe("result store reveal timing", () => {
       ],
       ballots: [ballot("p1", ["c", "d"]), ballot("p2", ["e", "f"]), ballot("p3", ["g"])],
       eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
+      priorSelectedSongBlocks: [],
       now: computedAt,
     });
 
@@ -134,6 +135,7 @@ describe("result store reveal timing", () => {
       ],
       ballots: [ballot("p1", ["a", "d"]), ballot("p2", ["a", "e"]), ballot("p3", ["f", "g"])],
       eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
+      priorSelectedSongBlocks: [],
       now: "2026-06-28T00:00:00.000Z",
     });
 

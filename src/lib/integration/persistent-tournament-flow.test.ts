@@ -11,6 +11,7 @@ import {
 import { MemoryOperationalStateRepository } from "@/lib/persistence/repository";
 import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import { ResultStore } from "@/lib/results/result-store";
+import { selectedSongBlocksFromResultStoreBeforeRound } from "@/lib/results/selected-song-blocks";
 import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
 
 function chartsFor(type: "s" | "d", level: string, count: number, startRow: number, prefix: string) {
@@ -194,6 +195,7 @@ describe("repository-backed tournament integration", () => {
       draws: activeDraws(stores),
       ballots: stores.ballotStore.listForRound(1),
       eligiblePlayers: stores.rosterStore.listEligiblePlayersForRound(1),
+      priorSelectedSongBlocks: [],
       now: "computed",
     });
     stores.votingWindowStore.setResultsPhase(1, "results_revealed");
@@ -350,6 +352,10 @@ describe("repository-backed tournament integration", () => {
         draws,
         ballots: stores.ballotStore.listForRound(roundNumber),
         eligiblePlayers: stores.rosterStore.listEligiblePlayersForRound(roundNumber),
+        priorSelectedSongBlocks: selectedSongBlocksFromResultStoreBeforeRound(
+          stores.resultStore,
+          roundNumber,
+        ),
         now: `round-${roundNumber}-computed`,
       });
       stores.votingWindowStore.setResultsPhase(roundNumber, "results_computed");

@@ -276,6 +276,7 @@ describe("normalized operational state repository", () => {
       draws: [firstDraw, secondDraw],
       ballots: stores.ballotStore.listForRound(1),
       eligiblePlayers: stores.rosterStore.listEligiblePlayersForRound(1),
+      priorSelectedSongBlocks: [],
       now: "2026-06-29T00:02:00.000Z",
     });
 
@@ -380,6 +381,7 @@ describe("normalized operational state repository", () => {
       draws: [firstDraw, secondDraw],
       ballots: stores.ballotStore.listForRound(1),
       eligiblePlayers: stores.rosterStore.listEligiblePlayersForRound(1),
+      priorSelectedSongBlocks: [],
       now: "2026-06-30T00:01:00.000Z",
     });
 
@@ -799,6 +801,7 @@ describe("normalized operational state repository", () => {
       draws: [firstDraw, secondDraw],
       ballots: [],
       eligiblePlayers: [{ id: player.id, startggUsername: player.startggUsername }],
+      priorSelectedSongBlocks: [],
       now: "2026-06-30T00:00:02.000Z",
     });
     stores.hostLockStore.acquire("session-a", "host-token-a", 0);

@@ -2,6 +2,7 @@ import type { DrawnChartSummary, RandomIndex } from "@/lib/draw/draw-engine";
 import { secureRandomIndex } from "@/lib/draw/draw-engine";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import { assertRoundDrawsReady } from "@/lib/draw/round-readiness";
+import type { PriorSelectedSongBlock } from "@/lib/results/selected-song-blocks";
 import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
 import type { RoundBallot } from "@/lib/vote/ballot";
 
@@ -149,12 +150,15 @@ export function computeRoundResult(input: {
   ballots: readonly RoundBallot[];
   eligiblePlayers: EligiblePlayerSnapshot[];
   computedAt: string;
+  priorSelectedSongBlocks: readonly PriorSelectedSongBlock[];
   randomIndex?: RandomIndex;
 }): RoundResultSnapshot {
   const draws = [...input.draws].sort((left, right) => left.setOrder - right.setOrder);
   const countedBallots = filterBallotsByEligiblePlayers(input.ballots, input.eligiblePlayers);
 
-  assertRoundDrawsReady(input.roundNumber, draws);
+  assertRoundDrawsReady(input.roundNumber, draws, {
+    priorSelectedSongBlocks: input.priorSelectedSongBlocks,
+  });
 
   return {
     id: input.id,

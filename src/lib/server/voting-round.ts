@@ -1,7 +1,12 @@
 import "server-only";
 import { adminState } from "@/lib/server/admin-state";
 import { evaluateRoundDrawReadiness } from "@/lib/draw/round-readiness";
+import { selectedSongBlocksFromResultStoreBeforeRound } from "@/lib/results/selected-song-blocks";
 import { countBanSelections } from "@/lib/vote/ballot";
+
+function priorSelectedSongBlocksForRound(roundNumber: 1 | 2 | 3 | 4) {
+  return selectedSongBlocksFromResultStoreBeforeRound(adminState.resultStore, roundNumber);
+}
 
 export function getRoundDrawRecords(roundNumber: 1 | 2 | 3 | 4) {
   return adminState.drawStateStore
@@ -18,12 +23,17 @@ export function getCurrentEligiblePlayers(roundNumber: 1 | 2 | 3 | 4) {
 
 export function getVotingRoundSnapshot(roundNumber: 1 | 2 | 3 | 4, nowMs?: number) {
   const draws = getRoundDrawRecords(roundNumber);
-  const drawReadiness = evaluateRoundDrawReadiness(roundNumber, draws);
+  const drawReadiness = evaluateRoundDrawReadiness(roundNumber, draws, {
+    priorSelectedSongBlocks: priorSelectedSongBlocksForRound(roundNumber),
+  });
+  const drawnSetCountForVotingState = drawReadiness.isReady
+    ? drawReadiness.completeSetCount
+    : Math.min(drawReadiness.completeSetCount, drawReadiness.expectedSetCount - 1);
   const ballots = adminState.ballotStore.listForRound(roundNumber);
 
   return adminState.votingWindowStore.getSnapshot({
     roundNumber,
-    drawnSetCount: drawReadiness.completeSetCount,
+    drawnSetCount: drawnSetCountForVotingState,
     eligiblePlayers: getCurrentEligiblePlayers(roundNumber),
     submittedPlayerIds: ballots.map((ballot) => ballot.playerId),
     banSelectionsCast: countBanSelections(ballots),
@@ -32,7 +42,9 @@ export function getVotingRoundSnapshot(roundNumber: 1 | 2 | 3 | 4, nowMs?: numbe
 }
 
 export function getRoundDrawReadiness(roundNumber: 1 | 2 | 3 | 4) {
-  return evaluateRoundDrawReadiness(roundNumber, getRoundDrawRecords(roundNumber));
+  return evaluateRoundDrawReadiness(roundNumber, getRoundDrawRecords(roundNumber), {
+    priorSelectedSongBlocks: priorSelectedSongBlocksForRound(roundNumber),
+  });
 }
 
 export function getSubmittedPlayerIdsForRound(roundNumber: 1 | 2 | 3 | 4) {

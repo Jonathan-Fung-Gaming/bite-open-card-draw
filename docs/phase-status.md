@@ -2491,3 +2491,63 @@ Status: complete.
 - Existing repository CI workflow files predate this phase and were not changed.
 - The generated bundle scan was run after the local production build from this phase; rerun it after
   future build or bundling changes.
+
+## Production Readiness Remediation Phase 2 - Future Draw Correctness - 2026-07-03
+
+Status: complete for local memory, source, and browser-smoke validation. Hosted/disposable
+Supabase behavior still needs a configured Supabase-dev rehearsal environment before production
+release evidence can claim live database execution.
+
+### Scope
+
+- PRC-001: closed in code for memory/runtime paths and guarded in SQL source. Future rounds now
+  reject active draws that contain a song selected in an earlier computed-or-later result.
+- The selected-song block starts at result `computed` phase, not only at final stage reveal.
+- Drawn-but-not-selected songs remain eligible for later rounds.
+- Existing result-correction future-conflict protection remains in place.
+
+### Changed Files
+
+- Added `docs/phase-2-future-draw-correctness-plan-2026-07-03.md`.
+- Added `supabase/migrations/20260703020000_future_draw_selected_song_guards.sql`.
+- Updated selected-song block helpers in `src/lib/results/selected-song-blocks.ts`.
+- Updated round readiness and voting snapshot guards in `src/lib/draw/round-readiness.ts` and
+  `src/lib/server/voting-round.ts`.
+- Updated memory admin draw/open/compute paths in `src/app/coolguy69/actions.ts`.
+- Updated result computation contracts in `src/lib/results/result-engine.ts` and
+  `src/lib/results/result-store.ts`.
+- Added focused unit, integration, and SQL source assertions.
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/draw/draw-state.test.ts src/lib/draw/round-readiness.test.ts src/lib/results/selected-song-blocks.test.ts src/lib/results/result-engine.test.ts src/lib/integration/tournament-flow.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/db/schema.test.ts`
+  - passed, 7 files / 57 tests.
+- `rtk npm run lint` - passed after removing an unused import.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 50 files / 270 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk npm run test:phase9` - passed, one-round memory smoke.
+- `rtk npm run test:phase9:supabase-dev` - not run; environment validation failed before browser
+  execution because `E2E_TOURNAMENT_EVENT_ID` was unset and
+  `E2E_ALLOW_DESTRUCTIVE_RESET=true` was not configured. No Supabase data was touched.
+
+### Manual Review
+
+- Product rules were not changed: the app still has four rounds, two chart sets per round, seven
+  charts per set, least-ban winners, backend tiebreak decisions, and final two-chart reveal.
+- Future selected-song blocking now follows `docs/product-spec.md`: selected songs, not all drawn
+  songs, are blocked from later rounds.
+- Same-round duplicate-song blocking and exact chart duplicate prevention remain covered.
+- Browser code still receives no service-role keys, admin hashes, session secrets, or tournament
+  decision authority.
+- No `.github/workflows/*` files were added or changed.
+
+### Risks And Assumptions
+
+- Existing live event namespaces with stale future draws will fail open/compute until the operator
+  rerolls or resets the affected future draw. This is intentional fail-closed behavior.
+- SQL coverage in this phase is source-level plus local build/test coverage. A disposable
+  Supabase-dev run is still required once environment variables are available.
+- The new SQL migration must be applied before relying on Supabase backend parity for PRC-001.

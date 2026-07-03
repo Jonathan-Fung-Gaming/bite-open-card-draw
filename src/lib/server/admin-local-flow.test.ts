@@ -78,6 +78,7 @@ function setupComputedRound() {
     draws,
     ballots: stores.ballotStore.listForRound(1),
     eligiblePlayers: [...eligiblePlayers],
+    priorSelectedSongBlocks: [],
     now: "computed",
   });
 
@@ -164,6 +165,7 @@ describe("admin local flow evidence", () => {
       draws,
       ballots: stores.ballotStore.listForRound(1),
       eligiblePlayers: [...eligiblePlayers],
+      priorSelectedSongBlocks: [],
       now: "recomputed",
     });
 

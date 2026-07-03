@@ -16,11 +16,16 @@ function chart(id: string): DrawnChartSummary {
   };
 }
 
-function draw(id: string, setOrder: 1 | 2, chartCount = 7): DrawRecord {
+function draw(
+  id: string,
+  setOrder: 1 | 2,
+  chartCount = 7,
+  roundNumber: 1 | 2 | 3 | 4 = 1,
+): DrawRecord {
   return {
     id,
     roundSetId: `round-set-${setOrder}`,
-    roundNumber: 1,
+    roundNumber,
     setOrder,
     displayLabel: setOrder === 1 ? "S16" : "S17",
     version: 1,
@@ -65,5 +70,52 @@ describe("round draw readiness", () => {
     expect(() => assertRoundDrawsReady(1, [draw("set-1", 1, 6), draw("set-2", 2)])).toThrow(
       /exactly 7 charts/,
     );
+  });
+
+  it("rejects complete future draws containing prior selected songs", () => {
+    const stale = draw("set-1", 1, 7, 2);
+    const current = draw("set-2", 2, 7, 2);
+    stale.charts[0] = {
+      ...chart("shared"),
+      name: "Shared Winner",
+      songKey: "song-shared",
+    };
+
+    const readiness = evaluateRoundDrawReadiness(2, [stale, current], {
+      priorSelectedSongBlocks: [
+        {
+          songKey: "song-shared",
+          selectedInRoundNumber: 1,
+          chartId: "round-1-shared",
+          chartName: "Shared Winner",
+        },
+      ],
+    });
+
+    expect(readiness).toMatchObject({
+      isReady: false,
+      completeSetCount: 2,
+      problems: [
+        {
+          setOrder: 1,
+          displayLabel: "S18",
+          reason: "prior_selected_song",
+          chartName: "Shared Winner",
+          selectedInRoundNumber: 1,
+        },
+      ],
+    });
+    expect(() =>
+      assertRoundDrawsReady(2, [stale, current], {
+        priorSelectedSongBlocks: [
+          {
+            songKey: "song-shared",
+            selectedInRoundNumber: 1,
+            chartId: "round-1-shared",
+            chartName: "Shared Winner",
+          },
+        ],
+      }),
+    ).toThrow(/selected in Round 1/);
   });
 });

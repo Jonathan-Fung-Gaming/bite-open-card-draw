@@ -19,6 +19,7 @@ import {
 } from "@/lib/results/private-csv";
 import {
   assertNoFutureSelectedSongConflicts,
+  selectedSongBlocksFromResultStoreBeforeRound,
   syncSelectedSongBlocksFromResultStore,
 } from "@/lib/results/selected-song-blocks";
 import { adminState, resetTournamentOperationalState } from "@/lib/server/admin-state";
@@ -171,6 +172,10 @@ function selectedSongKeysForRound(roundNumber: 1 | 2 | 3 | 4) {
 
 function syncSelectedSongBlocks() {
   syncSelectedSongBlocksFromResultStore(adminState.drawStateStore, adminState.resultStore);
+}
+
+function priorSelectedSongBlocksForRound(roundNumber: 1 | 2 | 3 | 4) {
+  return selectedSongBlocksFromResultStoreBeforeRound(adminState.resultStore, roundNumber);
 }
 
 function assertDebugSnapshotAllowed() {
@@ -680,6 +685,7 @@ export async function drawRoundSetAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
+    syncSelectedSongBlocks();
     const draw = adminState.drawStateStore.drawRoundSet({
       roundNumber: getRoundNumber(formData),
       setOrder: getSetOrder(formData),
@@ -706,6 +712,7 @@ export async function rerollOneChartAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
+    syncSelectedSongBlocks();
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const chartId = getString(formData, "chartId");
@@ -751,6 +758,7 @@ export async function rerollRoundSetAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
+    syncSelectedSongBlocks();
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const roundNumber = getRoundNumber(formData);
@@ -791,6 +799,7 @@ export async function rerollFullRoundAction(formData: FormData) {
   const session = await requireActiveHost();
 
   try {
+    syncSelectedSongBlocks();
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const roundNumber = getRoundNumber(formData);
@@ -828,6 +837,18 @@ export async function openVotingAction(formData: FormData) {
     await withActiveHostVotingAdminState((session, nowMs) => {
       const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
       const drawReadiness = getRoundDrawReadiness(roundNumber);
+
+      if (!drawReadiness.isReady) {
+        const selectedSongProblem = drawReadiness.problems.find(
+          (problem) => problem.reason === "prior_selected_song",
+        );
+
+        if (selectedSongProblem) {
+          throw new Error(
+            `Round ${roundNumber} ${selectedSongProblem.displayLabel} includes ${selectedSongProblem.chartName}, which was selected in Round ${selectedSongProblem.selectedInRoundNumber}. Reroll or reset the affected future draw before opening voting or computing results.`,
+          );
+        }
+      }
 
       adminState.votingWindowStore.openVoting({
         roundNumber,
@@ -1040,6 +1061,7 @@ export async function computeResultsAction(formData: FormData) {
       draws: getRoundDrawRecords(roundNumber),
       ballots: adminState.ballotStore.listForRound(roundNumber),
       eligiblePlayers: snapshot.eligiblePlayers,
+      priorSelectedSongBlocks: priorSelectedSongBlocksForRound(roundNumber),
       now: snapshot.serverNow,
     });
     syncSelectedSongBlocks();

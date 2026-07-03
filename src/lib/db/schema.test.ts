@@ -15,6 +15,19 @@ const migration = readdirSync(migrationsDirectory)
   .map((fileName) => readFileSync(path.join(migrationsDirectory, fileName), "utf8"))
   .join("\n");
 
+function latestFunctionDefinition(functionName: string) {
+  const matches = [
+    ...migration.matchAll(
+      new RegExp(
+        `create or replace function public\\.${functionName}\\s*\\([\\s\\S]*?\\n\\$\\$;`,
+        "gi",
+      ),
+    ),
+  ];
+
+  return matches.at(-1)?.[0] ?? "";
+}
+
 describe("Phase 2 database schema", () => {
   it("creates the required core tables", () => {
     for (const table of CORE_DATABASE_TABLES) {
@@ -120,14 +133,43 @@ describe("Phase 2 database schema", () => {
   });
 
   it("guards core draw invariants at the database boundary", () => {
+    const drawInvariantFunction = latestFunctionDefinition("validate_drawn_chart_invariants");
+
     expect(migration).toContain("draws_one_active_per_event_set");
     expect(migration).toContain("where status = 'active' and superseded_at is null");
     expect(migration).toContain("validate_drawn_chart_invariants");
     expect(migration).toContain("excluded chart % cannot be drawn");
     expect(migration).toContain("same-round duplicate song % cannot be drawn twice");
     expect(migration).toContain("selected in an earlier round and cannot be drawn");
+    expect(drawInvariantFunction).toContain(
+      "public.normalized_result_phase_has_selected_songs(result_snapshot.reveal_phase)",
+    );
+    expect(drawInvariantFunction).toContain("draw_row.status = 'active'");
+    expect(drawInvariantFunction).toContain("draw_row.superseded_at is null");
+    expect(drawInvariantFunction).not.toContain("result_snapshot.reveal_phase = 'final'");
     expect(migration).toContain("validate_voting_window_draw_completion");
     expect(migration).toContain("exactly 7 drawn charts");
+  });
+
+  it("blocks stale future draws before voting or result computation", () => {
+    const votingWindowFunction = latestFunctionDefinition("validate_voting_window_draw_completion");
+    const resultSnapshotFunction = latestFunctionDefinition("validate_result_snapshot_draw_freshness");
+
+    expect(migration).toContain("validate_round_draws_against_prior_selected_songs");
+    expect(migration).toContain("normalized_result_phase_has_selected_songs");
+    expect(migration).toContain("'computed'");
+    expect(migration).toContain("'set_1_counts'");
+    expect(migration).toContain("'set_1_resolved'");
+    expect(migration).toContain("'set_2_counts'");
+    expect(migration).toContain("'set_2_resolved'");
+    expect(migration).toContain("'final'");
+    expect(votingWindowFunction).toContain(
+      "public.validate_round_draws_against_prior_selected_songs",
+    );
+    expect(resultSnapshotFunction).toContain(
+      "public.validate_round_draws_against_prior_selected_songs",
+    );
+    expect(migration).toContain("create trigger validate_result_snapshot_draw_freshness");
   });
 
   it("stores draw eligible pool and blocking context snapshots", () => {
