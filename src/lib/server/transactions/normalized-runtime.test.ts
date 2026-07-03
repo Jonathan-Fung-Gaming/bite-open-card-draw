@@ -319,6 +319,8 @@ describe("normalized runtime transactional mutations", () => {
     expect(computeFunction).toContain("insert into public.result_snapshots");
     expect(computeFunction).toContain("insert into public.result_rows");
     expect(computeFunction).toContain("insert into public.tiebreaks");
+    expect(migrations).toContain("validate_result_snapshot_draw_freshness");
+    expect(migrations).toContain("validate_round_draws_against_prior_selected_songs");
     expect(computeFunction).toContain("join public.round_player_eligibility as eligibility");
     expect(computeFunction).toContain("eligibility.player_id is not null");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_ack");

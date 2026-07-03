@@ -17,11 +17,17 @@ function chart(id: string, name: string): DrawnChartSummary {
   };
 }
 
-function draw(id: string, setOrder: 1 | 2, displayLabel: string, charts: DrawnChartSummary[]): DrawRecord {
+function draw(
+  id: string,
+  setOrder: 1 | 2,
+  displayLabel: string,
+  charts: DrawnChartSummary[],
+  roundNumber: 1 | 2 | 3 | 4 = 1,
+): DrawRecord {
   return {
     id,
     roundSetId: `static-${displayLabel.toLowerCase()}`,
-    roundNumber: 1,
+    roundNumber,
     setOrder,
     displayLabel,
     version: 1,
@@ -98,6 +104,7 @@ describe("result engine", () => {
         ballot("p4", ["g"]),
       ],
       eligiblePlayers: eligiblePlayers("p1", "p2", "p3", "p4"),
+      priorSelectedSongBlocks: [],
       computedAt: "now",
     });
 
@@ -126,6 +133,7 @@ describe("result engine", () => {
       ],
       ballots: [ballot("p1", ["c", "d"]), ballot("p2", ["e", "f"]), ballot("p3", ["g"])],
       eligiblePlayers: eligiblePlayers("p1", "p2", "p3"),
+      priorSelectedSongBlocks: [],
       computedAt: "now",
       randomIndex: () => 1,
     });
@@ -155,9 +163,48 @@ describe("result engine", () => {
         ],
         ballots: [],
         eligiblePlayers: [],
+        priorSelectedSongBlocks: [],
         computedAt: "now",
       }),
     ).toThrow(/exactly 7 charts/);
+  });
+
+  it("rejects stale future draws that include prior selected songs", () => {
+    expect(() =>
+      computeRoundResult({
+        id: "result",
+        roundNumber: 2,
+        draws: [
+          draw(
+            "draw-1",
+            1,
+            "S18",
+            [
+              chart("shared", "Shared Winner"),
+              chart("a", "Alpha"),
+              chart("b", "Bravo"),
+              chart("c", "Charlie"),
+              chart("d", "Delta"),
+              chart("e", "Echo"),
+              chart("f", "Foxtrot"),
+            ],
+            2,
+          ),
+          draw("draw-2", 2, "S19", sevenCharts("set-two"), 2),
+        ],
+        ballots: [],
+        eligiblePlayers: [],
+        priorSelectedSongBlocks: [
+          {
+            songKey: "song-shared",
+            selectedInRoundNumber: 1,
+            chartId: "round-1-shared",
+            chartName: "Shared Winner",
+          },
+        ],
+        computedAt: "now",
+      }),
+    ).toThrow(/selected in Round 1/);
   });
 
   it("uses the 5+ fallback reveal for true zero-ballot seven-way ties", () => {
@@ -177,6 +224,7 @@ describe("result engine", () => {
       ],
       ballots: [],
       eligiblePlayers: [],
+      priorSelectedSongBlocks: [],
       computedAt: "now",
       randomIndex: () => 3,
     });
@@ -209,6 +257,7 @@ describe("result engine", () => {
       ],
       ballots: [ballot("p1", ["a-6"], ["b-6"])],
       eligiblePlayers: eligiblePlayers("p1"),
+      priorSelectedSongBlocks: [],
       computedAt: "now",
       randomIndex: () => 0,
     });
@@ -237,6 +286,7 @@ describe("result engine", () => {
       ],
       ballots: [ballot("p1", ["a", "d"]), ballot("not-eligible", ["b", "c"])],
       eligiblePlayers: eligiblePlayers("p1"),
+      priorSelectedSongBlocks: [],
       computedAt: "now",
       randomIndex: () => 0,
     });

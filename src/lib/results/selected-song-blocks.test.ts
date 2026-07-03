@@ -6,7 +6,9 @@ import type { RoundResultSnapshot } from "@/lib/results/result-engine";
 import type { DrawStateStore } from "@/lib/draw/draw-state";
 import {
   assertNoFutureSelectedSongConflicts,
+  findPriorSelectedSongDrawConflicts,
   findFutureSelectedSongConflicts,
+  selectedSongBlocksFromResultsBeforeRound,
   selectedSongKeysFromResults,
 } from "./selected-song-blocks";
 
@@ -119,6 +121,56 @@ describe("selected song blocks", () => {
 
     expect(selectedSongKeysFromResults([result(1, [shared]), result(2, [shared])])).toEqual([
       "song-shared",
+    ]);
+  });
+
+  it("derives prior selected-song blocks only from earlier selected charts", () => {
+    const winner = chart("winner", "Winner", "song-winner");
+    const drawnNonwinner = chart("drawn", "Drawn Nonwinner", "song-drawn");
+    const sameRoundWinner = chart("same-round", "Same Round", "song-same-round");
+
+    expect(
+      selectedSongBlocksFromResultsBeforeRound(
+        [result(1, [winner, drawnNonwinner]), result(2, [sameRoundWinner])],
+        2,
+      ),
+    ).toEqual([
+      {
+        songKey: "song-winner",
+        selectedInRoundNumber: 1,
+        chartId: "winner",
+        chartName: "Winner",
+      },
+    ]);
+  });
+
+  it("finds target-round active draw conflicts with prior computed selected songs", () => {
+    const shared = chart("shared", "Shared Winner", "song-shared");
+    const otherRoundShared = chart("other", "Other Round Shared", "song-shared");
+
+    expect(
+      findPriorSelectedSongDrawConflicts({
+        roundNumber: 2,
+        draws: [draw(2, 1, [shared]), draw(3, 1, [otherRoundShared])],
+        priorSelectedSongBlocks: [
+          {
+            songKey: "song-shared",
+            selectedInRoundNumber: 1,
+            chartId: "round-1-shared",
+            chartName: "Shared Winner",
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        roundNumber: 2,
+        setOrder: 1,
+        displayLabel: "Set 1",
+        chartId: "shared",
+        chartName: "Shared Winner",
+        songKey: "song-shared",
+        selectedInRoundNumber: 1,
+      },
     ]);
   });
 

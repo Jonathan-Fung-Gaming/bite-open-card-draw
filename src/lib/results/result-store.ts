@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { RandomIndex } from "@/lib/draw/draw-engine";
 import { secureRandomIndex } from "@/lib/draw/draw-engine";
 import type { DrawRecord } from "@/lib/draw/draw-state";
+import type { PriorSelectedSongBlock } from "@/lib/results/selected-song-blocks";
 import type { RoundBallot } from "@/lib/vote/ballot";
 import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
 import {
@@ -48,6 +49,7 @@ export class ResultStore {
     draws: readonly DrawRecord[];
     ballots: readonly RoundBallot[];
     eligiblePlayers: EligiblePlayerSnapshot[];
+    priorSelectedSongBlocks: readonly PriorSelectedSongBlock[];
     now?: string;
   }) {
     if (this.results.has(input.roundNumber)) {
@@ -60,6 +62,7 @@ export class ResultStore {
       draws: input.draws,
       ballots: input.ballots,
       eligiblePlayers: input.eligiblePlayers,
+      priorSelectedSongBlocks: input.priorSelectedSongBlocks,
       computedAt: input.now ?? new Date().toISOString(),
       randomIndex: this.randomIndex,
     });

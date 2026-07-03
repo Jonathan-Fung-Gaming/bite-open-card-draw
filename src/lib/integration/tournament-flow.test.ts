@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { normalizeChartRow } from "@/lib/charts/normalize";
+import { evaluateRoundDrawReadiness } from "@/lib/draw/round-readiness";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import { DrawStateStore } from "@/lib/draw/draw-state";
 import { ResultStore } from "@/lib/results/result-store";
-import { syncSelectedSongBlocksFromResultStore } from "@/lib/results/selected-song-blocks";
+import {
+  selectedSongBlocksFromResultStoreBeforeRound,
+  syncSelectedSongBlocksFromResultStore,
+} from "@/lib/results/selected-song-blocks";
 import { RosterStore } from "@/lib/admin/roster";
 import { BallotStore } from "@/lib/vote/ballot-store";
 import { VotingWindowStore } from "@/lib/vote/voting-window";
@@ -137,6 +141,7 @@ describe("tournament integration hardening", () => {
       draws,
       ballots: ballots.listForRound(1),
       eligiblePlayers: closed.eligiblePlayers,
+      priorSelectedSongBlocks: [],
       now: closed.serverNow,
     });
 
@@ -243,6 +248,7 @@ describe("tournament integration hardening", () => {
       draws: roundOneDraws,
       ballots: [],
       eligiblePlayers: [],
+      priorSelectedSongBlocks: [],
       now: "computed-before-final-reveal",
     });
 
@@ -253,6 +259,201 @@ describe("tournament integration hardening", () => {
 
     expect(result.sets[0].selectedChart.songKey).toBe(sharedRoundOne.songKey);
     expect(roundTwo.charts.map((chart) => chart.songKey)).not.toContain(sharedRoundOne.songKey);
+  });
+
+  it("blocks opening or computing a future round with stale selected-song draws", () => {
+    const drawStore = new DrawStateStore(() => 0);
+    const resultStore = new ResultStore(() => 0);
+    const voting = new VotingWindowStore();
+    const sharedRoundOne = normalizeChartRow(
+      {
+        name: "A Shared Winner",
+        name_kr: "A Shared Winner",
+        artist: "Artist",
+        label: "test",
+        type: "s",
+        level: "16",
+        bg_img: "",
+      },
+      2,
+    );
+    const sharedRoundTwo = normalizeChartRow(
+      {
+        name: "A Shared Winner",
+        name_kr: "A Shared Winner",
+        artist: "Artist",
+        label: "test",
+        type: "s",
+        level: "18",
+        bg_img: "",
+      },
+      200,
+    );
+
+    drawStore.setChartsForTest([
+      sharedRoundOne,
+      ...chartsFor("s", "16", 8, 10, "S16"),
+      ...chartsFor("s", "17", 8, 30, "S17"),
+      sharedRoundTwo,
+      ...chartsFor("s", "18", 8, 50, "S18"),
+      ...chartsFor("s", "19", 8, 80, "S19"),
+    ]);
+
+    const roundTwoEarlyDraws = [
+      drawStore.drawRoundSet({ roundNumber: 2, setOrder: 1 }),
+      drawStore.drawRoundSet({ roundNumber: 2, setOrder: 2 }),
+    ] as const;
+    const roundOneDraws = [
+      drawStore.drawRoundSet({ roundNumber: 1, setOrder: 1 }),
+      drawStore.drawRoundSet({ roundNumber: 1, setOrder: 2 }),
+    ] as const;
+
+    expect(roundTwoEarlyDraws[0].charts.map((chart) => chart.songKey)).toContain(
+      sharedRoundTwo.songKey,
+    );
+
+    resultStore.computeRound({
+      roundNumber: 1,
+      draws: roundOneDraws,
+      ballots: [],
+      eligiblePlayers: [],
+      priorSelectedSongBlocks: [],
+      now: "round-one-computed",
+    });
+
+    const priorBlocks = selectedSongBlocksFromResultStoreBeforeRound(resultStore, 2);
+    const readiness = evaluateRoundDrawReadiness(2, roundTwoEarlyDraws, {
+      priorSelectedSongBlocks: priorBlocks,
+    });
+
+    expect(readiness.isReady).toBe(false);
+    expect(readiness.problems).toContainEqual(
+      expect.objectContaining({
+        reason: "prior_selected_song",
+        chartName: "A Shared Winner",
+        selectedInRoundNumber: 1,
+      }),
+    );
+
+    expect(() =>
+      voting.openVoting({
+        roundNumber: 2,
+        drawsReady: readiness.isReady,
+        eligiblePlayers: [],
+        nowMs: 0,
+      }),
+    ).toThrow(/both chart sets/i);
+
+    expect(() =>
+      resultStore.computeRound({
+        roundNumber: 2,
+        draws: roundTwoEarlyDraws,
+        ballots: [],
+        eligiblePlayers: [],
+        priorSelectedSongBlocks: priorBlocks,
+        now: "round-two-compute-blocked",
+      }),
+    ).toThrow(/selected in Round 1/);
+
+    syncSelectedSongBlocksFromResultStore(drawStore, resultStore);
+    drawStore.rerollRoundSet({ roundNumber: 2, setOrder: 1, reason: "remove stale winner" });
+    const correctedRoundTwoDraws = drawStore
+      .getRoundDraws(2)
+      .filter((draw): draw is DrawRecord => draw !== null);
+
+    expect(
+      evaluateRoundDrawReadiness(2, correctedRoundTwoDraws, {
+        priorSelectedSongBlocks: priorBlocks,
+      }).isReady,
+    ).toBe(true);
+  });
+
+  it("keeps drawn-but-not-selected songs eligible for later draws", () => {
+    const drawStore = new DrawStateStore(() => 0);
+    const resultStore = new ResultStore(() => 0);
+    const sharedRoundOne = normalizeChartRow(
+      {
+        name: "Shared Nonwinner",
+        name_kr: "Shared Nonwinner",
+        artist: "Artist",
+        label: "test",
+        type: "s",
+        level: "16",
+        bg_img: "",
+      },
+      2,
+    );
+    const sharedRoundTwo = normalizeChartRow(
+      {
+        name: "Shared Nonwinner",
+        name_kr: "Shared Nonwinner",
+        artist: "Artist",
+        label: "test",
+        type: "s",
+        level: "18",
+        bg_img: "",
+      },
+      200,
+    );
+
+    drawStore.setChartsForTest([
+      sharedRoundOne,
+      ...chartsFor("s", "16", 8, 10, "S16"),
+      ...chartsFor("s", "17", 8, 30, "S17"),
+      sharedRoundTwo,
+      ...chartsFor("s", "18", 8, 50, "S18"),
+      ...chartsFor("s", "19", 8, 80, "S19"),
+    ]);
+
+    const roundOneDraws = [
+      drawStore.drawRoundSet({ roundNumber: 1, setOrder: 1 }),
+      drawStore.drawRoundSet({ roundNumber: 1, setOrder: 2 }),
+    ] as const;
+
+    const result = resultStore.computeRound({
+      roundNumber: 1,
+      draws: roundOneDraws,
+      ballots: [
+        {
+          id: "ballot-1",
+          roundNumber: 1,
+          playerId: "player-1",
+          playerStartggUsername: "Player 1",
+          submittedAt: "submitted",
+          revision: 1,
+          source: "player",
+          manualReason: null,
+          manualOverride: false,
+          replacedExistingBallot: false,
+          choices: [
+            {
+              drawId: roundOneDraws[0].id,
+              roundSetId: roundOneDraws[0].roundSetId,
+              displayLabel: roundOneDraws[0].displayLabel,
+              noBans: false,
+              bannedChartIds: [sharedRoundOne.id],
+            },
+            {
+              drawId: roundOneDraws[1].id,
+              roundSetId: roundOneDraws[1].roundSetId,
+              displayLabel: roundOneDraws[1].displayLabel,
+              noBans: true,
+              bannedChartIds: [],
+            },
+          ],
+        },
+      ],
+      eligiblePlayers: [{ id: "player-1", startggUsername: "Player 1" }],
+      priorSelectedSongBlocks: [],
+      now: "round-one-computed",
+    });
+
+    expect(result.sets[0].selectedChart.songKey).not.toBe(sharedRoundOne.songKey);
+
+    syncSelectedSongBlocksFromResultStore(drawStore, resultStore);
+    const roundTwo = drawStore.drawRoundSet({ roundNumber: 2, setOrder: 1 });
+
+    expect(roundTwo.charts.map((chart) => chart.songKey)).toContain(sharedRoundTwo.songKey);
   });
 
   it("handles 100 eligible players with multiple edits and one final ballot per player", () => {
