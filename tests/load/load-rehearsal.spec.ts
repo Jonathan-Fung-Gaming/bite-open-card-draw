@@ -40,12 +40,9 @@ function positiveIntegerEnv(name: string, fallback: number) {
 }
 
 const PLAYER_COUNT = positiveIntegerEnv("E2E_LOAD_PLAYER_COUNT", 100);
-const ROUTE_PLAYER_COUNT = Math.min(
-  positiveIntegerEnv("E2E_LOAD_ROUTE_PLAYER_COUNT", 4),
-  PLAYER_COUNT,
-);
+const ROUTE_PLAYER_COUNT = positiveIntegerEnv("E2E_LOAD_ROUTE_PLAYER_COUNT", 12);
 const ROUTE_PLAYER_CONCURRENCY = Math.min(
-  positiveIntegerEnv("E2E_LOAD_ROUTE_PLAYER_CONCURRENCY", 1),
+  positiveIntegerEnv("E2E_LOAD_ROUTE_PLAYER_CONCURRENCY", 2),
   ROUTE_PLAYER_COUNT,
 );
 const SPECTATOR_COUNT = positiveIntegerEnv("E2E_LOAD_SPECTATOR_COUNT", 12);
@@ -103,7 +100,10 @@ async function goto(page: Page, baseURL: string, path: string) {
     } catch (error) {
       lastError = error;
 
-      if (!(error instanceof Error) || !error.message.includes("interrupted by another navigation")) {
+      if (
+        !(error instanceof Error) ||
+        !error.message.includes("interrupted by another navigation")
+      ) {
         throw error;
       }
 
@@ -259,6 +259,7 @@ async function submitAndEditBallot(
   baseURL: string,
   startggUsername: string,
   shouldEdit: boolean,
+  eligibleCount: number,
 ) {
   const revisions = shouldEdit ? ([1, 2] as const) : ([1] as const);
 
@@ -285,7 +286,7 @@ async function submitAndEditBallot(
     );
     expect(payload.playerStartggUsername).toBe(startggUsername);
     expect(payload.revision).toBe(revision);
-    expect(payload.eligibleCount).toBe(PLAYER_COUNT);
+    expect(payload.eligibleCount).toBe(eligibleCount);
     expect(payload.submittedCount).toBeGreaterThanOrEqual(1);
     expect(["voting_open", "final_30_seconds", "extension_1_minute"]).toContain(payload.status);
   }
@@ -296,6 +297,7 @@ async function submitLoadChunk(
   baseURL: string,
   players: string[],
   startingIndex: number,
+  eligibleCount: number,
 ) {
   await Promise.all(
     players.map((player, index) =>
@@ -304,6 +306,7 @@ async function submitLoadChunk(
         baseURL,
         player,
         (startingIndex + index + 1) % EDIT_EVERY_N_PLAYERS === 0,
+        eligibleCount,
       ),
     ),
   );
@@ -387,7 +390,8 @@ async function expectAdminTextAfterNavigation(page: Page, baseURL: string, text:
           await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
         }
 
-        return page.getByText(text, typeof text === "string" ? { exact: true } : undefined)
+        return page
+          .getByText(text, typeof text === "string" ? { exact: true } : undefined)
           .first()
           .isVisible();
       },
@@ -423,6 +427,11 @@ async function openSpectatorTraffic(browser: Browser, baseURL: string) {
   }
 
   await expect(roomSpectator.getByRole("link", { name: "View charts only" })).toBeVisible();
+  await roomSpectator.getByRole("link", { name: "View charts only" }).click();
+  await expect(roomSpectator).toHaveURL(/\/charts/);
+  await expect(roomSpectator.getByTestId("view-only-status")).toContainText("Voting open");
+  await expect(roomSpectator.getByLabel("Select your start.gg username")).toHaveCount(0);
+  await expect(roomSpectator.getByRole("button", { name: "Submit Ballot" })).toHaveCount(0);
   await expect(chartsSpectator.getByTestId("view-only-status")).toContainText("Voting open");
   await expect(resultsSpectator.getByRole("heading", { name: "Round 1 Results" })).toBeVisible();
 
@@ -472,34 +481,7 @@ async function advanceToFinalReveal(page: Page, baseURL: string) {
     .toBe(true);
 }
 
-test("100-player route-aware load keeps public routes active and exports final CSV @api-injection @player-route", async ({
-  page,
-  browser,
-  request,
-  baseURL,
-}, testInfo) => {
-  test.setTimeout(600_000);
-  test.info().annotations.push(
-    {
-      type: "PFR-005",
-      description:
-        "100 eligible players with spectator traffic; representative players submit through /room -> /vote before API load completion.",
-    },
-    {
-      type: "PFR-030",
-      description:
-        "Keeps stage and spectator routes active while 100 eligible players submit/edit.",
-    },
-  );
-
-  if (!baseURL) {
-    throw new Error("Missing Playwright baseURL.");
-  }
-
-  const players = Array.from({ length: PLAYER_COUNT }, (_, index) => playerName(index));
-  const routePlayers = players.slice(0, ROUTE_PLAYER_COUNT);
-  const apiPlayers = players.slice(ROUTE_PLAYER_COUNT);
-
+async function setupLoadRound(page: Page, baseURL: string, players: string[]) {
   await loginAndTakeHost(page, baseURL);
   const bulkImportForm = page.locator("form", {
     has: page.getByPlaceholder("Bulk import start.gg usernames"),
@@ -507,44 +489,13 @@ test("100-player route-aware load keeps public routes active and exports final C
 
   await bulkImportForm.getByPlaceholder("Bulk import start.gg usernames").fill(players.join("\n"));
   await submitAdminFormAndWait(page, bulkImportForm);
-  await expectActivePlayerCount(page, PLAYER_COUNT);
+  await expectActivePlayerCount(page, players.length);
 
   await loginAndTakeHost(page, baseURL);
   await drawRoundAndOpenVoting(page, baseURL);
+}
 
-  const stagePage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-
-  await goto(stagePage, baseURL, "/stage");
-  await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible();
-  const spectatorTraffic = await openSpectatorTraffic(browser, baseURL);
-  const routeSubmissionResults = await submitPlayerRouteBallots(browser, baseURL, routePlayers);
-
-  for (let index = 0; index < apiPlayers.length; index += LOAD_CONCURRENCY) {
-    const chunk = apiPlayers.slice(index, index + LOAD_CONCURRENCY);
-    const submittedCount = ROUTE_PLAYER_COUNT + index + chunk.length;
-
-    await submitLoadChunk(request, baseURL, chunk, ROUTE_PLAYER_COUNT + index);
-
-    if (submittedCount % 10 === 0 || submittedCount === players.length) {
-      await stagePage.reload({ waitUntil: "domcontentloaded" });
-      await expect(
-        stagePage.locator("header").getByText(/Voting open|Final 30 seconds|Voting closed/),
-      ).toBeVisible();
-    }
-
-    if (submittedCount < players.length) {
-      await page.waitForTimeout(LOAD_CHUNK_DELAY_MS);
-    }
-  }
-
-  await loginAndTakeHost(page, baseURL);
-  await expect(page.getByText(`${PLAYER_COUNT} / ${PLAYER_COUNT}`)).toBeVisible();
-
-  await spectatorTraffic.chartsSpectator.reload({ waitUntil: "domcontentloaded" });
-  await expect(spectatorTraffic.chartsSpectator.getByTestId("view-only-status")).toContainText(
-    /Voting open|Final 30 seconds|Results being revealed/,
-  );
-
+async function closeVotingComputeAndReveal(page: Page, baseURL: string, stagePage: Page) {
   if (!(await page.getByText("voting closed").isVisible())) {
     await expect(page.getByRole("button", { name: "Close Voting" })).toBeEnabled({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -553,6 +504,7 @@ test("100-player route-aware load keeps public routes active and exports final C
     await page.waitForTimeout(5_000);
     await expectAdminTextAfterNavigation(page, baseURL, "voting closed");
   }
+
   await expectAdminTextAfterNavigation(page, baseURL, "voting closed");
   await expect(page.getByRole("button", { name: "Compute Results" })).toBeEnabled({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -565,52 +517,236 @@ test("100-player route-aware load keeps public routes active and exports final C
   await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
     timeout: 15_000,
   });
+}
 
-  const expectedRevisionByPlayer = new Map<string, number>([
-    [playerName(0), 1],
-    [
-      playerName(PLAYER_COUNT - 1),
-      PLAYER_COUNT > ROUTE_PLAYER_COUNT && PLAYER_COUNT % EDIT_EVERY_N_PLAYERS === 0 ? 2 : 1,
-    ],
-  ]);
-  const csv = await expectPrivateCsvExport({
-    baseURL,
-    expectedRows: PLAYER_COUNT,
-    expectedRevisionByPlayer,
-    expectedSubmittedRows: PLAYER_COUNT,
-    request,
-    requiredPlayers: [playerName(0), playerName(PLAYER_COUNT - 1)],
-    roundNumber: 1,
-  });
-  const csvSummary = expectPrivateCsvFinalContent(csv, {
-    expectedRevisionByPlayer,
-    expectedRows: PLAYER_COUNT,
-    expectedSubmittedRows: PLAYER_COUNT,
-    requiredPlayers: [playerName(0), playerName(PLAYER_COUNT - 1)],
-    roundNumber: 1,
-  });
-  const exportedPlayers = csv.match(/Load Player \d{3}/g) ?? [];
+function expectedApiRevision(playerIndex: number) {
+  return (playerIndex + 1) % EDIT_EVERY_N_PLAYERS === 0 ? 2 : 1;
+}
 
-  expect(new Set(exportedPlayers).size).toBe(PLAYER_COUNT);
-  expect(csv).toContain("manual_override");
-  expect(csv).toContain("selected_set_1_chart");
-  expect(csv).toContain("selected_set_2_chart");
-  await writeJsonEvidence(testInfo, "pfr-100-player-route-load-evidence.json", {
-    apiInjectionPlayerCount: apiPlayers.length,
-    csvBytes: Buffer.byteLength(csv, "utf8"),
-    csvFilename: "round-1-private-ballots.csv",
-    csvSummary,
-    generatedAt: new Date().toISOString(),
-    playerCount: PLAYER_COUNT,
-    routePlayerConcurrency: ROUTE_PLAYER_CONCURRENCY,
-    routePlayerCount: routePlayers.length,
-    routeSubmissions: routeSubmissionResults,
-    spectatorCount: SPECTATOR_COUNT,
-    spectatorPaths: SPECTATOR_PATHS,
-  });
+test("100-player API-injection load keeps public routes active and exports final CSV @api-injection", async ({
+  page,
+  browser,
+  request,
+  baseURL,
+}, testInfo) => {
+  test.setTimeout(600_000);
+  test.info().annotations.push(
+    {
+      type: "PFR-005",
+      description:
+        "100 eligible players submit through the test-only load-ballot API while public routes stay active.",
+    },
+    {
+      type: "PFR-030",
+      description:
+        "API-injection load evidence is labeled separately from normal player-route evidence.",
+    },
+  );
 
-  await stagePage.close();
-  await Promise.all(spectatorTraffic.pages.map((spectatorPage) => spectatorPage.close()));
-  await page.getByRole("button", { name: "Release" }).click();
-  await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
+  if (!baseURL) {
+    throw new Error("Missing Playwright baseURL.");
+  }
+
+  const players = Array.from({ length: PLAYER_COUNT }, (_, index) => playerName(index));
+  await setupLoadRound(page, baseURL, players);
+
+  const stagePage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  let spectatorTraffic: Awaited<ReturnType<typeof openSpectatorTraffic>> | null = null;
+
+  try {
+    await goto(stagePage, baseURL, "/stage");
+    await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible();
+    spectatorTraffic = await openSpectatorTraffic(browser, baseURL);
+
+    for (let index = 0; index < players.length; index += LOAD_CONCURRENCY) {
+      const chunk = players.slice(index, index + LOAD_CONCURRENCY);
+      const submittedCount = index + chunk.length;
+
+      await submitLoadChunk(request, baseURL, chunk, index, PLAYER_COUNT);
+
+      if (submittedCount % 10 === 0 || submittedCount === players.length) {
+        await stagePage.reload({ waitUntil: "domcontentloaded" });
+        await expect(
+          stagePage.locator("header").getByText(/Voting open|Final 30 seconds|Voting closed/),
+        ).toBeVisible();
+      }
+
+      if (submittedCount < players.length) {
+        await page.waitForTimeout(LOAD_CHUNK_DELAY_MS);
+      }
+    }
+
+    await loginAndTakeHost(page, baseURL);
+    await expect(page.getByText(`${PLAYER_COUNT} / ${PLAYER_COUNT}`)).toBeVisible();
+
+    await spectatorTraffic.chartsSpectator.reload({ waitUntil: "domcontentloaded" });
+    await expect(spectatorTraffic.chartsSpectator.getByTestId("view-only-status")).toContainText(
+      /Voting open|Final 30 seconds|Results being revealed/,
+    );
+
+    await closeVotingComputeAndReveal(page, baseURL, stagePage);
+
+    const expectedRevisionByPlayer = new Map<string, number>([
+      [playerName(0), expectedApiRevision(0)],
+      [playerName(PLAYER_COUNT - 1), expectedApiRevision(PLAYER_COUNT - 1)],
+    ]);
+    const csv = await expectPrivateCsvExport({
+      baseURL,
+      expectedRows: PLAYER_COUNT,
+      expectedRevisionByPlayer,
+      expectedSubmittedRows: PLAYER_COUNT,
+      request,
+      requiredPlayers: [playerName(0), playerName(PLAYER_COUNT - 1)],
+      roundNumber: 1,
+    });
+    const csvSummary = expectPrivateCsvFinalContent(csv, {
+      expectedRevisionByPlayer,
+      expectedRows: PLAYER_COUNT,
+      expectedSubmittedRows: PLAYER_COUNT,
+      requiredPlayers: [playerName(0), playerName(PLAYER_COUNT - 1)],
+      roundNumber: 1,
+    });
+    const exportedPlayers = csv.match(/Load Player \d{3}/g) ?? [];
+
+    expect(new Set(exportedPlayers).size).toBe(PLAYER_COUNT);
+    expect(csv).toContain("manual_override");
+    expect(csv).toContain("selected_set_1_chart");
+    expect(csv).toContain("selected_set_2_chart");
+    await writeJsonEvidence(testInfo, "pfr-100-player-api-injection-load-evidence.json", {
+      apiInjectionPlayerCount: PLAYER_COUNT,
+      backend: process.env.E2E_TOURNAMENT_STATE_BACKEND ?? process.env.TOURNAMENT_STATE_BACKEND,
+      csvBytes: Buffer.byteLength(csv, "utf8"),
+      csvFilename: "round-1-private-ballots.csv",
+      csvSummary,
+      generatedAt: new Date().toISOString(),
+      privateCsvExport: "test-route:/api/e2e/private-csv",
+      playerCount: PLAYER_COUNT,
+      profile: "api-injection",
+      routePlayerCount: 0,
+      routePlayerStartPath: null,
+      routePlayerSubmitPath: null,
+      routeSubmissions: [],
+      serverMode: process.env.E2E_SERVER_MODE,
+      spectatorCount: SPECTATOR_COUNT,
+      spectatorPaths: SPECTATOR_PATHS,
+      submissionProfile: "api-injection",
+      apiInjectionEndpoint: "/api/e2e/load-ballot",
+      testRoutesEnabled: process.env.TOURNAMENT_TEST_ALLOW_E2E_ROUTES,
+    });
+  } finally {
+    await stagePage.close().catch(() => undefined);
+    await Promise.all(
+      (spectatorTraffic?.pages ?? []).map((spectatorPage) => spectatorPage.close()),
+    );
+    await page
+      .getByRole("button", { name: "Release" })
+      .click()
+      .catch(() => undefined);
+  }
+});
+
+test("route-player load uses room-to-vote submissions with spectator traffic @player-route", async ({
+  page,
+  browser,
+  request,
+  baseURL,
+}, testInfo) => {
+  test.setTimeout(600_000);
+  test.info().annotations.push(
+    {
+      type: "PFR-014",
+      description:
+        "Normal player-route load evidence uses /room -> /vote submissions instead of the test-only load-ballot API.",
+    },
+    {
+      type: "PFR-030",
+      description:
+        "Spectator and view-only routes stay active while route-player ballots are submitted.",
+    },
+  );
+
+  if (!baseURL) {
+    throw new Error("Missing Playwright baseURL.");
+  }
+
+  const players = Array.from({ length: ROUTE_PLAYER_COUNT }, (_, index) => playerName(index));
+  await setupLoadRound(page, baseURL, players);
+
+  const stagePage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  let spectatorTraffic: Awaited<ReturnType<typeof openSpectatorTraffic>> | null = null;
+
+  try {
+    await goto(stagePage, baseURL, "/stage");
+    await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible();
+    spectatorTraffic = await openSpectatorTraffic(browser, baseURL);
+
+    const routeSubmissionResults = await submitPlayerRouteBallots(browser, baseURL, players);
+
+    await loginAndTakeHost(page, baseURL);
+    await expect(page.getByText(`${ROUTE_PLAYER_COUNT} / ${ROUTE_PLAYER_COUNT}`)).toBeVisible();
+
+    await spectatorTraffic.chartsSpectator.reload({ waitUntil: "domcontentloaded" });
+    await expect(spectatorTraffic.chartsSpectator.getByTestId("view-only-status")).toContainText(
+      /Voting open|Final 30 seconds|Results being revealed/,
+    );
+
+    await closeVotingComputeAndReveal(page, baseURL, stagePage);
+
+    const expectedRevisionByPlayer = new Map<string, number>([
+      [playerName(0), 1],
+      [playerName(ROUTE_PLAYER_COUNT - 1), 1],
+    ]);
+    const csv = await expectPrivateCsvExport({
+      baseURL,
+      expectedRows: ROUTE_PLAYER_COUNT,
+      expectedRevisionByPlayer,
+      expectedSubmittedRows: ROUTE_PLAYER_COUNT,
+      request,
+      requiredPlayers: [playerName(0), playerName(ROUTE_PLAYER_COUNT - 1)],
+      roundNumber: 1,
+    });
+    const csvSummary = expectPrivateCsvFinalContent(csv, {
+      expectedRevisionByPlayer,
+      expectedRows: ROUTE_PLAYER_COUNT,
+      expectedSubmittedRows: ROUTE_PLAYER_COUNT,
+      requiredPlayers: [playerName(0), playerName(ROUTE_PLAYER_COUNT - 1)],
+      roundNumber: 1,
+    });
+    const exportedPlayers = csv.match(/Load Player \d{3}/g) ?? [];
+
+    expect(new Set(exportedPlayers).size).toBe(ROUTE_PLAYER_COUNT);
+    expect(routeSubmissionResults).toHaveLength(ROUTE_PLAYER_COUNT);
+    expect(routeSubmissionResults.every((result) => result.route === "/room -> /vote")).toBe(true);
+    await writeJsonEvidence(testInfo, "pfr-route-player-load-evidence.json", {
+      apiInjectionPlayerCount: 0,
+      backend: process.env.E2E_TOURNAMENT_STATE_BACKEND ?? process.env.TOURNAMENT_STATE_BACKEND,
+      csvBytes: Buffer.byteLength(csv, "utf8"),
+      csvFilename: "round-1-private-ballots.csv",
+      csvSummary,
+      generatedAt: new Date().toISOString(),
+      privateCsvExport: "test-route:/api/e2e/private-csv",
+      playerCount: ROUTE_PLAYER_COUNT,
+      profile: "player-route",
+      routePlayerConcurrency: ROUTE_PLAYER_CONCURRENCY,
+      routePlayerCount: ROUTE_PLAYER_COUNT,
+      routePlayerStartPath: "/room",
+      routePlayerSubmitPath: "/vote",
+      routeSubmissions: routeSubmissionResults,
+      serverMode: process.env.E2E_SERVER_MODE,
+      spectatorCount: SPECTATOR_COUNT,
+      spectatorPaths: SPECTATOR_PATHS,
+      submissionProfile: "player-route",
+      apiInjectionEndpoint: null,
+      testRoutesEnabled: process.env.TOURNAMENT_TEST_ALLOW_E2E_ROUTES,
+    });
+  } finally {
+    await stagePage.close().catch(() => undefined);
+    await Promise.all(
+      (spectatorTraffic?.pages ?? []).map((spectatorPage) => spectatorPage.close()),
+    );
+    await page
+      .getByRole("button", { name: "Release" })
+      .click()
+      .catch(() => undefined);
+  }
 });

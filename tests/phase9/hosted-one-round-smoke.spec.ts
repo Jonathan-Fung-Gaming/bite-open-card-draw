@@ -10,7 +10,12 @@ import {
   startHostedRehearsal,
 } from "./flows/rehearsal.flow";
 
-test("hosted one-round rehearsal smoke @smoke", async ({ page, browser, request, baseURL }, testInfo) => {
+test("hosted one-round rehearsal smoke @smoke @supabase-smoke", async ({
+  page,
+  browser,
+  request,
+  baseURL,
+}, testInfo) => {
   const resolvedBaseURL = requireBaseURL(baseURL);
   const adminPage = createAdminPage(page, resolvedBaseURL);
   let publicPages: RehearsalPublicPages | null = null;

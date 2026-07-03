@@ -55,6 +55,13 @@ function isAdminActionsOnly() {
   return process.env.E2E_USE_ADMIN_ACTIONS_ONLY === "true";
 }
 
+function isTransientSupabaseFetchFailure(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("Supabase rate limit failed: TypeError: fetch failed")
+  );
+}
+
 export class AdminPage {
   constructor(
     readonly page: Page,
@@ -66,24 +73,46 @@ export class AdminPage {
   }
 
   async visit() {
-    await this.goto();
-    await this.page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
-    this.assertNoAdminError();
+    let lastTransientError: unknown = null;
 
-    const passwordInput = this.page.getByLabel("Shared admin password");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.goto();
+        await this.page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
+        this.assertNoAdminError();
 
-    if ((await passwordInput.count()) > 0) {
-      await passwordInput.fill(ADMIN_PASSWORD);
-      await clickServerAction(this.page, this.page.getByRole("button", { name: "Log In" }), 5_000, {
-        submitForm: true,
-      });
-      this.assertNoAdminError();
+        const passwordInput = this.page.getByLabel("Shared admin password");
+
+        if ((await passwordInput.count()) > 0) {
+          await passwordInput.fill(ADMIN_PASSWORD);
+          await clickServerAction(
+            this.page,
+            this.page.getByRole("button", { name: "Log In" }),
+            5_000,
+            {
+              submitForm: true,
+            },
+          );
+          this.assertNoAdminError();
+        }
+
+        return this.page
+          .getByText("Host Lock", { exact: true })
+          .isVisible()
+          .catch(() => false);
+      } catch (error) {
+        if (!isTransientSupabaseFetchFailure(error) || attempt === 2) {
+          throw error;
+        }
+
+        lastTransientError = error;
+        await this.page.waitForTimeout(1_000 * (attempt + 1));
+      }
     }
 
-    return this.page
-      .getByText("Host Lock", { exact: true })
-      .isVisible()
-      .catch(() => false);
+    throw lastTransientError instanceof Error
+      ? lastTransientError
+      : new Error("Admin visit failed.");
   }
 
   async loginAndTakeHost() {
@@ -249,8 +278,9 @@ export class AdminPage {
       has: this.page.getByRole("button", { name: "Confirm Eligibility Change" }),
     });
 
-    await expect(eligibilityForm.getByRole("button", { name: "Confirm Eligibility Change" }))
-      .toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    await expect(
+      eligibilityForm.getByRole("button", { name: "Confirm Eligibility Change" }),
+    ).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
     await eligibilityForm.locator("select[name='playerId']").selectOption({ label: name });
     await eligibilityForm.locator("textarea[name='reason']").fill(reason);
     await eligibilityForm.locator("input[name='adminPassword']").fill(ADMIN_PASSWORD);
@@ -665,7 +695,9 @@ export class AdminPage {
     const refreshedLiveCounts = this.page.getByTestId("admin-live-counts");
 
     await expect(refreshedLiveCounts.locator("ol li")).toHaveCount(0);
-    await expect(refreshedLiveCounts.getByRole("button", { name: "Show live counts" })).toBeVisible();
+    await expect(
+      refreshedLiveCounts.getByRole("button", { name: "Show live counts" }),
+    ).toBeVisible();
   }
 
   private async installSupabaseHostLockForCurrentAdmin() {
