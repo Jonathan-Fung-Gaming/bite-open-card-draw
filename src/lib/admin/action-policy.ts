@@ -79,6 +79,19 @@ export const ADMIN_ACTION_POLICIES = [
     rationale: "Refreshes an existing admin session and does not change tournament state.",
   },
   {
+    serverAction: "getAdminLiveCountsAction",
+    classification: "read-only or sensitive disclosure action",
+    requiresAdminSession: true,
+    requiresActiveHost: false,
+    requiresPasswordReentry: false,
+    requiresAuditReason: false,
+    audited: false,
+    dangerousAudit: false,
+    tournamentChanging: false,
+    rationale:
+      "Reveals sensitive chart-by-chart live counts only after deliberate admin disclosure.",
+  },
+  {
     serverAction: "takeHostControlAction",
     classification: "read-only or sensitive disclosure action",
     requiresAdminSession: true,

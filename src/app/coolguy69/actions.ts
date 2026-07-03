@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHostToken, type HostLockReleaseOutcome } from "@/lib/admin/host-lock";
+import { buildAdminLiveCountRows } from "@/lib/admin/live-counts";
 import type { AdminSessionPayload } from "@/lib/admin/session";
 import {
   createOperationalDebugSnapshotExport,
@@ -1282,6 +1283,17 @@ export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
       roundEligibility,
     }),
   };
+}
+
+export async function getAdminLiveCountsAction(roundNumber: 1 | 2 | 3 | 4) {
+  await requireAdminSession();
+  await hydrateTournamentState();
+
+  const parsedRoundNumber = roundNumberInputSchema.parse(String(roundNumber));
+  const draws = getRoundDrawRecords(parsedRoundNumber);
+  const ballots = adminState.ballotStore.listForRound(parsedRoundNumber);
+
+  return buildAdminLiveCountRows(draws, ballots);
 }
 
 export async function downloadDebugSnapshotAction(formData: FormData) {

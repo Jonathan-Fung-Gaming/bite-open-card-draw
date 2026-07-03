@@ -16,6 +16,23 @@ export function shouldShowFinalPhoneResults(
   return resultPhase === "final" && (status === "results_revealed" || status === "round_complete");
 }
 
+export function shouldShowPhoneResultHoldingState(
+  status: VotingRoundStatus,
+  resultPhase: RoundResultSnapshot["revealPhase"] | null | undefined,
+) {
+  if (
+    status === "voting_closed" ||
+    status === "results_computed" ||
+    status === "results_revealing"
+  ) {
+    return true;
+  }
+
+  return (
+    (status === "results_revealed" || status === "round_complete") && resultPhase !== "final"
+  );
+}
+
 export function formatBallotSaveFailureMessage(
   message: string,
   hasServerConfirmedBallot: boolean,

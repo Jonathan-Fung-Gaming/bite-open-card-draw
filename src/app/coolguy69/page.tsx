@@ -24,6 +24,7 @@ import {
   closeVotingAction,
   computeResultsAction,
   downloadDebugSnapshotAction,
+  getAdminLiveCountsAction,
   downloadPrivateCsvAction,
   drawRoundSetAction,
   editPlayerUsernameAction,
@@ -48,13 +49,13 @@ import {
 } from "./actions";
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
 import { AdminLiveRefresh } from "./_components/AdminLiveRefresh";
+import { AdminLiveCountsDisclosure } from "./_components/AdminLiveCountsDisclosure";
 import { AdminSessionHeartbeat } from "./_components/AdminSessionHeartbeat";
 import { DebugSnapshotDownload } from "./_components/DebugSnapshotDownload";
 import { AdminActionButton } from "./_components/AdminActionButton";
 import { HostHeartbeat } from "./_components/HostHeartbeat";
 import { ManualBallotForm } from "./_components/ManualBallotForm";
 import { PrivateCsvDownload } from "./_components/PrivateCsvDownload";
-import type { RoundBallot } from "@/lib/vote/ballot";
 import { formatVotingTime } from "@/lib/vote/voting-window";
 
 type AdminPageProps = {
@@ -63,26 +64,6 @@ type AdminPageProps = {
     error?: string;
   }>;
 };
-
-function buildLiveCountRows(draws: ReturnType<typeof getRoundDrawRecords>, ballots: RoundBallot[]) {
-  return draws.map((draw) => ({
-    id: draw.id,
-    displayLabel: draw.displayLabel,
-    rows: draw.charts.map((chart) => {
-      const banCount = ballots.reduce((total, ballot) => {
-        const choice = ballot.choices.find((candidate) => candidate?.drawId === draw.id);
-
-        return total + (choice?.bannedChartIds.includes(chart.id) ? 1 : 0);
-      }, 0);
-
-      return {
-        id: chart.id,
-        name: chart.name,
-        banCount,
-      };
-    }),
-  }));
-}
 
 function buildChartPoolRows(charts: NormalizedChart[]) {
   const poolCounts = buildPoolCounts(charts);
@@ -221,10 +202,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   await advanceVotingTimerIfDue(currentRoundNumber, nowMs);
   const votingSnapshot = getVotingRoundSnapshot(currentRoundNumber, nowMs);
   const currentRoundDraws = getRoundDrawRecords(currentRoundNumber);
-  const currentRoundBallots = adminState.ballotStore.listForRound(currentRoundNumber);
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(currentRoundNumber);
   const result = adminState.resultStore.getRoundResult(currentRoundNumber);
-  const liveCountRows = buildLiveCountRows(currentRoundDraws, currentRoundBallots);
   const auditRecords = adminState.auditStore.list(12);
   const drawControls = ROUND_SET_DEFINITIONS.map((set) => ({
     set,
@@ -572,42 +551,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </details>
           </section>
-          <section className="metal-panel rounded-lg p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              Sensitive Admin Counts
-            </p>
-            <h2 className="mt-1 text-2xl font-black uppercase text-white">Live Chart Counts</h2>
-            <details className="mt-4 rounded border border-ember-300/30 bg-ember-900/15 p-3">
-              <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
-                Show live counts
-              </summary>
-              <p className="mt-3 text-sm text-metal-300">
-                Keep this closed on projector or stream. This warning does not require another
-                password because it does not change tournament state.
-              </p>
-              <div className="mt-4 grid gap-3">
-                {liveCountRows.length === 0 ? (
-                  <p className="text-sm text-metal-300">
-                    Draw both current-round sets before live counts appear.
-                  </p>
-                ) : (
-                  liveCountRows.map((set) => (
-                    <div key={set.id} className="rounded border border-metal-700 bg-black/25 p-3">
-                      <p className="font-bold text-white">{set.displayLabel}</p>
-                      <ol className="mt-2 grid gap-1 text-sm text-metal-300">
-                        {set.rows.map((row) => (
-                          <li key={row.id} className="flex justify-between gap-3">
-                            <span>{row.name}</span>
-                            <span className="font-mono text-ember-300">{row.banCount}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  ))
-                )}
-              </div>
-            </details>
-          </section>
+          <AdminLiveCountsDisclosure
+            roundNumber={currentRoundNumber}
+            action={getAdminLiveCountsAction}
+          />
           <section className="metal-panel rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>

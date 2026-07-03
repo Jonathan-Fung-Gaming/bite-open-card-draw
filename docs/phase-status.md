@@ -2886,3 +2886,67 @@ release evidence can claim live database execution.
 - SQL coverage in this phase is source-level plus local build/test coverage. A disposable
   Supabase-dev run is still required once environment variables are available.
 - The new SQL migration must be applied before relying on Supabase backend parity for PRC-001.
+
+## Production Readiness Remediation Phase 7 - Low-Cost Public And UI State Fixes - 2026-07-03
+
+Status: complete for local memory, load, browser-smoke, and Supabase production-flow validation.
+
+### Scope
+
+- PRC-019: closed by documenting the accepted all-at-once sorted count phase. Phase 0 did not choose
+  timed row-by-row reveal, so count phases continue to show all seven least-to-most rows while
+  selected labels remain hidden until the resolved phase.
+- PRC-021: closed. `/coolguy69` no longer server-renders chart-by-chart live count names or values;
+  the counts are fetched only after the admin clicks `Show live counts`.
+- PRC-023: closed. `/vote` now has an explicit closed/revealed/round-complete holding branch when
+  final result data is missing.
+- PRC-024: closed. Mobile browser coverage now asserts that `/vote` exposes no vague `/skip/i`
+  action while retaining the explicit `No bans for this set` path.
+
+### Changed Files
+
+- Added `docs/phase-7-low-cost-public-ui-state-fixes-plan-2026-07-03.md`.
+- Updated `docs/decision-log.md` and
+  `docs/production-readiness-review-checklist-2026-07-03.md`.
+- Added server-only admin live-count row building in `src/lib/admin/live-counts.ts`.
+- Added `AdminLiveCountsDisclosure` and `getAdminLiveCountsAction` for deliberate admin count
+  disclosure.
+- Updated `/vote` phone result-state branching and `src/lib/vote/phone-view.ts` tests.
+- Added result-row test markers and browser assertions for count-phase ordering and behavior.
+- Updated Phase 9 admin page helpers for the new live-count disclosure.
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 52 files / 305 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk npm run test:phase9` - passed, one-round memory smoke.
+- `$env:E2E_TOURNAMENT_EVENT_ID='load-memory-dev-smoke'; rtk npm run test:load` - passed,
+  100-player memory load smoke.
+- `rtk npm run test:e2e:production-flow:validate` - passed.
+- `rtk npm run test:e2e:production-flow` - passed, hosted Supabase host-lock evidence plus
+  four-round production-flow rehearsal.
+
+### Manual Review
+
+- Product rules were unchanged: no draw, ballot, result computation, tiebreak selection, roster, or
+  dangerous-action password behavior was changed.
+- Admin live counts remain admin-session gated, deliberately disclosed, and passwordless as required
+  for sensitive but non-destructive disclosure.
+- Public/phone routes still withhold final selected charts and full counts until final stage reveal.
+- The vague skip rule remains intact: zero bans require the explicit `No bans for this set` control.
+- No `.github/workflows/*` files were added or changed.
+- The production-flow run intentionally used the Supabase backend because it is the only check that
+  exercises the hosted host-lock and four-round release path.
+
+### Risks And Assumptions
+
+- Timed row-by-row result reveal remains out of scope unless a future product decision explicitly
+  chooses it. The accepted Phase 7 behavior is all seven sorted count rows at once during the
+  host-advanced count phase.
+- The Supabase egress root cause is still the broad route/state hydration and refresh model. Phase 7
+  removes the live-count HTML leak, but it does not replace the public/admin read model.
+- No Supabase migration is applicable for this phase; changes are UI, server action, docs, and test
+  coverage only.
