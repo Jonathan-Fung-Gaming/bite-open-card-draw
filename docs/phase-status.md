@@ -12,6 +12,72 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 8 - Focused Phone And Roster Browser Regressions - 2026-07-03
+
+Status: implemented and locally verified. No Supabase migration is applicable for this phase because
+the changes are limited to test selectors, Playwright helpers, browser regression coverage, and
+test-only private CSV parity with the admin export path.
+
+### Scope
+
+- PRC-013 is closed: admin roster/count markers and page helpers now support named inactive-player
+  changes plus active-count, current voting denominator, and vote-dropdown membership/order
+  assertions.
+- PRC-015 is closed: two browser contexts open the same start.gg username, the second context sees
+  the active-device warning, both submit different valid ballots, and final private CSV evidence
+  proves the newer choices/revision win.
+- PRC-016 is closed: a browser regression forces an edit submit failure, verifies the
+  previous-server-confirmed-ballot reassurance, reloads the phone, and proves the original timestamp,
+  choices, and revision remain.
+- PRC-017 is closed: focused phone e2e coverage proves inactive-before-open hiding, after-open
+  snapshot stability, dangerous emergency current-round add, and next-round routine roster
+  exclusion.
+
+### Changed Files
+
+- `docs/phase-8-focused-phone-roster-browser-regressions-plan-2026-07-03.md`
+- `docs/phase-status.md`
+- `docs/production-readiness-review-checklist-2026-07-03.md`
+- `src/app/api/e2e/private-csv/route.ts`
+- `src/app/coolguy69/page.tsx`
+- `src/app/vote/BallotFlow.tsx`
+- `tests/phase9/pages/admin.page.ts`
+- `tests/phase9/pages/vote.page.ts`
+- `tests/phase9/phase8-phone-roster-regressions.spec.ts`
+
+### Checks Run
+
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test:phase9` - passed, 2 Playwright smoke tests including the focused Phase 8
+  regression.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - rerun passed.
+- `rtk npm run test` - passed, 52 files / 305 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk npm run test:e2e:production-flow:validate` - passed.
+- `rtk git diff --check` - passed.
+
+### Manual Review
+
+- Product rules remain unchanged: active roster snapshots are still taken when voting opens,
+  routine roster changes after open apply to future rounds, emergency current-round add remains a
+  dangerous password-confirmed action, same-username second devices still warn and latest valid
+  ballot wins, and failed saves keep the prior server-confirmed ballot.
+- Browser code still receives no service-role keys, password hashes, session secrets, plaintext
+  passwords, or tournament decision authority.
+- The e2e private CSV route now mirrors the admin export path for emergency current-round
+  eligibility metadata; it remains guarded by the existing test-route safety checks.
+- No `.github/workflows/*` files were added or changed.
+
+### Risks And Assumptions
+
+- The focused regression runs in the memory-dev smoke profile. Emergency current-round add is not a
+  normalized Supabase RPC, so hosted Supabase parity for that workflow remains outside this phase.
+- A direct one-off Playwright runner invocation for only the Phase 8 spec passed the test body but
+  did not exit before the tool timeout; the recorded evidence uses the normal `rtk npm run
+  test:phase9` command, which exited successfully.
+
 ## Production Readiness Remediation Phase 6 - Chart Import And Release Data Gates - 2026-07-03
 
 Status: implemented and locally verified. No Supabase migration is applicable for this phase because

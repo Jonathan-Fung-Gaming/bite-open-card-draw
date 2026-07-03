@@ -138,11 +138,15 @@ Checks run during this review:
   - Expected: each round's downloaded private CSV reflects the active snapshot: 48, 36, 24, 12.
   - Suggested tests: save and assert all four CSVs, not only final-round download evidence.
 
-- [ ] **PRC-013 - Medium - Roster selectors/helpers are brittle for attrition tests.**
+- [x] **PRC-013 - Medium - Roster selectors/helpers are brittle for attrition tests.**
   - Files: `src/app/coolguy69/page.tsx`, `tests/phase9/pages/vote.page.ts`.
   - Expected: test helpers can deactivate named players and assert dropdown membership/count/order.
   - Suggested tests: `AdminPage.markPlayersInactive(names)`, `expectActiveCount(count)`,
     `VotePage.expectEligiblePlayers(names)`.
+  - Closure evidence: Phase 8 added stable admin roster/count markers plus
+    `AdminPage.markPlayersInactive(names)`, `AdminPage.expectActiveCount(count)`,
+    `AdminPage.expectVotingEligibleCount(count)`, and `VotePage.expectEligiblePlayers(names)`.
+    `rtk npm run test:phase9` passes with the focused Phase 8 smoke regression.
 
 - [ ] **PRC-014 - Medium - 100-player load test is one-round and API-heavy.**
   - Files: `tests/load/load-rehearsal.spec.ts`.
@@ -151,27 +155,36 @@ Checks run during this review:
   - Suggested tests: multi-round attrition load profile or higher route-player count against
     Supabase.
 
-- [ ] **PRC-015 - Medium - Same-username second-device replacement is not proven end-to-end.**
+- [x] **PRC-015 - Medium - Same-username second-device replacement is not proven end-to-end.**
   - Files: `src/app/vote/BallotFlow.tsx`, `src/app/vote/actions.ts`,
     `src/lib/vote/ballot-store.ts`, `tests/e2e/full-flow.spec.ts`.
   - Expected: second device can submit after warning, latest valid ballot wins, and results/export
     count only the newer choices.
   - Suggested tests: two browser contexts submit different ballots for the same start.gg username,
     then verify admin/results/CSV.
+  - Closure evidence: `tests/phase9/phase8-phone-roster-regressions.spec.ts` opens two browser
+    contexts for `Rehearsal Player 01`, asserts the active-device warning on the second phone, and
+    verifies the final private CSV contains the second device's chart IDs and revision 2.
 
-- [ ] **PRC-016 - Medium - Save-failure UX lacks browser-level proof.**
+- [x] **PRC-016 - Medium - Save-failure UX lacks browser-level proof.**
   - Files: `src/app/vote/BallotFlow.tsx`, `src/lib/vote/phone-view.ts`,
     `src/lib/vote/ballot.test.ts`.
   - Expected: failed edit preserves prior server-confirmed ballot and does not create a revision.
   - Suggested tests: force submit failure during edit; assert previous choices/timestamp remain.
+  - Closure evidence: the Phase 8 smoke regression forces a failed edit submit after an existing
+    saved ballot, asserts the reassurance copy, reloads the phone, and verifies the original
+    timestamp/no-ban choices plus private CSV revision 1.
 
-- [ ] **PRC-017 - Medium - Inactive-player hiding needs phone e2e coverage.**
+- [x] **PRC-017 - Medium - Inactive-player hiding needs phone e2e coverage.**
   - Files: `src/lib/admin/roster.ts`, `src/lib/vote/voting-window.ts`,
     `src/app/vote/page.tsx`, `src/app/vote/BallotFlow.tsx`.
   - Expected: inactive users are hidden before voting opens; current-round snapshots and emergency
     adds behave exactly as documented.
   - Suggested tests: inactive before open, inactive after open, emergency current-round add, then
     next-round dropdown verification.
+  - Closure evidence: the Phase 8 smoke regression hides a player before open, proves an inactive
+    after-open player remains in the current voting snapshot, exercises the dangerous emergency
+    current-round add, and verifies the next-round dropdown excludes both inactive players.
 
 - [x] **PRC-018 - Medium - Zero-ballot / 7-way tiebreak behavior conflicts between docs.**
   - Files: `src/lib/results/result-engine.ts`,
