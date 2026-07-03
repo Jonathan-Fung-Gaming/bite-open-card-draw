@@ -183,6 +183,27 @@ describe("voting window store", () => {
     expect(persisted?.closesAt).toBe(new Date(TEN_MINUTES_MS).toISOString());
   });
 
+  it("persists the one-minute extension when explicitly advanced at normal expiration", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+
+    store.advanceVoting(1, ["player-1", "player-2"], TEN_MINUTES_MS);
+
+    const persisted = store.exportSnapshot().windows[0];
+
+    expect(persisted).toMatchObject({
+      status: "extension_1_minute",
+      extensionUsed: true,
+      closesAt: new Date(TEN_MINUTES_MS + ONE_MINUTE_MS).toISOString(),
+    });
+  });
+
   it("persists deadline advancement from the stored deadline instead of the request time", () => {
     const store = new VotingWindowStore();
 
@@ -199,6 +220,28 @@ describe("voting window store", () => {
 
     expect(persisted?.status).toBe("voting_closed");
     expect(persisted?.closedAt).toBe(new Date(TEN_MINUTES_MS + ONE_MINUTE_MS).toISOString());
+  });
+
+  it("does not advance deadlines while voting is paused", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 0,
+    });
+    store.pauseVoting(1, 2 * 60 * 1000);
+
+    store.advanceVoting(1, [], TEN_MINUTES_MS + ONE_MINUTE_MS);
+
+    const persisted = store.exportSnapshot().windows[0];
+
+    expect(persisted).toMatchObject({
+      status: "voting_paused",
+      closesAt: null,
+      remainingMsWhenPaused: 8 * 60 * 1000,
+    });
   });
 
   it("pauses and resumes without losing remaining official time", () => {

@@ -86,6 +86,7 @@ const adminSessionEndInputSchema = z.object({
 export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   submitBallot: submitBallotInputSchema,
   computeResults: computeResultsInputSchema,
+  advanceVotingTimer: advanceVotingTimerInputSchema,
 } as const;
 
 export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
@@ -100,7 +101,6 @@ export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   resumeVotingWindow: resumeVotingWindowInputSchema,
   closeVotingWindow: closeVotingWindowInputSchema,
   reopenVotingWindow: reopenVotingWindowInputSchema,
-  advanceVotingTimer: advanceVotingTimerInputSchema,
   drawRoundSet: drawRoundSetInputSchema,
   rerollOneChart: rerollOneChartInputSchema,
   rerollRoundSet: rerollRoundSetInputSchema,
@@ -131,6 +131,7 @@ export type NormalizedTransactionalMutationInput<
 export const NORMALIZED_RUNTIME_RPC_NAMES = {
   submitBallot: "normalized_submit_ballot",
   computeResults: "normalized_compute_results",
+  advanceVotingTimer: "normalized_advance_voting_timer",
 } as const satisfies Record<NormalizedTransactionalMutationName, NormalizedRuntimeRpcName>;
 
 export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
@@ -145,7 +146,6 @@ export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
   resumeVotingWindow: "normalized_resume_voting_window",
   closeVotingWindow: "normalized_close_voting_window",
   reopenVotingWindow: "normalized_reopen_voting_window",
-  advanceVotingTimer: "normalized_advance_voting_timer",
   drawRoundSet: "normalized_draw_round_set",
   rerollOneChart: "normalized_reroll_one_chart",
   rerollRoundSet: "normalized_reroll_round_set",

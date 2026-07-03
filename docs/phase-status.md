@@ -12,6 +12,86 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 3 - Durable Timer Transitions - 2026-07-03
+
+Status: implemented and locally verified. Hosted/disposable Supabase rehearsal remains blocked by
+missing local Supabase rehearsal environment variables.
+
+### Acceptance Criteria
+
+- PRC-010 is closed for local memory runtime by adding request-scoped durable voting timer
+  advancement before public/admin snapshots.
+- `/stage`, `/vote`, `/charts`, `/results`, and `/coolguy69` call the server-side timer
+  advancement helper before rendering voting snapshots.
+- Phone live-state polling and duplicate-device presence checks call the same helper before
+  returning state.
+- The helper writes only when a real transition is due: deadline expiration or all eligible players
+  submitted before the active deadline.
+- Paused, missing, closed, result, and not-yet-due active windows do not write.
+- Supabase `normalized_advance_voting_timer` is implemented in a new migration with database time,
+  an advisory transaction lock, the locked deadline helper, row-change metadata, and service-role
+  execute grants.
+- The normalized TypeScript transaction facade now treats only `advanceVotingTimer` as implemented;
+  unrelated emergency workflow RPCs remain blocked for later phases.
+
+### Changed Files
+
+- `docs/phase-3-durable-timer-transitions-plan-2026-07-03.md`
+- `docs/phase-status.md`
+- `src/app/charts/page.tsx`
+- `src/app/coolguy69/page.tsx`
+- `src/app/results/page.tsx`
+- `src/app/stage/page.tsx`
+- `src/app/vote/actions.ts`
+- `src/app/vote/page.tsx`
+- `src/lib/server/voting-round.ts`
+- `src/lib/server/voting-round.test.ts`
+- `src/lib/server/transactions/normalized-runtime.ts`
+- `src/lib/server/transactions/normalized-runtime.test.ts`
+- `src/lib/vote/voting-window.test.ts`
+- `supabase/migrations/20260703030000_durable_voting_timer_rpc.sql`
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/vote/voting-window.test.ts src/lib/server/voting-round.test.ts src/lib/server/transactions/normalized-runtime.test.ts` - passed, 3 files / 39 tests.
+- `rtk npm run test -- src/lib/db/schema.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/server/persistence.test.ts` - passed, 3 files / 33 tests.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run lint` - passed.
+- `rtk npm run test` - passed, 51 files / 278 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk npm run test:phase9` - passed, one-round memory smoke rehearsal.
+- `rtk npm run test:phase9:supabase-dev` - not run; environment validation failed because
+  `E2E_TOURNAMENT_EVENT_ID` is unset and `E2E_ALLOW_DESTRUCTIVE_RESET=true` is not configured.
+- `rtk npm run test:e2e:production-flow:validate` - not run; environment validation failed for the
+  same missing disposable Supabase settings.
+- `rtk git diff --check` - passed.
+
+### Manual Review
+
+- Product rules remain unchanged: one 10-minute round voting window covers both chart sets, below
+  75 percent turnout extends once, the extension closes regardless of turnout, all-submitted rounds
+  enter a 30-second final-change warning, and pause freezes timer/submissions.
+- Timer advancement remains server-side. No browser randomness, browser timer authority, or
+  client-side tournament mutation path was added.
+- Public routes can trigger only an idempotent server-side timer advancement when the hydrated
+  authoritative state is actually due to transition.
+- Supabase timer advancement uses `normalized_database_time()` and the existing
+  `normalized_apply_voting_deadline_locked()` helper so submit, compute, and poll-triggered
+  advancement share the same deadline rules.
+- Public screens still show aggregate turnout/ban-selection information only; no live
+  chart-by-chart counts were exposed.
+- No `.github/workflows/*` files were added.
+
+### Risks And Assumptions
+
+- The new Supabase migration must be applied to the target Supabase project before relying on
+  poll-triggered durable timer advancement in Supabase mode.
+- Local source/unit tests verify the SQL shape, but disposable hosted Supabase rehearsal is still
+  required once `E2E_TOURNAMENT_EVENT_ID` and `E2E_ALLOW_DESTRUCTIVE_RESET=true` are configured.
+- Poll-triggered writes are deliberately request-scoped. A completely idle site with no public,
+  phone, or admin polling will advance on the next request rather than via a background job.
+
 ## Production Readiness Remediation Phase 0 - Policy And Decision Lock - 2026-07-03
 
 Status: complete.

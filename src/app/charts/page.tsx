@@ -2,7 +2,7 @@ import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydrateTournamentState } from "@/lib/server/persistence";
-import { getVotingRoundSnapshot } from "@/lib/server/voting-round";
+import { advanceVotingTimerIfDue, getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
 import {
   formatVotingStatusLabel,
@@ -72,6 +72,7 @@ export default async function ChartsPage() {
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const nowMs = await getAuthoritativeNowMs();
+  await advanceVotingTimerIfDue(roundNumber, nowMs);
   const result = adminState.resultStore.getRoundResult(roundNumber);
   const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
   const showFinalResults = shouldShowFinalPhoneResults(snapshot.status, result?.revealPhase);

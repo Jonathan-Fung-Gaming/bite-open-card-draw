@@ -8,7 +8,7 @@ import {
 } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { hydrateTournamentState } from "@/lib/server/persistence";
-import { getVotingRoundSnapshot } from "@/lib/server/voting-round";
+import { advanceVotingTimerIfDue, getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
@@ -112,6 +112,7 @@ export default async function StagePage() {
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const serverNowMs = await getAuthoritativeNowMs();
+  await advanceVotingTimerIfDue(roundNumber, serverNowMs);
   const view = buildStageRoundView(adminState.drawStateStore, roundNumber);
   const snapshot = getVotingRoundSnapshot(roundNumber, serverNowMs);
   const result = adminState.resultStore.getRoundResult(roundNumber);
