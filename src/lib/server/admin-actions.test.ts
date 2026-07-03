@@ -307,6 +307,10 @@ describe("admin action production safeguards", () => {
       path.join(process.cwd(), "src/app/coolguy69/page.tsx"),
       "utf8",
     );
+    const liveCountsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/_components/AdminLiveCountsDisclosure.tsx"),
+      "utf8",
+    );
     const manualBallotSource = readFileSync(
       path.join(process.cwd(), "src/app/coolguy69/_components/ManualBallotForm.tsx"),
       "utf8",
@@ -549,12 +553,18 @@ describe("admin action production safeguards", () => {
       }
     }
 
-    const liveCountsStart = pageSource.indexOf("Show live counts");
-    const liveCountsBlock = pageSource.slice(liveCountsStart, liveCountsStart + 800);
+    const liveCountsActionBlock = getActionBlock(actionsSource, "getAdminLiveCountsAction");
 
-    expect(liveCountsStart).toBeGreaterThanOrEqual(0);
-    expect(liveCountsBlock).toContain("warning does not require another");
-    expect(liveCountsBlock).not.toContain('name="adminPassword"');
+    expect(pageSource).toContain("AdminLiveCountsDisclosure");
+    expect(pageSource).not.toContain("buildLiveCountRows");
+    expect(pageSource).not.toContain("liveCountRows.map");
+    expect(pageSource).not.toContain("row.banCount");
+    expect(liveCountsSource).toContain("Show live counts");
+    expect(liveCountsSource).toContain("warning does not require another");
+    expect(liveCountsSource).not.toContain('name="adminPassword"');
+    expect(liveCountsActionBlock).toContain("requireAdminSession");
+    expect(liveCountsActionBlock).toContain("buildAdminLiveCountRows");
+    expect(liveCountsActionBlock).not.toContain("verifyDangerousActionPassword");
   });
 
   it("records stable chart display metadata for exclusion audits", () => {

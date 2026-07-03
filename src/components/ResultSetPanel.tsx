@@ -145,6 +145,8 @@ export function ResultSetPanel({
                     ? "border-ember-300 shadow-ember-tight"
                     : "border-metal-700",
                 )}
+                data-ban-count={row.banCount}
+                data-testid="result-row"
               >
                 <div
                   className={clsx(

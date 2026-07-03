@@ -20,6 +20,8 @@
 - Room link has `I am a player voting` and `View charts only`.
 - Spectators can view charts but cannot submit votes.
 - Results use ban counts only, not percentages.
+- Stage count phases show all 7 sorted rows for a set at once; selected/winner reveal remains a
+  separate host-advanced phase.
 - Admin route is `/coolguy69`.
 - Admin uses one shared password.
 - Dangerous actions require password re-entry and action summary.

@@ -21,6 +21,12 @@ async function expectNoHorizontalOverflow(page: Page) {
     .toBeLessThanOrEqual(4);
 }
 
+async function expectNoVagueSkipAction(page: Page) {
+  await expect(page.getByRole("button", { name: /skip/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /skip/i })).toHaveCount(0);
+  await expect(page.getByText(/skip/i)).toHaveCount(0);
+}
+
 async function expectCenteredSeventhCard(page: Page) {
   const viewport = page.viewportSize();
   const cards = page.getByTestId("ballot-chart-card");
@@ -158,13 +164,19 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   await expectNoHorizontalOverflow(page);
 
   await goto(page, "/vote");
+  await expectNoVagueSkipAction(page);
   await page.getByLabel("Select your start.gg username").selectOption({
     label: voterName,
   });
   await expect(page.getByText(`Are you sure you are voting as ${voterName}?`)).toBeVisible();
   await page.getByRole("button", { name: "Confirm" }).click();
   await expect(page.getByTestId("ballot-chart-card")).toHaveCount(7);
+  await expectNoVagueSkipAction(page);
   await expectCenteredSeventhCard(page);
+  await expect(page.getByRole("button", { name: /skip/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /skip/i })).toHaveCount(0);
+  await expect(page.getByText(/^skip$/i)).toHaveCount(0);
+  await expect(page.getByLabel("No bans for this set")).toBeVisible();
   await expectNoHorizontalOverflow(page);
   const ballotGeometry = await collectMobileBallotGeometry(page);
 

@@ -21,6 +21,7 @@ host-lock, and audit requirements. It follows the narrow product policy:
 | `takeHostControlAction` | Read-only or sensitive disclosure | No | Conditional for forced takeover | Yes |
 | `refreshHostLockAction` | Read-only or sensitive disclosure | No | No | No |
 | `releaseHostControlAction` | Read-only or sensitive disclosure | No | No | Yes |
+| `getAdminLiveCountsAction` | Read-only or sensitive disclosure | No | No | No |
 | `addPlayerAction` | Active-host-only tournament action | Yes | No | Yes |
 | `bulkImportPlayersAction` | Active-host-only tournament action | Yes | No | Yes |
 | `setPlayerActiveStatusAction` | Active-host-only tournament action | Yes | No | Yes |

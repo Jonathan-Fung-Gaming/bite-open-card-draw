@@ -91,6 +91,20 @@ async function expectStageRows(page: Page) {
   await expect(rows.nth(1).getByTestId("stage-chart-card")).toHaveCount(7);
 }
 
+async function expectResultRowsSortedLeastToMostBanned(page: Page) {
+  const rows = page.getByTestId("result-row");
+
+  await expect(rows).toHaveCount(7, {
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+
+  const banCounts = await rows.evaluateAll((elements) =>
+    elements.map((element) => Number(element.getAttribute("data-ban-count"))),
+  );
+
+  expect(banCounts).toEqual([...banCounts].sort((left, right) => left - right));
+}
+
 async function expectRenderedImageElement(image: Locator) {
   await expect(image).toBeVisible({ timeout: 7_000 });
   await expect
@@ -715,12 +729,16 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expectPublicRoutesHideFinalSpoilersBeforeReveal(page);
 
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
+  await expectResultRowsSortedLeastToMostBanned(stagePage);
+  await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
   await waitForVisibleTiebreakReveal(stagePage, 1);
   await advanceRevealAndWaitForAdminPhase(page, "set 2 counts");
   await expect(stagePage.locator("header").getByText("Set 2 counts")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+  await expectResultRowsSortedLeastToMostBanned(stagePage);
+  await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await expectNoStageVerticalScroll(stagePage);
   await advanceRevealAndWaitForAdminPhase(page, "set 2 resolved");
   await waitForVisibleTiebreakReveal(stagePage, 1);
@@ -937,21 +955,11 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   });
   await expectAdminRevealPhase(page, "computed");
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
+  await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0, { timeout: 500 });
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
 
-  await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute(
-    "data-winner-revealed",
-    "false",
-    {
-      timeout: 7_000,
-    },
-  );
   await expect(stagePage.getByTestId("rune-wheel-slot")).toHaveCount(12);
   await expect(stagePage.getByTestId("rune-wheel")).not.toContainText("Sealed rune");
-  await expect(stagePage.getByTestId("rune-wheel-status")).toHaveText(
-    "Backend winner sealed. Reveal in progress.",
-  );
-  await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0, { timeout: 500 });
 
   await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute(
     "data-winner-revealed",

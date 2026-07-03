@@ -182,13 +182,18 @@ Checks run during this review:
   - Evidence: `docs/product-spec.md`, `docs/pump_open_stage_repo_validation_checklist.md`,
     `docs/admin-action-policy.md`, `src/lib/results/result-engine.test.ts`.
 
-- [ ] **PRC-019 - Medium - Results are sorted least-to-most but not progressively revealed
+- [x] **PRC-019 - Medium - Results are sorted least-to-most but not progressively revealed
   chart-by-chart.**
   - Files: `src/app/stage/page.tsx`, `src/components/ResultSetPanel.tsx`.
   - Current risk: count phases render the full sorted list at once.
   - Expected: either document all-at-once sorted reveal as acceptable or implement sequential
     chart-by-chart reveal.
   - Suggested tests: Playwright assertion for the chosen behavior.
+  - Closure: Phase 7 documents all-at-once sorted count reveal as the accepted behavior because
+    Phase 0 did not choose timed row-by-row reveal. Browser smoke now asserts count phases show all
+    seven least-to-most result rows and do not show the selected label until the resolved phase.
+  - Evidence: `docs/decision-log.md`, `tests/e2e/full-flow.spec.ts`,
+    `src/components/ResultSetPanel.tsx`.
 
 - [ ] **PRC-020 - Medium - Projector readability and QR scan thresholds may be too low.**
   - Files: `src/components/StageDrawCard.tsx`, `src/components/QRPanel.tsx`,
@@ -197,12 +202,17 @@ Checks run during this review:
     distance.
   - Suggested tests: raise geometry thresholds and run manual phone scan at event distance.
 
-- [ ] **PRC-021 - Medium - Admin live counts are hidden visually but present in initial admin DOM.**
+- [x] **PRC-021 - Medium - Admin live counts are hidden visually but present in initial admin DOM.**
   - Files: `src/app/coolguy69/page.tsx`.
   - Expected: if "behind warning" means deliberate disclosure, chart-by-chart counts should be
     fetched/rendered only after opening the warning.
   - Suggested tests: authenticated admin HTML before opening contains no chart-by-chart live count
     values.
+  - Closure: Phase 7 moves live count rows out of the `/coolguy69` server render and fetches them
+    through an authenticated, passwordless disclosure action after `Show live counts`.
+  - Evidence: `src/app/coolguy69/_components/AdminLiveCountsDisclosure.tsx`,
+    `src/app/coolguy69/actions.ts`, `src/lib/server/admin-actions.test.ts`,
+    `tests/phase9/pages/admin.page.ts` raw authenticated HTML check.
 
 - [x] **PRC-022 - Medium - Dangerous-action password policy is ambiguous for host controls.**
   - Files: `src/app/coolguy69/page.tsx`, `src/app/coolguy69/actions.ts`.
@@ -210,18 +220,25 @@ Checks run during this review:
     active-host-only plus audit; password-required dangerous actions are classified separately.
   - Evidence: `docs/admin-action-policy.md` and `src/lib/admin/action-policy.test.ts`.
 
-- [ ] **PRC-023 - Low - Post-complete missing-result phone state can fall through to generic
+- [x] **PRC-023 - Low - Post-complete missing-result phone state can fall through to generic
   pre-vote copy.**
   - Files: `src/app/vote/page.tsx`, `src/lib/vote/phone-view.ts`.
   - Expected: closed/revealing/complete states without final results show a holding/result-loading
     state, not pre-vote draw copy.
   - Suggested tests: route/component test for `round_complete` with missing final result.
+  - Closure: Phase 7 adds an explicit phone result holding-state helper and uses it before generic
+    pre-vote branches.
+  - Evidence: `src/lib/vote/phone-view.ts`, `src/app/vote/page.tsx`,
+    `src/lib/vote/phone-view.test.ts`.
 
-- [ ] **PRC-024 - Low - No-vague-skip rule lacks a direct browser regression assertion.**
+- [x] **PRC-024 - Low - No-vague-skip rule lacks a direct browser regression assertion.**
   - Files: `src/app/vote/BallotFlow.tsx`, `tests/e2e/mobile-routes.spec.ts`.
   - Expected: `/vote` never exposes a button/link matching `/skip/i`; only explicit
     `No bans for this set` completes zero bans.
   - Suggested tests: mobile `/vote` assertion.
+  - Closure: Phase 7 adds a mobile `/vote` browser assertion for no visible `/skip/i` button, link,
+    or exact text while keeping `No bans for this set` visible and usable.
+  - Evidence: `tests/e2e/mobile-routes.spec.ts`.
 
 ## Third Pass - Data, Security Hardening, And Operations
 

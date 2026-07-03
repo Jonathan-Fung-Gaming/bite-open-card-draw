@@ -74,7 +74,9 @@ export class AdminPage {
 
     if ((await passwordInput.count()) > 0) {
       await passwordInput.fill(ADMIN_PASSWORD);
-      await clickServerAction(this.page, this.page.getByRole("button", { name: "Log In" }));
+      await clickServerAction(this.page, this.page.getByRole("button", { name: "Log In" }), 5_000, {
+        submitForm: true,
+      });
       this.assertNoAdminError();
     }
 
@@ -539,30 +541,41 @@ export class AdminPage {
   async expectLiveCountsHiddenByDefaultAndRevealable() {
     await this.loginAndTakeHost();
 
-    const liveCounts = this.page.locator("details", { hasText: "Show live counts" });
+    const liveCounts = this.page.getByTestId("admin-live-counts");
     const liveCountRows = liveCounts.locator("ol li");
 
     await expect(liveCounts).toHaveCount(1);
-    await expect
-      .poll(async () => liveCounts.evaluate((element) => (element as HTMLDetailsElement).open))
-      .toBe(false);
-    await expect(liveCountRows.first()).toBeHidden();
+    await expect(liveCountRows).toHaveCount(0);
     await expect(liveCounts.locator("input[type='password']")).toHaveCount(0);
 
-    await liveCounts.locator("summary").click();
-    await expect
-      .poll(async () => liveCounts.evaluate((element) => (element as HTMLDetailsElement).open))
-      .toBe(true);
+    const rawAdminHtml = await this.page.evaluate(async () => {
+      const response = await fetch(window.location.href, { credentials: "include" });
+
+      return {
+        ok: response.ok,
+        text: await response.text(),
+      };
+    });
+    const liveCountsHtmlStart = rawAdminHtml.text.indexOf('data-testid="admin-live-counts"');
+    const initialLiveCountsHtml = rawAdminHtml.text.slice(
+      liveCountsHtmlStart,
+      liveCountsHtmlStart + 2500,
+    );
+
+    expect(rawAdminHtml.ok).toBe(true);
+    expect(liveCountsHtmlStart).toBeGreaterThanOrEqual(0);
+    expect(initialLiveCountsHtml).not.toContain("<ol");
+    expect(initialLiveCountsHtml).not.toContain("<li");
+    expect(initialLiveCountsHtml).not.toContain("Refresh live counts");
+
+    await liveCounts.getByRole("button", { name: "Show live counts" }).click();
     await expect(liveCountRows.first()).toBeVisible();
 
     await this.goto();
-    const refreshedLiveCounts = this.page.locator("details", { hasText: "Show live counts" });
+    const refreshedLiveCounts = this.page.getByTestId("admin-live-counts");
 
-    await expect
-      .poll(async () =>
-        refreshedLiveCounts.evaluate((element) => (element as HTMLDetailsElement).open),
-      )
-      .toBe(false);
+    await expect(refreshedLiveCounts.locator("ol li")).toHaveCount(0);
+    await expect(refreshedLiveCounts.getByRole("button", { name: "Show live counts" })).toBeVisible();
   }
 
   private async installSupabaseHostLockForCurrentAdmin() {
