@@ -3,6 +3,7 @@ import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import {
+  advanceVotingTimerIfDue,
   getRoundDrawRecords,
   getVotingRoundSnapshot,
 } from "@/lib/server/voting-round";
@@ -18,6 +19,7 @@ export default async function VotePage() {
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const nowMs = await getAuthoritativeNowMs();
+  await advanceVotingTimerIfDue(roundNumber, nowMs);
   const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
   const draws = getRoundDrawRecords(roundNumber);
   const phoneStatus = adminState.ballotStore.getPhoneStatus(roundNumber);

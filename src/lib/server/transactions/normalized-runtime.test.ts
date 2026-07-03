@@ -39,6 +39,7 @@ type RpcCall = {
 const implementedMutationNames: NormalizedTransactionalMutationName[] = [
   "submitBallot",
   "computeResults",
+  "advanceVotingTimer",
 ];
 
 const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
@@ -53,7 +54,6 @@ const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
   "resumeVotingWindow",
   "closeVotingWindow",
   "reopenVotingWindow",
-  "advanceVotingTimer",
   "drawRoundSet",
   "rerollOneChart",
   "rerollRoundSet",
@@ -216,6 +216,37 @@ describe("normalized runtime transactional mutations", () => {
     ]);
   });
 
+  it("executes durable voting timer advancement through the normalized timer RPC", async () => {
+    const calls: RpcCall[] = [];
+    const result = await executeNormalizedTransactionalMutation(
+      "advanceVotingTimer",
+      { roundNumber: 1 },
+      {
+        eventId: "event-a",
+        supabase: createMockRpcClient(calls, {
+          data: { committed: true, changed: true, rows_changed: 1, status: "extension_1_minute" },
+          error: null,
+        }),
+      },
+    );
+
+    expect(result).toEqual({
+      committed: true,
+      changed: true,
+      rows_changed: 1,
+      status: "extension_1_minute",
+    });
+    expect(calls).toEqual([
+      {
+        functionName: "normalized_advance_voting_timer",
+        args: {
+          p_event_id: "event-a",
+          p_payload: { roundNumber: 1 },
+        },
+      },
+    ]);
+  });
+
   it("uses TOURNAMENT_EVENT_ID when no explicit event id is passed", async () => {
     const calls: RpcCall[] = [];
 
@@ -325,6 +356,20 @@ describe("normalized runtime transactional mutations", () => {
     expect(computeFunction).toContain("eligibility.player_id is not null");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_ack");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_disabled");
+  });
+
+  it("implements durable voting timer advancement as a database-time transaction", () => {
+    const migrations = readMigrations();
+    const timerFunction = latestRpcDefinition(migrations, "normalized_advance_voting_timer");
+
+    expect(timerFunction).not.toBe("");
+    expect(timerFunction).toContain("normalized_database_time");
+    expect(timerFunction).toContain("pg_advisory_xact_lock");
+    expect(timerFunction).toContain("normalized_apply_voting_deadline_locked");
+    expect(timerFunction).toContain("'rows_changed'");
+    expect(timerFunction).toContain("'changed'");
+    expect(timerFunction).not.toContain("normalized_runtime_transaction_disabled");
+    expect(timerFunction).not.toContain("normalized_runtime_transaction_ack");
   });
 
   it("persists normalized draw state through one transactional RPC", () => {

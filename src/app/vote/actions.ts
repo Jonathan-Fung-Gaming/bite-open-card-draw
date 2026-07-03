@@ -12,6 +12,7 @@ import {
 import { assertRateLimit } from "@/lib/server/rate-limit";
 import { submitNormalizedPlayerBallot } from "@/lib/server/normalized-ballots";
 import {
+  advanceVotingTimerIfDue,
   getRoundDrawRecords,
   getSubmittedPlayerIdsForRound,
   getVotingRoundSnapshot,
@@ -79,6 +80,7 @@ export async function getVoteLiveStateAction(
   await hydrateTournamentState();
 
   const nowMs = await getAuthoritativeNowMs();
+  await advanceVotingTimerIfDue(roundNumber, nowMs);
   const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
   const result = adminState.resultStore.getRoundResult(roundNumber);
 
@@ -110,8 +112,12 @@ export async function claimVoterPresenceAction(input: {
     message: "Too many voter presence claims. Try again shortly.",
   });
 
+  await hydrateTournamentState();
+
+  const nowMs = await getAuthoritativeNowMs();
+  await advanceVotingTimerIfDue(input.roundNumber, nowMs);
+
   return withPersistedVotingState(async () => {
-    const nowMs = await getAuthoritativeNowMs();
     const snapshot = getVotingRoundSnapshot(input.roundNumber, nowMs);
     const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === input.playerId);
 

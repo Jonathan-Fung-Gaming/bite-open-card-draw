@@ -7,6 +7,7 @@ import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { getDeploymentSafetySnapshot } from "@/lib/server/deployment-safety";
 import { hydrateTournamentState } from "@/lib/server/persistence";
 import {
+  advanceVotingTimerIfDue,
   getRoundDrawRecords,
   getSubmittedPlayerIdsForRound,
   getVotingRoundSnapshot,
@@ -217,6 +218,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const roundSnapshot = adminState.roundStateStore.getSnapshot();
   const currentRoundNumber = roundSnapshot.currentRound;
   const selectedChartPool = resolveSelectedChartPool(params?.chartPool, currentRoundNumber);
+  await advanceVotingTimerIfDue(currentRoundNumber, nowMs);
   const votingSnapshot = getVotingRoundSnapshot(currentRoundNumber, nowMs);
   const currentRoundDraws = getRoundDrawRecords(currentRoundNumber);
   const currentRoundBallots = adminState.ballotStore.listForRound(currentRoundNumber);

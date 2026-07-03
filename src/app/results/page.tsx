@@ -2,7 +2,11 @@ import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydrateTournamentState } from "@/lib/server/persistence";
-import { getRoundDrawRecords, getVotingRoundSnapshot } from "@/lib/server/voting-round";
+import {
+  advanceVotingTimerIfDue,
+  getRoundDrawRecords,
+  getVotingRoundSnapshot,
+} from "@/lib/server/voting-round";
 import { resolvePublicRouteState } from "@/lib/round/round-state";
 import { shouldShowFinalPhoneResults } from "@/lib/vote/phone-view";
 import { formatVotingStatusLabel, formatVotingTime } from "@/lib/vote/voting-window";
@@ -87,6 +91,7 @@ export default async function ResultsPage() {
 
   const { currentRound } = adminState.roundStateStore.getSnapshot();
   const nowMs = await getAuthoritativeNowMs();
+  await advanceVotingTimerIfDue(currentRound, nowMs);
   const routeRounds = ([1, 2, 3, 4] as const).map((roundNumber) => {
     const roundSnapshot = getVotingRoundSnapshot(roundNumber, nowMs);
     const roundResult = adminState.resultStore.getRoundResult(roundNumber);
