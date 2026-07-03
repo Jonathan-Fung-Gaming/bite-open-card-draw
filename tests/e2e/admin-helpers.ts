@@ -49,15 +49,18 @@ async function throwIfAdminError(page: Page) {
 }
 
 export async function clickAdminActionAndWait(page: Page, button: Locator) {
-  const adminPostPromise = page
-    .waitForResponse(
-      (response) => isAdminPostResponse(response.url(), response.request().method()),
-      { timeout: 5_000 },
-    )
-    .catch(() => null);
+  const waitForAdminPost = () =>
+    page
+      .waitForResponse(
+        (response) => isAdminPostResponse(response.url(), response.request().method()),
+        { timeout: 5_000 },
+      )
+      .catch(() => null);
 
   await button.scrollIntoViewIfNeeded();
   await page.waitForTimeout(50);
+
+  let adminPostPromise = waitForAdminPost();
 
   try {
     await button.click({ timeout: 8_000 });
@@ -74,6 +77,7 @@ export async function clickAdminActionAndWait(page: Page, button: Locator) {
       element.scrollIntoView({ block: "center", inline: "center" });
     });
     await page.waitForTimeout(100);
+    adminPostPromise = waitForAdminPost();
     await button.click({ timeout: 8_000 });
   }
 
