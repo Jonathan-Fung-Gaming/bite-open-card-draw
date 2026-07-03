@@ -18,4 +18,16 @@ describe("admin session tokens", () => {
     expect(refreshed.payload.expiresAt).toBeGreaterThan(first.payload.expiresAt);
     expect(verified?.sessionId).toBe(first.payload.sessionId);
   });
+
+  it("rejects expired tokens unless cleanup decoding explicitly allows them", () => {
+    const secret = "test-secret";
+    const session = createAdminSessionToken(secret, 1_000, "session-id");
+    const afterExpiry = session.payload.expiresAt + 1;
+
+    expect(verifyAdminSessionToken(session.token, secret, afterExpiry)).toBeNull();
+    expect(
+      verifyAdminSessionToken(session.token, secret, afterExpiry, { allowExpired: true })
+        ?.sessionId,
+    ).toBe("session-id");
+  });
 });

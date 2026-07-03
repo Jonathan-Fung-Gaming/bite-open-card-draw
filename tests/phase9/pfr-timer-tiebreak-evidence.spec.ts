@@ -318,7 +318,7 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
     await expect(stageRawPage.getByTestId("rune-wheel-status")).toHaveText(
       "Backend winner sealed. Reveal in progress.",
     );
-    await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0);
+    await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0, { timeout: 500 });
 
     const hiddenSlotLabels = await readRuneSlotLabels(stageRawPage);
     const hiddenSlotCounts = countLabels(hiddenSlotLabels);

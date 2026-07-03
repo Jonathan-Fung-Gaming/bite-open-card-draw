@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HOST_TOKEN_COOKIE, ADMIN_SESSION_COOKIE } from "@/lib/admin/session";
+import {
+  ADMIN_SESSION_COOKIE,
+  HOST_TOKEN_COOKIE,
+  createAdminSessionToken,
+} from "@/lib/admin/session";
 import { hashAdminPassword } from "@/lib/admin/password";
-import { createAdminSessionCookie, setHostTokenCookie } from "./admin-auth";
+import {
+  createAdminSessionCookie,
+  getAdminSessionFromCookies,
+  setHostTokenCookie,
+} from "./admin-auth";
 
 vi.mock("server-only", () => ({}));
 
@@ -49,6 +57,7 @@ describe("admin auth cookie security", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it("sets admin session cookies Secure when VERCEL_ENV is production", async () => {
@@ -77,5 +86,16 @@ describe("admin auth cookie security", () => {
     await setHostTokenCookie("host-token");
 
     expect(cookieOptionsFor(HOST_TOKEN_COOKIE).secure).toBe(false);
+  });
+
+  it("does not authenticate expired admin session cookies", async () => {
+    vi.stubEnv("SESSION_SECRET", "phase-1-session-secret");
+    const session = createAdminSessionToken("phase-1-session-secret", 1_000);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(session.payload.expiresAt + 1);
+    nextHeaders.cookieStore.get.mockReturnValue({ value: session.token });
+
+    await expect(getAdminSessionFromCookies()).resolves.toBeNull();
   });
 });

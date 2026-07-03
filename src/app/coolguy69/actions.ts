@@ -64,6 +64,7 @@ import {
   clearHostTokenCookie,
   createAdminSessionCookie,
   getAdminSessionFromCookies,
+  getAdminSessionPayloadFromCookiesForCleanup,
   getHostTokenCookie,
   refreshAdminSessionCookie,
   requireAdminSession,
@@ -293,9 +294,38 @@ export async function adminLoginAction(formData: FormData) {
   redirect("/coolguy69");
 }
 
+async function bestEffortReleaseHostLockForCurrentCookies(
+  options: { allowExpiredSession?: boolean } = {},
+) {
+  const session = options.allowExpiredSession
+    ? await getAdminSessionPayloadFromCookiesForCleanup()
+    : await getAdminSessionFromCookies();
+  const hostToken = await getHostTokenCookie();
+
+  if (!session || !hostToken) {
+    return false;
+  }
+
+  try {
+    return await withPersistedHostLockState(async () => {
+      const nowMs = await getAuthoritativeNowMs();
+
+      return adminState.hostLockStore.release(session.sessionId, hostToken, nowMs).released;
+    });
+  } catch {
+    return false;
+  }
+}
+
 export async function adminLogoutAction() {
+  await bestEffortReleaseHostLockForCurrentCookies();
   await clearAdminCookies();
   redirect("/coolguy69");
+}
+
+export async function expireAdminSessionAction() {
+  await bestEffortReleaseHostLockForCurrentCookies({ allowExpiredSession: true });
+  await clearAdminCookies();
 }
 
 export async function refreshAdminSessionAction() {

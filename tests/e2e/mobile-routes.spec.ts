@@ -7,6 +7,7 @@ import {
   getAdminPassword,
   goto,
   HOSTED_REFRESH_TIMEOUT_MS,
+  clickAdminActionAndWait,
   loginAndTakeHost,
 } from "./admin-helpers";
 
@@ -94,22 +95,25 @@ async function startRehearsalMode(page: Page) {
 
   await rehearsalForm.getByPlaceholder("Admin password").fill(ADMIN_PASSWORD);
   await rehearsalForm.getByPlaceholder("Audit reason").fill("mobile route e2e reset");
-  await page.getByRole("button", { name: "Start Rehearsal" }).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Start Rehearsal" }));
   await expect(page.getByText("Rehearsal mode", { exact: true }).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 }
 
 async function drawBothSetsAndOpenVoting(page: Page) {
-  await page.getByRole("button", { name: "Draw Set" }).nth(0).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(0));
   await expect(page.getByText(/Version 1/).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
-  await page.getByRole("button", { name: "Draw Set" }).nth(1).click();
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(1));
   await expect(page.getByText("ready to vote")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
-  await page.getByRole("button", { name: "Open Voting", exact: true }).click();
+  await clickAdminActionAndWait(
+    page,
+    page.getByRole("button", { name: "Open Voting", exact: true }),
+  );
   await expect(page.getByText("voting open")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });

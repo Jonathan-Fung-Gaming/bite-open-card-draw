@@ -930,7 +930,7 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   await expect(stagePage.getByTestId("rune-wheel-status")).toHaveText(
     "Backend winner sealed. Reveal in progress.",
   );
-  await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
+  await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0, { timeout: 500 });
 
   await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute(
     "data-winner-revealed",

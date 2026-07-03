@@ -37,7 +37,12 @@ export function createAdminSessionToken(secret: string, now = Date.now(), sessio
   };
 }
 
-export function verifyAdminSessionToken(token: string | undefined, secret: string, now = Date.now()) {
+export function verifyAdminSessionToken(
+  token: string | undefined,
+  secret: string,
+  now = Date.now(),
+  options: { allowExpired?: boolean } = {},
+) {
   if (!token) {
     return null;
   }
@@ -59,7 +64,7 @@ export function verifyAdminSessionToken(token: string | undefined, secret: strin
   try {
     const payload = JSON.parse(base64UrlDecode(encodedPayload)) as AdminSessionPayload;
 
-    if (payload.expiresAt <= now) {
+    if (!options.allowExpired && payload.expiresAt <= now) {
       return null;
     }
 

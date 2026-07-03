@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  normalizeChartExclusionState,
   overlayChartExclusionOverrides,
   upsertChartExclusion,
 } from "@/lib/charts/exclusions";
@@ -430,13 +431,14 @@ export class DrawStateStore {
     }
 
     this.selectedSongKeys = new Set(snapshot.selectedSongKeys);
-    this.chartExclusions =
+    this.chartExclusions = normalizeChartExclusionState(
       snapshot.chartExclusions?.map((exclusion) => ({ ...exclusion })) ??
-      (snapshot.excludedChartKeys ?? []).map((chartKey) => ({
-        chartKey,
-        excluded: true,
-        reason: "Imported legacy chart exclusion key.",
-        updatedAt: new Date().toISOString(),
-      }));
+        (snapshot.excludedChartKeys ?? []).map((chartKey) => ({
+          chartKey,
+          excluded: true,
+          reason: "Imported legacy chart exclusion key.",
+          updatedAt: new Date().toISOString(),
+        })),
+    );
   }
 }

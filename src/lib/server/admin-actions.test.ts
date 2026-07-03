@@ -52,6 +52,27 @@ describe("admin action production safeguards", () => {
     expect(actionsSource).toContain("releaseOutcome");
   });
 
+  it("releases host lock before logout clearing and exposes inactivity cleanup", () => {
+    const actionsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
+      "utf8",
+    );
+    const inactivitySource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/_components/AdminInactivityTimer.tsx"),
+      "utf8",
+    );
+    const logoutBlock = getActionBlock(actionsSource, "adminLogoutAction");
+    const expireBlock = getActionBlock(actionsSource, "expireAdminSessionAction");
+
+    expect(logoutBlock.indexOf("await bestEffortReleaseHostLockForCurrentCookies();")).toBeLessThan(
+      logoutBlock.indexOf("await clearAdminCookies();"),
+    );
+    expect(expireBlock).toContain(
+      "bestEffortReleaseHostLockForCurrentCookies({ allowExpiredSession: true })",
+    );
+    expect(inactivitySource).toContain("expireAdminSessionAction");
+  });
+
   it("persists final reveal state before public route revalidation", () => {
     const actionsSource = readFileSync(
       path.join(process.cwd(), "src/app/coolguy69/actions.ts"),

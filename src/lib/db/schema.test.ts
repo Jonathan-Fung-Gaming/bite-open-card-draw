@@ -100,6 +100,11 @@ describe("Phase 2 database schema", () => {
       "result_snapshots_event_round_unique unique (event_id, round_number)",
     );
     expect(migration).toContain("host_locks_event_lock_name_unique unique (event_id, lock_name)");
+    expect(migration).toContain(
+      "chart_exclusions_event_chart_unique unique (event_id, chart_id)",
+    );
+    expect(migration).toContain("partition by event_id, chart_id");
+    expect(migration).toContain("ranked.duplicate_rank > 1");
   });
 
   it("stores draw-level identity for ballot choices, result rows, and tiebreaks", () => {

@@ -50,6 +50,19 @@ async function getRequestRateLimitKey(scope: string) {
 }
 
 export async function getAdminSessionFromCookies() {
+  return getAdminSessionFromCookiesInternal();
+}
+
+export async function getAdminSessionPayloadFromCookiesForCleanup() {
+  return getAdminSessionFromCookiesInternal({
+    allowExpired: true,
+    validateNormalizedSession: false,
+  });
+}
+
+async function getAdminSessionFromCookiesInternal(
+  options: { allowExpired?: boolean; validateNormalizedSession?: boolean } = {},
+) {
   const secret = getOptionalEnv("SESSION_SECRET");
 
   if (!secret) {
@@ -58,13 +71,16 @@ export async function getAdminSessionFromCookies() {
 
   const cookieStore = await cookies();
   const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-  const session = verifyAdminSessionToken(token, secret);
+  const session = verifyAdminSessionToken(token, secret, Date.now(), {
+    allowExpired: options.allowExpired,
+  });
 
   if (!session || !token) {
     return null;
   }
 
   if (
+    options.validateNormalizedSession !== false &&
     shouldUseNormalizedAdminSessions() &&
     !(await createNormalizedAdminSessionStore().validate(session, token))
   ) {

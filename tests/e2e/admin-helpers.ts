@@ -49,14 +49,38 @@ async function throwIfAdminError(page: Page) {
 }
 
 export async function clickAdminActionAndWait(page: Page, button: Locator) {
-  const adminPostPromise = page
-    .waitForResponse(
-      (response) => isAdminPostResponse(response.url(), response.request().method()),
-      { timeout: 5_000 },
-    )
-    .catch(() => null);
+  const waitForAdminPost = () =>
+    page
+      .waitForResponse(
+        (response) => isAdminPostResponse(response.url(), response.request().method()),
+        { timeout: 5_000 },
+      )
+      .catch(() => null);
 
-  await button.click();
+  await button.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(50);
+
+  let adminPostPromise = waitForAdminPost();
+
+  try {
+    await button.click({ timeout: 8_000 });
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      (!error.message.includes("intercepts pointer events") &&
+        !error.message.includes("element is outside of the viewport"))
+    ) {
+      throw error;
+    }
+
+    await button.evaluate((element) => {
+      element.scrollIntoView({ block: "center", inline: "center" });
+    });
+    await page.waitForTimeout(100);
+    adminPostPromise = waitForAdminPost();
+    await button.click({ timeout: 8_000 });
+  }
+
   await Promise.race([adminPostPromise, page.waitForTimeout(1_000)]);
   await page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => null);
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => null);
