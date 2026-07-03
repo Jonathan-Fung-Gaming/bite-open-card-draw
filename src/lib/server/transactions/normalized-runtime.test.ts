@@ -40,10 +40,12 @@ const implementedMutationNames: NormalizedTransactionalMutationName[] = [
   "submitBallot",
   "computeResults",
   "advanceVotingTimer",
+  "manualBallotOverride",
+  "reopenVotingWindow",
+  "resetRound",
 ];
 
 const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
-  "manualBallotOverride",
   "claimActiveVoterPresence",
   "touchActiveVoterPresence",
   "acquireHostLock",
@@ -53,7 +55,6 @@ const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
   "pauseVotingWindow",
   "resumeVotingWindow",
   "closeVotingWindow",
-  "reopenVotingWindow",
   "drawRoundSet",
   "rerollOneChart",
   "rerollRoundSet",
@@ -62,7 +63,6 @@ const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
   "advanceResultReveal",
   "markResultsRevealed",
   "overrideResult",
-  "resetRound",
   "adminSessionCreate",
   "adminSessionTouch",
   "adminSessionLogout",
@@ -247,6 +247,67 @@ describe("normalized runtime transactional mutations", () => {
     ]);
   });
 
+  it("executes emergency admin RPCs with sanitized server-side payloads", async () => {
+    const calls: RpcCall[] = [];
+
+    await executeNormalizedTransactionalMutation(
+      "manualBallotOverride",
+      {
+        roundNumber: 1,
+        playerId: uuidA,
+        choices: [
+          { drawId: uuidB, roundSetId: uuidA, noBans: false, bannedChartIds: [uuidC] },
+          { drawId: uuidC, roundSetId: uuidB, noBans: true, bannedChartIds: [] },
+        ],
+        replaceExistingBallot: true,
+        reason: "paper backup",
+        adminSessionId: uuidB,
+      },
+      {
+        eventId: "event-a",
+        supabase: createMockRpcClient(calls),
+      },
+    );
+
+    await executeNormalizedTransactionalMutation(
+      "reopenVotingWindow",
+      {
+        roundNumber: 1,
+        durationMinutes: 3,
+        reason: "phone issue",
+        adminSessionId: uuidB,
+      },
+      {
+        eventId: "event-a",
+        supabase: createMockRpcClient(calls),
+      },
+    );
+
+    await executeNormalizedTransactionalMutation(
+      "resetRound",
+      {
+        roundNumber: 1,
+        reason: "operator correction",
+        adminSessionId: uuidB,
+      },
+      {
+        eventId: "event-a",
+        supabase: createMockRpcClient(calls),
+      },
+    );
+
+    expect(calls.map((call) => call.functionName)).toEqual([
+      "normalized_manual_ballot_override",
+      "normalized_reopen_voting_window",
+      "normalized_reset_round",
+    ]);
+    for (const call of calls) {
+      expect(call.args.p_payload).not.toHaveProperty("adminPassword");
+      expect(call.args.p_payload).toHaveProperty("adminSessionId", uuidB);
+      expect(call.args.p_payload).toHaveProperty("reason");
+    }
+  });
+
   it("uses TOURNAMENT_EVENT_ID when no explicit event id is passed", async () => {
     const calls: RpcCall[] = [];
 
@@ -370,6 +431,37 @@ describe("normalized runtime transactional mutations", () => {
     expect(timerFunction).toContain("'changed'");
     expect(timerFunction).not.toContain("normalized_runtime_transaction_disabled");
     expect(timerFunction).not.toContain("normalized_runtime_transaction_ack");
+  });
+
+  it("implements emergency admin workflow RPCs as row-changing service-role transactions", () => {
+    const migrations = readMigrations();
+    const manualFunction = latestRpcDefinition(migrations, "normalized_manual_ballot_override");
+    const reopenFunction = latestRpcDefinition(migrations, "normalized_reopen_voting_window");
+    const resetFunction = latestRpcDefinition(migrations, "normalized_reset_round");
+
+    for (const definition of [manualFunction, reopenFunction, resetFunction]) {
+      expect(definition).not.toBe("");
+      expect(definition).toContain("normalized_database_time");
+      expect(definition).toContain("pg_advisory_xact_lock");
+      expect(definition).toContain("insert into public.admin_actions");
+      expect(definition).not.toContain("normalized_runtime_transaction_disabled");
+      expect(definition).not.toContain("normalized_runtime_transaction_ack");
+      expect(definition).not.toContain("adminPassword");
+    }
+
+    expect(manualFunction).toContain("replaceExistingBallot");
+    expect(manualFunction).toContain("'manual_admin'");
+    expect(manualFunction).toContain("delete from public.result_snapshots");
+    expect(manualFunction).toContain("override_reason");
+    expect(reopenFunction).toContain("status = 'voting_open'");
+    expect(reopenFunction).toContain("delete from public.result_snapshots");
+    expect(resetFunction).toContain("delete from public.ballot_revisions");
+    expect(resetFunction).toContain("delete from public.ballots");
+    expect(resetFunction).toContain("delete from public.voting_windows");
+    expect(resetFunction).toContain("delete from public.round_player_eligibility");
+    expect(resetFunction).toContain("delete from public.draws");
+    expect(resetFunction).not.toContain("delete from public.admin_actions");
+    expect(resetFunction).not.toContain("delete from public.players");
   });
 
   it("persists normalized draw state through one transactional RPC", () => {

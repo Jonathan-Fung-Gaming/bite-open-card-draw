@@ -45,6 +45,11 @@ import {
   withPersistedVotingAdminState,
 } from "@/lib/server/persistence";
 import { getTournamentEventId } from "@/lib/server/env";
+import {
+  reopenNormalizedVotingWindow,
+  resetNormalizedRound,
+  submitNormalizedManualBallotOverride,
+} from "@/lib/server/normalized-admin-workflows";
 import { computeNormalizedResults } from "@/lib/server/normalized-results";
 import { isCurrentRoundEligibilityChangeAllowed } from "@/lib/vote/voting-window";
 import {
@@ -933,12 +938,75 @@ export async function closeVotingAction(formData: FormData) {
 
 export async function manualBallotAction(formData: FormData) {
   try {
+    const roundNumber = getRoundNumber(formData);
+
+    if (getTournamentStateBackend() === "supabase") {
+      const session = await requireActiveHostForNormalizedAction();
+
+      await verifyDangerousActionPassword(getAdminPassword(formData));
+
+      const nowMs = await getAuthoritativeNowMs();
+      const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
+
+      if (!snapshot.canAcceptManualBallot) {
+        throw new Error("Manual ballots are allowed only before results reveal.");
+      }
+
+      const result = adminState.resultStore.getRoundResult(roundNumber);
+
+      if (result && result.revealPhase !== "computed") {
+        throw new Error(
+          "Manual ballots are allowed before result reveal starts. Use result correction after reveal begins.",
+        );
+      }
+
+      const playerId = getString(formData, "playerId");
+      const player = snapshot.eligiblePlayers.find((candidate) => candidate.id === playerId);
+
+      if (!player) {
+        throw new Error("Manual ballot player must be eligible for the voting window.");
+      }
+
+      const reason = getRequiredReason(formData);
+      const existing = adminState.ballotStore.get(roundNumber, playerId);
+      const replaceExisting = getString(formData, "replaceExistingBallot") === "yes";
+
+      if (existing && !replaceExisting) {
+        throw new Error(
+          `${player.startggUsername} already has a submitted ballot. Confirm replacement before saving a manual override.`,
+        );
+      }
+
+      const draws = getRoundDrawRecords(roundNumber);
+      const choices = draws.map((draw) => {
+        const noBans = getString(formData, `noBans:${draw.id}`) === "true";
+
+        return {
+          drawId: draw.id,
+          roundSetId: draw.roundSetId,
+          displayLabel: draw.displayLabel,
+          noBans,
+          bannedChartIds: noBans ? [] : getStringList(formData, `bans:${draw.id}`),
+        };
+      });
+
+      await submitNormalizedManualBallotOverride({
+        roundNumber,
+        playerId: player.id,
+        choices,
+        replaceExistingBallot: replaceExisting,
+        reason,
+        adminSessionId: session.sessionId,
+      });
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
     assertSupabaseTransactionalMutationImplemented("manualBallotOverride");
     const session = await requireActiveHost();
 
     await verifyDangerousActionPassword(getAdminPassword(formData));
 
-    const roundNumber = getRoundNumber(formData);
     const nowMs = await getAuthoritativeNowMs();
     advanceVotingDeadline(roundNumber, nowMs);
     const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
@@ -1409,11 +1477,37 @@ export async function seedRehearsalTiebreakAction(formData: FormData) {
 
 export async function reopenVotingAction(formData: FormData) {
   try {
+    const roundNumber = getRoundNumber(formData);
+
+    if (getTournamentStateBackend() === "supabase") {
+      const session = await requireActiveHostForNormalizedAction();
+
+      await verifyDangerousActionPassword(getAdminPassword(formData));
+
+      const reason = getRequiredReason(formData);
+      const durationMinutes = getDurationMinutes(formData);
+      const result = adminState.resultStore.getRoundResult(roundNumber);
+
+      if (result && result.revealPhase !== "computed") {
+        throw new Error(
+          "Emergency reopen is allowed only before result reveal starts. Use result correction after reveal begins.",
+        );
+      }
+
+      await reopenNormalizedVotingWindow({
+        roundNumber,
+        durationMinutes,
+        reason,
+        adminSessionId: session.sessionId,
+      });
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
     assertSupabaseTransactionalMutationImplemented("reopenVotingWindow");
     const session = await requireActiveHost();
 
     await verifyDangerousActionPassword(getAdminPassword(formData));
-    const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
     const durationMinutes = getDurationMinutes(formData);
     const nowMs = await getAuthoritativeNowMs();
@@ -1458,11 +1552,28 @@ export async function reopenVotingAction(formData: FormData) {
 
 export async function resetRoundAction(formData: FormData) {
   try {
+    const roundNumber = getRoundNumber(formData);
+
+    if (getTournamentStateBackend() === "supabase") {
+      const session = await requireActiveHostForNormalizedAction();
+
+      await verifyDangerousActionPassword(getAdminPassword(formData));
+
+      const reason = getRequiredReason(formData);
+
+      await resetNormalizedRound({
+        roundNumber,
+        reason,
+        adminSessionId: session.sessionId,
+      });
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
     assertSupabaseTransactionalMutationImplemented("resetRound");
     const session = await requireActiveHost();
 
     await verifyDangerousActionPassword(getAdminPassword(formData));
-    const roundNumber = getRoundNumber(formData);
     const reason = getRequiredReason(formData);
 
     resetRoundState(roundNumber);
