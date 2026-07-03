@@ -69,6 +69,7 @@ export type ChartImportReport = {
   strictMode: boolean;
   reviewedBy: string | null;
   reviewedAt: string | null;
+  reviewedCommit: string | null;
   totalSourceRows: number;
   importedCharts: number;
   repairedRows: ChartImportRowDiagnostic[];

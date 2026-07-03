@@ -67,12 +67,16 @@ workflow.
 - [ ] `rtk npm run import:charts` completed.
 - [ ] `data/generated/chart-import-report.json` archived with SHA-256 from
       `data/generated/chart-import-report.sha256`:
-      `ae31f8388c96d7247deb4ae4b2164551f4eb5b643e6040bd430a2c44eb68dc40`.
+      `C36424754EC19D615FA6057E34D852FBBC96DF2FB8A991A2A9813A167A9331B7`.
 - [ ] Import report reviewed or strict mode passed. Current generated report:
-      `2026-07-02T13:59:55.671Z`, 4,426 imported charts, 9 repaired rows, 145 skipped
-      rows, 154 strict failures. Reviewer and date: `TODO`.
+      `2026-07-03T03:37:10.176Z`, 4,426 imported charts, 9 repaired rows, 145 skipped
+      rows. Signed-review evidence: `reviewedBy=Codex`,
+      `reviewedAt=2026-07-03T03:37:10.141Z`,
+      `reviewedCommit=c58dda2496db13d9b16a74a63dfde9a9e1e64343`.
 - [ ] All required pools have at least 7 eligible charts.
 - [ ] Chart exclusions were reviewed.
+- [ ] Imported chart catalog identity recorded from `data/generated/charts.json`:
+      `AC5D46321C151BB748F102ACF739C00CE6F310DA96E5E0480DFDA5B526F23175`.
 - [ ] `rtk npm run cache:chart-images` completed with at least 1 real cached image asset.
 - [ ] Image cache manifest identity recorded from `data/generated/image-assets.json`:
       `F5D886138BEE349A88F942D1196F0BC219C5E2211BCFF0014497A437D76653E0`
@@ -81,6 +85,8 @@ workflow.
 - [ ] Runtime catalog identity recorded from `rtk npm run verify:real-chart-images`:
       `F5DC28CA048E69C33AF9CD97B0C566A87BAC1E386796C0743F028F1DBF2F2E2B`
       for 4,426 runtime charts and 639 public PNG cache files.
+- [ ] `rtk npm run verify:release-data` completed and passed with signed diagnostics or strict-clean
+      import evidence.
 - [ ] `public/chart-images/cache` contains real cached image files.
 - [ ] Tournament logo source exists at `public/brand/tournament-logo.png`.
 - [ ] Tournament logo app rendition exists at `public/brand/tournament-logo-web.png`
@@ -153,6 +159,7 @@ workflow.
 - [ ] `rtk npm run import:charts`
 - [ ] `rtk npm run cache:chart-images`
 - [ ] `rtk npm run verify:real-chart-images`
+- [ ] `rtk npm run verify:release-data`
 - [ ] `rtk npm audit --omit=dev`
 - [ ] `rtk git diff --check`
 - [ ] `rtk npm run build`

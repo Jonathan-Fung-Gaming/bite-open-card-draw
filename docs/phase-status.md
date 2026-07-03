@@ -12,6 +12,111 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 6 - Chart Import And Release Data Gates - 2026-07-03
+
+Status: implemented and locally verified. No Supabase migration is applicable for this phase because
+the changes are limited to chart import validation, generated release artifact gates, image
+verification wiring, e2e assertion robustness, and operator documentation.
+
+### Acceptance Criteria
+
+- PRC-025 is closed for local release gating: final chart import now has an explicit signed-review
+  path with `reviewedBy`, ISO `reviewedAt`, and `reviewedCommit` evidence in
+  `data/generated/chart-import-report.json`.
+- PRC-026 is closed: CSV header validation now requires exactly
+  `name,name_kr,artist,label,type,level,bg_img` in that order, with no extra headers.
+- Unexpected extra row columns after `bg_img` are rejected. The repair path is limited to the known
+  9-column mirrored-title comma shape present in the current source CSV.
+- PRC-027 is closed: Unicode-only title/artist key parts now receive deterministic hash-backed
+  `unicode-...` key parts instead of collapsing to `unknown`.
+- PRC-028 is closed locally: `rtk npm run verify:release-data` validates source CSV SHA, import
+  report SHA, fixture mode, pool counts, duplicate keys, signed diagnostics, imported chart catalog
+  identity, image manifest identity, runtime catalog identity, imported/runtime/image chart ID
+  consistency, and the same public-cache checks used by `verify:real-chart-images`.
+- Current generated local artifacts pass the signed-review release gate: 4,426 imported charts,
+  9 repaired rows, 145 skipped unsupported rows, 639 cached image assets, 0 fallback image assets,
+  and 4,426 runtime charts with non-fallback cached artwork.
+
+### Changed Files
+
+- `docs/asset-audit.md`
+- `docs/data-audit.md`
+- `docs/deployment-readiness.md`
+- `docs/event-day-runbook.md`
+- `docs/phase-6-chart-import-release-data-gates-plan-2026-07-03.md`
+- `docs/phase-status.md`
+- `docs/release-checklist.md`
+- `package.json`
+- `scripts/import-charts.ts`
+- `scripts/verify-real-chart-images.ts`
+- `scripts/verify-release-data.ts`
+- `src/lib/charts/importer.ts`
+- `src/lib/charts/importer.test.ts`
+- `src/lib/charts/normalize.ts`
+- `src/lib/charts/normalize.test.ts`
+- `src/lib/charts/release-data-gate.ts`
+- `src/lib/charts/release-data-gate.test.ts`
+- `src/lib/charts/types.ts`
+- `tests/e2e/full-flow.spec.ts`
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/charts/importer.test.ts src/lib/charts/normalize.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/image-cache.test.ts src/lib/charts/release-data-gate.test.ts`
+  - passed, 5 files / 32 tests.
+- `rtk npm run import:charts -- --strict`
+  - expected failure: strict mode found 154 diagnostics from the current source CSV
+    (9 repaired mirrored-title rows and 145 skipped unsupported rows).
+- `rtk npm run import:charts -- --reviewed-by=Codex --reviewed-commit=c58dda2496db13d9b16a74a63dfde9a9e1e64343`
+  - passed, generated signed local import evidence.
+- `rtk npm run cache:chart-images`
+  - passed, 639 cached assets / 0 fallback assets.
+- `rtk npm run verify:real-chart-images`
+  - passed, verified `data/generated/charts-with-images.json` against 639 public cache files for
+    4,426 charts.
+- `rtk npm run verify:release-data`
+  - passed with `strictClean=false`, `signedDiagnostics=true`, import report SHA
+    `c36424754ec19d615fa6057e34d852fbbc96df2fb8a991a2a9813a167a9331b7`, imported catalog SHA
+    `ac5d46321c151bb748f102acf739c00ce6f310da96e5e0480dfda5b526f23175`, runtime catalog SHA
+    `f5dc28ca048e69c33af9cd97b0c566a87bac1e386796c0743f028f1dbf2f2e2b`, and image manifest SHA
+    `f5d886138bee349a88f942d1196f0bc219c5e2211bcff0014497a437d76653e0`.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 52 files / 304 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e`
+  - first run exposed an existing hard-coded memory event id in private CSV filename assertions;
+    after the assertion was made event-id aware, rerun passed, 6 Playwright tests.
+- `rtk git diff --check` - passed.
+
+### Manual Review
+
+- Product rules remain unchanged: tournament rounds, chart sets, draw counts, voting, results,
+  tiebreaks, final reveal, admin, and player identity behavior were not changed.
+- The importer still uses `data/source/charts.csv`, preserves `bg_img`, validates required pools,
+  and keeps missing-image fallback behavior intact.
+- The Unicode fallback is scoped only to key parts that previously became `unknown`; existing ASCII
+  key behavior remains unchanged.
+- The release gate is local/operator tooling. It does not expose service-role keys, password hashes,
+  session secrets, plaintext passwords, or browser-side tournament-changing behavior.
+- The private CSV e2e assertion now follows the configured disposable event id instead of assuming
+  `e2e-memory-dev-smoke`, matching the runtime filename behavior.
+- Independent final review initially found release-data gate false positives around stale runtime
+  catalogs, non-strict unsigned clean imports, and loose review timestamps. The gate now validates
+  imported/runtime/image chart ID consistency, requires strict-clean or signed evidence, and accepts
+  only generated ISO UTC review timestamps.
+- No `.github/workflows/*` files were added or changed.
+- No Supabase migration was added or required.
+
+### Risks And Assumptions
+
+- The current event CSV is not strict-clean. It remains release-gated through signed review evidence
+  until the source CSV is cleaned or the unsupported rows are otherwise resolved.
+- Generated `data/generated/*.json` and `*.sha256` files are ignored by git. The final event release
+  still needs those artifacts archived or attached outside normal source tracking.
+- The signed generated report currently records pre-PR commit
+  `c58dda2496db13d9b16a74a63dfde9a9e1e64343`; rerun the signed import and release gate after the
+  final merge if the event release checklist needs exact final commit evidence.
+
 ## Production Readiness Remediation Phase 5 - Audit, Exclusion, And Host-Lock Persistence - 2026-07-03
 
 Status: implemented and locally verified. The new Supabase migration must be applied to every target

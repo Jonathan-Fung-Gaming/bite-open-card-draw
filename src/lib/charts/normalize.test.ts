@@ -25,6 +25,38 @@ describe("chart normalization", () => {
     );
   });
 
+  it("uses stable hashed key parts for Unicode-only values that would otherwise collapse", () => {
+    const first = normalizeChartRow(
+      {
+        ...rawRow,
+        name: "가나다",
+        name_kr: "가나다",
+        artist: "작곡가",
+      },
+      2,
+    );
+    const second = normalizeChartRow(
+      {
+        ...rawRow,
+        name: "라마바",
+        name_kr: "라마바",
+        artist: "작곡가",
+      },
+      3,
+    );
+
+    expect(first.songKey).toMatch(/^unicode-[0-9a-f]{16}__unicode-[0-9a-f]{16}$/);
+    expect(first.chartKey).toMatch(/^unicode-[0-9a-f]{16}__unicode-[0-9a-f]{16}__s16$/);
+    expect(first.songKey).not.toBe("unknown__unknown");
+    expect(first.songKey).not.toBe(second.songKey);
+    expect(normalizeKeyPart("☆")).toMatch(/^unicode-[0-9a-f]{16}$/);
+    expect(normalizeKeyPart("")).toBe("unknown");
+  });
+
+  it("keeps readable ASCII parts from mixed Unicode values", () => {
+    expect(normalizeKeyPart("사랑 Love ☆")).toBe("love");
+  });
+
   it("parses leading-zero chart levels", () => {
     expect(parseChartLevel("09")).toBe(9);
   });

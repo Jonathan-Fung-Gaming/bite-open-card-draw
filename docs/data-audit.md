@@ -134,12 +134,15 @@ Do not mark the event chart data ready until these values are filled for the cur
 - Import command: `rtk npm run import:charts` or `rtk npm run import:charts -- --strict`
 - Import report path: `data/generated/chart-import-report.json`
 - Import report SHA-256 path: `data/generated/chart-import-report.sha256`
-- Import report reviewer/date when strict mode is not clean: `TODO`
-- Repaired rows reviewed: `TODO`
-- Skipped rows reviewed: `TODO`
+- Import report reviewer/date/commit when strict mode is not clean: `reviewedBy`, ISO
+  `reviewedAt`, and `reviewedCommit` in `data/generated/chart-import-report.json`
+- Release data gate command: `rtk npm run verify:release-data`
+- Repaired rows reviewed: `9 repaired rows require signed review unless the CSV is cleaned`
+- Skipped rows reviewed: `145 skipped unsupported rows require signed review unless the CSV is cleaned`
 - Required pool counts after exclusions reviewed: `TODO`
 - Current release commit: `TODO`
 
 The import report now records repaired rows, skipped rows, out-of-scope rows, required pool counts,
-source CSV checksum, optional reviewer metadata, and strict-mode failures. For final event use,
-either run strict mode cleanly or record a reviewer/date accepting every repaired or skipped row.
+source CSV checksum, optional reviewer/date/commit metadata, and strict-mode failures. For final
+event use, either run strict mode cleanly or record signed reviewer/date/commit evidence accepting
+every repaired or skipped row, then run `rtk npm run verify:release-data`.

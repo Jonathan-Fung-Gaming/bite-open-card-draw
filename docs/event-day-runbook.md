@@ -34,10 +34,14 @@ Use this checklist on the event machine before players arrive and before every r
   deployed or event use.
 - Run `rtk npm run import:charts` and confirm the output prints `Imported ... charts` plus required
   pool counts with every required pool at 7 or more.
+- If strict import is not clean, confirm `data/generated/chart-import-report.json` records
+  `reviewedBy`, ISO `reviewedAt`, and `reviewedCommit` for every repaired or skipped diagnostic.
 - Run `rtk npm run cache:chart-images` before the event. Expected output is
   `Prepared ... image assets: N cached, M using fallback /chart-images/fallback-card.svg`; `N` must
   be greater than 0 before claiming real cached artwork is ready.
 - Run `rtk npm run verify:real-chart-images` and confirm it reports non-fallback cached image assets.
+- Run `rtk npm run verify:release-data` and confirm it passes with matching source CSV, import
+  report, runtime catalog, and image manifest hashes.
 - If remote artwork fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only`
   only after explicitly accepting fallback cards for rehearsal or emergency operation.
 - Confirm `public/chart-images/cache` contains real files when non-fallback artwork is required.

@@ -28,8 +28,27 @@ const FALLBACK_CHART_IMAGE_PATH = "/chart-images/fallback-card.svg";
 const LOGO_ALT_TEXT = "Pump It Up Open Stage tournament logo";
 const LOGO_ROUTE_BYTE_LIMIT = 400_000;
 const BALLOT_DRAFT_STORAGE_KEY = "bite-open-card-draw:ballot-drafts:v1";
-const PRIVATE_CSV_FILENAME_PATTERN =
-  /^e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv$/;
+
+function sanitizeFilenameSegment(value: string) {
+  return (
+    value
+      .trim()
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "event"
+  );
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const PRIVATE_CSV_EVENT_ID = sanitizeFilenameSegment(
+  process.env.E2E_TOURNAMENT_EVENT_ID ?? process.env.TOURNAMENT_EVENT_ID ?? "e2e-memory-dev-smoke",
+);
+const PRIVATE_CSV_FILENAME_PATTERN = new RegExp(
+  `^${escapeRegExp(PRIVATE_CSV_EVENT_ID)}-round-1-private-ballots-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z-[a-f0-9]{8}\\.csv$`,
+);
 
 type EvidenceBox = {
   height: number;
@@ -800,7 +819,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await writeJsonEvidence(testInfo, "pfr-private-csv-manual-summary.json", manualCsvSummary);
   await expect(
     page.getByText(
-      /^Downloaded e2e-memory-dev-smoke-round-1-private-ballots-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9]{8}\.csv\.$/,
+      new RegExp(
+        `^Downloaded ${escapeRegExp(PRIVATE_CSV_EVENT_ID)}-round-1-private-ballots-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z-[a-f0-9]{8}\\.csv\\.$`,
+      ),
     ),
   ).toBeVisible();
 
