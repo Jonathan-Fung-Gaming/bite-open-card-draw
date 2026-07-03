@@ -16,7 +16,7 @@
     "test:load:api-injection": "node scripts/run-playwright.mjs --profile=memory-dev-smoke test --config=playwright.load.config.ts --grep \"@api-injection\"",
     "test:load:player-routes": "node scripts/run-playwright.mjs --profile=memory-dev-smoke test --config=playwright.load.config.ts --grep \"@player-route\"",
     "test:phase9": "node scripts/run-playwright.mjs --profile=memory-dev-smoke test --config=playwright.phase9.config.ts --grep \"@smoke\"",
-    "test:phase9:supabase-dev": "node scripts/run-playwright.mjs --profile=supabase-dev-rehearsal test --config=playwright.phase9.config.ts --grep \"@smoke\"",
+    "test:phase9:supabase-dev": "node scripts/run-playwright.mjs --profile=supabase-dev-rehearsal test --config=playwright.phase9.config.ts --grep \"@supabase-smoke\"",
     "test:phase9:full": "node scripts/run-playwright.mjs --profile=supabase-dev-rehearsal test --config=playwright.phase9.config.ts --grep \"@full\"",
     "start": "next start",
     "build": "next build",

@@ -28,12 +28,24 @@ function withoutPlayers(...excludedNames: string[]) {
   return PLAYER_NAMES.filter((name) => !excluded.has(name));
 }
 
+function isSupabaseProfile() {
+  return (
+    (process.env.E2E_TOURNAMENT_STATE_BACKEND ?? process.env.TOURNAMENT_STATE_BACKEND) ===
+    "supabase"
+  );
+}
+
 test("Phase 8 phone roster regressions cover snapshots, duplicate username, and save failure @smoke", async ({
   page,
   browser,
   request,
   baseURL,
 }, testInfo) => {
+  if (isSupabaseProfile()) {
+    test.skip(true, "Phase 8 focused phone/roster regressions run in the memory smoke profile.");
+    return;
+  }
+
   const resolvedBaseURL = requireBaseURL(baseURL);
   const adminPage = createAdminPage(page, resolvedBaseURL);
   const openedPages: Page[] = [];
@@ -130,7 +142,9 @@ test("Phase 8 phone roster regressions cover snapshots, duplicate username, and 
       roundNumber: ROUND_ONE,
     });
     const records = parsePrivateCsv(csv);
-    const recordByPlayer = new Map(records.map((record) => [record.player_startgg_username, record]));
+    const recordByPlayer = new Map(
+      records.map((record) => [record.player_startgg_username, record]),
+    );
     const playerOneCsv = recordByPlayer.get(PLAYER_ONE);
     const playerTwoCsv = recordByPlayer.get(PLAYER_TWO);
     const inactiveAfterOpenCsv = recordByPlayer.get(INACTIVE_AFTER_OPEN);

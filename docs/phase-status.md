@@ -12,6 +12,106 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 9 - Real Supabase And Load Confidence - 2026-07-03
+
+Status: implemented and locally/hosted-disposable verified. No Supabase migration is applicable for
+this phase because the changes are limited to Playwright evidence, runner guard behavior, and
+operator documentation.
+
+### Scope
+
+- PRC-009 is covered by a new Supabase-only invariant/concurrency smoke that runs under
+  `test:phase9:supabase-dev`: service-role database time, event-scoped runtime table queries, anon
+  denial for critical RPCs, production host-lock persistence invariants against the real
+  `tournament-host` row, neighbor-event route isolation, concurrent Supabase load-ballot
+  submissions, concurrent `normalized_compute_results` calls, and final event-scoped DB row
+  reconciliation.
+- PRC-014 is covered by splitting the previous hybrid load test into separate `@api-injection` and
+  `@player-route` profiles with distinct Playwright project names and JSON evidence labels.
+- PRC-030 remains covered by route-level private CSV security tests; the manual Supabase guide now
+  calls out that deployed e2e-route probes remain later production-flow evidence work.
+- Memory Playwright profiles now ignore `.env.local` event ids and use disposable `e2e-*` event ids
+  unless the backend is Supabase.
+
+### Changed Files
+
+- `docs/phase-9-real-supabase-load-confidence-plan-2026-07-03.md`
+- `docs/phase-9-hosted-supabase-manual-guide.md`
+- `docs/phase-status.md`
+- `package.json`
+- `playwright.load.config.ts`
+- `scripts/run-playwright.mjs`
+- `tests/load/load-rehearsal.spec.ts`
+- `tests/phase9/hosted-one-round-smoke.spec.ts`
+- `tests/phase9/pages/admin.page.ts`
+- `tests/phase9/phase8-phone-roster-regressions.spec.ts`
+- `tests/phase9/supabase-invariants.spec.ts`
+
+### Checks Run
+
+- `rtk npm run test -- src/app/api/e2e/private-csv/route.test.ts` - passed, 7 tests.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test:load:player-routes` - initially exposed unstable dynamic Playwright project
+  naming and memory event-id inheritance from `.env.local`; after runner/config fixes, rerun passed.
+  A later parallel rerun with the API-injection profile was discarded because simultaneous dev
+  servers contended for `.next`; the serial rerun passed.
+- `rtk npm run test:load:api-injection` - passed.
+- `rtk npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
+  skipped under memory.
+- `rtk npm run test:phase9:supabase-dev` - initially exposed the Supabase RPC payload assertion and
+  the memory-only Phase 8 regression being selected by the Supabase script; after fixes, rerun
+  passed with hosted one-round smoke and Supabase invariant/concurrency/host-lock evidence passing.
+- `rtk node scripts/run-playwright.mjs --profile=supabase-dev-rehearsal test --config=playwright.phase9.config.ts tests/phase9/host-lock-two-session.spec.ts --grep "@full"` -
+  attempted twice; both attempts failed before host-lock assertions because admin login hit
+  `Supabase rate limit failed: TypeError: fetch failed`, and the wrapper did not exit before the
+  tool timeout. Phase 9 host-lock database invariants are covered by the passing
+  `test:phase9:supabase-dev` smoke instead; browser-level host-lock rehearsal remains later
+  production-flow/deployed evidence work.
+- `rtk npm run lint` - passed.
+- `rtk npm run test` - passed, 52 files / 305 tests.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk npm run build` - an initial parallel run conflicted with simultaneous typecheck/e2e access
+  to `.next`; serial rerun passed.
+- `rtk npm run test:e2e:production-flow:validate` - passed.
+- `rtk git diff --check` - passed.
+
+### Manual Review
+
+- Product behavior is unchanged: tournament rules, voting rules, result computation, tiebreak
+  behavior, final reveal, admin password policy, and route purposes were not changed.
+- The API-injection profile is now clearly labeled as test-route pressure evidence and no longer
+  stands in for normal phone-route submissions.
+- The player-route profile submits through `/room -> /vote`, opens spectator traffic on `/room`,
+  `/charts`, and `/results`, follows the `View charts only` path, and asserts view-only pages expose
+  no username selector or submit control.
+- The Supabase invariant spec writes only inside the configured disposable Supabase event namespace
+  plus a derived `-neighbor` event used only to prove route isolation; it still depends on the
+  existing `E2E_ALLOW_DESTRUCTIVE_RESET=true` runner guard.
+- Host-lock Supabase evidence uses production `HostLockStore` /
+  `resolveHostLockPersistence` semantics against the real `tournament-host` row, with disposable
+  admin-session rows satisfying the production foreign key. It verifies one current event-scoped
+  lock row, non-owner read-only semantics, heartbeat refresh, replacement after expiry, and forced
+  takeover ownership changes.
+- The load runner now rejects `playwright.load.config.ts` invocations unless exactly one of
+  `@api-injection` or `@player-route` is selected.
+- Critical RPC permission coverage checks anon denial for `normalized_database_time`,
+  `normalized_submit_ballot`, and `normalized_compute_results`.
+- Browser code still receives no service-role keys, password hashes, session secrets, or plaintext
+  passwords.
+
+### Risks And Assumptions
+
+- `test:phase9:supabase-dev` used the locally configured disposable Supabase event id
+  `rehearsal-2026-07-03-prod-db-01`. Do not reuse that namespace for the real tournament.
+- A non-fatal Next server log from a private CSV action can appear after the Supabase-dev command
+  exits successfully; it did not fail the Playwright run.
+- The older browser-only host-lock `@full` spec is not used as the Phase 9 gate because the current
+  disposable Supabase environment repeatedly failed during admin-login rate-limit fetches before
+  host-lock assertions. Re-run it during Phase 11/deployed evidence if that path is needed.
+- Deployed 404 probes for `/api/e2e/*` remain Phase 11/deployed-evidence work because the route
+  files still ship in the app tree.
+- Full 48 -> 36 -> 24 -> 12 production-flow rehearsal remains Phase 11 and was not claimed here.
+
 ## Production Readiness Remediation Phase 8 - Focused Phone And Roster Browser Regressions - 2026-07-03
 
 Status: implemented and locally verified. No Supabase migration is applicable for this phase because

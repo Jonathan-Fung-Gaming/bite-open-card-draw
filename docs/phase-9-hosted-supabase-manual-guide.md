@@ -22,6 +22,27 @@ Phase 9 is not just a visual rehearsal. It is the release evidence for these ope
 - `CR-003`: voting timer decisions use hosted database time and survive app restart/redeploy.
 - `CR-008`: a full hosted Supabase rehearsal has been completed and documented.
 
+For the 2026-07-03 production-readiness remediation plan, Phase 9 is narrower and maps to:
+
+- `PRC-009`: real/disposable Supabase confidence for migrations, event scoping, concurrent ballot
+  submit, concurrent result compute, host lock behavior, and critical RPC permissions.
+- `PRC-014`: load evidence must label API-injection behavior separately from normal
+  `/room -> /vote` route-player behavior.
+- `PRC-030`: `/api/e2e/private-csv` route security must be covered at route level; deployed 404
+  probes remain later production-flow/deployed-evidence work.
+
+Current focused commands:
+
+```bash
+rtk npm run test:phase9:supabase-dev
+rtk npm run test:load:api-injection
+rtk npm run test:load:player-routes
+```
+
+`test:load:api-injection` is the 100-player API pressure profile. `test:load:player-routes` is a
+smaller browser-real profile that submits through `/room -> /vote` with spectator/view-only traffic.
+Do not treat either profile as the Phase 11 full production-flow rehearsal.
+
 ## Safety Rules
 
 - Do not paste secrets into chat.

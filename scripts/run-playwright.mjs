@@ -234,7 +234,9 @@ function collectProductionFlowValidationErrors(config) {
   }
 
   if (config.allowRehearsalAdminControls !== "true") {
-    errors.push("TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS=true is required for production-flow rehearsal.");
+    errors.push(
+      "TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS=true is required for production-flow rehearsal.",
+    );
   }
 
   return [...errors, ...collectSupabaseValidationErrors(config)];
@@ -267,6 +269,7 @@ function printEnvironmentSummary(config) {
       `voteLivePolling=${enabledLabel(config.disableVoteLivePolling)}`,
       `publicRouteRefresh=${enabledLabel(config.disablePublicRefresh)}`,
       `phase9BallotMode=${config.phase9BallotMode ?? "(default)"}`,
+      `loadProfile=${config.loadProfile ?? "(none)"}`,
       `adminActionsOnly=${config.useAdminActionsOnly === "true" ? "enabled" : "disabled"}`,
       `rehearsalControls=${config.allowRehearsalAdminControls === "true" ? "enabled" : "disabled"}`,
       `testRoutes=${config.allowE2eRoutes === "true" ? "enabled" : "disabled"}`,
@@ -292,6 +295,29 @@ loadEnvConfig(process.cwd());
 const usesLoadConfig = requestedArgs.some((arg) => arg.includes("playwright.load.config"));
 const usesPhase9Config = requestedArgs.some((arg) => arg.includes("playwright.phase9.config"));
 const usesPhase9Full = usesPhase9Config && requestedArgs.some((arg) => arg.includes("@full"));
+const hasPlayerRouteLoadGrep = requestedArgs.some((arg) => arg.includes("@player-route"));
+const hasApiInjectionLoadGrep = requestedArgs.some((arg) => arg.includes("@api-injection"));
+const e2eLoadProfile = usesLoadConfig
+  ? hasPlayerRouteLoadGrep
+    ? "player-route"
+    : hasApiInjectionLoadGrep
+      ? "api-injection"
+      : "all"
+  : undefined;
+
+if (usesLoadConfig && hasPlayerRouteLoadGrep && hasApiInjectionLoadGrep) {
+  console.error(
+    "[playwright-runner] Load config requires exactly one profile grep: @api-injection or @player-route.",
+  );
+  process.exit(1);
+}
+
+if (usesLoadConfig && e2eLoadProfile === "all") {
+  console.error(
+    "[playwright-runner] Load config requires an explicit --grep @api-injection or --grep @player-route so load evidence stays isolated.",
+  );
+  process.exit(1);
+}
 const defaults = profileDefaults(requestedProfile, {
   usesHarnessConfig: usesLoadConfig || usesPhase9Config,
   usesPhase9Full,
@@ -311,7 +337,9 @@ const skipBuild =
   e2eServerMode === "dev" ||
   e2eServerMode === "external";
 const explicitTournamentEventId =
-  process.env.E2E_TOURNAMENT_EVENT_ID || process.env.TOURNAMENT_EVENT_ID;
+  e2eTournamentStateBackend === "supabase"
+    ? process.env.E2E_TOURNAMENT_EVENT_ID || process.env.TOURNAMENT_EVENT_ID
+    : undefined;
 const e2eTournamentEventId =
   explicitTournamentEventId ||
   (e2eTournamentStateBackend === "memory" ? `e2e-${requestedProfile}` : undefined);
@@ -362,6 +390,7 @@ const runConfig = {
   disableVoteLivePolling: e2eDisableVoteLivePolling,
   disablePublicRefresh: e2eDisablePublicRefresh,
   phase9BallotMode: e2ePhase9BallotMode,
+  loadProfile: e2eLoadProfile,
   useAdminActionsOnly: e2eUseAdminActionsOnly,
   allowRehearsalAdminControls: e2eAllowRehearsalAdminControls,
   allowE2eRoutes: e2eAllowE2eRoutes,
@@ -397,6 +426,7 @@ const env = sanitizeEnv({
   E2E_TOURNAMENT_STATE_BACKEND: e2eTournamentStateBackend,
   E2E_TOURNAMENT_EVENT_ID: e2eTournamentEventId,
   E2E_PHASE9_BALLOT_MODE: e2ePhase9BallotMode,
+  E2E_LOAD_PROFILE: e2eLoadProfile,
   E2E_USE_ADMIN_ACTIONS_ONLY: e2eUseAdminActionsOnly,
   NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT: e2eDisableAdminSessionHeartbeat,
   NEXT_PUBLIC_E2E_DISABLE_HOST_HEARTBEAT: e2eDisableHostHeartbeat,
@@ -405,8 +435,9 @@ const env = sanitizeEnv({
   TOURNAMENT_STATE_BACKEND: e2eTournamentStateBackend,
   TOURNAMENT_EVENT_ID: e2eTournamentEventId,
   NEXT_PUBLIC_SITE_URL: e2ePublicSiteUrl,
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:54321",
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "local-anon-key",
+  NEXT_PUBLIC_SUPABASE_URL: hostedSupabaseUrl || "http://127.0.0.1:54321",
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: hostedSupabaseAnonKey || "local-anon-key",
+  SUPABASE_SERVICE_ROLE_KEY: hostedSupabaseServiceRoleKey,
   TOURNAMENT_TEST_ALLOW_E2E_ROUTES: e2eAllowE2eRoutes,
   TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND: e2eAllowMemoryBackend,
   TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL: e2eAllowLocalPublicUrl,

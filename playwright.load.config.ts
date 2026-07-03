@@ -1,6 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 import { e2eBaseURL, e2eWebServer } from "./playwright.env";
 
+const loadProfile = process.env.E2E_LOAD_PROFILE;
+const loadProjectName =
+  loadProfile === "player-route"
+    ? "load-route-player-chromium"
+    : loadProfile === "api-injection"
+      ? "load-api-injection-chromium"
+      : "load-chromium";
+
 export default defineConfig({
   testDir: "./tests/load",
   outputDir: "test-results/load",
@@ -23,7 +31,7 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "load-api-injection-chromium",
+      name: loadProjectName,
       use: { ...devices["Desktop Chrome"] },
     },
   ],
