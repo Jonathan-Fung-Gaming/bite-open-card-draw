@@ -10,6 +10,7 @@ import {
   formatVotingTime,
   type VotingRoundSnapshot,
 } from "@/lib/vote/voting-window";
+import { toPublicChartsSetViews } from "@/lib/charts/public-chart-view";
 import { shouldShowFinalPhoneResults } from "@/lib/vote/phone-view";
 import { ChartsAutoRefresh } from "./ChartsAutoRefresh";
 import { ChartsSetNavigator } from "./ChartsSetNavigator";
@@ -118,7 +119,7 @@ export default async function ChartsPage() {
       <ChartsAutoRefresh />
       <RoundHeader title="Drawn Charts" status="View-only chart display" />
       <ChartsSetNavigator
-        sets={view.sets}
+        sets={toPublicChartsSetViews(view.sets)}
         status={chartsStatus(snapshot, snapshot.drawnSetCount)}
       />
     </main>

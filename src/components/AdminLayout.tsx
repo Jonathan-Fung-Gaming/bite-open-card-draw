@@ -9,7 +9,7 @@ type AdminLayoutProps = {
 
 export function AdminLayout({ children, hostStatus = "inactive" }: AdminLayoutProps) {
   return (
-    <main className="min-h-screen px-4 py-5 sm:px-6 lg:px-8">
+    <main className="min-h-screen overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <header className="flex flex-col gap-4 border-b border-ember-300/15 pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">

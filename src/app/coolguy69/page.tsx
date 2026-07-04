@@ -3,6 +3,7 @@ import { AdminLayout, DangerousActionDialog, HostLockBadge, TournamentLogo } fro
 import { buildPoolCounts } from "@/lib/charts/importer";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import { REQUIRED_CHART_POOLS, type NormalizedChart } from "@/lib/charts/types";
+import type { HostLockSnapshot } from "@/lib/admin/host-lock";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import { adminState } from "@/lib/server/admin-state";
 import { getAdminSessionFromCookies } from "@/lib/server/admin-auth";
@@ -162,6 +163,43 @@ function readinessTextClass(isReady: boolean) {
   return isReady ? "text-white" : "text-ember-300";
 }
 
+function sessionPrefix(sessionId: string | null) {
+  return sessionId ? sessionId.slice(0, 8) : "none";
+}
+
+function hostStateHeading(status: HostLockSnapshot["status"]) {
+  switch (status) {
+    case "active":
+      return "This browser is active host";
+    case "readonly":
+      return "Read-only admin";
+    default:
+      return "No active host";
+  }
+}
+
+function hostStateDetail(status: HostLockSnapshot["status"]) {
+  switch (status) {
+    case "active":
+      return "Tournament controls are enabled here. Release host control before handing operation to another browser.";
+    case "readonly":
+      return "Another browser has host control. Controls stay disabled here unless the host releases, the heartbeat expires, or you force takeover.";
+    default:
+      return "Take host control from this browser before running tournament actions.";
+  }
+}
+
+function hostTakeoverText(hostSnapshot: HostLockSnapshot) {
+  switch (hostSnapshot.status) {
+    case "active":
+      return "Heartbeat protected";
+    case "readonly":
+      return "Force takeover is gated";
+    default:
+      return "Takeover available now";
+  }
+}
+
 function RerollOneChartConfirmation({
   activeDraw,
   canControl,
@@ -294,7 +332,7 @@ function RerollFullRoundConfirmation({
               name="roundNumber"
               disabled={!canControl}
               defaultValue={currentRoundNumber}
-              className="mt-2 block w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+              className="mt-2 block w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
             >
               <option value="1">Round 1</option>
               <option value="2">Round 2</option>
@@ -351,13 +389,16 @@ function DrawControlCard({
   const { activeDraw, historyCount, set } = control;
 
   return (
-    <section className="rounded border border-metal-700 bg-black/20 p-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+    <section
+      className="rounded border border-metal-700 bg-black/20 p-3"
+      data-testid="admin-draw-control-card"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.18em] text-ember-300">
             Round {set.roundNumber} - Set {set.setOrder}
           </p>
-          <h3 className="text-xl font-black text-white">{set.displayLabel}</h3>
+          <h3 className="break-words text-xl font-black text-white">{set.displayLabel}</h3>
         </div>
         <form action={drawRoundSetAction}>
           <input type="hidden" name="roundNumber" value={set.roundNumber} />
@@ -383,10 +424,13 @@ function DrawControlCard({
               className="grid gap-2 rounded border border-metal-700 bg-black/25 p-2 text-sm md:grid-cols-[minmax(0,1fr)_170px]"
             >
               <div className="min-w-0">
-                <p className="truncate font-semibold text-white">
+                <p
+                  className="break-words font-semibold text-white"
+                  data-testid="admin-draw-chart-name"
+                >
                   {index + 1}. {chart.name}
                 </p>
-                <p className="truncate text-xs text-metal-300">{chart.artist}</p>
+                <p className="break-words text-xs text-metal-300">{chart.artist}</p>
               </div>
               {includeRerollControls ? (
                 <RerollOneChartConfirmation
@@ -412,22 +456,70 @@ function DrawControlCard({
 
 function HostControlPanel({
   canControl,
-  hostStatus,
+  currentSessionId,
+  hostSnapshot,
+  serverNowMs,
 }: {
   canControl: boolean;
-  hostStatus: "inactive" | "active" | "readonly";
+  currentSessionId: string;
+  hostSnapshot: HostLockSnapshot;
+  serverNowMs: number;
 }) {
+  const hostStatus = hostSnapshot.status;
+  const ownerIsCurrentSession = hostSnapshot.ownerSessionId === currentSessionId;
+  const ownerLabel =
+    hostStatus === "inactive"
+      ? "No active owner"
+      : ownerIsCurrentSession
+        ? `This session (${sessionPrefix(currentSessionId)})`
+        : `Session ${sessionPrefix(hostSnapshot.ownerSessionId)}`;
+
   return (
     <section className="metal-panel rounded-lg p-4" data-testid="admin-host-control-panel">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
             Host Lock
           </p>
-          <h2 className="mt-1 text-2xl font-black uppercase text-white">Control</h2>
+          <h2 className="mt-1 break-words text-2xl font-black uppercase text-white">Control</h2>
         </div>
         <HostLockBadge status={hostStatus} />
       </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3" data-testid="admin-host-lock-context">
+        <div className={`rounded border p-3 ${readinessToneClass(canControl)}`}>
+          <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Current browser</p>
+          <p
+            className={`mt-2 break-words text-lg font-black uppercase ${readinessTextClass(canControl)}`}
+          >
+            {hostStateHeading(hostStatus)}
+          </p>
+          <p className="mt-1 break-words text-xs text-metal-300">{hostStateDetail(hostStatus)}</p>
+        </div>
+        <div className="rounded border border-metal-700 bg-black/25 p-3">
+          <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Active owner</p>
+          <p className="mt-2 break-words font-mono text-lg font-black text-white">{ownerLabel}</p>
+          <p className="mt-1 text-xs text-metal-300">
+            Only the active host can change tournament state.
+          </p>
+        </div>
+        <div className="rounded border border-metal-700 bg-black/25 p-3">
+          <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Takeover clarity</p>
+          <p className="mt-2 break-words text-lg font-black uppercase text-white">
+            {hostTakeoverText(hostSnapshot)}
+          </p>
+          <p className="mt-1 break-words text-xs text-metal-300">
+            Use the heartbeat panel for the live expiry window. Forced takeover stays password and
+            audit-reason gated while another heartbeat is live.
+          </p>
+        </div>
+      </div>
+      <HostHeartbeat
+        expiresAt={hostSnapshot.expiresAt}
+        heartbeatAt={hostSnapshot.heartbeatAt}
+        ownerSessionId={hostSnapshot.ownerSessionId}
+        serverNowMs={serverNowMs}
+        status={hostStatus}
+      />
       <div className="mt-4 flex flex-wrap gap-2">
         {hostStatus === "readonly" ? (
           <form action={takeHostControlAction} className="grid gap-3">
@@ -599,16 +691,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     <AdminLayout hostStatus={hostSnapshot.status}>
       <AdminLiveRefresh />
       <AdminSessionHeartbeat />
-      <HostHeartbeat active={hostSnapshot.status === "active"} />
-      <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
-        <div className="flex flex-col gap-5">
+      <section className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="flex min-w-0 flex-col gap-5">
           {error ? (
             <section className="order-0 rounded-lg border border-ember-500/35 bg-ember-900/20 p-4 text-sm text-ember-300">
               {error}
             </section>
           ) : null}
           <div className="order-1">
-            <HostControlPanel canControl={canControl} hostStatus={hostSnapshot.status} />
+            <HostControlPanel
+              canControl={canControl}
+              currentSessionId={session.sessionId}
+              hostSnapshot={hostSnapshot}
+              serverNowMs={nowMs}
+            />
           </div>
           <section className="metal-panel order-2 rounded-lg p-4" data-testid="admin-readiness">
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -728,7 +824,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   name="roundNumber"
                   disabled={!canControl}
                   defaultValue={currentRoundNumber}
-                  className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                  className="min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
                 >
                   <option value="1">Round 1</option>
                   <option value="2">Round 2</option>
@@ -898,7 +994,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   key={`${set.roundNumber}-${set.displayLabel}`}
                   className="rounded border border-metal-700 bg-black/25 p-3"
                 >
-                  <p className="text-sm font-bold text-white">
+                  <p className="break-words text-sm font-bold text-white">
                     Round {set.roundNumber} - {set.displayLabel}
                   </p>
                   <p className="mt-1 text-xs uppercase tracking-[0.16em] text-metal-300">
@@ -947,7 +1043,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <select
                 name="chartPool"
                 defaultValue={selectedChartPool}
-                className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                className="min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
               >
                 {chartPoolRows.map((row) => (
                   <option key={row.pool} value={row.pool}>
@@ -981,9 +1077,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       value={chart.excluded ? "false" : "true"}
                     />
                     <div className="min-w-0">
-                      <p className="truncate font-bold text-white">{chart.name}</p>
-                      <p className="truncate text-xs text-metal-300">{chart.artist}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.14em] text-metal-400">
+                      <p className="break-words font-bold text-white">{chart.name}</p>
+                      <p className="break-words text-xs text-metal-300">{chart.artist}</p>
+                      <p className="mt-1 break-words text-xs uppercase tracking-[0.14em] text-metal-400">
                         {chart.excluded
                           ? `Excluded: ${chart.exclusionReason ?? "No reason stored"}`
                           : "Eligible"}
@@ -1234,7 +1330,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   id="durationMinutes"
                   name="durationMinutes"
                   disabled={!canReopenVoting}
-                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
                 >
                   <option value="1">1 minute</option>
                   <option value="2">2 minutes</option>
@@ -1254,7 +1350,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   required
                   disabled={!canReopenVoting}
                   rows={3}
-                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
                 />
                 {reopenDisabledReason ? (
                   <p className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
@@ -1289,7 +1385,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   name="roundNumber"
                   defaultValue={currentRoundNumber}
                   disabled={!canControl}
-                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
                 >
                   <option value="1">Round 1</option>
                   <option value="2">Round 2</option>
@@ -1308,7 +1404,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   required
                   disabled={!canControl}
                   rows={3}
-                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
                 />
                 <button
                   className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
@@ -1522,75 +1618,86 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 Bulk Import
               </button>
             </form>
-            <div className="mt-4 overflow-hidden rounded border border-metal-700">
-              <table className="w-full border-collapse text-sm">
-                <thead className="bg-black/40 text-left text-xs uppercase tracking-[0.16em] text-ember-300">
-                  <tr>
-                    <th className="p-3">Username</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {players.map((player) => (
-                    <tr
-                      key={player.id}
-                      className="border-t border-metal-700 bg-black/20"
-                      data-active={player.active ? "true" : "false"}
-                      data-player-username={player.startggUsername}
-                      data-testid="admin-roster-row"
-                    >
-                      <td className="p-3 font-semibold text-white">{player.startggUsername}</td>
-                      <td className="p-3 text-metal-300">
-                        {player.active ? "Active" : "Inactive"}
-                        {player.hasTournamentHistory ? (
-                          <span className="mt-1 block text-xs text-metal-400">History locked</span>
-                        ) : null}
-                      </td>
-                      <td className="grid gap-2 p-3">
-                        <form
-                          action={editPlayerUsernameAction}
-                          className="flex flex-col gap-2 sm:flex-row"
+            <div className="mt-4 overflow-hidden rounded border border-metal-700 text-sm">
+              <div className="hidden grid-cols-[minmax(0,1fr)_140px_minmax(0,1.4fr)] gap-3 bg-black/40 p-3 text-xs uppercase tracking-[0.16em] text-ember-300 md:grid">
+                <p>Username</p>
+                <p>Status</p>
+                <p>Action</p>
+              </div>
+              <div className="grid gap-px bg-metal-700">
+                {players.map((player) => (
+                  <article
+                    key={player.id}
+                    className="grid gap-3 bg-black/20 p-3 md:grid-cols-[minmax(0,1fr)_140px_minmax(0,1.4fr)]"
+                    data-active={player.active ? "true" : "false"}
+                    data-player-username={player.startggUsername}
+                    data-testid="admin-roster-row"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
+                        Username
+                      </p>
+                      <p className="break-words font-semibold text-white">
+                        {player.startggUsername}
+                      </p>
+                    </div>
+                    <div className="min-w-0 text-metal-300">
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
+                        Status
+                      </p>
+                      <p className="break-words">{player.active ? "Active" : "Inactive"}</p>
+                      {player.hasTournamentHistory ? (
+                        <span className="mt-1 block break-words text-xs text-metal-400">
+                          History locked
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="grid min-w-0 gap-2">
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
+                        Action
+                      </p>
+                      <form
+                        action={editPlayerUsernameAction}
+                        className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                      >
+                        <input type="hidden" name="playerId" value={player.id} />
+                        <input
+                          name="startggUsername"
+                          defaultValue={player.startggUsername}
+                          disabled={!canControl || player.hasTournamentHistory}
+                          className="min-w-0 rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white disabled:opacity-40"
+                        />
+                        <button
+                          className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
+                          disabled={!canControl || player.hasTournamentHistory}
+                          type="submit"
                         >
-                          <input type="hidden" name="playerId" value={player.id} />
-                          <input
-                            name="startggUsername"
-                            defaultValue={player.startggUsername}
-                            disabled={!canControl || player.hasTournamentHistory}
-                            className="min-w-0 rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white disabled:opacity-40"
-                          />
-                          <button
-                            className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
-                            disabled={!canControl || player.hasTournamentHistory}
-                            type="submit"
-                          >
-                            Save Name
-                          </button>
-                        </form>
-                        <form action={setPlayerActiveStatusAction}>
-                          <input type="hidden" name="playerId" value={player.id} />
-                          <input
-                            type="hidden"
-                            name="active"
-                            value={player.active ? "false" : "true"}
-                          />
-                          <button
-                            className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
-                            disabled={!canControl}
-                            type="submit"
-                          >
-                            {player.active ? "Mark Inactive" : "Reactivate"}
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          Save Name
+                        </button>
+                      </form>
+                      <form action={setPlayerActiveStatusAction}>
+                        <input type="hidden" name="playerId" value={player.id} />
+                        <input
+                          type="hidden"
+                          name="active"
+                          value={player.active ? "false" : "true"}
+                        />
+                        <button
+                          className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
+                          disabled={!canControl}
+                          type="submit"
+                        >
+                          {player.active ? "Mark Inactive" : "Reactivate"}
+                        </button>
+                      </form>
+                    </div>
+                  </article>
+                ))}
+              </div>
             </div>
           </section>
         </div>
-        <aside className="grid content-start gap-5">
+        <aside className="grid min-w-0 content-start gap-5">
           <section className="metal-panel rounded-lg p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
               Session
@@ -1623,12 +1730,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     className="rounded border border-metal-700 bg-black/25 p-3 text-sm"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-bold text-white">{record.action.replaceAll("_", " ")}</p>
+                      <p className="break-words font-bold text-white">
+                        {record.action.replaceAll("_", " ")}
+                      </p>
                       <p className="font-mono text-xs text-metal-300">{record.createdAt}</p>
                     </div>
-                    <p className="mt-1 text-metal-300">{record.summary}</p>
+                    <p className="mt-1 break-words text-metal-300">{record.summary}</p>
                     {record.reason ? (
-                      <p className="mt-1 text-xs text-ember-300">Reason: {record.reason}</p>
+                      <p className="mt-1 break-words text-xs text-ember-300">
+                        Reason: {record.reason}
+                      </p>
                     ) : null}
                     <p className="mt-1 text-xs text-metal-400">
                       Session {record.sessionId.slice(0, 8)}
@@ -1638,7 +1749,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               )}
             </div>
           </section>
-          <form action={addInactivePlayerToCurrentRoundAction}>
+          <form action={addInactivePlayerToCurrentRoundAction} className="min-w-0">
             <input type="hidden" name="roundNumber" value={currentRoundNumber} />
             <DangerousActionDialog
               action="add an inactive player to current round eligibility"
@@ -1657,7 +1768,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 name="playerId"
                 required
                 disabled={!canControl}
-                className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
               >
                 {inactivePlayers.map((player) => (
                   <option key={player.id} value={player.id}>
