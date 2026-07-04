@@ -23,14 +23,14 @@ The Phase 9 Playwright rehearsal is split into reusable page objects and flows u
   still keeps the dev server and test liveness shortcuts, so treat it as pre-release debugging only.
 - `rtk npm run test:e2e:production-flow:validate` prints and validates the production-flow
   environment without launching Playwright.
-- `rtk npm run test:e2e:production-flow` is the release-evidence browser command for Phase 7. It
+- `rtk npm run test:e2e:production-flow` is the release-evidence browser command for Phase 11. It
   requires Supabase, an explicit disposable event id, production server mode, enabled admin session
   heartbeat, enabled host heartbeat, enabled vote polling, enabled public refresh, and UI ballot
   submission. It must also prove the 48 -> 36 -> 24 -> 12 active voting-player progression across
   all four rounds.
 
 Use memory/dev smoke after routine changes. Use the production-flow command only during the grouped
-Phase 7 browser evidence window, after Phase 1 through Phase 6 remediation checks pass.
+Phase 11 browser evidence window, after the earlier remediation checks pass.
 
 Example production-flow validation setup:
 
@@ -48,6 +48,19 @@ Expected validation output includes `profile=production-flow`, `backend=supabase
 `hostHeartbeat=enabled`, `voteLivePolling=enabled`, `publicRouteRefresh=enabled`, and
 `adminActionsOnly=enabled`.
 
+For deployed/external Phase 11 evidence, also set:
+
+```powershell
+$env:E2E_SERVER_MODE = "external"
+$env:E2E_BASE_URL = "https://your-deployed-preview-or-production-url.example"
+$env:E2E_DEPLOYED_TEST_ROUTE_TOKEN = "<deployed probe token value for negative /api/e2e/* checks>"
+$env:E2E_DEPLOYED_COMMIT_SHA = "<deployed commit sha>"
+```
+
+External production-flow mode refuses to run without deployed commit evidence. The Phase 11
+production-flow run attaches projector/mobile visual evidence and image request metadata to the same
+48 -> 36 -> 24 -> 12 rehearsal.
+
 Do not use direct Supabase fixture writes as a replacement for hosted admin action coverage. They
 are acceptable only for disposable setup/teardown or deterministic diagnostics that do not perform
 the admin action being rehearsed.
@@ -57,7 +70,7 @@ the admin action being rehearsed.
 - `rtk npm run test:load:api-injection` runs the focused synthetic `/api/e2e/load-ballot` load tool.
   It defaults to 100 eligible players, multiple edits, stage connected, and spectator traffic on
   `/room`, `/charts`, and `/results`.
-- This synthetic API load is not release evidence for real player-route behavior. Phase 7 must add
+- This synthetic API load is not release evidence for real player-route behavior. Phase 11 must add
   or run browser evidence that uses `/room` and `/vote` roster selection, duplicate-username
   warnings, real form submission, edits, public route polling, and spectator/view-only traffic.
 

@@ -20,7 +20,7 @@ Use this checklist on the event machine before players arrive and before every r
   `profile=production-flow`, `backend=supabase`, production server mode, explicit disposable
   `eventId`, `adminSessionHeartbeat=enabled`, `hostHeartbeat=enabled`,
   `voteLivePolling=enabled`, `publicRouteRefresh=enabled`, and `adminActionsOnly=enabled`.
-- Run `rtk npm run test:e2e:production-flow` only as the grouped Phase 7 browser evidence command.
+- Run `rtk npm run test:e2e:production-flow` only as the grouped Phase 11 browser evidence command.
   Do not substitute `rtk npm run test:e2e`, `rtk npm run test:phase9:full`, or
   `rtk npm run test:load:api-injection` as production-flow closure evidence.
 - Confirm the grouped production-flow Playwright run starts Round 1 with 48 active voting players,
@@ -29,7 +29,8 @@ Use this checklist on the event machine before players arrive and before every r
 - Confirm each round's active count, turnout denominator, eligibility snapshot, submitted ballot
   count, and private CSV row count match the expected 48, 36, 24, or 12 count.
 - Confirm production environment variables are set in Vercel and not committed to Git.
-- Confirm Supabase migrations are applied.
+- Confirm Supabase migrations are applied through `20260704010000_normalized_voter_presence_rpc.sql`
+  with `rtk npm run supabase:migration:list`.
 - Confirm `TOURNAMENT_STATE_BACKEND=supabase` and a stable `TOURNAMENT_EVENT_ID` are configured for
   deployed or event use.
 - Run `rtk npm run import:charts` and confirm the output prints `Imported ... charts` plus required
@@ -55,6 +56,9 @@ Use this checklist on the event machine before players arrive and before every r
   privacy, tiebreak edge cases, admin workflows, 100 eligible players, real player-route behavior,
   spectator/view-only traffic, and request-rate artifacts.
 - During rehearsal, confirm private CSV auto-download and manual CSV download after final reveal.
+- During Phase 11 evidence, confirm the production-flow artifacts include
+  `phase11-deployed-visual-evidence.json`, projector screenshots at 1280x720 and 1366x768, mobile
+  `/vote` evidence, QR `/room` geometry, and local cached chart-art paths.
 - Reset rehearsal data and confirm `Tournament mode` before importing or using real event data.
 
 ## Stage Laptop Checklist
@@ -78,6 +82,8 @@ Use this checklist on the event machine before players arrive and before every r
 - Open `/room` from the QR destination.
 - Confirm the room page offers `I am a player voting` and `View charts only`.
 - Scan from at least two phones.
+- Record the manual venue-distance QR scan date, devices, and approximate distance in
+  `docs/release-checklist.md`.
 - Confirm cellular and venue Wi-Fi both work if available.
 
 ## Phone Testing Checklist

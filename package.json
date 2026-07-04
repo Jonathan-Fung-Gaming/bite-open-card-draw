@@ -24,7 +24,12 @@
     "import:charts": "tsx scripts/import-charts.ts",
     "cache:chart-images": "node --use-system-ca --import tsx scripts/cache-chart-images.ts",
     "verify:real-chart-images": "tsx scripts/verify-real-chart-images.ts",
-    "verify:release-data": "tsx scripts/verify-release-data.ts"
+    "verify:release-data": "tsx scripts/verify-release-data.ts",
+    "supabase:version": "npx supabase --version",
+    "supabase:status": "npx supabase status",
+    "supabase:migration:list": "npx supabase migration list",
+    "supabase:db:push": "npx supabase db push",
+    "supabase:db:lint": "npx supabase db lint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

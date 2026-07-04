@@ -13,6 +13,137 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 11 - Production-Flow And Visual Evidence - 2026-07-04
+
+Status: implemented and verified in local production-start mode against the linked Supabase
+database. External deployed evidence is now guarded and documented, but still requires a deployed
+URL, deployed commit SHA, and deployed e2e-route token after merge/deploy before it can be treated
+as completed release evidence.
+
+### Scope
+
+- A Phase 11 plan was written and reviewed before implementation:
+  `docs/phase-11-production-flow-deployed-evidence-plan-2026-07-04.md`.
+- The full production-flow rehearsal now attaches visual/image evidence during Round 1 voting for
+  `/stage` at 1280x720, 1366x768, and 1920x1080, plus mobile `/room -> /vote` at 390x844.
+- The visual evidence asserts two horizontal 7-card stage rows, no page overflow, QR target/size,
+  timer/QR separation, readable chart titles, centered seventh mobile card, local cached chart
+  artwork, successful image responses, and no live third-party chart-art URLs.
+- Production-flow external mode now fails fast unless the commit served by `E2E_BASE_URL` is
+  provided explicitly through `E2E_DEPLOYED_COMMIT_SHA`; the runner logs the deployed commit in
+  profile metadata.
+- The production-flow plan now asserts exact active-player counts of 48, 36, 24, and 12 and verifies
+  that each 12-player attrition batch is active before deactivation and inactive afterward.
+- QR geometry gates were raised to a 176 px minimum for projector/mobile evidence, with title
+  overflow and minimum-font checks for stage chart titles.
+- Phase 11 keeps GitHub Actions deferred until Phase 12 by removing `.github/workflows/ci.yml` and
+  updating the local CI-workflow test to assert no workflow files exist before that phase.
+- Supabase npm aliases were added for release operations:
+  `supabase:version`, `supabase:status`, `supabase:migration:list`, `supabase:db:push`, and
+  `supabase:db:lint`.
+- The Phase 9 Playwright JSON reporter was removed so ignored `test-results` artifacts do not write
+  broad environment snapshots.
+
+### Changed Files
+
+- `.github/workflows/ci.yml` removed
+- `docs/asset-audit.md`
+- `docs/deployment-readiness.md`
+- `docs/event-day-runbook.md`
+- `docs/phase-11-production-flow-deployed-evidence-plan-2026-07-04.md`
+- `docs/phase-status.md`
+- `docs/production-readiness-review-checklist-2026-07-03.md`
+- `docs/rehearsal-runbook.md`
+- `docs/release-checklist.md`
+- `docs/remediation-issue-checklist.md`
+- `docs/testing-checklist.md`
+- `package.json`
+- `playwright.env.ts`
+- `playwright.phase9.config.ts`
+- `scripts/run-playwright.mjs`
+- `scripts/write-asset-audit.ps1`
+- `src/components/QRPanel.tsx`
+- `src/components/StageDrawCard.tsx`
+- `src/lib/server/ci-workflow.test.ts`
+- `tests/e2e/full-flow.spec.ts`
+- `tests/e2e/projector-mobile-evidence.spec.ts`
+- `tests/phase9/fixtures/phase11-visual-evidence.ts`
+- `tests/phase9/fixtures/rehearsal-plan.ts`
+- `tests/phase9/flows/rehearsal.flow.ts`
+- `tests/phase9/hosted-full-rehearsal.spec.ts`
+- `tests/phase9/pages/admin.page.ts`
+
+### Checks Run
+
+- `rtk npm run test -- tests/phase9/fixtures/rehearsal-plan.test.ts src/lib/server/ci-workflow.test.ts`
+  - passed, 5 tests.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run lint` - passed.
+- `rtk npm run test` - passed, 53 files / 309 tests.
+- `rtk npm run build` - passed. An earlier parallel build/e2e attempt contended for `.next`; the
+  serial rerun passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests. An earlier parallel build/e2e attempt
+  contended for `.next`; the serial rerun passed.
+- `rtk npm run test:e2e:no-build -- --project=visual-evidence-chromium` - passed after tightening
+  the QR sizing layout to avoid 1280x720 overflow.
+- `rtk npm run test:e2e:production-flow:validate` - passed against linked Supabase event
+  `rehearsal-2026-07-03-prod-db-01`, with backend `supabase`, server mode `start`, test routes
+  disabled, and a fresh build.
+- `rtk npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
+  skipped under memory.
+- `rtk npm run test:load:player-routes` - passed.
+- `rtk npm run test:load:api-injection` - passed.
+- `rtk npm run verify:real-chart-images` - passed for 4,426 runtime charts and 639 public cache
+  files.
+- `rtk npm run verify:release-data` - passed.
+- `rtk npm run supabase:migration:list` - passed; local and remote migrations are aligned through
+  `20260704010000`.
+- `rtk npm run test:e2e:production-flow` - passed in 21.6 minutes against linked Supabase event
+  `rehearsal-2026-07-03-prod-db-01`; host-lock two-session evidence passed and the hosted four-round
+  rehearsal passed.
+- `rtk git diff --check` - passed.
+
+### Full Production-Flow Evidence
+
+- Round 1 started with 48 active voting players, prewarmed 48 voter room pages, submitted 48 valid
+  UI ballots through `/room -> /vote`, and verified public privacy, gated admin counts, final
+  reveal, and private CSV content.
+- Round 2 marked exactly 12 Round 1 voting players inactive before voting, verified the inactive
+  transition, and submitted 36 valid UI ballots.
+- Round 3 marked exactly 12 more voting players inactive before voting, verified the inactive
+  transition, and submitted 24 valid UI ballots.
+- Round 4 marked exactly 12 more voting players inactive before voting, verified the inactive
+  transition, and submitted 12 valid UI ballots.
+- The Round 1 visual artifact was written under Playwright `test-results` as
+  `phase11-deployed-visual-evidence.json` with screenshots for stage 1280x720, 1366x768, 1920x1080,
+  and mobile vote 390x844. It recorded the local production-start base URL, source/deployed commit
+  metadata from the local HEAD at test time, backend `supabase`, server mode `start`, event id
+  `rehearsal-2026-07-03-prod-db-01`, and the 176 px QR threshold.
+
+### Manual Review
+
+- Tournament rules remain unchanged: 4 rounds, 2 chart sets per round, 7 charts per set, one
+  10-minute voting window per round, 1-2 bans or explicit no-ban completion per set, least-ban
+  winners, server-decided tiebreaks, and final two-chart reveal.
+- Browser code still receives no service-role keys, password hashes, session secrets, plaintext
+  admin passwords, or tournament-changing authority.
+- Production-flow external mode now makes commit identity explicit, but no external deployed run
+  was executed in this local phase closure because the merged deployment URL/commit/token must be
+  supplied after merge/deploy.
+- No new Supabase migration was created for Phase 11. The linked database already has all local
+  migrations through `20260704010000`.
+
+### Risks And Assumptions
+
+- The automated QR geometry threshold is stronger than the prior gate, but a real phone scan at
+  venue distance remains an event-day/release checklist item.
+- The generated Playwright evidence artifacts remain ignored under `test-results`; they should be
+  attached to release records when a specific release is certified, not committed to the repo.
+- External deployed production-flow evidence should be run only against a disposable event namespace,
+  not the live tournament namespace.
+- GitHub Actions remain intentionally absent until Phase 12; release readiness before that phase is
+  proven by explicit local/deployed commands rather than workflow status.
+
 ## Production Readiness Remediation Phase 10 - Playwright Helper Upgrades - 2026-07-03
 
 Status: implemented and verified. The production-flow rehearsal now completes the required

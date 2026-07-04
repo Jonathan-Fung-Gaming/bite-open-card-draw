@@ -24,6 +24,8 @@ const PROJECTOR_VIEWPORTS = [
   { height: 1080, name: "1920x1080", width: 1920 },
 ] as const;
 const MOBILE_VOTE_VIEWPORT = { height: 844, name: "390x844", width: 390 } as const;
+const STAGE_QR_MIN_SIZE_PX = 176;
+const STAGE_TITLE_MIN_FONT_SIZE_PX = 12;
 
 type EvidenceBox = {
   height: number;
@@ -119,6 +121,31 @@ async function expectStageImagesRendered(page: Page) {
     .toBe(true);
 }
 
+async function expectStageTitlesReadable(page: Page) {
+  const titles = page.getByTestId("stage-chart-title");
+
+  await expect(titles).toHaveCount(14);
+
+  const titleEvidence = await titles.evaluateAll((elements) =>
+    elements.map((element) => {
+      const style = window.getComputedStyle(element);
+
+      return {
+        clientWidth: element.clientWidth,
+        fontSize: Number.parseFloat(style.fontSize),
+        scrollWidth: element.scrollWidth,
+        text: element.textContent?.trim() ?? "",
+      };
+    }),
+  );
+
+  for (const title of titleEvidence) {
+    expect(title.text.length).toBeGreaterThan(0);
+    expect(title.fontSize).toBeGreaterThanOrEqual(STAGE_TITLE_MIN_FONT_SIZE_PX);
+    expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth + 2);
+  }
+}
+
 async function collectStageViewportGeometry(page: Page) {
   const viewport = page.viewportSize();
   const rows = page.getByTestId("stage-set-row");
@@ -137,6 +164,7 @@ async function collectStageViewportGeometry(page: Page) {
     { timeout: 35_000 },
   );
   await expectStageImagesRendered(page);
+  await expectStageTitlesReadable(page);
   await expectNoHorizontalOverflow(page);
   await expectNoVerticalOverflow(page);
 
@@ -176,8 +204,8 @@ async function collectStageViewportGeometry(page: Page) {
   expect(timerBox).not.toBeNull();
   expect(votingBandBox).not.toBeNull();
   expect(chartRowsBox).not.toBeNull();
-  expect(qrBox!.width).toBeGreaterThan(140);
-  expect(qrBox!.height).toBeGreaterThan(140);
+  expect(qrBox!.width).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
+  expect(qrBox!.height).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
   expect(timerBox!.width).toBeGreaterThan(160);
   expect(timerBox!.height).toBeGreaterThanOrEqual(60);
   expect(intersectionArea(toEvidenceBox(qrBox!), toEvidenceBox(timerBox!))).toBeLessThanOrEqual(1);

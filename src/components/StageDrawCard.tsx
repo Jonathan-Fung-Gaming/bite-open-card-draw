@@ -47,13 +47,17 @@ export function StageDrawCard({ chart, index, variant = "standard" }: StageDrawC
         <div>
           <h3
             className={clsx(
-              "line-clamp-2 font-black uppercase leading-tight text-white",
+              "line-clamp-2 break-words font-black uppercase leading-tight text-white",
               featured ? "text-4xl xl:text-5xl" : "text-xs lg:text-sm 2xl:text-lg",
             )}
+            data-testid="stage-chart-title"
           >
             {chart?.name ?? "Awaiting Draw"}
           </h3>
-          <p className={clsx("mt-1 line-clamp-1 text-metal-300", featured ? "text-xl" : "text-sm")}>
+          <p
+            className={clsx("mt-1 line-clamp-1 break-words text-metal-300", featured ? "text-xl" : "text-sm")}
+            data-testid="stage-chart-artist"
+          >
             {chart?.artist ?? "Host control pending"}
           </p>
         </div>

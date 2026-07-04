@@ -28,6 +28,7 @@ const FALLBACK_CHART_IMAGE_PATH = "/chart-images/fallback-card.svg";
 const LOGO_ALT_TEXT = "Pump It Up Open Stage tournament logo";
 const LOGO_ROUTE_BYTE_LIMIT = 400_000;
 const BALLOT_DRAFT_STORAGE_KEY = "bite-open-card-draw:ballot-drafts:v1";
+const STAGE_QR_MIN_SIZE_PX = 176;
 
 function sanitizeFilenameSegment(value: string) {
   return (
@@ -171,8 +172,8 @@ async function expectReadableVotingAccess(page: Page) {
   expect(timerBox).not.toBeNull();
   expect(votingBandBox).not.toBeNull();
   expect(chartRowsBox).not.toBeNull();
-  expect(qrBox!.width).toBeGreaterThan(140);
-  expect(qrBox!.height).toBeGreaterThan(140);
+  expect(qrBox!.width).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
+  expect(qrBox!.height).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
   expect(timerBox?.width).toBeGreaterThan(160);
   expect(timerBox?.height).toBeGreaterThanOrEqual(60);
   expect(qrBox!.x).toBeGreaterThan(timerBox!.x + timerBox!.width - 8);

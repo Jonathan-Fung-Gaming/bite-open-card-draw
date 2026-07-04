@@ -4,6 +4,7 @@ import {
   assertRoundAttritionPlan,
   createProductionFlowRoundExpectations,
 } from "./fixtures/rehearsal-plan";
+import { collectPhase11VisualEvidence } from "./fixtures/phase11-visual-evidence";
 import { expectProductionFlowTestRoutesDisabled } from "./fixtures/production-flow-safety";
 import {
   attachRehearsalDiagnostics,
@@ -26,6 +27,7 @@ test("hosted Supabase four-round rehearsal covers result reveal and CSV @full", 
   const resolvedBaseURL = requireBaseURL(baseURL);
   const adminPage = createAdminPage(page, resolvedBaseURL);
   const roundExpectations = createProductionFlowRoundExpectations();
+  let phase11VisualEvidenceCaptured = false;
   let publicPages: RehearsalPublicPages | null = null;
   let testError: unknown = null;
 
@@ -46,6 +48,30 @@ test("hosted Supabase four-round rehearsal covers result reveal and CSV @full", 
       request,
       roundExpectations,
       rounds: [1, 2, 3, 4],
+      afterVotingOpened: async ({ expectation, roundNumber }) => {
+        if (
+          process.env.E2E_PROFILE !== "production-flow" ||
+          phase11VisualEvidenceCaptured ||
+          roundNumber !== 1
+        ) {
+          return;
+        }
+
+        const votePlayerName = expectation.activePlayers[expectation.activePlayers.length - 1];
+
+        if (!votePlayerName) {
+          throw new Error("Phase 11 visual evidence requires at least one active player.");
+        }
+
+        await collectPhase11VisualEvidence({
+          baseURL: resolvedBaseURL,
+          browser,
+          roundNumber,
+          testInfo,
+          votePlayerName,
+        });
+        phase11VisualEvidenceCaptured = true;
+      },
     });
   } catch (error) {
     testError = error;

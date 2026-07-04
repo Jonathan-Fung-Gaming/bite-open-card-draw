@@ -73,6 +73,10 @@ export async function openRehearsalPublicPages(browser: Browser, baseURL: string
 
 type RunHostedRoundOptions = {
   adminPage: AdminPage;
+  afterVotingOpened?: (options: {
+    expectation: RehearsalRoundExpectation;
+    roundNumber: number;
+  }) => Promise<void>;
   baseURL: string;
   browser: Browser;
   browserDownloadPath?: string;
@@ -84,6 +88,7 @@ type RunHostedRoundOptions = {
 
 export async function runHostedRound({
   adminPage,
+  afterVotingOpened,
   baseURL,
   browser,
   browserDownloadPath,
@@ -111,6 +116,7 @@ export async function runHostedRound({
     await assertRoundEligibility(publicPages.vote, adminPage, roundNumber, expectation);
     console.log(`[phase9] round ${roundNumber}: assert initial public voting denominator`);
     await expectPublicInitialVotingState(publicPages, roundNumber, expectation);
+    await afterVotingOpened?.({ expectation, roundNumber });
     await submitRehearsalBallots({
       baseURL,
       browser,
@@ -164,6 +170,10 @@ type RunHostedRehearsalOptions = {
   publicPages: RehearsalPublicPages;
   request: APIRequestContext;
   rounds: number[];
+  afterVotingOpened?: (options: {
+    expectation: RehearsalRoundExpectation;
+    roundNumber: number;
+  }) => Promise<void>;
   browserDownloadPathForRound?: (roundNumber: number) => string | undefined;
   roundExpectations?: readonly RehearsalRoundExpectation[];
 };
@@ -175,6 +185,7 @@ export async function runHostedRehearsal({
   publicPages,
   request,
   rounds,
+  afterVotingOpened,
   browserDownloadPathForRound,
   roundExpectations,
 }: RunHostedRehearsalOptions) {
@@ -191,6 +202,7 @@ export async function runHostedRehearsal({
 
     await runHostedRound({
       adminPage,
+      afterVotingOpened,
       baseURL,
       browser,
       browserDownloadPath: browserDownloadPathForRound?.(roundNumber),
@@ -228,7 +240,9 @@ async function prepareRosterForRound(
     console.log(
       `[phase9] round ${expectation.roundNumber}: mark ${expectation.playersToMarkInactiveBeforeRound.length} players inactive before voting`,
     );
+    await adminPage.expectPlayersActive(expectation.playersToMarkInactiveBeforeRound, true);
     await adminPage.markPlayersInactive(expectation.playersToMarkInactiveBeforeRound);
+    await adminPage.expectPlayersActive(expectation.playersToMarkInactiveBeforeRound, false);
   }
 
   await adminPage.expectActiveCount(expectation.activePlayerCount);

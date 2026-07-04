@@ -126,6 +126,7 @@ const e2eAllowLocalPublicUrl =
   (isLocalBaseURL(e2eBaseURL) ? "true" : "false");
 const e2eUseAdminActionsOnly =
   process.env.E2E_USE_ADMIN_ACTIONS_ONLY ?? (e2eProfile === "production-flow" ? "true" : "false");
+const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
 
 if (e2eProfile === "production-flow") {
   const errors: string[] = [];
@@ -140,6 +141,12 @@ if (e2eProfile === "production-flow") {
 
   if (!explicitE2eTournamentEventId) {
     errors.push("E2E_TOURNAMENT_EVENT_ID must be explicit.");
+  }
+
+  if (e2eServerMode === "external" && !e2eDeployedCommit) {
+    errors.push(
+      "external production-flow mode requires E2E_DEPLOYED_COMMIT_SHA so deployed evidence is tied to the commit served by E2E_BASE_URL.",
+    );
   }
 
   if (e2eDisableAdminSessionHeartbeat === "true") {

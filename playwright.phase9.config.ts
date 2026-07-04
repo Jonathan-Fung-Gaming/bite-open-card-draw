@@ -10,10 +10,7 @@ export default defineConfig({
   },
   fullyParallel: false,
   workers: 1,
-  reporter: [
-    ["list", { printSteps: true }],
-    ["json", { outputFile: "test-results/phase9/results.json" }],
-  ],
+  reporter: [["list", { printSteps: true }]],
   use: {
     baseURL: e2eBaseURL,
     acceptDownloads: true,
