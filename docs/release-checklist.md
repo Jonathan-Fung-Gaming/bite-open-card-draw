@@ -68,6 +68,17 @@ workflow.
 - [x] Current source branch recorded for Phase 12 PR: `codex/phase-12-release-metadata-closure`.
 - [ ] Deployed commit recorded: pending deployed URL/deployment metadata.
 - [x] Reviewer/operator recorded for source closure: `Codex`.
+- [ ] Deployed chart-art cache probe passes: a sampled `/chart-images/cache/*.png` URL from
+      `rtk npm run verify:real-chart-images` returns 200 from the deployed URL.
+- [ ] Deployed route image evidence for `/stage`, `/charts`, `/vote`, and `/results` uses
+      `/chart-images/cache/*` where chart cards are rendered, not only
+      `/chart-images/fallback-card.svg`.
+- [ ] Deployed `/stage` QR evidence shows an absolute public `/room` URL for the event origin.
+- [ ] Phase 0 negative production evidence has been cleared by a newer deployment: on 2026-07-05,
+      `https://bite-open-card-draw.vercel.app` pointed to deployment
+      `dpl_CbcYUupwVHcCXXPPH6gE3AquE8Y5`; sampled cache path
+      `/chart-images/cache/72c9c23d2dabd62504d6a6c5.png` returned 404, while fallback SVG
+      returned 200. Do not treat that deployment as real cached artwork evidence.
 
 ## Remediation Gate
 

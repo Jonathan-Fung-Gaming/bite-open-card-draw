@@ -162,6 +162,43 @@ local demos, or single-process development only.
 14. Mark inactive/eliminated players before opening voting.
 15. Confirm duplicate active usernames are blocked.
 
+## Post-Deployment Image And QR Smoke
+
+Run this against every deployed preview or production URL before using it for rehearsal or event
+operation.
+
+1. Record the deployed URL, Vercel deployment id, deployed source commit, and deployment time.
+2. Confirm `NEXT_PUBLIC_SITE_URL` in the deployed environment is the same public origin that phones
+   should open.
+3. Run `rtk npm run verify:real-chart-images` locally and copy one
+   `Sample runtime cached artwork` path from the output.
+4. Probe that exact path on the deployed URL. It must return 200. Example:
+
+   ```powershell
+   rtk proxy powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://your-deployment.example/chart-images/cache/<sample>.png' -Method Head"
+   ```
+
+5. Probe the fallback asset too. It should return 200, but it must not be the only chart art used by
+   live chart cards:
+
+   ```powershell
+   rtk proxy powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://your-deployment.example/chart-images/fallback-card.svg' -Method Head"
+   ```
+
+6. Open `/stage` and `/charts` on the deployed URL and record route/network evidence that chart-card
+   images request `/chart-images/cache/*`. During a rehearsal state that renders phone/result cards,
+   repeat the check for `/vote` and `/results`.
+7. Inspect `/stage` and record the QR target. It must be an absolute public `/room` URL for the same
+   deployed/event origin.
+8. If a tracked cache PNG returns 404 from the deployed URL, classify the issue as a deployment
+   artifact problem before changing app code. Check the deployed branch/commit, Vercel uploaded file
+   count, ignored files, and whether the deployment was created before `public/chart-images/cache`
+   was populated.
+9. `data/generated/*.json` files are ignored/reproducible local release artifacts under the current
+   repository strategy. The deployed runtime can fall back to `data/source/charts.csv` and derive the
+   public cache path from `bg_img`; the deploy-critical asset is `public/chart-images/cache/*` unless
+   the build strategy is later changed to generate and include the JSON artifacts.
+
 ## Phase 11 Production-Flow Evidence
 
 Local production-build evidence:
