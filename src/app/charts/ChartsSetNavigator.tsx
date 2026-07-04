@@ -24,18 +24,34 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hydrated, setHydrated] = useState(false);
   const maxActiveIndex = Math.max(sets.length - 1, 0);
-  const boundedActiveIndex = Math.min(Math.max(activeIndex, 0), maxActiveIndex);
+  const drawnIndexes = sets.flatMap(({ draw }, index) => (draw ? [index] : []));
+  const partiallyDrawn = drawnIndexes.length > 0 && drawnIndexes.length < sets.length;
+  const fallbackActiveIndex = partiallyDrawn ? (drawnIndexes[0] ?? 0) : 0;
+  const activeIndexIsAvailable =
+    activeIndex >= 0 &&
+    activeIndex <= maxActiveIndex &&
+    (!partiallyDrawn || Boolean(sets[activeIndex]?.draw));
+  const boundedActiveIndex = activeIndexIsAvailable
+    ? Math.min(Math.max(activeIndex, 0), maxActiveIndex)
+    : fallbackActiveIndex;
   const activeSet = sets[boundedActiveIndex];
 
   useEffect(() => {
     const storedIndex = Number(window.sessionStorage.getItem(ACTIVE_SET_STORAGE_KEY));
 
-    if (Number.isInteger(storedIndex) && storedIndex >= 0 && storedIndex <= maxActiveIndex) {
+    if (
+      Number.isInteger(storedIndex) &&
+      storedIndex >= 0 &&
+      storedIndex <= maxActiveIndex &&
+      (!partiallyDrawn || Boolean(sets[storedIndex]?.draw))
+    ) {
       setActiveIndex(storedIndex);
+    } else if (partiallyDrawn) {
+      setActiveIndex(fallbackActiveIndex);
     }
 
     setHydrated(true);
-  }, [maxActiveIndex]);
+  }, [fallbackActiveIndex, maxActiveIndex, partiallyDrawn, sets]);
 
   useEffect(() => {
     if (!hydrated) {
@@ -51,7 +67,7 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              View only
+              View-only chart browser
             </p>
             <h2 className="mt-1 text-xl font-black uppercase text-white">{status.label}</h2>
           </div>
@@ -62,36 +78,62 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
           ) : null}
         </div>
         <p className="mt-2 text-sm text-metal-300">{status.detail}</p>
+        <p
+          className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-metal-400"
+          data-testid="view-only-navigation-note"
+        >
+          Navigation only. No votes are recorded here.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:hidden" role="tablist" aria-label="Chart sets">
-        {sets.map(({ set }, index) => (
-          <button
-            key={set.displayLabel}
-            aria-controls={`view-only-set-${set.setOrder}`}
-            aria-selected={boundedActiveIndex === index}
-            className={clsx(
-              "rounded border px-3 py-3 text-sm font-black uppercase",
-              boundedActiveIndex === index
-                ? "border-ember-300 bg-ember-900/35 text-white"
-                : "border-metal-700 bg-black/25 text-metal-300",
-            )}
-            disabled={!hydrated}
-            onClick={() => setActiveIndex(index)}
-            role="tab"
-            type="button"
-          >
-            Set {set.setOrder}
-            <span className="block font-mono text-xs">{set.displayLabel}</span>
-          </button>
-        ))}
+      <div
+        className="grid grid-cols-2 gap-2 md:hidden"
+        role="tablist"
+        aria-label="View-only chart sets"
+      >
+        {sets.map(({ set, draw }, index) => {
+          const tabAvailable = !partiallyDrawn || Boolean(draw);
+
+          return (
+            <a
+              key={set.displayLabel}
+              aria-controls={`view-only-set-${set.setOrder}`}
+              aria-disabled={tabAvailable ? undefined : "true"}
+              aria-selected={boundedActiveIndex === index}
+              className={clsx(
+                "rounded border px-3 py-3 text-sm font-black uppercase",
+                boundedActiveIndex === index
+                  ? "border-ember-300 bg-ember-900/35 text-white"
+                  : "border-metal-700 bg-black/25 text-metal-300",
+                !tabAvailable && "opacity-55",
+              )}
+              href={tabAvailable ? `#view-only-set-${set.setOrder}` : "#"}
+              onClick={(event) => {
+                if (!tabAvailable) {
+                  event.preventDefault();
+                  setActiveIndex(fallbackActiveIndex);
+                  return;
+                }
+
+                setActiveIndex(index);
+              }}
+              role="tab"
+            >
+              View Set {set.setOrder}
+              <span className="block font-mono text-xs">{set.displayLabel}</span>
+            </a>
+          );
+        })}
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
         {sets.map(({ set, draw }, index) => (
           <div
             key={set.displayLabel}
-            className={clsx(index === boundedActiveIndex ? "block" : "hidden", "md:block")}
+            className={clsx(
+              !hydrated || index === boundedActiveIndex ? "block" : "hidden",
+              "md:block",
+            )}
             id={`view-only-set-${set.setOrder}`}
             role="tabpanel"
           >

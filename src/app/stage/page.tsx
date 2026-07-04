@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   CountdownTimer,
   QRPanel,
@@ -20,6 +21,10 @@ import { formatVotingTime, type VotingRoundSnapshot } from "@/lib/vote/voting-wi
 import { StageAutoRefresh } from "./StageAutoRefresh";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Stage Display",
+};
 
 function stageStatus(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean) {
   if (!bothSetsDrawn) {

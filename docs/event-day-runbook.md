@@ -69,6 +69,9 @@ Use this checklist on the event machine before players arrive and before every r
 - Confirm chart card titles fit at projector resolution.
 - Confirm the timer and QR panel are readable from the room.
 - Disable browser UI or use fullscreen if the venue setup expects it.
+- If `/stage` shows `Stage view interrupted`, wait for the automatic retry. If it remains
+  interrupted, confirm `/coolguy69` is healthy on the host laptop, then refresh the projector
+  browser.
 
 ## Projector / Stream Capture Checklist
 

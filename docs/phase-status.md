@@ -15,6 +15,133 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## UX/UI Tournament Readiness Phase 4 - Room, View-Only, And Results Clarity - 2026-07-05
+
+Status: complete for local source, unit, build, and browser evidence. This phase did not change
+tournament rules or database schema. Supabase migrations are not applicable.
+
+### Scope
+
+- Added and reviewed the phase plan:
+  `docs/ux-ui-phase-4-room-view-results-clarity-plan-2026-07-05.md`.
+- Made `/room` dynamic and added concise current-round/status context while preserving the exact
+  required choices `I am a player voting` and `View charts only`.
+- Added light `/room` auto-refresh so already-open room pages update as the host draws charts,
+  opens voting, and releases results.
+- Rewrote `/charts` waiting/ready copy in spectator-safe event language and removed public
+  reroll/ballot-invalidation wording.
+- Added distinct `/charts` copy for no-set, one-set, and both-sets-drawn states.
+- Made mobile `/charts` read as a view-only chart browser, exposed anchor targets for set tabs, and
+  kept panels server-visible until hydration takes over.
+- Prevented stale mobile set-tab state from hiding the only drawn set during one-set-drawn states.
+- Added current-round pending and previous-round notice panels to `/results`.
+- Replaced public `/vote` missing-result fallback wording that referenced result computation and
+  committed snapshots.
+- Added route-specific browser titles for `/room`, `/stage`, `/vote`, `/charts`, `/results`, and
+  `/coolguy69`.
+- Added automatic retry and clearer projector recovery copy to the `/stage` error boundary, plus a
+  matching event-day runbook note.
+- Eager-loaded public view-only chart images so the `/charts` inspection page and mobile WebKit
+  evidence reliably render visible artwork.
+
+### Checklist Items Closed
+
+- `UXR-011`
+- `UXR-012`
+- `UXR-017`
+- `UXR-018`
+- `UXR-019`
+- `UXR-020`
+- `UXR-021`
+- `UXR-023`
+
+### Evidence
+
+- `tests/e2e/mobile-routes.spec.ts` captures `uxr-012-mobile-room-awaiting-draw.png`,
+  `uxr-018-mobile-charts-one-set-drawn.png`, `uxr-019-mobile-results-pending.png`, existing mobile
+  `/charts` set screenshots, and asserts route titles, room auto-refresh, required `/room` links,
+  no public internal copy, partial-draw stale-tab recovery, view-only navigation labels, no ballot
+  controls on `/charts`, and no horizontal overflow.
+- `tests/e2e/full-flow.spec.ts` asserts `/stage`, `/room`, `/charts`, and `/coolguy69` route titles,
+  verifies one-set `/charts` copy during the live draw flow, and captures
+  `uxr-019-results-previous-round-fallback.png` after Round 1 is final and Round 2 is not final.
+- `src/app/stage/error.test.ts` verifies the stage error boundary renders automatic retry copy,
+  manual retry, projector recovery instructions, and calls `reset()` after the auto-retry delay.
+
+### Changed Files
+
+- `docs/event-day-runbook.md`
+- `docs/phase-status.md`
+- `docs/ux-ui-phase-4-room-view-results-clarity-plan-2026-07-05.md`
+- `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md`
+- `src/app/charts/ChartsSetNavigator.tsx`
+- `src/app/charts/page.tsx`
+- `src/app/coolguy69/page.tsx`
+- `src/app/layout.tsx`
+- `src/app/results/page.tsx`
+- `src/app/room/RoomAutoRefresh.tsx`
+- `src/app/room/page.tsx`
+- `src/app/stage/error.test.ts`
+- `src/app/stage/error.tsx`
+- `src/app/stage/page.tsx`
+- `src/app/vote/page.tsx`
+- `src/components/PublicDrawSetPanel.tsx`
+- `tests/e2e/full-flow.spec.ts`
+- `tests/e2e/mobile-routes.spec.ts`
+
+### Checks Run
+
+- `rtk npm run test -- src/app/stage/error.test.ts` - passed, 2 tests.
+- `rtk npm run test:e2e -- tests/e2e/mobile-routes.spec.ts` - passed, 2 Playwright tests.
+- `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts` - passed, 3 Playwright tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 54 files / 316 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- Earlier focused mobile e2e runs exposed two implementation/test issues: admin setup was trying to
+  click host controls after navigating the same page to public routes, and mobile WebKit did not
+  complete lazy public chart-image loads before the metadata check. The final passing run uses a
+  separate public evidence page and eager public chart images.
+- Post-implementation review found that `/room` needed refresh behavior, the stage retry timer
+  needed direct verification, and a remembered Set 2 mobile tab could hide the only drawn set during
+  one-set-drawn `/charts` states. These were fixed before final gates were rerun.
+- One final full e2e attempt reached the manual CSV section as the old 300-second full-flow test
+  budget expired; the expanded smoke test budget is now 420 seconds and the final full e2e rerun
+  passed.
+
+### Manual Review
+
+- Product rules were unchanged: four rounds, two chart sets per round, seven charts per set, one
+  10-minute voting window, explicit no-ban completion, least-ban selection, backend-decided
+  tiebreaks, and final two-chart stage reveal remain intact.
+- `/room` still offers the exact required choices and does not collect identity or submit votes.
+- `/charts` remains view-only: no username selector, ballot controls, submit action, or
+  turnout-affecting behavior was added.
+- The anti-spoiler boundary remains intact. `/vote`, `/charts`, and `/results` still show holding
+  copy until the host releases final results after the stage reveal.
+- Public routes still do not show chart-by-chart live counts during voting.
+- Security boundaries remain server-side. No browser randomness, client-side tournament decisions,
+  service-role keys, password hashes, plaintext passwords, or new tournament-changing client
+  mutations were added.
+
+### Risks And Assumptions
+
+- The `/stage` error boundary retries through Next's `reset()` every five seconds. If the underlying
+  server/backend failure persists, the runbook still instructs the operator to confirm
+  `/coolguy69` health and refresh the projector browser.
+- `/charts` now eager-loads public chart images for inspection reliability. This intentionally adds
+  earlier image requests on the view-only route, but uses the existing local cached/fallback image
+  strategy.
+- `/room` now refreshes on the same public-inspection cadence used by view-only public routes.
+  Background tabs may still be browser-throttled, so users can manually navigate if a venue phone is
+  heavily throttled.
+- Full production-flow 48 -> 36 -> 24 -> 12 rehearsal evidence was not rerun because this phase
+  targeted public route clarity and local memory-backend browser evidence passed. The
+  release-blocking full rehearsal remains part of the later closure gate.
+- No database schema, RPC, or Supabase migration changed in this phase.
+
 ## UX/UI Tournament Readiness Phase 3 - Phone And Stage Chart Readability - 2026-07-05
 
 Status: complete for local source, unit, build, and browser evidence. This phase did not change

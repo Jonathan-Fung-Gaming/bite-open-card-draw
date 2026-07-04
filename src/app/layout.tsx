@@ -13,7 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pump It Up Open Stage",
+  title: {
+    default: "Pump It Up Open Stage",
+    template: "%s | Pump It Up Open Stage",
+  },
   description: "Tournament draw, voting, and stage visualization for Pump It Up Open Stage.",
 };
 
