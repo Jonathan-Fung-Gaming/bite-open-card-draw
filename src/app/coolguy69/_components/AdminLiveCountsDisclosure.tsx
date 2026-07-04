@@ -8,10 +8,7 @@ type AdminLiveCountsDisclosureProps = {
   action: (roundNumber: 1 | 2 | 3 | 4) => Promise<AdminLiveCountSet[]>;
 };
 
-export function AdminLiveCountsDisclosure({
-  roundNumber,
-  action,
-}: AdminLiveCountsDisclosureProps) {
+export function AdminLiveCountsDisclosure({ roundNumber, action }: AdminLiveCountsDisclosureProps) {
   const [liveCountRows, setLiveCountRows] = useState<AdminLiveCountSet[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -33,6 +30,11 @@ export function AdminLiveCountsDisclosure({
     });
   }
 
+  function hideLiveCounts() {
+    setLiveCountRows(null);
+    setMessage("Live counts hidden.");
+  }
+
   return (
     <section className="metal-panel rounded-lg p-4" data-testid="admin-live-counts">
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -44,14 +46,26 @@ export function AdminLiveCountsDisclosure({
           Keep this closed on projector or stream. This warning does not require another password
           because it does not change tournament state.
         </p>
-        <button
-          className="button-metal mt-4 rounded px-4 py-2 text-sm font-black uppercase disabled:opacity-40"
-          disabled={isPending}
-          onClick={revealLiveCounts}
-          type="button"
-        >
-          {liveCountRows ? "Refresh live counts" : "Show live counts"}
-        </button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            aria-expanded={Boolean(liveCountRows)}
+            className="button-metal rounded px-4 py-2 text-sm font-black uppercase disabled:opacity-40"
+            disabled={isPending}
+            onClick={revealLiveCounts}
+            type="button"
+          >
+            {liveCountRows ? "Refresh live counts" : "Show live counts"}
+          </button>
+          {liveCountRows ? (
+            <button
+              className="rounded border border-metal-700 px-4 py-2 text-sm font-black uppercase text-metal-300 hover:border-ember-300/50 hover:text-white"
+              onClick={hideLiveCounts}
+              type="button"
+            >
+              Hide live counts
+            </button>
+          ) : null}
+        </div>
         {message ? (
           <p className="mt-3 text-sm text-ember-300" role="alert">
             {message}
@@ -69,9 +83,12 @@ export function AdminLiveCountsDisclosure({
                   <p className="font-bold text-white">{set.displayLabel}</p>
                   <ol className="mt-2 grid gap-1 text-sm text-metal-300">
                     {set.rows.map((row) => (
-                      <li key={row.id} className="flex justify-between gap-3">
-                        <span>{row.name}</span>
-                        <span className="font-mono text-ember-300">{row.banCount}</span>
+                      <li
+                        key={row.id}
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3"
+                      >
+                        <span className="min-w-0 break-words text-white">{row.name}</span>
+                        <span className="shrink-0 font-mono text-ember-300">{row.banCount}</span>
                       </li>
                     ))}
                   </ol>

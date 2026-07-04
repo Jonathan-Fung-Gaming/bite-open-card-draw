@@ -15,6 +15,117 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## UX/UI Tournament Readiness Phase 5 - Admin Secondary Panels, Host Lock, Counts, And Data Exposure - 2026-07-05
+
+Status: complete for local source, unit, build, and browser evidence. This phase did not change
+tournament rules or database schema. Supabase migrations are not applicable.
+
+### Scope
+
+- Added and reviewed the phase plan:
+  `docs/ux-ui-phase-5-admin-secondary-panels-plan-2026-07-05.md`.
+- Expanded `/coolguy69` host-lock presentation with active/read-only/no-host context, short owner
+  session prefix, takeover/expiry guidance, and visible heartbeat confidence using the existing
+  host heartbeat server action.
+- Kept host-lock enforcement unchanged: non-host controls remain disabled, normal host control stays
+  server-side, and forced takeover remains password and audit-reason gated.
+- Added `Hide live counts` to the admin live-count disclosure, kept chart rows absent when hidden,
+  and contained live-count row names with a fixed count column.
+- Hardened long-name containment across roster rows, draw controls, manual ballot correction,
+  chart eligibility rows, live counts, dangerous-action summaries, audit snippets, and native admin
+  selects.
+- Replaced the public `/charts` client props with a display-safe chart view model that omits draw
+  metadata, eligibility snapshots, reasons, timestamps, source image URLs, chart keys, and song keys.
+
+### Checklist Items Closed
+
+- `UXR-029`
+- `UXR-030`
+- `UXR-032`
+- `UXR-033`
+
+### Evidence
+
+- `tests/e2e/full-flow.spec.ts` asserts no-host, active-host, and second-browser read-only host-lock
+  context plus heartbeat confidence UI, then captures admin evidence through the full smoke flow.
+- `uxr-032-admin-desktop-long-names.png` and `uxr-032-admin-narrow-long-names.png` cover seeded long
+  roster text plus deterministic long chart catalog text with desktop and narrow admin containment
+  assertions.
+- `uxr-032-admin-draw-controls-long-name.png` covers deterministic long selected-chart text inside
+  the primary admin draw-control cards after both current-round sets are drawn.
+- `uxr-030-admin-live-counts-long-name.png` covers live counts after show and refresh with
+  deterministic long live-count text contained, followed by an assertion that `Hide live counts`
+  removes chart rows from the DOM.
+- `src/lib/charts/public-chart-view.test.ts` proves the `/charts` public view model includes only
+  display-safe set/chart fields and omits draw metadata/snapshot/reason/source fields.
+- Full e2e still verifies `/charts` renders the two view-only sets and no vote controls after the
+  public prop reduction.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `docs/ux-ui-phase-5-admin-secondary-panels-plan-2026-07-05.md`
+- `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md`
+- `src/app/charts/ChartsSetNavigator.tsx`
+- `src/app/charts/page.tsx`
+- `src/app/coolguy69/_components/AdminLiveCountsDisclosure.tsx`
+- `src/app/coolguy69/_components/HostHeartbeat.tsx`
+- `src/app/coolguy69/_components/ManualBallotForm.tsx`
+- `src/app/coolguy69/page.tsx`
+- `src/components/AdminLayout.tsx`
+- `src/components/DangerousActionDialog.tsx`
+- `src/components/PublicDrawSetPanel.tsx`
+- `src/lib/charts/public-chart-view.ts`
+- `src/lib/charts/public-chart-view.test.ts`
+- `tests/e2e/full-flow.spec.ts`
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/charts/public-chart-view.test.ts` - passed, 2 tests.
+- `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "full round smoke flow"` - passed.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 55 files / 318 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- Earlier focused e2e attempts exposed two implementation/test issues: the seeded long-name roster
+  player was still active and therefore changed private CSV row expectations, and long native admin
+  select values could widen the admin page. The long-name player is now marked inactive before the
+  voting snapshot, and admin layout/select containment was fixed before final gates were rerun.
+
+### Manual Review
+
+- Product rules were unchanged: four rounds, two chart sets per round, seven charts per set, one
+  10-minute voting window, explicit no-ban completion, least-ban selection, backend-decided
+  tiebreaks, and final two-chart reveal remain intact.
+- Host-lock behavior remains aligned with `docs/product-spec.md`: one active host controls the
+  tournament, other admin browsers are read-only, heartbeat expiry enables takeover, and forced
+  takeover is explicitly password/audit gated.
+- Admin live counts remain admin-only, hidden by default, warning-gated, and passwordless because
+  they are sensitive but non-destructive. Public routes still do not show chart-by-chart live counts
+  during voting.
+- `/charts` remains view-only and public-safe: it cannot submit votes or affect turnout, and its
+  client props no longer carry full draw records or non-display draw metadata.
+- Security boundaries remain server-side. No service-role keys, password hashes, plaintext
+  passwords, browser-side tournament decisions, or new tournament-changing client mutations were
+  added.
+
+### Risks And Assumptions
+
+- The heartbeat confidence panel updates from the existing active-host heartbeat action; if a
+  browser tab is heavily throttled, the server-side host lock still remains authoritative and the UI
+  refreshes on heartbeat failure.
+- `overflow-x-hidden` on the admin root prevents native input/select internal scroll width from
+  creating page-level horizontal scroll. Playwright also asserts the relevant admin panels remain
+  visually contained at desktop and narrow widths.
+- The live-count long-name evidence uses a deterministic browser-test text fixture after counts are
+  fetched, so it proves the layout containment path without changing tournament chart data.
+- Full production-flow 48 -> 36 -> 24 -> 12 rehearsal evidence was not rerun because Phase 5
+  targeted secondary admin UX and public data shaping. The release-blocking full rehearsal remains
+  part of the Phase 6 closure gate.
+- No database schema, RPC, or Supabase migration changed in this phase.
+
 ## UX/UI Tournament Readiness Phase 4 - Room, View-Only, And Results Clarity - 2026-07-05
 
 Status: complete for local source, unit, build, and browser evidence. This phase did not change

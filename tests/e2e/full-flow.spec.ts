@@ -50,6 +50,10 @@ const PRIVATE_CSV_EVENT_ID = sanitizeFilenameSegment(
 const PRIVATE_CSV_FILENAME_PATTERN = new RegExp(
   `^${escapeRegExp(PRIVATE_CSV_EVENT_ID)}-round-1-private-ballots-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z-[a-f0-9]{8}\\.csv$`,
 );
+const PHASE5_LONG_USERNAME =
+  "Phase5_Long_StartGG_Username_With_No_Breakpoints_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const PHASE5_LONG_CHART_FIXTURE =
+  "Phase5DeterministicLiveCountChartNameWithoutNaturalBreakpointsABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 type EvidenceBox = {
   height: number;
@@ -335,6 +339,16 @@ async function expectAdminEventDayFlow(page: Page) {
   const selectedPoolDetails = chartEligibility.locator("details").first();
 
   await expect(hostControl).toContainText("Host Lock");
+  await expect(hostControl.getByTestId("admin-host-lock-context")).toContainText(
+    "This browser is active host",
+  );
+  await expect(hostControl.getByTestId("admin-host-lock-context")).toContainText("Active owner");
+  await expect(hostControl.getByTestId("admin-host-lock-context")).toContainText(
+    "Takeover clarity",
+  );
+  await expect(hostControl.getByTestId("host-heartbeat-confidence")).toContainText(
+    "Heartbeat confidence",
+  );
   await expect(hostControl.getByRole("button", { name: "Release" })).toBeVisible();
   await expect(readiness).toContainText("Host control");
   await expect(readiness).toContainText("Active players");
@@ -373,6 +387,91 @@ async function expectAdminEventDayFlow(page: Page) {
   expect(votingTop).toBeLessThan(manualTop);
   expect(manualTop).toBeLessThan(resultsTop);
   expect(resultsTop).toBeLessThan(chartEligibilityTop);
+}
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+
+  if (overflow <= 4) {
+    return;
+  }
+
+  const offenders = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("body *"))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const overflowPx = element.scrollWidth - element.clientWidth;
+
+        return {
+          className: element.getAttribute("class") ?? "",
+          overflowPx,
+          tagName: element.tagName.toLowerCase(),
+          text: element.textContent?.trim().slice(0, 120) ?? "",
+          width: Math.round(rect.width),
+        };
+      })
+      .filter((entry) => entry.overflowPx > 4)
+      .sort((left, right) => right.overflowPx - left.overflowPx)
+      .slice(0, 8),
+  );
+
+  expect(
+    overflow,
+    `Horizontal overflow offenders: ${JSON.stringify(offenders, null, 2)}`,
+  ).toBeLessThanOrEqual(4);
+}
+
+async function expectVisibleContainersDoNotOverflow(locator: Locator, label: string) {
+  const rows = await locator.evaluateAll((elements) =>
+    elements
+      .map((element, index) => {
+        const rect = element.getBoundingClientRect();
+
+        return {
+          clientWidth: element.clientWidth,
+          index,
+          scrollWidth: element.scrollWidth,
+          visible: rect.width > 0 && rect.height > 0,
+        };
+      })
+      .filter((entry) => entry.visible),
+  );
+
+  for (const row of rows) {
+    expect(
+      row.scrollWidth,
+      `${label} ${row.index} should contain horizontal content`,
+    ).toBeLessThanOrEqual(row.clientWidth + 4);
+  }
+}
+
+async function expectAdminSecondaryPanelsContained(page: Page) {
+  await expectNoHorizontalOverflow(page);
+  await expectVisibleContainersDoNotOverflow(
+    page.getByTestId("admin-host-control-panel"),
+    "host lock panel",
+  );
+  await expectVisibleContainersDoNotOverflow(page.getByTestId("admin-roster-row"), "roster row");
+  await expectVisibleContainersDoNotOverflow(
+    page.getByTestId("admin-draw-control-card"),
+    "draw control card",
+  );
+  await expectVisibleContainersDoNotOverflow(
+    page.getByTestId("admin-chart-exclusion-row"),
+    "chart exclusion row",
+  );
+  await expectVisibleContainersDoNotOverflow(
+    page.getByTestId("admin-live-counts"),
+    "live counts panel",
+  );
+  await expectVisibleContainersDoNotOverflow(
+    page.locator("form", {
+      has: page.getByRole("heading", { name: "Manual Ballot Correction" }),
+    }),
+    "manual ballot panel",
+  );
 }
 
 async function collectLocatorBoxes(locator: Locator) {
@@ -921,15 +1020,74 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     mobileWaitingPage,
   );
 
-  await loginAndTakeHost(page);
+  await goto(page, "/coolguy69");
+  await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Log In" }));
+  await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
+  await expect(page.getByTestId("admin-host-lock-context")).toContainText("No active host");
+  await expect(page.getByTestId("host-heartbeat-confidence")).toContainText("No active heartbeat");
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Take Host Control" }));
+  await expect(page.getByRole("button", { name: "Release" })).toBeEnabled({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await expect(page).toHaveTitle("Host Console | Pump It Up Open Stage");
   await expectAdminEventDayFlow(page);
+  const readonlyContext = await browser.newContext({
+    acceptDownloads: true,
+    baseURL,
+  });
+  const readonlyPage = await readonlyContext.newPage();
+
+  await goto(readonlyPage, "/coolguy69");
+  await readonlyPage.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
+  await clickAdminActionAndWait(readonlyPage, readonlyPage.getByRole("button", { name: "Log In" }));
+  await expect(readonlyPage.getByTestId("admin-host-lock-context")).toContainText(
+    "Read-only admin",
+  );
+  await expect(readonlyPage.getByTestId("admin-host-lock-context")).toContainText(
+    "Force takeover is gated",
+  );
+  await expect(readonlyPage.getByTestId("host-heartbeat-confidence")).toContainText(
+    "Read-only until takeover",
+  );
+  await expect(readonlyPage.getByRole("button", { name: "Force Host Takeover" })).toBeVisible();
+  await readonlyContext.close();
   await captureEvidenceScreenshot(testInfo, "uxr-phase1-admin-event-day-flow.png", page);
   await page
     .getByPlaceholder("Bulk import start.gg usernames")
-    .fill("Alpha\nBravo\nCharlie\nDelta");
+    .fill(`Alpha\nBravo\nCharlie\nDelta\n${PHASE5_LONG_USERNAME}`);
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Bulk Import" }));
-  await expect(page.getByRole("cell", { name: "Alpha", exact: true })).toBeVisible();
+  await expect(page.getByTestId("admin-roster-row").filter({ hasText: "Alpha" })).toBeVisible();
+  await expect(
+    page.getByTestId("admin-roster-row").filter({ hasText: PHASE5_LONG_USERNAME }),
+  ).toBeVisible();
+  await clickAdminActionAndWait(
+    page,
+    page
+      .getByTestId("admin-roster-row")
+      .filter({ hasText: PHASE5_LONG_USERNAME })
+      .getByRole("button", { name: "Mark Inactive" }),
+  );
+  await expect(
+    page.getByTestId("admin-roster-row").filter({ hasText: PHASE5_LONG_USERNAME }),
+  ).toHaveAttribute("data-active", "false");
+
+  const chartEligibility = page
+    .getByText("Chart Eligibility", { exact: true })
+    .locator("xpath=ancestor::section[1]");
+  const selectedPoolDetails = chartEligibility.locator("details").first();
+
+  if (!(await selectedPoolDetails.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await selectedPoolDetails.locator("summary").click();
+  }
+
+  await expect(chartEligibility).toContainText("Pneumonoultramicroscopicsilicovolcanoconiosis");
+  await expectAdminSecondaryPanelsContained(page);
+  await captureEvidenceScreenshot(testInfo, "uxr-032-admin-desktop-long-names.png", page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectAdminSecondaryPanelsContained(page);
+  await captureEvidenceScreenshot(testInfo, "uxr-032-admin-narrow-long-names.png", page);
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   const stagePage = await page.context().newPage();
   await goto(stagePage, "/stage");
@@ -985,6 +1143,14 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(stagePage.getByText(/Version 1 \/ (Revealing [0-7] \/ 7|Pool)/)).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+  await page
+    .getByTestId("admin-draw-chart-name")
+    .first()
+    .evaluate((element, text) => {
+      element.textContent = text;
+    }, PHASE5_LONG_CHART_FIXTURE);
+  await expectAdminSecondaryPanelsContained(page);
+  await captureEvidenceScreenshot(testInfo, "uxr-032-admin-draw-controls-long-name.png", page);
   await goto(mobileWaitingPage, "/vote");
   await expect(
     mobileWaitingPage.getByText("The host has not opened the 10-minute voting window yet."),
@@ -1015,6 +1181,24 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     "pfr-projector-stage-voting-geometry.json",
     stageVotingGeometry,
   );
+
+  const liveCountsPanel = page.getByTestId("admin-live-counts");
+
+  await liveCountsPanel.getByRole("button", { name: "Show live counts" }).click();
+  await expect(liveCountsPanel.locator("ol li")).toHaveCount(14);
+  await liveCountsPanel.getByRole("button", { name: "Refresh live counts" }).click();
+  await expect(liveCountsPanel.locator("ol li")).toHaveCount(14);
+  await liveCountsPanel
+    .locator("ol li span")
+    .first()
+    .evaluate((element, text) => {
+      element.textContent = text;
+    }, PHASE5_LONG_CHART_FIXTURE);
+  await expectAdminSecondaryPanelsContained(page);
+  await captureEvidenceScreenshot(testInfo, "uxr-030-admin-live-counts-long-name.png", page);
+  await liveCountsPanel.getByRole("button", { name: "Hide live counts" }).click();
+  await expect(liveCountsPanel.locator("ol li")).toHaveCount(0);
+  await expect(liveCountsPanel.getByRole("button", { name: "Show live counts" })).toBeVisible();
 
   const mobileChartsPage = await page.context().newPage();
   await mobileChartsPage.setViewportSize({ width: 390, height: 844 });

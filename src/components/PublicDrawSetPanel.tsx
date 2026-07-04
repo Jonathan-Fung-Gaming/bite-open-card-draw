@@ -1,11 +1,9 @@
-import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
-import type { DrawRecord } from "@/lib/draw/draw-state";
-import type { RoundSetDefinition } from "@/lib/tournament";
+import type { PublicChartsDraw, PublicChartsSetDefinition } from "@/lib/charts/public-chart-view";
 import { ChartArtImage } from "./ChartArtImage";
 
 type PublicDrawSetPanelProps = {
-  set: RoundSetDefinition;
-  draw: DrawRecord | null;
+  set: PublicChartsSetDefinition;
+  draw: PublicChartsDraw | null;
 };
 
 export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
@@ -28,19 +26,17 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
       </div>
       {draw ? (
         <div className="public-chart-grid" data-testid="public-chart-card-row">
-          {draw.charts.map((chart, index) => {
-            const imagePath = chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH;
-
+          {draw.charts.map((chart) => {
             return (
               <article
                 key={chart.id}
                 className="overflow-hidden rounded-md border border-ember-300/25 bg-furnace-900 shadow-ember-tight"
-                data-chart-image-path={imagePath}
+                data-chart-image-path={chart.imagePath}
                 data-testid="stage-chart-card"
               >
                 <div className="relative aspect-[16/9] overflow-hidden border-b border-ember-300/15 bg-black/35">
                   <ChartArtImage
-                    src={imagePath}
+                    src={chart.imagePath}
                     loading="eager"
                     className="h-full w-full object-contain opacity-95"
                   />
@@ -48,7 +44,7 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
                 <div className="flex min-h-28 flex-col justify-between p-3">
                   <div className="flex items-center justify-between text-xs font-black uppercase tracking-[0.16em] text-ember-300">
                     <span data-testid="chart-card-difficulty">{chart.displayDifficulty}</span>
-                    <span className="font-mono">{String(index + 1).padStart(2, "0")}</span>
+                    <span className="font-mono">{String(chart.order).padStart(2, "0")}</span>
                   </div>
                   <div>
                     <h3

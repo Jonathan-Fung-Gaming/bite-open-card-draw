@@ -3,14 +3,10 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { PublicDrawSetPanel } from "@/components";
-import type { DrawRecord } from "@/lib/draw/draw-state";
-import type { RoundSetDefinition } from "@/lib/tournament";
+import type { PublicChartsSetView } from "@/lib/charts/public-chart-view";
 
 type ChartsSetNavigatorProps = {
-  sets: {
-    set: RoundSetDefinition;
-    draw: DrawRecord | null;
-  }[];
+  sets: PublicChartsSetView[];
   status: {
     label: string;
     detail: string;

@@ -109,8 +109,8 @@ export function ManualBallotForm({
       </div>
       <div className="flex items-start gap-3">
         <AlertTriangle aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-ember-300" />
-        <div>
-          <p className="font-bold text-white">
+        <div className="min-w-0">
+          <p className="break-words font-bold text-white">
             {selectedHasExistingBallot
               ? `You are about to manually replace a ballot for ${selectedUsername}.`
               : "You are about to manually enter a ballot."}
@@ -140,7 +140,7 @@ export function ManualBallotForm({
         disabled={disabled}
         value={selectedPlayerId}
         onChange={(event) => setSelectedPlayerId(event.target.value)}
-        className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+        className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
       >
         <option value="">Choose eligible player</option>
         {players.map((player) => (
@@ -152,7 +152,7 @@ export function ManualBallotForm({
 
       {selectedHasExistingBallot ? (
         <div className="mt-3 rounded border border-ember-500/40 bg-ember-900/25 p-3 text-sm text-ember-300">
-          <p>{selectedUsername} already has a submitted ballot.</p>
+          <p className="break-words">{selectedUsername} already has a submitted ballot.</p>
           <p>Replacing it may change the round result and will be marked in the private CSV.</p>
           <p>Confirm replacement below before saving.</p>
         </div>
@@ -196,9 +196,10 @@ export function ManualBallotForm({
                   return (
                     <label
                       key={chart.id}
-                      className="flex gap-2 rounded border border-metal-700 bg-black/25 p-2 text-sm text-metal-300"
+                      className="flex min-w-0 gap-2 rounded border border-metal-700 bg-black/25 p-2 text-sm text-metal-300"
                     >
                       <input
+                        className="mt-1 shrink-0"
                         checked={checked}
                         disabled={banDisabled}
                         name={`bans:${draw.id}`}
@@ -206,9 +207,9 @@ export function ManualBallotForm({
                         type="checkbox"
                         value={chart.id}
                       />
-                      <span>
+                      <span className="min-w-0 break-words">
                         <span className="font-bold text-white">{chart.name}</span>
-                        <span className="ml-2 text-xs uppercase text-ember-300">
+                        <span className="ml-2 inline-block text-xs uppercase text-ember-300">
                           {chart.displayDifficulty}
                         </span>
                       </span>
@@ -241,7 +242,9 @@ export function ManualBallotForm({
             value="yes"
             disabled={disabled}
           />
-          <span>Replace existing ballot for {selectedUsername}</span>
+          <span className="min-w-0 break-words">
+            Replace existing ballot for {selectedUsername}
+          </span>
         </label>
       ) : null}
 

@@ -73,29 +73,34 @@ export function DangerousActionDialog({
   }, [summaryItems]);
 
   return (
-    <section ref={sectionRef} className="rounded-lg border border-ember-500/35 bg-ember-900/20 p-4">
+    <section
+      ref={sectionRef}
+      className="min-w-0 rounded-lg border border-ember-500/35 bg-ember-900/20 p-4"
+    >
       {children}
       <div
         className="mt-4 flex items-start gap-3 rounded border border-ember-300/30 bg-black/25 p-3"
         data-testid="dangerous-action-summary"
       >
         <AlertTriangle aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-ember-300" />
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
             Action summary
           </p>
-          <p className="mt-1 font-bold text-white">You are about to {action}.</p>
+          <p className="mt-1 break-words font-bold text-white">You are about to {action}.</p>
           {summaryItems.length > 0 ? (
             <dl className="mt-2 grid gap-1 text-sm text-metal-300">
               {summaryItems.map((item) => (
                 <div key={item.fieldName} className="grid gap-1 sm:grid-cols-[96px_1fr]">
                   <dt className="font-bold text-metal-400">{item.label}</dt>
-                  <dd className="text-white">{summaryValues[item.fieldName] || "Not selected"}</dd>
+                  <dd className="min-w-0 break-words text-white">
+                    {summaryValues[item.fieldName] || "Not selected"}
+                  </dd>
                 </div>
               ))}
             </dl>
           ) : null}
-          <p className="mt-1 text-sm text-metal-300">This will {consequence}.</p>
+          <p className="mt-1 break-words text-sm text-metal-300">This will {consequence}.</p>
         </div>
       </div>
       <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor={passwordId}>
