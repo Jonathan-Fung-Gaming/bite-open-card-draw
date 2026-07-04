@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { AdminLayout, DangerousActionDialog, HostLockBadge, TournamentLogo } from "@/components";
 import { buildPoolCounts } from "@/lib/charts/importer";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
@@ -66,6 +67,10 @@ type AdminPageProps = {
     chartPool?: string;
     error?: string;
   }>;
+};
+
+export const metadata: Metadata = {
+  title: "Host Console",
 };
 
 function buildChartPoolRows(charts: NormalizedChart[]) {

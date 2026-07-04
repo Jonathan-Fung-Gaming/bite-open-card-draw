@@ -165,15 +165,21 @@ async function startRehearsalMode(page: Page) {
   });
 }
 
-async function drawBothSetsAndOpenVoting(page: Page) {
+async function drawFirstSet(page: Page) {
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(0));
   await expect(page.getByText(/Version 1/).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+}
+
+async function drawSecondSet(page: Page) {
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(1));
   await expect(page.getByText("ready to vote")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+}
+
+async function openVoting(page: Page) {
   await clickAdminActionAndWait(
     page,
     page.getByRole("button", { name: "Open Voting", exact: true }),
@@ -181,6 +187,18 @@ async function drawBothSetsAndOpenVoting(page: Page) {
   await expect(page.getByText("voting open")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+}
+
+async function drawBothSetsAndOpenVoting(page: Page) {
+  await drawFirstSet(page);
+  await drawSecondSet(page);
+  await openVoting(page);
+}
+
+async function expectNoInternalPublicCopy(page: Page) {
+  await expect(
+    page.getByText(/rerolled|invalidated|result computation|committed result snapshot|snapshot/i),
+  ).toHaveCount(0);
 }
 
 test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
@@ -191,8 +209,58 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
 
   if (!publicOnlyWebKitRun) {
     await loginAndTakeHost(page, "mobile route e2e takeover");
+    await expect(page).toHaveTitle("Host Console | Pump It Up Open Stage");
     await startRehearsalMode(page);
-    await drawBothSetsAndOpenVoting(page);
+    const phase4EvidencePage = await page.context().newPage();
+
+    await phase4EvidencePage.setViewportSize({ width: 390, height: 844 });
+    await goto(phase4EvidencePage, "/room");
+    await expect(phase4EvidencePage).toHaveTitle("Tournament Room | Pump It Up Open Stage");
+    await expect(phase4EvidencePage.getByTestId("room-current-status")).toContainText(
+      "Round 1 awaiting draw",
+    );
+    await captureEvidenceScreenshot(
+      testInfo,
+      "uxr-012-mobile-room-awaiting-draw.png",
+      phase4EvidencePage,
+    );
+    await expect(phase4EvidencePage.getByTestId("room-auto-refresh")).toHaveAttribute(
+      "data-refresh-enabled",
+      "true",
+    );
+    await drawFirstSet(page);
+    await phase4EvidencePage.evaluate(() => {
+      window.sessionStorage.setItem("bite-open-card-draw:view-only-active-set", "1");
+    });
+    await goto(phase4EvidencePage, "/charts");
+    await expect(phase4EvidencePage).toHaveTitle("View Charts | Pump It Up Open Stage");
+    await expect(phase4EvidencePage.getByTestId("view-only-status")).toContainText(
+      "One chart set drawn",
+    );
+    await expect(phase4EvidencePage.getByTestId("view-only-status")).toContainText(
+      "The drawn chart set is visible now",
+    );
+    await expect(phase4EvidencePage.getByTestId("view-only-navigation-note")).toContainText(
+      "No votes are recorded here",
+    );
+    await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(0)).toContainText(
+      "Draw complete",
+    );
+    await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(0)).toBeVisible();
+    await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(1)).toBeHidden();
+    await expect(phase4EvidencePage.getByRole("tab", { name: /View Set 2/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await expectNoInternalPublicCopy(phase4EvidencePage);
+    await captureEvidenceScreenshot(
+      testInfo,
+      "uxr-018-mobile-charts-one-set-drawn.png",
+      phase4EvidencePage,
+    );
+    await phase4EvidencePage.close();
+    await drawSecondSet(page);
+    await openVoting(page);
   } else {
     await goto(page, "/charts");
     const statusText = (await page.getByTestId("view-only-status").textContent()) ?? "";
@@ -205,18 +273,38 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   }
 
   await goto(page, "/room");
+  await expect(page).toHaveTitle("Tournament Room | Pump It Up Open Stage");
+  await expect(page.getByTestId("room-current-status")).toContainText("Current tournament state");
+  await expect(page.getByTestId("room-current-status")).toContainText("Round 1 voting open");
   await expect(page.getByRole("link", { name: "I am a player voting" })).toBeVisible();
   await expect(page.getByRole("link", { name: "View charts only" })).toBeVisible();
-  await expectTouchTarget(page.getByRole("link", { name: "I am a player voting" }), "room vote link");
+  await expectTouchTarget(
+    page.getByRole("link", { name: "I am a player voting" }),
+    "room vote link",
+  );
   await expectTouchTarget(page.getByRole("link", { name: "View charts only" }), "room charts link");
   await expectNoHorizontalOverflow(page);
+  await expectNoInternalPublicCopy(page);
 
   await goto(page, "/charts");
+  await expect(page).toHaveTitle("View Charts | Pump It Up Open Stage");
+  await expect(page.getByTestId("view-only-status")).toContainText("View-only chart browser");
   await expect(page.getByTestId("view-only-status")).toContainText("Voting open");
-  await expect(page.getByRole("tab", { name: /Set 1/ })).toBeVisible();
-  await expect(page.getByRole("tab", { name: /Set 2/ })).toBeVisible();
-  await expectTouchTarget(page.getByRole("tab", { name: /Set 1/ }), "charts set 1 tab");
-  await expectTouchTarget(page.getByRole("tab", { name: /Set 2/ }), "charts set 2 tab");
+  await expect(page.getByTestId("view-only-navigation-note")).toContainText(
+    "No votes are recorded here",
+  );
+  await expect(page.getByRole("tab", { name: /View Set 1/ })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /View Set 2/ })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /View Set 1/ })).toHaveAttribute(
+    "href",
+    /#view-only-set-1$/,
+  );
+  await expect(page.getByRole("tab", { name: /View Set 2/ })).toHaveAttribute(
+    "href",
+    /#view-only-set-2$/,
+  );
+  await expectTouchTarget(page.getByRole("tab", { name: /View Set 1/ }), "charts set 1 tab");
+  await expectTouchTarget(page.getByRole("tab", { name: /View Set 2/ }), "charts set 2 tab");
   await expect(page.getByTestId("stage-set-row").nth(0)).toBeVisible();
   await expect(page.getByTestId("stage-set-row").nth(1)).toBeHidden();
   await expectVisibleCardMetadata(page.getByTestId("stage-set-row").nth(0), 7);
@@ -225,7 +313,7 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
     `uxr-003-${testInfo.project.name}-mobile-charts-set-1.png`,
     page,
   );
-  await page.getByRole("tab", { name: /Set 2/ }).click();
+  await page.getByRole("tab", { name: /View Set 2/ }).click();
   await expect(page.getByTestId("stage-set-row").nth(1)).toBeVisible();
   await expectVisibleCardMetadata(page.getByTestId("stage-set-row").nth(1), 7);
   await captureEvidenceScreenshot(
@@ -236,9 +324,12 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   await expect(page.getByLabel("Select your start.gg username")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Submit Ballot" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
+  await expectNoInternalPublicCopy(page);
 
   await goto(page, "/vote");
+  await expect(page).toHaveTitle("Player Voting | Pump It Up Open Stage");
   await expectNoVagueSkipAction(page);
+  await expectNoInternalPublicCopy(page);
   await page.getByLabel("Select your start.gg username").selectOption({
     label: voterName,
   });
@@ -288,6 +379,14 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   await expectTouchTarget(page.getByRole("button", { name: "Edit S17" }), "saved edit S17");
 
   await goto(page, "/results");
+  await expect(page).toHaveTitle("Results | Pump It Up Open Stage");
   await expect(page.getByRole("heading", { name: "Round 1 Results" })).toBeVisible();
+  await expect(page.getByTestId("current-round-results-pending")).toContainText("Current Round 1");
+  await expectNoInternalPublicCopy(page);
+  await captureEvidenceScreenshot(
+    testInfo,
+    `uxr-019-${testInfo.project.name}-mobile-results-pending.png`,
+    page,
+  );
   await expectNoHorizontalOverflow(page);
 });

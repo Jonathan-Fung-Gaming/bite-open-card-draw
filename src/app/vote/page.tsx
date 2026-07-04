@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
@@ -17,6 +18,10 @@ import { BallotFlow } from "./BallotFlow";
 import { VoteAutoRefresh } from "./VoteAutoRefresh";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Player Voting",
+};
 
 export default async function VotePage() {
   await hydrateTournamentState();
@@ -80,10 +85,10 @@ export default async function VotePage() {
           <div className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300">
             {missingFinalResult ? (
               <>
-                <p>Final charts will appear here after result computation stores them.</p>
+                <p>Final charts will appear here once the host releases them.</p>
                 {phoneStatus.phase === "revealed" ? (
                   <p className="mt-3 text-sm text-metal-300">
-                    Phone reveal state is ready; the committed result snapshot is still loading.
+                    Keep this page open; it will update after the host finishes the stage check.
                   </p>
                 ) : null}
               </>

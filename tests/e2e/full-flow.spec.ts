@@ -789,7 +789,7 @@ async function expectOpenPublicPagesAfterReset({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await chartsPage.bringToFront();
-  await expect(chartsPage.getByText("Awaiting host draw").first()).toBeVisible({
+  await expect(chartsPage.getByText("Awaiting first chart set").first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await resultsPage.bringToFront();
@@ -797,9 +797,7 @@ async function expectOpenPublicPagesAfterReset({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await votePage.bringToFront();
-  await expect(
-    votePage.getByText("The host is drawing the two chart sets."),
-  ).toBeVisible({
+  await expect(votePage.getByText("The host is drawing the two chart sets.")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
@@ -830,6 +828,18 @@ async function expectOpenPublicPagesAfterRoundAdvance({
   await expect(votePage.locator("header").getByText("Round 2")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+}
+
+async function setCurrentRoundFromAdmin(page: Page, roundNumber: string) {
+  const currentRoundForm = page.locator("form", {
+    has: page.getByRole("button", { name: "Set Current Round" }),
+  });
+
+  await currentRoundForm.locator('select[name="roundNumber"]').selectOption(roundNumber);
+  await clickAdminActionAndWait(
+    page,
+    currentRoundForm.getByRole("button", { name: "Set Current Round" }),
+  );
 }
 
 async function currentStageFinalChartNames(stagePage: Page) {
@@ -886,20 +896,25 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   browser,
   baseURL,
 }, testInfo) => {
-  test.setTimeout(300_000);
+  test.setTimeout(420_000);
 
   await collectLogoRoutePerformanceEvidence(browser, baseURL, testInfo);
 
   await goto(page, "/stage");
+  await expect(page).toHaveTitle("Stage Display | Pump It Up Open Stage");
   await expect(page.getByText("Round 1 Draw")).toBeVisible();
 
   await goto(page, "/room");
+  await expect(page).toHaveTitle("Tournament Room | Pump It Up Open Stage");
+  await expect(page.getByTestId("room-current-status")).toContainText("Round 1 awaiting draw");
   await expect(page.getByRole("link", { name: "I am a player voting" })).toBeVisible();
   await expect(page.getByRole("link", { name: "View charts only" })).toBeVisible();
   const mobileWaitingPage = await page.context().newPage();
   await mobileWaitingPage.setViewportSize({ width: 390, height: 844 });
   await goto(mobileWaitingPage, "/vote");
-  await expect(mobileWaitingPage.getByText("The host is drawing the two chart sets.")).toBeVisible();
+  await expect(
+    mobileWaitingPage.getByText("The host is drawing the two chart sets."),
+  ).toBeVisible();
   await captureEvidenceScreenshot(
     testInfo,
     "uxr-013-mobile-vote-waiting-not-drawn.png",
@@ -907,6 +922,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   );
 
   await loginAndTakeHost(page);
+  await expect(page).toHaveTitle("Host Console | Pump It Up Open Stage");
   await expectAdminEventDayFlow(page);
   await captureEvidenceScreenshot(testInfo, "uxr-phase1-admin-event-day-flow.png", page);
   await page
@@ -917,11 +933,13 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   const stagePage = await page.context().newPage();
   await goto(stagePage, "/stage");
+  await expect(stagePage).toHaveTitle("Stage Display | Pump It Up Open Stage");
   await expect(stagePage.locator("header").getByText("Awaiting host draw")).toBeVisible();
 
   const chartsPage = await page.context().newPage();
   await goto(chartsPage, "/charts");
-  await expect(chartsPage.getByText("Awaiting host draw").first()).toBeVisible();
+  await expect(chartsPage).toHaveTitle("View Charts | Pump It Up Open Stage");
+  await expect(chartsPage.getByText("Awaiting first chart set").first()).toBeVisible();
 
   await page.getByRole("button", { name: "Draw Set" }).nth(0).click();
   await expect(page.getByText(/Version 1/).first()).toBeVisible();
@@ -931,6 +949,10 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+  await expect(chartsPage.getByTestId("view-only-status")).toContainText("One chart set drawn");
+  await expect(chartsPage.getByTestId("view-only-status")).toContainText(
+    "The drawn chart set is visible now",
+  );
 
   const firstChartRerollDetails = page
     .locator("details")
@@ -957,6 +979,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await page.getByRole("button", { name: "Draw Set" }).nth(1).click();
   await expect(page.getByText("ready to vote")).toBeVisible();
+  await expect(chartsPage.getByTestId("view-only-status")).toContainText("Ready to vote", {
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await expect(stagePage.getByText(/Version 1 \/ (Revealing [0-7] \/ 7|Pool)/)).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -1066,11 +1091,11 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   );
   await failNextVoteSubmitRequest(phonePage);
   await phonePage.getByRole("button", { name: "Submit Ballot" }).click();
-  await expect(
-    phonePage.getByText(/Previous server-confirmed ballot remains valid\./),
-  ).toBeVisible({
-    timeout: HOSTED_REFRESH_TIMEOUT_MS,
-  });
+  await expect(phonePage.getByText(/Previous server-confirmed ballot remains valid\./)).toBeVisible(
+    {
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    },
+  );
   await expect(phonePage.getByText("Ballot Saved")).toBeVisible();
   await phonePage.reload({ waitUntil: "domcontentloaded" });
   await expect(phonePage.getByText("Loaded saved revision 2.")).toBeVisible({
@@ -1186,7 +1211,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   const mobileResultsPage = await page.context().newPage();
   await mobileResultsPage.setViewportSize({ width: 390, height: 844 });
   await goto(mobileResultsPage, "/results");
-  await expect(mobileResultsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+  await expect(
+    mobileResultsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" }),
+  ).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expectSelectedResultCardsReadable(mobileResultsPage);
@@ -1200,9 +1227,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     viewport: { height: 844, width: 390 },
   });
 
-  await fallbackResultsContext.route("**/chart-images/cache/**", (route) =>
-    route.abort("failed"),
-  );
+  await fallbackResultsContext.route("**/chart-images/cache/**", (route) => route.abort("failed"));
   try {
     const fallbackResultsPage = await fallbackResultsContext.newPage();
 
@@ -1318,6 +1343,27 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     ),
   ).toBeVisible();
 
+  await setCurrentRoundFromAdmin(page, "2");
+  await expect(page.getByText("Current Round 2")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await goto(resultsPage, "/results");
+  await expect(resultsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(resultsPage.getByTestId("previous-round-results-notice")).toContainText(
+    "Showing Round 1. Round 2 is not final yet.",
+  );
+  await captureEvidenceScreenshot(
+    testInfo,
+    "uxr-019-results-previous-round-fallback.png",
+    resultsPage,
+  );
+  await setCurrentRoundFromAdmin(page, "1");
+  await expect(page.getByText("Current Round 1")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+
   const currentFinalNames = await currentStageFinalChartNames(stagePage);
   const { chartName: correctedChartName, form: overrideForm } = await selectDifferentOverrideTarget(
     page,
@@ -1379,14 +1425,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     votePage: phonePage,
   });
 
-  const currentRoundForm = page.locator("form", {
-    has: page.getByRole("button", { name: "Set Current Round" }),
-  });
-  await currentRoundForm.locator('select[name="roundNumber"]').selectOption("1");
-  await clickAdminActionAndWait(
-    page,
-    currentRoundForm.getByRole("button", { name: "Set Current Round" }),
-  );
+  await setCurrentRoundFromAdmin(page, "1");
   await expect(page.getByText("Current Round 1")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });

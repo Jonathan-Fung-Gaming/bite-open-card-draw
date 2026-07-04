@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
@@ -15,12 +16,24 @@ import { ChartsSetNavigator } from "./ChartsSetNavigator";
 
 export const dynamic = "force-dynamic";
 
-function chartsStatus(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean) {
-  if (!bothSetsDrawn) {
+export const metadata: Metadata = {
+  title: "View Charts",
+};
+
+function chartsStatus(snapshot: VotingRoundSnapshot, drawnSetCount: number) {
+  if (drawnSetCount === 0) {
     return {
-      label: "Awaiting host draw",
+      label: "Awaiting first chart set",
+      detail: "Chart sets will appear here as the host draws them. This view cannot submit votes.",
+      timerText: null,
+    };
+  }
+
+  if (drawnSetCount === 1) {
+    return {
+      label: "One chart set drawn",
       detail:
-        "Charts will appear here after the host draws both sets. This view cannot submit votes.",
+        "The drawn chart set is visible now. The second set will appear when the host finishes the draw. This view cannot submit votes.",
       timerText: null,
     };
   }
@@ -42,7 +55,7 @@ function chartsStatus(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean) {
     return {
       label: formatVotingStatusLabel(snapshot.status),
       detail:
-        "Both chart sets are drawn. Waiting for the host to open voting. If charts were rerolled after voting started, prior ballots were invalidated and players must submit again when voting reopens.",
+        "Both chart sets are drawn. Waiting for the host to open voting. This view stays read-only.",
       timerText: null,
     };
   }
@@ -104,7 +117,10 @@ export default async function ChartsPage() {
     <main className="min-h-screen">
       <ChartsAutoRefresh />
       <RoundHeader title="Drawn Charts" status="View-only chart display" />
-      <ChartsSetNavigator sets={view.sets} status={chartsStatus(snapshot, view.bothSetsDrawn)} />
+      <ChartsSetNavigator
+        sets={view.sets}
+        status={chartsStatus(snapshot, snapshot.drawnSetCount)}
+      />
     </main>
   );
 }

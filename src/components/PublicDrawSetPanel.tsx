@@ -41,6 +41,7 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
                 <div className="relative aspect-[16/9] overflow-hidden border-b border-ember-300/15 bg-black/35">
                   <ChartArtImage
                     src={imagePath}
+                    loading="eager"
                     className="h-full w-full object-contain opacity-95"
                   />
                 </div>
@@ -56,7 +57,10 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
                     >
                       {chart.name}
                     </h3>
-                    <p className="mt-1 break-words text-sm text-metal-300" data-testid="chart-card-artist">
+                    <p
+                      className="mt-1 break-words text-sm text-metal-300"
+                      data-testid="chart-card-artist"
+                    >
                       {chart.artist}
                     </p>
                   </div>
