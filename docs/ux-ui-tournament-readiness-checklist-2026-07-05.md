@@ -1,0 +1,75 @@
+# UX/UI Tournament Readiness Checklist - 2026-07-05
+
+Use this checklist to close the issues from the July 5 UX/UI validation pass. The companion
+execution plan is `docs/ux-ui-tournament-readiness-remediation-plan-2026-07-05.md`.
+
+Do not check an item until:
+
+- the issue has been fixed or explicitly accepted as-is by the user,
+- the fix has route-level evidence or a targeted automated test,
+- relevant screenshots or notes are recorded in the phase summary,
+- lint, typecheck, tests, build, and e2e gates have been run where applicable.
+
+The product behavior source of truth remains `docs/product-spec.md` and
+`docs/pump_open_stage_repo_validation_checklist.md`.
+
+## Image And Chart Art
+
+| Done | ID | Severity | Phase | Issue | Closure evidence |
+| --- | --- | --- | --- | --- | --- |
+| [ ] | UXR-001 | P1 | 0 | Live production shows fallback/placeholder chart images even though local cached images validate. | Production route/network evidence proves live charts request real `/chart-images/cache/*` assets, or a documented deployment/data fix explains any intentional fallback rows. |
+| [ ] | UXR-002 | P1 | 3 | Chart-image components rely on precomputed fallback paths; broken non-fallback cache URLs do not visibly recover at render time. | Browser test or component test covers a missing image URL and verifies fallback art appears. |
+| [ ] | UXR-003 | P1 | 3 | Mobile ballot/chart/result cards crop and darken chart art enough that artwork is difficult to inspect. | Mobile screenshots for `/vote`, `/charts`, and `/results` show readable art, title, artist, and difficulty. |
+| [ ] | UXR-004 | P2 | 3 | Long selected chart names and artists truncate in primary public result cards. | Mobile result screenshot includes a long real chart name without losing identity-critical text. |
+
+## Stage, QR, Reveal, And Route Freshness
+
+| Done | ID | Severity | Phase | Issue | Closure evidence |
+| --- | --- | --- | --- | --- | --- |
+| [ ] | UXR-005 | P1 | 1 | Stage QR code is not centered in its panel. | Desktop and 720p stage screenshots show the QR square centered in the panel. |
+| [ ] | UXR-006 | P2 | 0 | Local/rehearsal QR can encode relative `/room` when `NEXT_PUBLIC_SITE_URL` is missing outside production. | Release/rehearsal gate verifies QR target is an absolute public event URL before venue use. |
+| [ ] | UXR-007 | P1 | 2 | Stage reveal cadence can stutter or look inconsistent because refresh timing and reveal timing are tightly coupled. | Stage reveal evidence shows smooth, predictable progression through chart reveal and tiebreak states. |
+| [ ] | UXR-008 | P1 | 2 | Phones can show final charts before the projector visibly reaches the final reveal. | E2E evidence proves phones remain in the holding state until stage reveal completion is committed. |
+| [ ] | UXR-009 | P1 | 2 | Final `/stage`, `/vote`, `/charts`, and `/results` views can go stale after correction, reset, or round advance. | Already-open public pages update after final correction/reset/advance without manual browser refresh. |
+| [ ] | UXR-010 | P1 | 3 | Standard stage chart cards are too small at 720p/projector scale. | 1280x720 screenshot shows all 14 chart cards readable from a stage-view layout. |
+| [ ] | UXR-011 | P3 | 4 | Stage error state has only manual retry and can strand the projector if nobody is watching the browser. | Stage failure/recovery behavior is documented or automated retry/status recovery is implemented and verified. |
+
+## Room, Vote, Charts, And Results
+
+| Done | ID | Severity | Phase | Issue | Closure evidence |
+| --- | --- | --- | --- | --- | --- |
+| [ ] | UXR-012 | P2 | 4 | `/room` gives no current tournament state before users choose player voting or view-only charts. | `/room` screenshot shows clear current round/status context without changing the required two choices. |
+| [ ] | UXR-013 | P2 | 3 | `/vote` waiting state gives little guidance beyond waiting for the host. | Waiting-state screenshot clearly explains whether charts are drawn, voting is closed, paused, or not opened. |
+| [ ] | UXR-014 | P2 | 3 | `No bans for this set` is easy to miss because it appears below all chart cards. | Mobile ballot evidence shows the explicit no-bans path is prominent and remains rule-compliant. |
+| [ ] | UXR-015 | P2 | 3 | Edit-after-save state does not clearly distinguish a saved server ballot from unsaved edits. | Browser test covers saved ballot, edit, unsaved draft, failed save, and previous server-confirmed ballot messaging. |
+| [ ] | UXR-016 | P2 | 3 | Duplicate-device/duplicate-ballot warning appears late in the identity flow. | Identity-flow evidence shows the warning early enough to prevent accidental wrong-player voting. |
+| [ ] | UXR-017 | P3 | 4 | Public `/charts` copy includes reroll/ballot invalidation language that is irrelevant or confusing for spectators. | `/charts` ready/waiting copy is spectator-safe and avoids internal admin language. |
+| [ ] | UXR-018 | P3 | 4 | One-set-drawn `/charts` state can be contradictory: copy says charts appear after both sets, but one set can render. | One-set-drawn route evidence shows consistent copy and display behavior. |
+| [ ] | UXR-019 | P2 | 4 | `/results` previous-round fallback can be misread as current-round results. | Results evidence distinguishes current-round pending results from previous-round final results. |
+| [ ] | UXR-020 | P3 | 4 | Result holding and vote-copy states include internal implementation language such as computation/snapshot wording. | Player-facing route screenshots contain event-language copy only. |
+| [ ] | UXR-021 | P3 | 4 | Mobile `/charts` navigation depends on hydration and can resemble a voting flow. | Mobile `/charts` works with delayed hydration and communicates view-only status unambiguously. |
+| [ ] | UXR-022 | P3 | 3 | Some phone controls are small for tournament-floor touch use. | Mobile screenshots and tap-target checks show comfortable primary and secondary controls. |
+| [ ] | UXR-023 | P3 | 5 | Routes share the app-wide browser title, reducing operator confidence across multiple tabs. | Route-specific metadata or title evidence identifies `/stage`, `/vote`, `/charts`, `/results`, and `/coolguy69`. |
+
+## Admin Console And Host Workflow
+
+| Done | ID | Severity | Phase | Issue | Closure evidence |
+| --- | --- | --- | --- | --- | --- |
+| [ ] | UXR-024 | P1 | 1 | `/coolguy69` panel order is not event-day focused. | Admin screenshot shows host lock/current round/draw/reveal/voting controls as the primary day-of flow. |
+| [ ] | UXR-025 | P1 | 1 | Draw/reveal/start-voting controls are not the main admin focus, and draw controls are buried below secondary panels. | Above-the-fold admin evidence shows current-round draw, reveal, and voting actions. |
+| [ ] | UXR-026 | P1 | 1 | Chart Eligibility is open by default and pushes normal host actions far down the page. | Admin page loads with eligibility/configuration collapsed or placed after day-of controls. |
+| [ ] | UXR-027 | P1 | 1 | Reroll warning text is always visible, repeats per chart, and can spill across cramped columns. | Reroll warnings appear only inside explicit dangerous-action confirmation UI, with readable text. |
+| [ ] | UXR-028 | P2 | 1 | Manual ballot correction is placed after result reveal controls, increasing the chance a host computes results before noticing corrections. | After-close admin flow presents manual ballot correction before compute/reveal or provides a blocking reminder. |
+| [ ] | UXR-029 | P2 | 5 | Host lock status is visible but not operator-clear enough for live use. | Admin evidence shows active host, read-only state, takeover/expiry context, and heartbeat confidence clearly. |
+| [ ] | UXR-030 | P2 | 5 | Live counts cannot be collapsed once revealed and can expose long chart-name overflow. | Live-count panel can be hidden again and handles long chart names without layout damage. |
+| [ ] | UXR-031 | P2 | 1 | Roster/config/release readiness details are too low or mixed into secondary areas for event setup confidence. | Admin setup/readiness area clearly surfaces roster count, image/cache readiness, chart pools, and current round. |
+| [ ] | UXR-032 | P3 | 5 | Admin roster, draw, and live-count tables/lists risk overflow with long usernames or chart names. | Responsive admin screenshots show long names contained without horizontal clipping or overlap. |
+| [ ] | UXR-033 | P2 | 5 | Public `/charts` receives full `DrawRecord` data including draw metadata that is not needed for the visible public UI. | Public client payload or component props are reduced to the fields required for display. |
+
+## Closure Gate
+
+- [ ] Every `UXR-*` item above is checked or explicitly accepted as-is by the user.
+- [ ] `docs/phase-status.md` records the phases completed, checks run, risks, and assumptions.
+- [ ] Browser screenshots cover desktop stage/admin and mobile room/vote/charts/results.
+- [ ] Full tournament rehearsal evidence still satisfies the 48 -> 36 -> 24 -> 12 active-player requirement.
+- [ ] Release checklist references this checklist before event use.
