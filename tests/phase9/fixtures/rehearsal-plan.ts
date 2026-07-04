@@ -169,6 +169,14 @@ export function expectedAllProductionFlowPlayers() {
 }
 
 export function assertRoundAttritionPlan(expectations: readonly RehearsalRoundExpectation[]) {
+  const activeCounts = expectations.map((expectation) => expectation.activePlayerCount);
+
+  if (activeCounts.join(",") !== PRODUCTION_FLOW_ACTIVE_COUNTS.join(",")) {
+    throw new Error(
+      `Production-flow active counts must be ${PRODUCTION_FLOW_ACTIVE_COUNTS.join(" -> ")}, got ${activeCounts.join(" -> ")}.`,
+    );
+  }
+
   for (const expectation of expectations.slice(1)) {
     if (expectation.playersToMarkInactiveBeforeRound.length !== ATTRITION_BATCH_SIZE) {
       throw new Error(

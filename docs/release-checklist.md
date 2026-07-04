@@ -27,6 +27,11 @@ workflow.
       linked with current release metadata.
 - [ ] Release-blocking Playwright evidence includes the 48 -> 36 -> 24 -> 12 active voting-player
       progression across Rounds 1 through 4.
+- [ ] Phase 11 production-flow evidence includes `phase11-deployed-visual-evidence.json`,
+      projector screenshots at 1280x720 and 1366x768, mobile `/vote` evidence, image request
+      metadata, and local cached chart-art path proof.
+- [ ] If evidence was collected against a deployed URL, `E2E_DEPLOYED_COMMIT_SHA` matches the
+      deployed commit recorded below.
 - [ ] Current release commit recorded: `TODO`.
 - [ ] Current release branch recorded: `TODO`.
 - [ ] Deployed commit recorded: `TODO`.
@@ -58,6 +63,8 @@ workflow.
       id.
 - [ ] `TOURNAMENT_TEST_ROUTE_TOKEN` is not set in production.
 - [ ] No `.env` or `.env.local` file is committed.
+- [ ] Supabase migrations are applied through `20260704010000_normalized_voter_presence_rpc.sql`.
+- [ ] `rtk npm run supabase:migration:list` confirms local and remote migrations are in sync.
 
 ## Data
 
@@ -120,6 +127,8 @@ workflow.
 
 - [ ] `/stage` readability was checked on projector/stream capture.
 - [ ] `/room` QR destination opens on phones.
+- [ ] Manual venue-distance QR scan recorded: date `TODO`, devices `TODO`, approximate distance
+      `TODO`, result `TODO`.
 - [ ] `/vote` mobile ballot flow was tested.
 - [ ] `/charts` view-only mode was tested and auto-refreshes after draw and final reveal.
 - [ ] `/results` post-reveal mode was tested.
@@ -138,6 +147,8 @@ workflow.
       Rounds 2, 3, and 4.
 - [ ] The four-round rehearsal private CSVs were checked for 48, 36, 24, and 12 round rows and
       matching submitted-ballot counts.
+- [ ] Phase 11 visual/image evidence was collected from the same production-flow run or from an
+      external deployed run tied to the same deployed commit.
 - [ ] Private CSV auto-download was tested.
 - [ ] Manual `Download private ballot CSV` was tested.
 - [ ] Private CSV filename includes event id, round, timestamp, and collision-resistant suffix.
@@ -153,6 +164,7 @@ workflow.
 - [ ] `rtk npm run test`
 - [ ] `rtk npm run test:e2e`
 - [ ] `rtk npm run test:e2e:production-flow`
+- [ ] `rtk npm run supabase:migration:list`
 - [ ] `rtk npm run test:load`
 - [ ] `rtk npm run test:phase9`
 - [ ] `rtk npm run test:phase9:full`

@@ -38,7 +38,7 @@ Checks run during this review:
   - Suggested tests: draw Round 2 early with a shared song, select that song in Round 1, then assert
     Round 2 open/compute is blocked or future draws are invalidated.
 
-- [ ] **PRC-002 - Critical - Production-flow Playwright does not implement 48 -> 36 -> 24 -> 12.**
+- [x] **PRC-002 - Critical - Production-flow Playwright does not implement 48 -> 36 -> 24 -> 12.**
   - Files: `tests/phase9/fixtures/supabase-state.ts`, `src/app/coolguy69/actions.ts`,
     `tests/phase9/assertions/public-ui.assert.ts`, `tests/phase9/flows/results-reveal.flow.ts`.
   - Current risk: the full rehearsal seeds/expects 12 players, not 48, and does not remove 12
@@ -47,8 +47,11 @@ Checks run during this review:
     after exactly 12 voting players are removed before each later round.
   - Suggested tests: assert admin active count, `/vote` eligibility, turnout denominator,
     eligibility snapshot, submitted ballot count, and CSV row count for every round.
+  - Closure evidence: Phase 10 added the 48 -> 36 -> 24 -> 12 production-flow planner and Phase 11
+    tightened active/inactive transition assertions. `rtk npm run test:e2e:production-flow` passed
+    on 2026-07-04 against linked Supabase event `rehearsal-2026-07-03-prod-db-01`.
 
-- [ ] **PRC-003 - Critical - Full rehearsal submits only 2 UI ballots per round.**
+- [x] **PRC-003 - Critical - Full rehearsal submits only 2 UI ballots per round.**
   - Files: `tests/phase9/flows/ballot-submission.flow.ts`,
     `tests/phase9/fixtures/supabase-state.ts`.
   - Current risk: the "voting players" requirement is not represented by active players voting.
@@ -56,6 +59,9 @@ Checks run during this review:
     separates a small UI smoke from the required full voting-player evidence.
   - Suggested tests: deterministic ballots for 48, 36, 24, and 12 players with representative real
     `/room -> /vote` submissions.
+  - Closure evidence: Phase 11 production-flow submitted 48, 36, 24, and 12 valid UI ballots through
+    `/room -> /vote` in the four production rounds. The full gate passed in 21.8 minutes on
+    2026-07-04.
 
 - [ ] **PRC-004 - Critical - Supabase production blocks required emergency admin workflows.**
   - Files: `src/lib/server/transactions/normalized-runtime.ts`,
@@ -85,7 +91,7 @@ Checks run during this review:
   - Suggested tests: set `VERCEL_ENV=production`, `NODE_ENV=development`, test token present; assert
     both e2e routes return 404 and mutate nothing.
 
-- [ ] **PRC-007 - High - Default CI/e2e gates are not production readiness gates.**
+- [x] **PRC-007 - High - Default CI/e2e gates are not production readiness gates.**
   - Files: `package.json`, `.github/workflows/ci.yml`, `scripts/run-playwright.mjs`.
   - Current risk: green CI and default e2e can still be memory-backed smoke coverage.
   - Expected: release readiness has a named production-flow Supabase gate with fresh build, real
@@ -93,6 +99,10 @@ Checks run during this review:
     attrition flow.
   - Suggested tests: require `rtk npm run test:e2e:production-flow` plus release artifacts before
     event signoff.
+  - Closure evidence: `rtk npm run test:e2e:production-flow` now runs a fresh build in Supabase
+    start mode with admin actions, heartbeats, polling, public refresh, test routes disabled, and
+    the required attrition flow. Phase 11 also removes the premature `.github/workflows/ci.yml`
+    because workflow automation remains deferred until Phase 12.
 
 - [ ] **PRC-008 - High - Release checklist remains open and cannot certify the current build.**
   - Files: `docs/release-checklist.md`.
@@ -125,18 +135,24 @@ Checks run during this review:
 
 ## Second Pass - Expanded Logic, UX, And Test Gaps
 
-- [ ] **PRC-011 - High - Playwright expectations are hard-coded to 12 eligible, 2 submitted, and 8
+- [x] **PRC-011 - High - Playwright expectations are hard-coded to 12 eligible, 2 submitted, and 8
   ban selections.**
   - Files: `tests/phase9/assertions/public-ui.assert.ts`,
     `tests/phase9/flows/results-reveal.flow.ts`.
   - Expected: round-aware expectations of 48, 36, 24, and 12.
   - Suggested tests: pass per-round expectations through `runHostedRehearsal`.
+  - Closure evidence: Phase 10 introduced round-aware production-flow expectations and Phase 11
+    asserts exact active-player counts in the production-flow plan. The full production-flow gate
+    passed on 2026-07-04.
 
-- [ ] **PRC-012 - High - CSV/download assertions do not prove per-round attrition.**
+- [x] **PRC-012 - High - CSV/download assertions do not prove per-round attrition.**
   - Files: `tests/phase9/hosted-full-rehearsal.spec.ts`,
     `tests/phase9/flows/results-reveal.flow.ts`.
   - Expected: each round's downloaded private CSV reflects the active snapshot: 48, 36, 24, 12.
   - Suggested tests: save and assert all four CSVs, not only final-round download evidence.
+  - Closure evidence: The Phase 11 production-flow run verified all four round CSVs, including
+    submitted rows, active-at-round-start rows, required player rows, and revisions for the 48, 36,
+    24, and 12 active-player snapshots.
 
 - [x] **PRC-013 - Medium - Roster selectors/helpers are brittle for attrition tests.**
   - Files: `src/app/coolguy69/page.tsx`, `tests/phase9/pages/vote.page.ts`.
@@ -214,6 +230,10 @@ Checks run during this review:
   - Expected: card titles and QR are readable/scannable at 1280x720 and 1366x768 from venue
     distance.
   - Suggested tests: raise geometry thresholds and run manual phone scan at event distance.
+  - Phase 11 progress: automated QR geometry was raised to a 176 px minimum, stage title
+    readability/overflow assertions were added, and local production-flow visual evidence captured
+    1280x720, 1366x768, and 1920x1080 stage screenshots. This remains open for the manual
+    venue-distance phone scan recorded in `docs/release-checklist.md`.
 
 - [x] **PRC-021 - Medium - Admin live counts are hidden visually but present in initial admin DOM.**
   - Files: `src/app/coolguy69/page.tsx`.
@@ -333,6 +353,10 @@ Checks run during this review:
     deployed artifact and route transfer evidence.
   - Expected: deployed app uses the approved CSV/cache set and remains performant on target hosting.
   - Suggested gate: deployed `/stage` and `/vote` image-render/transfer evidence.
+  - Phase 11 progress: production-flow now writes `phase11-deployed-visual-evidence.json` with
+    stage/vote image responses, resource transfer metadata, local cached artwork paths, and proof
+    that chart art does not use live third-party URLs. The local production-start run passed; this
+    remains open until the same gate is run against the merged deployed URL and commit.
 
 - [ ] **PRC-036 - Medium - Working tree and release metadata are not release-stable.**
   - Files: `AGENTS.md`, `docs/*`, `docs/release-checklist.md`.

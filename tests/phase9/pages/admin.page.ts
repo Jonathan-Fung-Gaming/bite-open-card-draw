@@ -240,6 +240,36 @@ export class AdminPage {
       .toBe(String(count));
   }
 
+  async expectPlayersActive(names: readonly string[], active: boolean) {
+    const expectedState = String(active);
+
+    await expect
+      .poll(
+        async () => {
+          if (!(await this.visit())) {
+            return null;
+          }
+
+          const states = [];
+
+          for (const name of names) {
+            const row = this.rosterRow(name);
+
+            if ((await row.count()) !== 1) {
+              states.push(null);
+              continue;
+            }
+
+            states.push(await row.getAttribute("data-active"));
+          }
+
+          return states;
+        },
+        { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+      )
+      .toEqual(names.map(() => expectedState));
+  }
+
   async markPlayersInactive(names: readonly string[]) {
     await this.loginAndTakeHost();
 

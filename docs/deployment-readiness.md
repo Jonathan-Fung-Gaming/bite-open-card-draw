@@ -4,7 +4,7 @@
 
 - Vercel project linked to this repository.
 - Supabase project with migrations applied through
-  `20260703010000_service_role_table_privileges.sql`.
+  `20260704010000_normalized_voter_presence_rpc.sql`.
 - Production environment variables configured in Vercel project settings only.
 
 Do not commit `.env`, `.env.local`, Supabase service-role keys, Vercel tokens, session secrets, or plaintext admin passwords.
@@ -43,6 +43,7 @@ rtk npm run test:e2e:production-flow
 rtk npm run test:load
 rtk npm run test:phase9
 rtk npm run test:phase9:full
+rtk npm run supabase:migration:list
 rtk npm run import:charts
 rtk npm run cache:chart-images
 rtk npm run verify:real-chart-images
@@ -66,7 +67,7 @@ Do not use the release for tournament operation until:
   rehearsal id, including `phase9-e2e-2026-06-30-prod-23`,
   `phase9-load-2026-06-30-prod-07`, or `phase9-fourround-2026-06-30-prod-05`, for the real
   tournament.
-- Supabase migrations are applied through `20260703010000_service_role_table_privileges.sql`.
+- Supabase migrations are applied through `20260704010000_normalized_voter_presence_rpc.sql`.
 - `TOURNAMENT_TEST_ROUTE_TOKEN` is absent from production environment variables.
 - `rtk npm run cache:chart-images` produces at least one non-fallback cached artwork file and
   `public/chart-images/cache` or the chosen controlled storage has real files.
@@ -89,7 +90,8 @@ Hosted Supabase rehearsal is no longer an unresolved release blocker as of 2026-
 - Production Supabase was used by explicit exception because no spare project remained. The accepted
   risk is that global migrations were applied to the existing production project.
 - `rtk npx supabase db lint --linked` passed with no schema errors.
-- `rtk npx supabase migration list --linked` showed remote migration `20260630041000`.
+- Historical `rtk npx supabase migration list --linked` showed remote migration `20260630041000`.
+  Current Phase 11 readiness requires `20260704010000_normalized_voter_presence_rpc.sql`.
 - Hosted `rtk npm run test:e2e` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
   `phase9-e2e-2026-06-30-prod-23`.
 - Hosted `rtk npm run test:load` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
@@ -111,12 +113,13 @@ Apply migrations before event use:
 
 ```bash
 rtk npx supabase link --project-ref <project-ref>
-rtk npx supabase db push
+rtk npm run supabase:db:push
 ```
 
 Then verify:
 
 ```bash
+rtk npm run supabase:migration:list
 rtk npm run test
 ```
 
@@ -157,6 +160,34 @@ local demos, or single-process development only.
 13. Bulk import start.gg usernames.
 14. Mark inactive/eliminated players before opening voting.
 15. Confirm duplicate active usernames are blocked.
+
+## Phase 11 Production-Flow Evidence
+
+Local production-build evidence:
+
+```powershell
+$env:E2E_TOURNAMENT_EVENT_ID = "rehearsal-YYYY-MM-DD-disposable"
+$env:E2E_ALLOW_DESTRUCTIVE_RESET = "true"
+rtk npm run test:e2e:production-flow:validate
+rtk npm run test:e2e:production-flow
+```
+
+External deployed evidence needs the same Supabase/rehearsal variables plus deployed route metadata:
+
+```powershell
+$env:E2E_SERVER_MODE = "external"
+$env:E2E_BASE_URL = "https://your-deployed-preview-or-production-url.example"
+$env:E2E_DEPLOYED_TEST_ROUTE_TOKEN = "<deployed probe token value for negative /api/e2e/* checks>"
+$env:E2E_DEPLOYED_COMMIT_SHA = "<deployed commit sha>"
+rtk npm run test:e2e:production-flow:validate
+rtk npm run test:e2e:production-flow
+```
+
+The external command must use a disposable `E2E_TOURNAMENT_EVENT_ID`. It probes `/api/e2e/*` with
+no token, the local test token, and the deployed probe token; all probes must return 404. Phase 11
+visual artifacts are attached to the production-flow run and include projector screenshots, QR
+geometry, mobile `/vote` evidence, image request/resource metadata, and local cached artwork path
+checks.
 
 ## Free-Tier Notes
 

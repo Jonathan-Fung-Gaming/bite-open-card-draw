@@ -16,7 +16,7 @@ source of truth when older phase labels are stale.
 - `rtk npm run build`
 - `rtk npm run test:e2e:memory-dev-smoke`
 - `rtk npm run test:e2e:production-flow:validate`
-- `rtk npm run test:e2e:production-flow` during the grouped Phase 7 browser evidence window only.
+- `rtk npm run test:e2e:production-flow` during the grouped Phase 11 browser evidence window only.
 - `rtk npm run test:load:api-injection` for the focused synthetic load tool.
 - E2E command names must make the backend/server profile clear. Memory/dev smoke is not production
   release evidence.
@@ -32,6 +32,7 @@ enabled, and `adminActionsOnly=enabled` before any item can be treated as releas
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
 | Production rehearsal command | `rtk npm run test:e2e:production-flow:validate` output plus the grouped browser command output and artifacts                                            | PFR-003, PFR-004 |
 | Full four-round flow         | Draw both sets, open voting, submit/edit ballots, close, compute, reveal, final two charts, private CSV download, and verify 48 -> 36 -> 24 -> 12 active voting-player attrition | PFR-003, PFR-019 |
+| Deployed visual/image evidence | Phase 11 evidence artifact with projector screenshots, QR geometry, mobile `/vote` screenshot, image request/resource entries, and no live third-party chart-art URLs | PRC-020, PRC-035 |
 | Timer transitions            | 10-minute window, below-75 extension, at/above-75 close, all-submitted final warning with edit, pause/resume, manual close, emergency reopen            | PFR-019          |
 | Negative ballots             | Incomplete set, third ban, wrong draw id, stale chart id, no-bans-plus-bans, voting before both sets drawn                                              | PFR-020          |
 | Identity and revisions       | Duplicate active username, active second-device warning, latest valid ballot wins, failed edit preserves prior ballot, pre-submit username change       | PFR-021          |
@@ -188,6 +189,8 @@ practice rehearsal or one-round 100-player synthetic load test does not satisfy 
 - Rehearsal reset clears operational state and returns to tournament mode.
 - Forced rehearsal tiebreak seeding is blocked outside rehearsal mode.
 - Deployment, data setup, event-day, and rehearsal workflows are documented.
+- Production-flow evidence attaches Phase 11 visual/image artifacts during Round 1 voting and keeps
+  them distinct from local memory smoke tests.
 
 ## Phase 12 Release Tests
 

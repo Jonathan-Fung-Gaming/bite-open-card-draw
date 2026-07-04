@@ -211,6 +211,12 @@ function collectProductionFlowValidationErrors(config) {
     );
   }
 
+  if (config.serverMode === "external" && !process.env.E2E_DEPLOYED_COMMIT_SHA) {
+    errors.push(
+      "external production-flow mode requires E2E_DEPLOYED_COMMIT_SHA so deployed evidence is tied to the commit served by E2E_BASE_URL.",
+    );
+  }
+
   if (config.allowLocalPublicUrl === "true") {
     errors.push("TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL must be false for production-flow.");
   }
@@ -286,6 +292,7 @@ function printEnvironmentSummary(config) {
       `loadProfile=${config.loadProfile ?? "(none)"}`,
       `adminActionsOnly=${config.useAdminActionsOnly === "true" ? "enabled" : "disabled"}`,
       `rehearsalControls=${config.allowRehearsalAdminControls === "true" ? "enabled" : "disabled"}`,
+      `deployedCommit=${config.deployedCommit ?? "(none)"}`,
       `testRoutes=${config.allowE2eRoutes === "true" ? "enabled" : "disabled"}`,
     ].join(" "),
   );
@@ -382,6 +389,7 @@ const e2eAllowRehearsalAdminControls =
   (requestedProfile === "production-flow" || requestedProfile === "supabase-dev-rehearsal"
     ? "true"
     : "false");
+const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
 const e2ePublicSiteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ??
   (isProductionFlowLocalStart ? "https://event.example.test" : e2eBaseURL);
@@ -413,6 +421,7 @@ const runConfig = {
   supabaseUrl: hostedSupabaseUrl,
   supabaseAnonKey: hostedSupabaseAnonKey,
   supabaseServiceRoleKey: hostedSupabaseServiceRoleKey,
+  deployedCommit: e2eDeployedCommit,
 };
 
 printEnvironmentSummary(runConfig);

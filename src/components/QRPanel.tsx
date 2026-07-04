@@ -60,7 +60,7 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
       <div
         className={clsx(
           "flex aspect-square w-full items-center justify-center rounded-md border border-ember-300/25 bg-white text-furnace-950 shadow-ember-tight",
-          compact ? "mt-3 max-w-40 p-2 2xl:max-w-56" : "mt-4 max-w-72 p-3",
+          compact ? "mt-3 max-w-44 p-2 2xl:max-w-56" : "mt-4 max-w-72 p-3",
         )}
         data-qr-target={roomUrl}
         data-testid="room-qr-link"
