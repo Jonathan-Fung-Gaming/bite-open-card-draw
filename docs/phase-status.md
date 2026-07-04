@@ -13,6 +13,111 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 12 - Release Metadata Closure - 2026-07-04
+
+Status: implemented for source-side metadata, final-phase CI, and local/release evidence gates.
+External deployed evidence, production environment verification, real event roster setup,
+venue-distance QR scan evidence, private CSV file location confirmation, and post-merge deployed
+commit matching remain release checklist items and were not claimed as complete.
+
+### Scope
+
+- Added and reviewed `docs/phase-12-release-metadata-closure-plan-2026-07-04.md`.
+- Created final-phase GitHub Actions workflow `.github/workflows/ci.yml` with source-only gates:
+  `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
+- Updated CI/secret hygiene tests to validate the Phase 12 workflow and prove it does not require
+  production secrets, Supabase migration pushes, image-cache downloads, or production-flow gates.
+- Recorded Phase 12 source metadata in `docs/release-checklist.md`, including branch, base commit,
+  operator, chart CSV hash, import report hash, imported catalog hash, runtime catalog hash, image
+  manifest hash, and public chart-art cache count/bytes.
+- Renamed the older Supabase-dev four-round command from `test:phase9:full` to
+  `test:diagnostic:supabase-dev-full` so it cannot be mistaken for release evidence.
+- Reconciled stale remediation checklist language so Phase 11's linked-Supabase production-flow
+  evidence replaces the older hosted-Supabase blocker.
+- Hardened private CSV export audit persistence to use the result-admin partial persistence path,
+  avoiding unnecessary full player/draw/ballot rewrites during a read/export action.
+
+### Changed Files
+
+- `.github/workflows/ci.yml`
+- `docs/asset-audit.md`
+- `docs/deployment-readiness.md`
+- `docs/event-day-runbook.md`
+- `docs/phase-12-release-metadata-closure-plan-2026-07-04.md`
+- `docs/phase-status.md`
+- `docs/production-flow-risk-remediation-plan-2026-07-02.md`
+- `docs/production-readiness-remediation-plan-2026-07-03.md`
+- `docs/production-readiness-review-checklist-2026-07-03.md`
+- `docs/rehearsal-runbook.md`
+- `docs/release-checklist.md`
+- `docs/remediation-issue-checklist.md`
+- `package.json`
+- `src/app/coolguy69/actions.ts`
+- `src/lib/server/ci-workflow.test.ts`
+- `src/lib/server/normalized-operational-state.test.ts`
+
+### Checks Run
+
+- `rtk npm run test -- src/lib/server/ci-workflow.test.ts` - passed, 3 tests.
+- `rtk npm run test -- src/lib/server/normalized-operational-state.test.ts src/lib/server/ci-workflow.test.ts`
+  - passed, 15 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 53 files / 310 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk npm run test:phase9` - passed, 2 passed and 1 Supabase-only invariant skipped under memory.
+- `rtk npm run test:e2e:production-flow:validate` - passed against linked Supabase disposable event
+  `rehearsal-2026-07-03-prod-db-01`.
+- `rtk npm run test:e2e:production-flow` - passed after the private CSV persistence change in 20.0
+  minutes against linked Supabase disposable event `rehearsal-2026-07-03-prod-db-01`; host-lock
+  two-session evidence and the full four-round 48 -> 36 -> 24 -> 12 rehearsal passed.
+- `rtk npm run import:charts` - passed, then rerun with
+  `--reviewed-by=Codex --reviewed-commit=a67f4f1e1f5bfbe2c46869586a45a3932bb2f6f2` so repaired and
+  skipped diagnostics retain signed review evidence.
+- `rtk npm run cache:chart-images` - passed with 639 cached assets and 0 fallback assets.
+- `rtk npm run verify:real-chart-images` - passed for 4,426 runtime charts and 639 public cache
+  files.
+- `rtk npm run verify:release-data` - passed with signed diagnostics and current import report hash
+  `43ac5e28174a2912338e9d2a905c38f317c0d04081b9cf761cce31f9631041fd`.
+- `rtk npm run test:load` - passed, API-injection load profile.
+- `rtk npm run test:load:player-routes` - passed, normal `/room -> /vote` route-player profile with
+  spectator traffic.
+- `rtk npm audit --omit=dev` - passed with 0 vulnerabilities.
+- `rtk npm run supabase:migration:list` - passed; local and remote migrations are aligned through
+  `20260704010000`.
+- `rtk npm run supabase:db:lint` - failed because local Supabase Postgres is not running
+  (`LegacyDbConnectError`).
+- `rtk npx supabase db lint --linked` - passed, no remote schema errors found.
+- `rtk git diff --check` - passed.
+- `rtk npm run test:diagnostic:supabase-dev-full` - not a release gate and intentionally not rerun
+  after the command rename. The previous legacy command name exposed why the dev-profile full run
+  was too expensive and easy to confuse with production-flow evidence.
+
+### Manual Review
+
+- Product rules were unchanged: 4 rounds, 2 chart sets per round, 7 charts per set, one 10-minute
+  voting window, explicit `No bans for this set`, least-ban winners, server-side tiebreak decisions,
+  and final two-chart reveal remain intact.
+- The GitHub Actions workflow does not include production secrets, Supabase service-role values,
+  migration pushes, production-flow credentials, or chart-image network/cache operations.
+- Private CSV export still requires admin session and active host control; the change only narrows
+  persistence for export audit rows so a read/export path does not rewrite unrelated runtime tables.
+- Release checklist rows for deployed commit, production Vercel environment, real event namespace,
+  real roster, manual venue QR scan, and CSV file location remain intentionally unchecked.
+
+### Risks And Assumptions
+
+- A tracked release checklist cannot truthfully contain the final SHA of the same commit that edits
+  it. The post-merge source commit and deployed commit must be recorded in PR/release evidence after
+  merge/deploy.
+- The old `test:phase9:full` name was removed to prevent accidental release use. The remaining
+  `test:diagnostic:supabase-dev-full` command is diagnostic only; the release-blocking full gate is
+  `rtk npm run test:e2e:production-flow`.
+- External deployed production-flow evidence still requires `E2E_BASE_URL`,
+  `E2E_DEPLOYED_COMMIT_SHA`, and the deployed e2e-route probe token after merge/deploy.
+- The linked Supabase disposable event id must not be reused as the real tournament event namespace.
+
 ## Production Readiness Remediation Phase 11 - Production-Flow And Visual Evidence - 2026-07-04
 
 Status: implemented and verified in local production-start mode against the linked Supabase
@@ -958,8 +1063,8 @@ pre-event command, not a default PR/smoke gate.
   and `tests/phase9/hosted-full-rehearsal.spec.ts`.
 - Added Phase 9 helper modules under `tests/phase9/fixtures`, `tests/phase9/pages`,
   `tests/phase9/flows`, and `tests/phase9/assertions`.
-- Updated `package.json` so `rtk npm run test:phase9` runs the `@smoke` one-round path and
-  `rtk npm run test:phase9:full` runs the `@full` four-round path.
+- Updated `package.json` so `rtk npm run test:phase9` runs the `@smoke` one-round path and the
+  Supabase-dev full diagnostic command runs the `@full` four-round path.
 - Updated rehearsal/release/deployment docs with the new command split.
 
 ### Checks Run
@@ -978,9 +1083,10 @@ pre-event command, not a default PR/smoke gate.
 
 ### Risks And Assumptions
 
-- `rtk npm run test:phase9:full` was not run during this refactor because it is the long hosted
-  four-round rehearsal gate. Use it with hosted Supabase variables and a disposable
-  `TOURNAMENT_EVENT_ID` before event release.
+- The Supabase-dev full diagnostic was not run during this refactor because it is the long hosted
+  four-round rehearsal profile. It is diagnostic only; current release evidence uses
+  `rtk npm run test:e2e:production-flow` with hosted Supabase variables and a disposable
+  `TOURNAMENT_EVENT_ID`.
 - The refactor preserves the existing hosted fallback helpers for Supabase host lock, current-round
   updates, and final reveal recovery; those are harness stabilizers rather than tournament logic.
 

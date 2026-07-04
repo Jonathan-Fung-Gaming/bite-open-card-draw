@@ -810,7 +810,6 @@ rtk npm run test:e2e
 rtk npm run test:e2e:production-flow
 rtk npm run test:load
 rtk npm run test:phase9
-rtk npm run test:phase9:full
 rtk npm run import:charts
 rtk npm run cache:chart-images
 rtk npm run verify:real-chart-images
@@ -823,6 +822,9 @@ Risks:
 
 - If any artifact is regenerated after metadata is recorded, release metadata
   becomes stale and must be redone from the relevant data/evidence phase.
+- The Supabase-dev full diagnostic command is not a release gate. Use
+  `rtk npm run test:e2e:production-flow` for the release-blocking four-round
+  Supabase evidence.
 
 ## Issue Coverage Matrix
 

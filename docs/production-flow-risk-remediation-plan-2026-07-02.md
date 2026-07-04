@@ -59,7 +59,7 @@ after every individual code edit.
 5. If the grouped run fails, fix with the narrowest non-Playwright reproduction possible, then rerun
    the failed Playwright project or spec once for debugging. Run one final full Playwright evidence
    window before closing any Playwright-dependent item.
-6. Current `npm run test:e2e`, `npm run test:phase9:full`, and `npm run test:load` commands are not
+6. Current `npm run test:e2e`, `npm run test:diagnostic:supabase-dev-full`, and `npm run test:load` commands are not
    closure evidence for production flow until the PFR-004 runner/env issue is fixed or the run is
    explicitly shown to use the required production-like configuration.
 

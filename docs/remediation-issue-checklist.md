@@ -150,7 +150,7 @@ Do not mark an item complete unless the fix is implemented, verified by an appro
 | [x]  | RIC-103 | Multi-instance or equivalent persistence test proves two app instances see the same state.                 | Phase 5: `operational-state.test.ts` uses two independent store containers with one shared repository and verifies writes from one are visible to the other.                  |
 | [x]  | RIC-104 | 100-player load-sized test runs against persistent services.                                               | Phase 7: `persistent-tournament-flow.test.ts` submits and edits 100 eligible player ballots, persists through `MemoryOperationalStateRepository`, restores, and verifies 100 latest revision-2 ballots plus final-30 status. |
 | [x]  | RIC-105 | Stage screenshot/visual checks cover two 7-card rows, QR, timer, chart images, tiebreak, and final reveal. | Phase 2: Playwright checks two 7-card stage rows, real QR SVG and short URL, readable timer/QR bounding boxes, rendered stage image natural width, sealed/revealed tiebreak wheel, and final stage list with exactly two cards. |
-| [x]  | RIC-106 | CI workflow creation is deferred until Phase 12 and does not require production secrets before then.        | Phase 11: `.github/workflows/ci.yml` is removed/deferred and `ci-workflow.test.ts` verifies no `.github/workflows/*.yml` files exist before the final CI phase. |
+| [x]  | RIC-106 | CI workflow creation is deferred until Phase 12 and does not require production secrets before then.        | Phase 11: `.github/workflows/ci.yml` was removed/deferred before the final phase. Phase 12 creates `.github/workflows/ci.yml` with source-only gates and tests that it does not require production secrets or release-only Supabase/production-flow commands. |
 | [x]  | RIC-107 | CI/e2e reliability is documented if any checks remain local-only.                                          | Phase 7: `docs/phase-status.md` documents CI/local parity, Playwright's generated test-only secrets, fallback cache behavior in CI, and the remaining real-image event setup blocker. |
 
 ## Documentation And Process
@@ -183,10 +183,9 @@ The remediation plan is complete only when:
 - A full four-round rehearsal has been completed with persistent state.
 - Risks and assumptions are documented in `docs/phase-status.md`.
 
-As of release closure work on 2026-06-29, the real cached artwork items (`RIC-020`, `RIC-021`,
-`RIC-022`, and `RIC-028`) are closed with evidence, and an automated four-round repository-backed
-persistent rehearsal plus CSV generation test passes. The final event-readiness gate is still blocked
-until an explicitly approved hosted Supabase rehearsal is completed with
-`TOURNAMENT_STATE_BACKEND=supabase` and a non-production `TOURNAMENT_EVENT_ID`. The current
-runtime uses normalized event-scoped tables rather than the old fixed `primary` snapshot row, but
-hosted rehearsal is still required before event readiness can be claimed.
+As of Phase 11 on 2026-07-04, the hosted Supabase production-flow rehearsal blocker was replaced by
+passing linked-Supabase evidence for the required 48 -> 36 -> 24 -> 12 active voting-player flow
+against disposable event id `rehearsal-2026-07-03-prod-db-01`. The remaining event-readiness gates
+are Phase 12 release metadata, post-merge/deployed commit evidence, production environment
+confirmation, real event namespace/roster setup, venue-distance QR scan evidence, private CSV file
+location confirmation, and any final migrations required after merge.
