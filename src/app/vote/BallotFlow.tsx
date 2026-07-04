@@ -309,6 +309,7 @@ export function BallotFlow({
   const [liveTurnoutText, setLiveTurnoutText] = useState(turnoutText);
   const [isPending, startTransition] = useTransition();
   const initializedIdentityRef = useRef(false);
+  const lastPresenceClaimRef = useRef<{ claimedAtMs: number; key: string } | null>(null);
   const refreshRequestedRef = useRef(false);
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null;
   const alreadySubmitted = existingBallotLookup?.exists === true;
@@ -389,12 +390,17 @@ export function BallotFlow({
 
   const claimPresence = useCallback(
     async (player: EligiblePlayerSnapshot) => {
+      const deviceId = getDeviceId();
+      const claimKey = `${roundNumber}:${player.id}:${deviceId}`;
+
       try {
         const presence = await claimVoterPresenceAction({
           roundNumber,
           playerId: player.id,
-          deviceId: getDeviceId(),
+          deviceId,
         });
+
+        lastPresenceClaimRef.current = { claimedAtMs: Date.now(), key: claimKey };
 
         if (presence.hasOtherActiveDevice) {
           setPresenceWarning(
@@ -548,8 +554,6 @@ export function BallotFlow({
       void poll();
     }, VOTE_LIVE_POLL_INTERVAL_MS);
 
-    void poll();
-
     return () => {
       cancelled = true;
       window.clearInterval(interval);
@@ -582,37 +586,6 @@ export function BallotFlow({
   }, [choices, confirmed, draws, hydrated, roundNumber, savedAt, selectedPlayerId, step]);
 
   useEffect(() => {
-    if (
-      process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true" ||
-      !hydrated ||
-      confirmed ||
-      !selectedPlayer ||
-      !liveCanSubmit
-    ) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    const player = selectedPlayer;
-
-    async function checkSelectedPlayerPresence() {
-      setPresencePending(true);
-      await claimPresence(player);
-
-      if (!cancelled) {
-        setPresencePending(false);
-      }
-    }
-
-    void checkSelectedPlayerPresence();
-
-    return () => {
-      cancelled = true;
-      setPresencePending(false);
-    };
-  }, [claimPresence, confirmed, hydrated, liveCanSubmit, selectedPlayer]);
-
-  useEffect(() => {
     if (process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true") {
       return undefined;
     }
@@ -621,14 +594,20 @@ export function BallotFlow({
       return undefined;
     }
 
+    const player = selectedPlayer;
+    const claimKey = `${roundNumber}:${player.id}:${getDeviceId()}`;
+    const lastClaim = lastPresenceClaimRef.current;
+
+    if (!lastClaim || lastClaim.key !== claimKey || Date.now() - lastClaim.claimedAtMs > 5_000) {
+      void claimPresence(player);
+    }
+
     const interval = window.setInterval(() => {
-      void claimPresence(selectedPlayer);
+      void claimPresence(player);
     }, VOTER_PRESENCE_REFRESH_INTERVAL_MS);
 
-    void claimPresence(selectedPlayer);
-
     return () => window.clearInterval(interval);
-  }, [claimPresence, confirmed, liveCanSubmit, selectedPlayer]);
+  }, [claimPresence, confirmed, liveCanSubmit, roundNumber, selectedPlayer]);
 
   function updateChoice(nextChoice: BallotSetChoice) {
     setChoices((current) => current.map((choice, index) => (index === step ? nextChoice : choice)));

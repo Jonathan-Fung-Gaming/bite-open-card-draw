@@ -8,6 +8,7 @@ type ServerActionClickOptions = {
   postDataIncludes?: readonly string[];
   requireServerActionResponse?: boolean;
   responseTimeoutMs?: number;
+  skipMinimumSettle?: boolean;
   submitForm?: boolean;
 };
 
@@ -127,7 +128,9 @@ export async function clickServerAction(
     throw new Error(`Server action returned HTTP ${response.status()}.`);
   }
 
-  await page.waitForTimeout(Math.max(settleMs, getMinimumActionSettleMs()));
+  await page.waitForTimeout(
+    options.skipMinimumSettle ? settleMs : Math.max(settleMs, getMinimumActionSettleMs()),
+  );
 
   const currentUrl = new URL(page.url());
   const actionError = currentUrl.searchParams.get("error");

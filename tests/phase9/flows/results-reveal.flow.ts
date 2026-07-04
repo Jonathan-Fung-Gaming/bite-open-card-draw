@@ -10,6 +10,7 @@ import {
   expectSupabaseRevealPhase,
   expectSupabaseSupportedTiebreaks,
 } from "../fixtures/supabase-state";
+import type { RehearsalRoundExpectation } from "../fixtures/rehearsal-plan";
 import { AdminPage } from "../pages/admin.page";
 
 type RevealRouteHooks = {
@@ -55,15 +56,21 @@ export async function verifyRoundCsvExport(options: {
   adminPage: AdminPage;
   baseURL: string;
   browserDownloadPath?: string;
+  expectation: RehearsalRoundExpectation;
   request: APIRequestContext;
   roundNumber: number;
 }) {
-  const { adminPage, baseURL, browserDownloadPath, request, roundNumber } = options;
+  const { adminPage, baseURL, browserDownloadPath, expectation, request, roundNumber } = options;
+  const expectedSubmittedPlayers = Object.fromEntries(expectation.expectedRevisionByPlayer);
 
   if (!isBrowserCsvDownloadOnly()) {
     await expectPrivateCsvExport({
       baseURL,
-      expectedRows: 12,
+      expectedActiveAtRoundStartRows: expectation.expectedActiveAtRoundStartRows,
+      expectedRows: expectation.expectedRows,
+      expectedSubmittedRows: expectation.expectedSubmittedRows,
+      expectedRevisionByPlayer: expectation.expectedRevisionByPlayer,
+      requiredPlayers: [...expectation.requiredCsvPlayers],
       request,
       roundNumber,
     });
@@ -76,22 +83,17 @@ export async function verifyRoundCsvExport(options: {
   if (resolvedDownloadPath) {
     const download = await adminPage.verifyManualCsvDownload(roundNumber, resolvedDownloadPath);
     const summary = expectPrivateCsvFinalContent(download.csv, {
-      expectedRevisionByPlayer: {
-        "Rehearsal Player 01": 2,
-        "Rehearsal Player 02": 1,
-      },
-      expectedRows: 12,
-      expectedSubmittedRows: 2,
-      requiredPlayers: ["Rehearsal Player 01", "Rehearsal Player 02"],
+      expectedActiveAtRoundStartRows: expectation.expectedActiveAtRoundStartRows,
+      expectedRevisionByPlayer: expectation.expectedRevisionByPlayer,
+      expectedRows: expectation.expectedRows,
+      expectedSubmittedRows: expectation.expectedSubmittedRows,
+      requiredPlayers: expectation.requiredCsvPlayers,
       roundNumber,
     });
 
     await expectSupabaseFinalCsvMatchesDatabase({
       csv: download.csv,
-      expectedSubmittedPlayers: {
-        "Rehearsal Player 01": 2,
-        "Rehearsal Player 02": 1,
-      },
+      expectedSubmittedPlayers,
       roundNumber,
     });
     const summaryDir = join(process.cwd(), "test-results", "phase9");

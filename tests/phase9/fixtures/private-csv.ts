@@ -78,7 +78,10 @@ export type PrivateCsvSummary = {
 };
 
 type PrivateCsvFinalContentOptions = {
+  expectedActiveAtRoundStartRows?: number;
+  expectedManualOverrideRows?: number;
   expectedRevisionByPlayer?: ReadonlyMap<string, number> | Record<string, number>;
+  expectedReplacedExistingRows?: number;
   expectedRows: number;
   expectedSubmittedRows?: number;
   requiredPlayers?: readonly string[];
@@ -190,9 +193,28 @@ export function expectPrivateCsvFinalContent(
   }
 
   const submittedRecords = records.filter((record) => record.submitted === "true");
+  const activeAtRoundStartRecords = records.filter(
+    (record) => record.player_active_at_round_start === "true",
+  );
+  const manualOverrideRecords = records.filter((record) => record.manual_override === "true");
+  const replacedExistingRecords = records.filter(
+    (record) => record.replaced_existing_ballot === "true",
+  );
 
   if (typeof options.expectedSubmittedRows === "number") {
     expect(submittedRecords.length).toBe(options.expectedSubmittedRows);
+  }
+
+  if (typeof options.expectedActiveAtRoundStartRows === "number") {
+    expect(activeAtRoundStartRecords.length).toBe(options.expectedActiveAtRoundStartRows);
+  }
+
+  if (typeof options.expectedManualOverrideRows === "number") {
+    expect(manualOverrideRecords.length).toBe(options.expectedManualOverrideRows);
+  }
+
+  if (typeof options.expectedReplacedExistingRows === "number") {
+    expect(replacedExistingRecords.length).toBe(options.expectedReplacedExistingRows);
   }
 
   for (const record of records) {
@@ -274,16 +296,22 @@ export function expectPrivateCsvFinalContent(
 
 export async function expectPrivateCsvExport(options: {
   baseURL: string;
+  expectedActiveAtRoundStartRows?: number;
+  expectedManualOverrideRows?: number;
   expectedRows: number;
   expectedSubmittedRows?: number;
   request: APIRequestContext;
   expectedRevisionByPlayer?: ReadonlyMap<string, number> | Record<string, number>;
+  expectedReplacedExistingRows?: number;
   requiredPlayers?: string[];
   roundNumber: number;
 }) {
   const {
     baseURL,
+    expectedActiveAtRoundStartRows,
+    expectedManualOverrideRows,
     expectedRevisionByPlayer,
+    expectedReplacedExistingRows,
     expectedRows,
     expectedSubmittedRows,
     request,
@@ -311,6 +339,9 @@ export async function expectPrivateCsvExport(options: {
   expect(rows.length - 1).toBe(expectedRows);
   expectPrivateCsvFinalContent(csv, {
     expectedRevisionByPlayer,
+    expectedActiveAtRoundStartRows,
+    expectedManualOverrideRows,
+    expectedReplacedExistingRows,
     expectedRows,
     expectedSubmittedRows,
     requiredPlayers: requiredPlayers ?? ["Rehearsal Player 01", "Rehearsal Player 02"],

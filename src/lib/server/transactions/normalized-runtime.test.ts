@@ -37,6 +37,7 @@ type RpcCall = {
 };
 
 const implementedMutationNames: NormalizedTransactionalMutationName[] = [
+  "claimActiveVoterPresence",
   "submitBallot",
   "computeResults",
   "advanceVotingTimer",
@@ -46,7 +47,6 @@ const implementedMutationNames: NormalizedTransactionalMutationName[] = [
 ];
 
 const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
-  "claimActiveVoterPresence",
   "touchActiveVoterPresence",
   "acquireHostLock",
   "refreshHostLock",
@@ -417,6 +417,19 @@ describe("normalized runtime transactional mutations", () => {
     expect(computeFunction).toContain("eligibility.player_id is not null");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_ack");
     expect(computeFunction).not.toContain("normalized_runtime_transaction_disabled");
+  });
+
+  it("implements voter presence as a row-scoped service-role transaction", () => {
+    const migrations = readMigrations();
+    const claimFunction = latestRpcDefinition(migrations, "normalized_claim_voter_presence");
+
+    expect(claimFunction).not.toBe("");
+    expect(claimFunction).toContain("normalized_database_time");
+    expect(claimFunction).toContain("round_player_eligibility");
+    expect(claimFunction).toContain("active_voter_presence");
+    expect(claimFunction).toContain("on conflict (event_id, round_number, player_id, device_id)");
+    expect(claimFunction).not.toContain("normalized_runtime_transaction_disabled");
+    expect(claimFunction).not.toContain("normalized_runtime_transaction_ack");
   });
 
   it("implements durable voting timer advancement as a database-time transaction", () => {
