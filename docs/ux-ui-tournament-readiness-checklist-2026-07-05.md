@@ -17,7 +17,7 @@ The product behavior source of truth remains `docs/product-spec.md` and
 
 | Done | ID | Severity | Phase | Issue | Closure evidence |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | UXR-001 | P1 | 0 | Live production shows fallback/placeholder chart images even though local cached images validate. | Production route/network evidence proves live charts request real `/chart-images/cache/*` assets, or a documented deployment/data fix explains any intentional fallback rows. |
+| [ ] | UXR-001 | P1 | 0 | Live production shows fallback/placeholder chart images even though local cached images validate. | Phase 0 classified this as a deployment artifact/stale production artifact: sampled live cache PNG returned 404 and live `/stage` plus `/charts` used fallback art. Keep open until a newer deployment serves `/chart-images/cache/*` and route evidence proves cache art renders. |
 | [ ] | UXR-002 | P1 | 3 | Chart-image components rely on precomputed fallback paths; broken non-fallback cache URLs do not visibly recover at render time. | Browser test or component test covers a missing image URL and verifies fallback art appears. |
 | [ ] | UXR-003 | P1 | 3 | Mobile ballot/chart/result cards crop and darken chart art enough that artwork is difficult to inspect. | Mobile screenshots for `/vote`, `/charts`, and `/results` show readable art, title, artist, and difficulty. |
 | [ ] | UXR-004 | P2 | 3 | Long selected chart names and artists truncate in primary public result cards. | Mobile result screenshot includes a long real chart name without losing identity-critical text. |
@@ -27,7 +27,7 @@ The product behavior source of truth remains `docs/product-spec.md` and
 | Done | ID | Severity | Phase | Issue | Closure evidence |
 | --- | --- | --- | --- | --- | --- |
 | [ ] | UXR-005 | P1 | 1 | Stage QR code is not centered in its panel. | Desktop and 720p stage screenshots show the QR square centered in the panel. |
-| [ ] | UXR-006 | P2 | 0 | Local/rehearsal QR can encode relative `/room` when `NEXT_PUBLIC_SITE_URL` is missing outside production. | Release/rehearsal gate verifies QR target is an absolute public event URL before venue use. |
+| [x] | UXR-006 | P2 | 0 | Local/rehearsal QR can encode relative `/room` when `NEXT_PUBLIC_SITE_URL` is missing outside production. | Phase 0 evidence: live `/stage` QR target was `https://bite-open-card-draw.vercel.app/room`, local `.env.local` sets the same public origin, production helper tests reject missing/localhost origins, and release/deployment checklists now require deployed absolute `/room` QR evidence before venue use. |
 | [ ] | UXR-007 | P1 | 2 | Stage reveal cadence can stutter or look inconsistent because refresh timing and reveal timing are tightly coupled. | Stage reveal evidence shows smooth, predictable progression through chart reveal and tiebreak states. |
 | [ ] | UXR-008 | P1 | 2 | Phones can show final charts before the projector visibly reaches the final reveal. | E2E evidence proves phones remain in the holding state until stage reveal completion is committed. |
 | [ ] | UXR-009 | P1 | 2 | Final `/stage`, `/vote`, `/charts`, and `/results` views can go stale after correction, reset, or round advance. | Already-open public pages update after final correction/reset/advance without manual browser refresh. |
