@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { captureEvidenceScreenshot, writeJsonEvidence } from "./evidence-artifacts";
 import {
   getAdminPassword,
@@ -17,6 +17,13 @@ async function expectNoHorizontalOverflow(page: Page) {
   await expect
     .poll(async () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth))
     .toBeLessThanOrEqual(4);
+}
+
+async function expectTouchTarget(locator: Locator, label: string) {
+  const box = await locator.boundingBox();
+
+  expect(box, `${label} should be visible for touch-target measurement`).not.toBeNull();
+  expect(box!.height, `${label} height`).toBeGreaterThanOrEqual(44);
 }
 
 async function expectNoVagueSkipAction(page: Page) {
@@ -60,7 +67,12 @@ function intersectionArea(
 async function collectMobileBallotGeometry(page: Page) {
   const viewport = page.viewportSize();
   const cards = page.getByTestId("ballot-chart-card");
+  const noBansBox = await page.getByTestId("no-bans-choice").boundingBox();
   const cardBoxes = [];
+
+  expect(noBansBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(noBansBox!.y + noBansBox!.height).toBeLessThanOrEqual(viewport!.height);
 
   for (let index = 0; index < (await cards.count()); index += 1) {
     const box = await cards.nth(index).boundingBox();
@@ -88,8 +100,55 @@ async function collectMobileBallotGeometry(page: Page) {
     horizontalOverflow: await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
     ),
+    noBansBox: {
+      height: Math.round(noBansBox!.height * 100) / 100,
+      width: Math.round(noBansBox!.width * 100) / 100,
+      x: Math.round(noBansBox!.x * 100) / 100,
+      y: Math.round(noBansBox!.y * 100) / 100,
+    },
     projectViewport: viewport,
   };
+}
+
+async function expectVisibleCardMetadata(scope: Locator, expectedCount: number) {
+  const images = scope.getByTestId("stage-chart-image");
+  const titles = scope.getByTestId("chart-card-title");
+  const artists = scope.getByTestId("chart-card-artist");
+  const difficulties = scope.getByTestId("chart-card-difficulty");
+
+  await expect(images).toHaveCount(expectedCount);
+  await expect(titles).toHaveCount(expectedCount);
+  await expect(artists).toHaveCount(expectedCount);
+  await expect(difficulties).toHaveCount(expectedCount);
+
+  await expect
+    .poll(async () =>
+      images.evaluateAll((elements) =>
+        elements.every((element) => (element as HTMLImageElement).naturalWidth > 0),
+      ),
+    )
+    .toBe(true);
+
+  for (const locator of [titles, artists, difficulties]) {
+    const boxes = await locator.evaluateAll((elements) =>
+      elements.map((element) => {
+        const style = window.getComputedStyle(element);
+
+        return {
+          clientWidth: element.clientWidth,
+          fontSize: Number.parseFloat(style.fontSize),
+          scrollWidth: element.scrollWidth,
+          text: element.textContent?.trim() ?? "",
+        };
+      }),
+    );
+
+    for (const box of boxes) {
+      expect(box.text.length).toBeGreaterThan(0);
+      expect(box.fontSize).toBeGreaterThanOrEqual(12);
+      expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth + 2);
+    }
+  }
 }
 
 async function startRehearsalMode(page: Page) {
@@ -148,16 +207,32 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   await goto(page, "/room");
   await expect(page.getByRole("link", { name: "I am a player voting" })).toBeVisible();
   await expect(page.getByRole("link", { name: "View charts only" })).toBeVisible();
+  await expectTouchTarget(page.getByRole("link", { name: "I am a player voting" }), "room vote link");
+  await expectTouchTarget(page.getByRole("link", { name: "View charts only" }), "room charts link");
   await expectNoHorizontalOverflow(page);
 
   await goto(page, "/charts");
   await expect(page.getByTestId("view-only-status")).toContainText("Voting open");
   await expect(page.getByRole("tab", { name: /Set 1/ })).toBeVisible();
   await expect(page.getByRole("tab", { name: /Set 2/ })).toBeVisible();
+  await expectTouchTarget(page.getByRole("tab", { name: /Set 1/ }), "charts set 1 tab");
+  await expectTouchTarget(page.getByRole("tab", { name: /Set 2/ }), "charts set 2 tab");
   await expect(page.getByTestId("stage-set-row").nth(0)).toBeVisible();
   await expect(page.getByTestId("stage-set-row").nth(1)).toBeHidden();
+  await expectVisibleCardMetadata(page.getByTestId("stage-set-row").nth(0), 7);
+  await captureEvidenceScreenshot(
+    testInfo,
+    `uxr-003-${testInfo.project.name}-mobile-charts-set-1.png`,
+    page,
+  );
   await page.getByRole("tab", { name: /Set 2/ }).click();
   await expect(page.getByTestId("stage-set-row").nth(1)).toBeVisible();
+  await expectVisibleCardMetadata(page.getByTestId("stage-set-row").nth(1), 7);
+  await captureEvidenceScreenshot(
+    testInfo,
+    `uxr-003-${testInfo.project.name}-mobile-charts-set-2.png`,
+    page,
+  );
   await expect(page.getByLabel("Select your start.gg username")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Submit Ballot" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
@@ -168,6 +243,7 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
     label: voterName,
   });
   await expect(page.getByText(`Are you sure you are voting as ${voterName}?`)).toBeVisible();
+  await expectTouchTarget(page.getByRole("button", { name: "Confirm" }), "confirm button");
   await page.getByRole("button", { name: "Confirm" }).click();
   await expect(page.getByTestId("ballot-chart-card")).toHaveCount(7);
   await expectNoVagueSkipAction(page);
@@ -176,6 +252,9 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   await expect(page.getByRole("link", { name: /skip/i })).toHaveCount(0);
   await expect(page.getByText(/^skip$/i)).toHaveCount(0);
   await expect(page.getByLabel("No bans for this set")).toBeVisible();
+  await expectTouchTarget(page.getByTestId("no-bans-choice"), "no-bans choice");
+  await expectTouchTarget(page.getByRole("button", { name: "Next", exact: true }), "next button");
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
   await expectNoHorizontalOverflow(page);
   const ballotGeometry = await collectMobileBallotGeometry(page);
 
@@ -194,11 +273,19 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   );
 
   await page.getByLabel("No bans for this set").check();
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+  await page.getByTestId("ballot-chart-card").first().click();
+  await expect(page.getByLabel("No bans for this set")).not.toBeChecked();
+  await expect(page.getByTestId("ban-selection-counter")).toHaveText("1/2 bans selected");
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByLabel("No bans for this set").check();
+  await expectTouchTarget(page.getByRole("button", { name: "Review" }), "review button");
   await page.getByRole("button", { name: "Review" }).click();
+  await expectTouchTarget(page.getByRole("button", { name: "Submit Ballot" }), "submit button");
   await page.getByRole("button", { name: "Submit Ballot" }).click();
   await expect(page.getByText("Ballot Saved")).toBeVisible();
+  await expectTouchTarget(page.getByRole("button", { name: "Edit S16" }), "saved edit S16");
+  await expectTouchTarget(page.getByRole("button", { name: "Edit S17" }), "saved edit S17");
 
   await goto(page, "/results");
   await expect(page.getByRole("heading", { name: "Round 1 Results" })).toBeVisible();

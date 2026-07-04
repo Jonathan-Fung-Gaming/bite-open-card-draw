@@ -19,7 +19,9 @@ const PROJECTOR_VIEWPORTS = [
 ] as const;
 const MOBILE_VOTE_VIEWPORT = { height: 844, name: "390x844", width: 390 } as const;
 const STAGE_QR_MIN_SIZE_PX = 176;
-const STAGE_TITLE_MIN_FONT_SIZE_PX = 12;
+const STAGE_CARD_MIN_HEIGHT_PX = 90;
+const STAGE_TITLE_MIN_FONT_SIZE_PX = 14;
+const STAGE_SECONDARY_MIN_FONT_SIZE_PX = 12;
 
 type EvidenceBox = {
   height: number;
@@ -287,12 +289,12 @@ async function expectNoVerticalOverflow(page: Page) {
     .toBeLessThanOrEqual(4);
 }
 
-async function collectStageTitleEvidence(page: Page) {
-  const titles = page.getByTestId("stage-chart-title");
-
-  await expect(titles).toHaveCount(14);
-
-  const evidence = await titles.evaluateAll((elements) =>
+async function collectReadableTextEvidence(
+  locator: Locator,
+  minimumFontSizePx: number,
+  label: string,
+) {
+  const evidence = await locator.evaluateAll((elements) =>
     elements.map((element) => {
       const style = window.getComputedStyle(element);
 
@@ -305,13 +307,39 @@ async function collectStageTitleEvidence(page: Page) {
     }),
   );
 
-  for (const title of evidence) {
-    expect(title.text.length).toBeGreaterThan(0);
-    expect(title.fontSize).toBeGreaterThanOrEqual(STAGE_TITLE_MIN_FONT_SIZE_PX);
-    expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth + 2);
+  for (const item of evidence) {
+    expect(item.text.length, `${label} should have visible text`).toBeGreaterThan(0);
+    expect(item.fontSize, `${label} font size`).toBeGreaterThanOrEqual(minimumFontSizePx);
+    expect(item.scrollWidth, `${label} should not clip horizontally`).toBeLessThanOrEqual(
+      item.clientWidth + 2,
+    );
   }
 
   return evidence;
+}
+
+async function collectStageTextEvidence(page: Page) {
+  const titles = page.getByTestId("stage-chart-title");
+  const artists = page.getByTestId("stage-chart-artist");
+  const difficulties = page.getByTestId("stage-chart-difficulty");
+
+  await expect(titles).toHaveCount(14);
+  await expect(artists).toHaveCount(14);
+  await expect(difficulties).toHaveCount(14);
+
+  return {
+    artists: await collectReadableTextEvidence(
+      artists,
+      STAGE_SECONDARY_MIN_FONT_SIZE_PX,
+      "stage artist",
+    ),
+    difficulties: await collectReadableTextEvidence(
+      difficulties,
+      STAGE_SECONDARY_MIN_FONT_SIZE_PX,
+      "stage difficulty",
+    ),
+    titles: await collectReadableTextEvidence(titles, STAGE_TITLE_MIN_FONT_SIZE_PX, "stage title"),
+  };
 }
 
 async function collectStageGeometry(page: Page) {
@@ -369,6 +397,7 @@ async function collectStageGeometry(page: Page) {
     ).toBeLessThanOrEqual(2);
 
     for (const card of cardBoxes) {
+      expect(card.height).toBeGreaterThanOrEqual(STAGE_CARD_MIN_HEIGHT_PX);
       expect(card.x).toBeGreaterThanOrEqual(0);
       expect(card.x + card.width).toBeLessThanOrEqual(viewport!.width + 1);
       expect(card.y).toBeGreaterThanOrEqual(0);
@@ -420,7 +449,7 @@ async function collectStageGeometry(page: Page) {
       votingBand: toEvidenceBox(votingBandBox!),
     },
     rows: rowEvidence,
-    titleEvidence: await collectStageTitleEvidence(page),
+    textEvidence: await collectStageTextEvidence(page),
     verticalOverflow: await page.evaluate(
       () =>
         Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) -

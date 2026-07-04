@@ -26,7 +26,9 @@ const PROJECTOR_VIEWPORTS = [
 ] as const;
 const MOBILE_VOTE_VIEWPORT = { height: 844, name: "390x844", width: 390 } as const;
 const STAGE_QR_MIN_SIZE_PX = 176;
-const STAGE_TITLE_MIN_FONT_SIZE_PX = 12;
+const STAGE_CARD_MIN_HEIGHT_PX = 90;
+const STAGE_TITLE_MIN_FONT_SIZE_PX = 14;
+const STAGE_SECONDARY_MIN_FONT_SIZE_PX = 12;
 
 type EvidenceBox = {
   height: number;
@@ -123,12 +125,8 @@ async function expectStageImagesRendered(page: Page) {
     .toBe(true);
 }
 
-async function expectStageTitlesReadable(page: Page) {
-  const titles = page.getByTestId("stage-chart-title");
-
-  await expect(titles).toHaveCount(14);
-
-  const titleEvidence = await titles.evaluateAll((elements) =>
+async function expectTextReadable(locator: Locator, minimumFontSizePx: number, label: string) {
+  const evidence = await locator.evaluateAll((elements) =>
     elements.map((element) => {
       const style = window.getComputedStyle(element);
 
@@ -141,11 +139,26 @@ async function expectStageTitlesReadable(page: Page) {
     }),
   );
 
-  for (const title of titleEvidence) {
-    expect(title.text.length).toBeGreaterThan(0);
-    expect(title.fontSize).toBeGreaterThanOrEqual(STAGE_TITLE_MIN_FONT_SIZE_PX);
-    expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth + 2);
+  for (const item of evidence) {
+    expect(item.text.length, `${label} should have visible text`).toBeGreaterThan(0);
+    expect(item.fontSize, `${label} font size`).toBeGreaterThanOrEqual(minimumFontSizePx);
+    expect(item.scrollWidth, `${label} should not clip horizontally`).toBeLessThanOrEqual(
+      item.clientWidth + 2,
+    );
   }
+}
+
+async function expectStageCardTextReadable(page: Page) {
+  const titles = page.getByTestId("stage-chart-title");
+  const artists = page.getByTestId("stage-chart-artist");
+  const difficulties = page.getByTestId("stage-chart-difficulty");
+
+  await expect(titles).toHaveCount(14);
+  await expect(artists).toHaveCount(14);
+  await expect(difficulties).toHaveCount(14);
+  await expectTextReadable(titles, STAGE_TITLE_MIN_FONT_SIZE_PX, "stage title");
+  await expectTextReadable(artists, STAGE_SECONDARY_MIN_FONT_SIZE_PX, "stage artist");
+  await expectTextReadable(difficulties, STAGE_SECONDARY_MIN_FONT_SIZE_PX, "stage difficulty");
 }
 
 async function collectStageViewportGeometry(page: Page) {
@@ -167,7 +180,7 @@ async function collectStageViewportGeometry(page: Page) {
     { timeout: 35_000 },
   );
   await expectStageImagesRendered(page);
-  await expectStageTitlesReadable(page);
+  await expectStageCardTextReadable(page);
   await expectNoHorizontalOverflow(page);
   await expectNoVerticalOverflow(page);
 
@@ -185,6 +198,7 @@ async function collectStageViewportGeometry(page: Page) {
     ).toBeLessThanOrEqual(2);
 
     for (const card of cardBoxes) {
+      expect(card.height).toBeGreaterThanOrEqual(STAGE_CARD_MIN_HEIGHT_PX);
       expect(card.x).toBeGreaterThanOrEqual(0);
       expect(card.x + card.width).toBeLessThanOrEqual(viewport!.width + 1);
       expect(card.y).toBeGreaterThanOrEqual(0);
@@ -246,6 +260,31 @@ async function collectStageViewportGeometry(page: Page) {
     ),
     viewport,
   };
+}
+
+async function expectFallbackImageRendered(locator: Locator) {
+  await expect(locator).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect
+    .poll(async () =>
+      locator.evaluate((element) => {
+        const image = element as HTMLImageElement;
+        const src = image.currentSrc || image.src;
+
+        return (
+          element.getAttribute("data-chart-image-fallback") === "true" &&
+          image.naturalWidth > 0 &&
+          src.includes("/chart-images/fallback-card.svg")
+        );
+      }),
+    )
+    .toBe(true);
+  const state = await locator.evaluate((element) => ({
+    naturalWidth: (element as HTMLImageElement).naturalWidth,
+    src: (element as HTMLImageElement).currentSrc || (element as HTMLImageElement).src,
+  }));
+
+  expect(state.naturalWidth).toBeGreaterThan(0);
+  expect(state.src).toContain("/chart-images/fallback-card.svg");
 }
 
 async function expectCenteredSeventhCard(page: Page) {
@@ -407,6 +446,57 @@ async function captureMobileVoteEvidence(browser: Browser, baseURL: string, test
   }
 }
 
+async function captureImageFallbackEvidence(browser: Browser, baseURL: string, testInfo: TestInfo) {
+  const stageContext = await browser.newContext({
+    baseURL,
+    viewport: { height: 720, width: 1280 },
+  });
+  const phoneContext = await browser.newContext({
+    baseURL,
+    hasTouch: true,
+    isMobile: true,
+    viewport: { height: MOBILE_VOTE_VIEWPORT.height, width: MOBILE_VOTE_VIEWPORT.width },
+  });
+
+  await stageContext.route("**/chart-images/cache/**", (route) => route.abort("failed"));
+  await phoneContext.route("**/chart-images/cache/**", (route) => route.abort("failed"));
+
+  try {
+    const stagePage = await stageContext.newPage();
+
+    await goto(stagePage, "/stage");
+    await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible({
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
+    await expect(stagePage.getByTestId("stage-chart-image")).toHaveCount(14, {
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
+    await expectFallbackImageRendered(stagePage.getByTestId("stage-chart-image").first());
+    await captureEvidenceScreenshot(testInfo, "uxr-002-stage-image-fallback.png", stagePage);
+
+    const chartsPage = await phoneContext.newPage();
+
+    await goto(chartsPage, "/charts");
+    await expect(chartsPage.getByTestId("view-only-status")).toContainText("Voting open");
+    await expectFallbackImageRendered(chartsPage.getByTestId("stage-chart-image").first());
+    await captureEvidenceScreenshot(testInfo, "uxr-002-mobile-charts-image-fallback.png", chartsPage);
+
+    const votePage = await phoneContext.newPage();
+
+    await goto(votePage, "/vote");
+    await votePage.getByLabel("Select your start.gg username").selectOption({
+      label: "Rehearsal Player 02",
+    });
+    await votePage.getByRole("button", { name: "Confirm" }).click();
+    await expect(votePage.getByTestId("ballot-chart-card")).toHaveCount(7);
+    await expectFallbackImageRendered(votePage.getByTestId("ballot-chart-image").first());
+    await captureEvidenceScreenshot(testInfo, "uxr-002-mobile-vote-image-fallback.png", votePage);
+  } finally {
+    await phoneContext.close();
+    await stageContext.close();
+  }
+}
+
 test("PFR-031 captures common projector viewports and mobile vote layout", async ({
   page,
   browser,
@@ -425,6 +515,7 @@ test("PFR-031 captures common projector viewports and mobile vote layout", async
 
     await captureProjectorEvidence(browser, baseURL, testInfo);
     await captureMobileVoteEvidence(browser, baseURL, testInfo);
+    await captureImageFallbackEvidence(browser, baseURL, testInfo);
   } finally {
     await resetRehearsalMode(page);
   }

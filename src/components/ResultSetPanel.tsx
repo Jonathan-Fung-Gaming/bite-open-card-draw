@@ -8,6 +8,7 @@ import {
   getTiebreakRevealRemainingMs,
   isTiebreakRevealComplete,
 } from "@/lib/results/reveal-timing";
+import { ChartArtImage } from "./ChartArtImage";
 import { RuneWheel } from "./RuneWheel";
 
 type ResultSetPanelProps = {
@@ -154,10 +155,8 @@ export function ResultSetPanel({
                     stageMode ? "h-12" : "h-24",
                   )}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <ChartArtImage
                     src={row.chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
-                    alt=""
                     className="h-full w-full object-cover opacity-65"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
+import { ChartArtImage } from "@/components";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import type { BallotSetChoice, PublicBallotLookup, PublicEditableBallot } from "@/lib/vote/ballot";
@@ -42,6 +43,12 @@ type StoredBallotDraft = {
   choices: BallotSetChoice[];
   step: number;
   updatedAt: string;
+};
+
+type PresenceClaimResult = {
+  claimKey: string;
+  hasOtherActiveDevice: boolean;
+  ok: boolean;
 };
 
 function emptyChoices(draws: DrawRecord[]): BallotSetChoice[] {
@@ -101,6 +108,14 @@ function getDeviceId() {
   }
 
   return deviceId;
+}
+
+function voterPresenceClaimKey(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  deviceId: string,
+) {
+  return `${roundNumber}:${playerId}:${deviceId}`;
 }
 
 function editTokenKey(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
@@ -297,6 +312,9 @@ export function BallotFlow({
   const [message, setMessage] = useState<string | null>(null);
   const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
   const [presenceWarning, setPresenceWarning] = useState<string | null>(null);
+  const [presenceWarningReadyToContinueKey, setPresenceWarningReadyToContinueKey] = useState<
+    string | null
+  >(null);
   const [presencePending, setPresencePending] = useState(false);
   const [existingBallot, setExistingBallot] = useState<PublicEditableBallot | null>(null);
   const [existingBallotLookup, setExistingBallotLookup] = useState<PublicBallotLookup | null>(null);
@@ -315,8 +333,9 @@ export function BallotFlow({
   const alreadySubmitted = existingBallotLookup?.exists === true;
   const isPaused = liveStatus === "voting_paused";
   const changesUnavailableCopy = isPaused
-    ? "Voting is paused. Your selections on this phone are still here; leave this page open and submit after the host resumes."
+    ? "Voting is paused. The host has frozen the timer and ballot changes. Your selections on this phone are still here; leave this page open and continue after voting resumes."
     : "Voting is not accepting ballot changes right now.";
+  const editingServerConfirmedBallot = confirmed && !savedAt && Boolean(existingBallot);
   const currentDraw = draws[step];
   const currentChoice = choices[step];
   const canSubmit = choices.every(
@@ -389,9 +408,9 @@ export function BallotFlow({
   );
 
   const claimPresence = useCallback(
-    async (player: EligiblePlayerSnapshot) => {
+    async (player: EligiblePlayerSnapshot): Promise<PresenceClaimResult> => {
       const deviceId = getDeviceId();
-      const claimKey = `${roundNumber}:${player.id}:${deviceId}`;
+      const claimKey = voterPresenceClaimKey(roundNumber, player.id, deviceId);
 
       try {
         const presence = await claimVoterPresenceAction({
@@ -410,13 +429,37 @@ export function BallotFlow({
           setPresenceWarning(null);
         }
 
-        return true;
+        return {
+          claimKey,
+          hasOtherActiveDevice: presence.hasOtherActiveDevice,
+          ok: true,
+        };
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Could not claim voter presence.");
-        return false;
+        return {
+          claimKey,
+          hasOtherActiveDevice: false,
+          ok: false,
+        };
       }
     },
     [roundNumber],
+  );
+
+  const claimPresenceIfStale = useCallback(
+    async (player: EligiblePlayerSnapshot) => {
+      const deviceId = getDeviceId();
+      const claimKey = voterPresenceClaimKey(roundNumber, player.id, deviceId);
+      const lastClaim = lastPresenceClaimRef.current;
+
+      if (lastClaim && lastClaim.key === claimKey && Date.now() - lastClaim.claimedAtMs <= 5_000) {
+        return true;
+      }
+
+      const claim = await claimPresence(player);
+      return claim.ok;
+    },
+    [claimPresence, roundNumber],
   );
 
   const warning = useMemo(() => {
@@ -599,15 +642,15 @@ export function BallotFlow({
     const lastClaim = lastPresenceClaimRef.current;
 
     if (!lastClaim || lastClaim.key !== claimKey || Date.now() - lastClaim.claimedAtMs > 5_000) {
-      void claimPresence(player);
+      void claimPresenceIfStale(player);
     }
 
     const interval = window.setInterval(() => {
-      void claimPresence(player);
+      void claimPresenceIfStale(player);
     }, VOTER_PRESENCE_REFRESH_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [claimPresence, confirmed, liveCanSubmit, roundNumber, selectedPlayer]);
+  }, [claimPresenceIfStale, confirmed, liveCanSubmit, roundNumber, selectedPlayer]);
 
   function updateChoice(nextChoice: BallotSetChoice) {
     setChoices((current) => current.map((choice, index) => (index === step ? nextChoice : choice)));
@@ -702,6 +745,7 @@ export function BallotFlow({
     setExistingBallot(null);
     setExistingBallotLookup(null);
     setPresenceWarning(null);
+    setPresenceWarningReadyToContinueKey(null);
     setMessage("Choose the correct start.gg username before submitting.");
     setSelectionMessage(null);
   }
@@ -713,7 +757,7 @@ export function BallotFlow({
           Voting as <span className="text-white">{selectedPlayer.startggUsername}</span>
         </p>
         <button
-          className="rounded border border-ember-300/35 px-3 py-2 text-xs font-black uppercase text-ember-300"
+          className="min-h-11 rounded border border-ember-300/35 px-4 py-3 text-sm font-black uppercase text-ember-300"
           onClick={changeUsernameBeforeSubmit}
           type="button"
         >
@@ -778,6 +822,7 @@ export function BallotFlow({
             setExistingBallot(null);
             setExistingBallotLookup(null);
             setPresenceWarning(null);
+            setPresenceWarningReadyToContinueKey(null);
             setChoices(emptyChoices(draws));
             setStep(0);
             setMessage(null);
@@ -824,13 +869,23 @@ export function BallotFlow({
             }
 
             setPresencePending(true);
-            const claimed = await claimPresence(selectedPlayer);
+            const claim = await claimPresence(selectedPlayer);
             setPresencePending(false);
 
-            if (!claimed) {
+            if (!claim.ok) {
+              setPresenceWarningReadyToContinueKey(null);
               return;
             }
 
+            if (
+              claim.hasOtherActiveDevice &&
+              presenceWarningReadyToContinueKey !== claim.claimKey
+            ) {
+              setPresenceWarningReadyToContinueKey(claim.claimKey);
+              return;
+            }
+
+            setPresenceWarningReadyToContinueKey(null);
             rememberIdentity(selectedPlayer);
             setConfirmed(true);
           }}
@@ -855,7 +910,10 @@ export function BallotFlow({
         <h1 className="mt-2 text-3xl font-black uppercase text-white">
           {selectedPlayer?.startggUsername}
         </h1>
-        <p className="mt-3 text-metal-300">Server-confirmed timestamp: {savedAt}</p>
+        <p className="mt-3 text-metal-300">
+          Server-confirmed ballot. This ballot remains valid unless a later save succeeds.
+        </p>
+        <p className="mt-2 text-metal-300">Server-confirmed timestamp: {savedAt}</p>
         {presenceWarningBanner}
         <div className="mt-5 grid gap-3">
           {choices.map((choice, index) => {
@@ -867,7 +925,7 @@ export function BallotFlow({
                 <p className="mt-1 text-sm text-metal-300">{describeChoice(draw, choice)}</p>
                 {liveCanSubmit ? (
                   <button
-                    className="mt-3 rounded border border-ember-300/35 px-3 py-2 text-xs font-black uppercase text-ember-300"
+                    className="mt-3 min-h-11 rounded border border-ember-300/35 px-4 py-3 text-sm font-black uppercase text-ember-300"
                     onClick={() => {
                       setSavedAt(null);
                       setStep(index);
@@ -889,7 +947,7 @@ export function BallotFlow({
         ) : null}
         {liveCanSubmit ? (
           <button
-            className="button-metal mt-5 rounded px-4 py-3 font-black uppercase"
+            className="button-metal mt-5 min-h-11 rounded px-4 py-3 font-black uppercase"
             onClick={() => {
               setSavedAt(null);
               setStep(draws.length);
@@ -921,6 +979,16 @@ export function BallotFlow({
         </h1>
         {identityCorrection}
         {presenceWarningBanner}
+        {editingServerConfirmedBallot ? (
+          <p
+            className="mt-4 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300"
+            data-testid="saved-edit-draft-warning"
+            role="status"
+          >
+            Editing unsaved changes. Your previous server-confirmed ballot remains valid until this
+            save succeeds.
+          </p>
+        ) : null}
         <div className="mt-5 grid gap-3">
           {choices.map((choice, index) => (
             <div key={choice.drawId} className="rounded border border-metal-700 bg-black/25 p-3">
@@ -934,7 +1002,7 @@ export function BallotFlow({
                     )}
               </p>
               <button
-                className="mt-3 rounded border border-ember-300/35 px-3 py-2 text-xs font-black uppercase text-ember-300"
+                className="mt-3 min-h-11 rounded border border-ember-300/35 px-4 py-3 text-sm font-black uppercase text-ember-300"
                 onClick={() => {
                   setStep(index);
                   setSelectionMessage(null);
@@ -958,15 +1026,17 @@ export function BallotFlow({
         ) : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <button
-            className="rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300"
+            className="min-h-11 rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300"
             onClick={() => setStep(1)}
+            type="button"
           >
             Back
           </button>
           <button
-            className="button-metal rounded px-4 py-3 font-black uppercase disabled:opacity-40"
+            className="button-metal min-h-11 rounded px-4 py-3 font-black uppercase disabled:opacity-40"
             disabled={!canSubmit || isPending || !liveCanSubmit}
             onClick={submit}
+            type="button"
           >
             Submit Ballot
           </button>
@@ -983,6 +1053,16 @@ export function BallotFlow({
       <h1 className="mt-2 text-3xl font-black uppercase text-white">{currentDraw?.displayLabel}</h1>
       {identityCorrection}
       {presenceWarningBanner}
+      {editingServerConfirmedBallot ? (
+        <p
+          className="mt-4 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300"
+          data-testid="saved-edit-draft-warning"
+          role="status"
+        >
+          Editing unsaved changes. Your previous server-confirmed ballot remains valid until this
+          save succeeds.
+        </p>
+      ) : null}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-metal-700 bg-black/25 p-3">
         <p className="text-sm font-black uppercase text-white" data-testid="ban-selection-counter">
           {currentChoice?.bannedChartIds.length ?? 0}/2 bans selected
@@ -1005,64 +1085,17 @@ export function BallotFlow({
           {changesUnavailableCopy}
         </p>
       ) : null}
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        {currentDraw?.charts.map((chart, index) => {
-          const selected = currentChoice?.bannedChartIds.includes(chart.id) ?? false;
-          return (
-            <button
-              key={chart.id}
-              aria-label={`Ban ${chart.name} (${chart.displayDifficulty})`}
-              aria-pressed={selected}
-              className={clsx(
-                "relative min-h-40 min-w-0 overflow-hidden rounded border bg-cover bg-center p-3 text-left",
-                selected
-                  ? "border-ember-300 bg-ember-900/40 shadow-ember-tight"
-                  : "border-metal-700 bg-black/25",
-                index === 6 ? "col-span-2 mx-auto w-[calc((100%_-_0.75rem)/2)] min-w-0" : "",
-              )}
-              data-chart-image-path={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
-              data-chart-id={chart.id}
-              data-chart-name={chart.name}
-              data-testid="ballot-chart-card"
-              style={{
-                backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.86)), url(${
-                  chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH
-                })`,
-              }}
-              onClick={() => toggleBan(chart.id)}
-              disabled={!liveCanSubmit}
-              type="button"
-            >
-              <span className="relative flex min-h-32 flex-col justify-between">
-                <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
-                  <span>{chart.displayDifficulty}</span>
-                  <span
-                    className={clsx(
-                      "rounded border px-2 py-1 font-black tracking-normal",
-                      selected
-                        ? "border-ember-300 bg-ember-900/45 text-white"
-                        : "border-metal-700 bg-black/35 text-metal-300",
-                    )}
-                    data-testid="ban-selected-label"
-                  >
-                    {selected ? "Ban selected" : "Tap to ban"}
-                  </span>
-                </span>
-                <span>
-                  <span className="mt-2 block break-words text-sm font-black uppercase leading-tight text-white line-clamp-3 sm:text-base">
-                    {chart.name}
-                  </span>
-                  <span className="mt-1 block break-words text-xs text-metal-300 line-clamp-2 sm:text-sm">
-                    {chart.artist}
-                  </span>
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <label className="mt-4 flex items-center gap-3 rounded border border-metal-700 bg-black/25 p-3 text-sm font-bold text-metal-300">
+      <label
+        className={clsx(
+          "mt-4 flex min-h-16 items-center gap-3 rounded border p-4 text-base font-black text-white",
+          currentChoice?.noBans
+            ? "border-ember-300 bg-ember-900/35 shadow-ember-tight"
+            : "border-ember-300/35 bg-black/25",
+        )}
+        data-testid="no-bans-choice"
+      >
         <input
+          className="h-6 w-6 accent-[#ffb95c]"
           type="checkbox"
           checked={currentChoice?.noBans ?? false}
           disabled={!liveCanSubmit}
@@ -1079,11 +1112,81 @@ export function BallotFlow({
             });
           }}
         />
-        No bans for this set
+        <span>
+          <span className="block uppercase">No bans for this set</span>
+          <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em] text-metal-300">
+            Explicit zero-ban choice
+          </span>
+        </span>
       </label>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        {currentDraw?.charts.map((chart, index) => {
+          const selected = currentChoice?.bannedChartIds.includes(chart.id) ?? false;
+          const imagePath = chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH;
+
+          return (
+            <button
+              key={chart.id}
+              aria-label={`Ban ${chart.name} (${chart.displayDifficulty})`}
+              aria-pressed={selected}
+              className={clsx(
+                "min-w-0 overflow-hidden rounded border bg-furnace-900 text-left disabled:opacity-55",
+                selected
+                  ? "border-ember-300 shadow-ember-tight"
+                  : "border-metal-700 bg-black/25",
+                index === 6 ? "col-span-2 mx-auto w-[calc((100%_-_0.75rem)/2)] min-w-0" : "",
+              )}
+              data-chart-image-path={imagePath}
+              data-chart-id={chart.id}
+              data-chart-name={chart.name}
+              data-testid="ballot-chart-card"
+              onClick={() => toggleBan(chart.id)}
+              disabled={!liveCanSubmit}
+              type="button"
+            >
+              <span className="block">
+                <span className="relative block aspect-[4/3] overflow-hidden border-b border-ember-300/15 bg-black/35">
+                  <ChartArtImage
+                    src={imagePath}
+                    className="h-full w-full object-contain opacity-95"
+                    testId="ballot-chart-image"
+                  />
+                  {selected ? (
+                    <span className="absolute inset-0 border-2 border-ember-300/80" />
+                  ) : null}
+                </span>
+                <span className="flex min-h-28 flex-col justify-between p-3">
+                  <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.14em] text-ember-300">
+                    <span>{chart.displayDifficulty}</span>
+                    <span
+                      className={clsx(
+                        "rounded border px-2 py-1 font-black tracking-normal",
+                        selected
+                          ? "border-ember-300 bg-ember-900/45 text-white"
+                          : "border-metal-700 bg-black/35 text-metal-300",
+                      )}
+                      data-testid="ban-selected-label"
+                    >
+                      {selected ? "Ban selected" : "Tap to ban"}
+                    </span>
+                  </span>
+                  <span>
+                    <span className="mt-3 block break-words text-sm font-black uppercase leading-tight text-white line-clamp-3 sm:text-base">
+                      {chart.name}
+                    </span>
+                    <span className="mt-1 block break-words text-xs text-metal-300 line-clamp-2 sm:text-sm">
+                      {chart.artist}
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
       <div className="mt-5 flex flex-wrap gap-3">
         <button
-          className="rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300 disabled:opacity-40"
+          className="min-h-11 rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300 disabled:opacity-40"
           disabled={step === 0}
           onClick={() => {
             setSelectionMessage(null);
@@ -1094,7 +1197,7 @@ export function BallotFlow({
           Back
         </button>
         <button
-          className="button-metal rounded px-4 py-3 font-black uppercase disabled:opacity-40"
+          className="button-metal min-h-11 rounded px-4 py-3 font-black uppercase disabled:opacity-40"
           disabled={
             !liveCanSubmit ||
             !currentChoice ||

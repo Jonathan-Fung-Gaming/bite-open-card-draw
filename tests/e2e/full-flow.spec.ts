@@ -6,6 +6,7 @@ import {
   type Download,
   type Locator,
   type Page,
+  type Route,
   type TestInfo,
 } from "@playwright/test";
 import { captureEvidenceScreenshot, writeJsonEvidence } from "./evidence-artifacts";
@@ -81,6 +82,28 @@ async function readDownloadText(download: Download) {
   return readFile(path, "utf8");
 }
 
+async function failNextVoteSubmitRequest(page: Page) {
+  let aborted = false;
+  const routeHandler = async (route: Route) => {
+    const request = route.request();
+    const isServerActionPost =
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/vote" &&
+      (Boolean(request.headers()["next-action"]) || (request.postData() ?? "").includes("$ACTION"));
+
+    if (!aborted && isServerActionPost) {
+      aborted = true;
+      await route.abort("failed");
+      await page.unroute("**/*", routeHandler);
+      return;
+    }
+
+    await route.continue();
+  };
+
+  await page.route("**/*", routeHandler);
+}
+
 async function expectStageRows(page: Page) {
   const rows = page.getByTestId("stage-set-row");
 
@@ -145,6 +168,64 @@ async function expectRenderedRealBackgroundImage(locator: Locator) {
       ),
     )
     .toBeGreaterThan(0);
+}
+
+async function expectFallbackImageRendered(locator: Locator) {
+  await expect(locator).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect
+    .poll(async () =>
+      locator.evaluate((element) => {
+        const image = element as HTMLImageElement;
+        const src = image.currentSrc || image.src;
+
+        return (
+          element.getAttribute("data-chart-image-fallback") === "true" &&
+          image.naturalWidth > 0 &&
+          src.includes("/chart-images/fallback-card.svg")
+        );
+      }),
+    )
+    .toBe(true);
+}
+
+async function expectSelectedResultCardsReadable(page: Page, expectedCount = 2) {
+  const titles = page.getByTestId("selected-chart-title");
+  const artists = page.getByTestId("selected-chart-artist");
+  const difficulties = page.getByTestId("selected-chart-difficulty");
+  const images = page.getByTestId("stage-chart-image");
+
+  await expect(titles).toHaveCount(expectedCount, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect(artists).toHaveCount(expectedCount);
+  await expect(difficulties).toHaveCount(expectedCount);
+  await expect(images).toHaveCount(expectedCount);
+  await expect
+    .poll(async () =>
+      images.evaluateAll((elements) =>
+        elements.every((element) => (element as HTMLImageElement).naturalWidth > 0),
+      ),
+    )
+    .toBe(true);
+
+  for (const locator of [titles, artists, difficulties]) {
+    const evidence = await locator.evaluateAll((elements) =>
+      elements.map((element) => {
+        const style = window.getComputedStyle(element);
+
+        return {
+          clientWidth: element.clientWidth,
+          fontSize: Number.parseFloat(style.fontSize),
+          scrollWidth: element.scrollWidth,
+          text: element.textContent?.trim() ?? "",
+        };
+      }),
+    );
+
+    for (const item of evidence) {
+      expect(item.text.length).toBeGreaterThan(0);
+      expect(item.fontSize).toBeGreaterThanOrEqual(12);
+      expect(item.scrollWidth).toBeLessThanOrEqual(item.clientWidth + 2);
+    }
+  }
 }
 
 async function expectReadableVotingAccess(page: Page) {
@@ -717,7 +798,7 @@ async function expectOpenPublicPagesAfterReset({
   });
   await votePage.bringToFront();
   await expect(
-    votePage.getByText("Both chart sets must be drawn before voting opens."),
+    votePage.getByText("The host is drawing the two chart sets."),
   ).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -776,10 +857,17 @@ async function selectDifferentOverrideTarget(adminPage: Page, currentChartNames:
         value: (element as HTMLOptionElement).value,
       })),
     );
-  const target = options.find(
-    (option) =>
-      option.value && !currentChartNames.includes(chartNameFromOverrideLabel(option.label)),
-  );
+  const candidates = options
+    .filter(
+      (option) =>
+        option.value && !currentChartNames.includes(chartNameFromOverrideLabel(option.label)),
+    )
+    .sort(
+      (left, right) =>
+        chartNameFromOverrideLabel(right.label).length -
+        chartNameFromOverrideLabel(left.label).length,
+    );
+  const target = candidates[0];
 
   if (!target) {
     throw new Error("Could not find a non-selected result override target.");
@@ -798,7 +886,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   browser,
   baseURL,
 }, testInfo) => {
-  test.setTimeout(240_000);
+  test.setTimeout(300_000);
 
   await collectLogoRoutePerformanceEvidence(browser, baseURL, testInfo);
 
@@ -808,6 +896,15 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await goto(page, "/room");
   await expect(page.getByRole("link", { name: "I am a player voting" })).toBeVisible();
   await expect(page.getByRole("link", { name: "View charts only" })).toBeVisible();
+  const mobileWaitingPage = await page.context().newPage();
+  await mobileWaitingPage.setViewportSize({ width: 390, height: 844 });
+  await goto(mobileWaitingPage, "/vote");
+  await expect(mobileWaitingPage.getByText("The host is drawing the two chart sets.")).toBeVisible();
+  await captureEvidenceScreenshot(
+    testInfo,
+    "uxr-013-mobile-vote-waiting-not-drawn.png",
+    mobileWaitingPage,
+  );
 
   await loginAndTakeHost(page);
   await expectAdminEventDayFlow(page);
@@ -863,6 +960,16 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(stagePage.getByText(/Version 1 \/ (Revealing [0-7] \/ 7|Pool)/)).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+  await goto(mobileWaitingPage, "/vote");
+  await expect(
+    mobileWaitingPage.getByText("The host has not opened the 10-minute voting window yet."),
+  ).toBeVisible();
+  await captureEvidenceScreenshot(
+    testInfo,
+    "uxr-013-mobile-vote-waiting-not-open.png",
+    mobileWaitingPage,
+  );
+  await mobileWaitingPage.close();
   await expectStageRows(stagePage);
   await expectRenderedRealStageImage(stagePage);
   await expectStageRows(chartsPage);
@@ -945,6 +1052,30 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(phonePage.getByText("Ballot Saved")).toBeVisible({ timeout: 7000 });
   await expect(phonePage.getByText("Loaded saved revision 2.")).toBeVisible();
   await expect(phonePage.getByText("Server-confirmed timestamp:")).toBeVisible();
+  await phonePage.getByRole("button", { name: "Edit S16" }).click();
+  await expect(phonePage.getByTestId("saved-edit-draft-warning")).toContainText(
+    "previous server-confirmed ballot remains valid",
+  );
+  const failedEditCards = phonePage.getByTestId("ballot-chart-card");
+  await failedEditCards.nth(0).click();
+  await failedEditCards.nth(2).click();
+  await phonePage.getByRole("button", { name: "Next", exact: true }).click();
+  await phonePage.getByRole("button", { name: "Review" }).click();
+  await expect(phonePage.getByTestId("saved-edit-draft-warning")).toContainText(
+    "previous server-confirmed ballot remains valid",
+  );
+  await failNextVoteSubmitRequest(phonePage);
+  await phonePage.getByRole("button", { name: "Submit Ballot" }).click();
+  await expect(
+    phonePage.getByText(/Previous server-confirmed ballot remains valid\./),
+  ).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(phonePage.getByText("Ballot Saved")).toBeVisible();
+  await phonePage.reload({ waitUntil: "domcontentloaded" });
+  await expect(phonePage.getByText("Loaded saved revision 2.")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 
   const duplicatePhonePage = await browser.newPage();
   await duplicatePhonePage.goto(new URL("/vote", page.url()).toString(), {
@@ -959,7 +1090,18 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     duplicatePhonePage.getByText("A ballot already exists for this start.gg username"),
   ).toBeVisible({ timeout: 7000 });
   await expect(duplicatePhonePage.getByRole("button", { name: "Confirm" })).toBeEnabled();
+  await duplicatePhonePage.getByRole("button", { name: "Confirm" }).click();
+  await expect(
+    duplicatePhonePage.getByText("Another active device has already claimed Alpha"),
+  ).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(duplicatePhonePage.getByRole("button", { name: "Confirm" })).toBeEnabled();
   await expect(duplicatePhonePage.getByTestId("ballot-chart-card")).toHaveCount(0);
+  await duplicatePhonePage.getByRole("button", { name: "Confirm" }).click();
+  await expect(duplicatePhonePage.getByTestId("ballot-chart-card").first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
   await duplicatePhonePage.close();
 
   const resultsPage = await page.context().newPage();
@@ -973,6 +1115,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expect(phonePage.getByText("Results are being revealed on stage.")).toBeVisible();
+  await captureEvidenceScreenshot(testInfo, "uxr-013-mobile-vote-closed-revealing.png", phonePage);
   await expect(resultsPage.getByText("Voting is closed.")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -1040,6 +1183,44 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await captureEvidenceScreenshot(testInfo, "uxr-009-open-vote-final.png", phonePage);
   await captureEvidenceScreenshot(testInfo, "uxr-009-open-charts-final.png", chartsPage);
   await captureEvidenceScreenshot(testInfo, "uxr-009-open-results-final.png", resultsPage);
+  const mobileResultsPage = await page.context().newPage();
+  await mobileResultsPage.setViewportSize({ width: 390, height: 844 });
+  await goto(mobileResultsPage, "/results");
+  await expect(mobileResultsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expectSelectedResultCardsReadable(mobileResultsPage);
+  await captureEvidenceScreenshot(testInfo, "uxr-004-mobile-results-final.png", mobileResultsPage);
+  await mobileResultsPage.close();
+
+  const fallbackResultsContext = await browser.newContext({
+    baseURL,
+    hasTouch: true,
+    isMobile: true,
+    viewport: { height: 844, width: 390 },
+  });
+
+  await fallbackResultsContext.route("**/chart-images/cache/**", (route) =>
+    route.abort("failed"),
+  );
+  try {
+    const fallbackResultsPage = await fallbackResultsContext.newPage();
+
+    await goto(fallbackResultsPage, "/results");
+    await expect(
+      fallbackResultsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" }),
+    ).toBeVisible({
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
+    await expectFallbackImageRendered(fallbackResultsPage.getByTestId("stage-chart-image").first());
+    await captureEvidenceScreenshot(
+      testInfo,
+      "uxr-002-mobile-results-image-fallback.png",
+      fallbackResultsPage,
+    );
+  } finally {
+    await fallbackResultsContext.close();
+  }
   const privateCsvDownload = await privateCsvDownloadPromise;
   const privateCsvText = await readDownloadText(privateCsvDownload);
   const csvExpectation = {
@@ -1152,8 +1333,24 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     { chartsPage, resultsPage, stagePage, votePage: phonePage },
     correctedChartName,
   );
+  const correctedMobileResultsPage = await page.context().newPage();
+  await correctedMobileResultsPage.setViewportSize({ width: 390, height: 844 });
+  await goto(correctedMobileResultsPage, "/results");
+  await expect(
+    correctedMobileResultsPage.getByTestId("selected-chart-title").filter({
+      hasText: correctedChartName,
+    }),
+  ).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expectSelectedResultCardsReadable(correctedMobileResultsPage);
+  await captureEvidenceScreenshot(
+    testInfo,
+    "uxr-004-mobile-results-corrected-long-name.png",
+    correctedMobileResultsPage,
+  );
+  await correctedMobileResultsPage.close();
   await writeJsonEvidence(testInfo, "uxr-009-open-route-correction.json", {
     correctedChartName,
+    correctedChartNameLength: correctedChartName.length,
     previousFinalNames: currentFinalNames,
   });
 
@@ -1198,7 +1395,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();
 });
 
-test("unsaved vote draft survives pause and resume reloads", async ({ page }) => {
+test("unsaved vote draft survives pause and resume reloads", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
 
   await loginAndTakeHost(page);
@@ -1247,8 +1444,9 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }) =>
   await expect(page.getByText("voting paused")).toBeVisible();
   await phonePage.reload({ waitUntil: "domcontentloaded" });
   await expect(
-    phonePage.getByText("Voting is paused. Your selections on this phone are still here"),
+    phonePage.getByText("Voting is paused. The host has frozen the timer and ballot changes."),
   ).toBeVisible();
+  await captureEvidenceScreenshot(testInfo, "uxr-013-mobile-vote-paused.png", phonePage);
   await expect(phonePage.getByTestId("ban-selection-counter")).toHaveText("1/2 bans selected");
   await expect(phonePage.getByTestId("ballot-chart-card").first()).toHaveAttribute(
     "aria-pressed",
