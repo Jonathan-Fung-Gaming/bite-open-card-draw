@@ -34,8 +34,12 @@ Fill these values for the current release commit before tournament use.
 - Runtime charts with non-fallback cached artwork: 4426
 - Total public cache size: 209721036 bytes (200.01 MB)
 - Largest public cache file size: 651394 bytes (636.1 KB)
-- Verification command/date/commit: rtk npm run verify:real-chart-images / TODO date / TODO commit
-- Combined release data gate: rtk npm run verify:release-data / TODO date / TODO commit
+- Verification command/date/commit: rtk npm run verify:real-chart-images / 2026-07-04 /
+  pre-merge base a67f4f1e1f5bfbe2c46869586a45a3932bb2f6f2 on
+  codex/phase-12-release-metadata-closure
+- Combined release data gate: rtk npm run verify:release-data / 2026-07-04 / pre-merge base
+  a67f4f1e1f5bfbe2c46869586a45a3932bb2f6f2 on
+  codex/phase-12-release-metadata-closure
 
 rtk npm run verify:real-chart-images must validate the same runtime catalog source and public
 cache paths that the deployed app uses, not only generated image metadata. rtk npm run
@@ -54,7 +58,8 @@ web rendition during normal event use.
 - Proof no chart art uses live third-party `bg_img` URLs: TODO
 - Phone route manual/browser evidence date and viewport/device: TODO
 - Projector route manual/browser evidence date and viewport: TODO
-- Current release commit: TODO
+- Current release commit: pending post-merge source commit; record in PR/release evidence after
+  merge to avoid a self-referential tracked-file SHA.
 
 Target: phone and projector routes should not require downloading the source PNG during normal
 event use. Record the actual route evidence in docs/release-checklist.md before release.

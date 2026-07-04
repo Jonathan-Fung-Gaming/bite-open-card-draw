@@ -19,8 +19,9 @@ The Phase 9 Playwright rehearsal is split into reusable page objects and flows u
 - `rtk npm run test:phase9:supabase-dev` runs the one-round Supabase rehearsal on `next dev` with
   test liveness shortcuts. It is useful for debugging Supabase data setup, but is not production
   release evidence.
-- `rtk npm run test:phase9:full` runs the four-round Supabase/dev rehearsal tagged `@full`. It
-  still keeps the dev server and test liveness shortcuts, so treat it as pre-release debugging only.
+- `rtk npm run test:diagnostic:supabase-dev-full` runs the four-round Supabase/dev rehearsal tagged
+  `@full`. It still keeps the dev server and test liveness shortcuts, so treat it as diagnostic
+  debugging only, not release evidence.
 - `rtk npm run test:e2e:production-flow:validate` prints and validates the production-flow
   environment without launching Playwright.
 - `rtk npm run test:e2e:production-flow` is the release-evidence browser command for Phase 11. It

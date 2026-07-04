@@ -41,6 +41,7 @@ import {
   getOperationalStateRepository,
   hydrateTournamentState,
   withPersistedResultAdminState,
+  persistResultAdminState,
   persistTournamentState,
   withPersistedHostLockState,
   withPersistedVotingAdminState,
@@ -1236,7 +1237,7 @@ export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
       tournamentChanging: false,
       metadata: { roundNumber, reason: "host_lock_required" },
     });
-    await persistTournamentState();
+    await persistResultAdminState();
 
     throw new Error("Active host control is required to download the private CSV.");
   }
@@ -1250,7 +1251,7 @@ export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
       tournamentChanging: false,
       metadata: { roundNumber, reason: "final_reveal_required" },
     });
-    await persistTournamentState();
+    await persistResultAdminState();
 
     throw new Error("Private CSV is available only after the final reveal.");
   }
@@ -1273,7 +1274,7 @@ export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
       ballotCount: ballots.length,
     },
   });
-  await persistTournamentState();
+  await persistResultAdminState();
 
   return {
     filename,

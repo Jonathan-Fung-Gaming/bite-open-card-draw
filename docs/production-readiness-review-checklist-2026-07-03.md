@@ -112,6 +112,10 @@ Checks run during this review:
     operator, and artifacts.
   - Suggested gate: block event use until the release checklist is complete for the exact deployed
     commit.
+  - Phase 12 progress: source-side metadata now records the Phase 12 plan, operator, branch, base
+    commit, data/catalog/image-cache identities, and CI workflow path. Deployed commit, production
+    environment, real event roster, venue QR scan, and post-merge final source commit evidence
+    remain open and must not be treated as complete without current external evidence.
 
 - [ ] **PRC-009 - High - Some production-critical SQL/RPC behavior is tested mostly by fake clients
   or source assertions.**
@@ -364,6 +368,9 @@ Checks run during this review:
   - Expected: release evidence points at committed source and deployed commit.
   - Suggested gate: commit intentional docs/code changes, rerun release gates, record
     `git rev-parse HEAD`.
+  - Phase 12 progress: intentional source changes are scoped to release metadata, final-phase CI, and
+    associated tests. PRC-036 can close only after these changes are committed, the worktree is
+    clean, release gates pass, and the post-merge source/deployed commit evidence is recorded.
 
 ## Requirements Documentation Updates Made In This Review
 

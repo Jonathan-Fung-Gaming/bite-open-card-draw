@@ -21,7 +21,7 @@ Use this checklist on the event machine before players arrive and before every r
   `eventId`, `adminSessionHeartbeat=enabled`, `hostHeartbeat=enabled`,
   `voteLivePolling=enabled`, `publicRouteRefresh=enabled`, and `adminActionsOnly=enabled`.
 - Run `rtk npm run test:e2e:production-flow` only as the grouped Phase 11 browser evidence command.
-  Do not substitute `rtk npm run test:e2e`, `rtk npm run test:phase9:full`, or
+  Do not substitute `rtk npm run test:e2e`, `rtk npm run test:diagnostic:supabase-dev-full`, or
   `rtk npm run test:load:api-injection` as production-flow closure evidence.
 - Confirm the grouped production-flow Playwright run starts Round 1 with 48 active voting players,
   marks exactly 12 voting players inactive before Round 2, exactly 12 more before Round 3, and

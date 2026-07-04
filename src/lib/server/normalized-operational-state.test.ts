@@ -1010,6 +1010,7 @@ describe("normalized operational state repository", () => {
     expect(writeTables).not.toContain("ballots");
     expect(writeTables).not.toContain("ballot_choices");
     expect(writeTables).not.toContain("ballot_revisions");
+    expect(writeTables).not.toContain("players");
     expect(writeTables).not.toContain("draws");
     expect(writeTables).not.toContain("drawn_charts");
     expect(writeTables).not.toContain("result_rows");
