@@ -18,7 +18,10 @@ type SubmitBallotOptions = {
   expectDuplicateWarning?: boolean;
   expectedMessage?: string | RegExp;
   playerName: string;
+  readSavedTimestamp?: boolean;
   startFromRoom?: boolean;
+  useCurrentRoom?: boolean;
+  waitForCardsAfterConfirm?: boolean;
 };
 
 const NO_BAN_PLAN: BallotBanPlan = [[], []] as const;
@@ -33,6 +36,10 @@ export class VotePage {
     await goto(this.page, this.baseURL, "/vote");
   }
 
+  async gotoRoom() {
+    await goto(this.page, this.baseURL, "/room");
+  }
+
   async reload() {
     await this.page.reload({ waitUntil: "domcontentloaded" });
   }
@@ -44,7 +51,11 @@ export class VotePage {
   }
 
   async gotoFromRoom() {
-    await goto(this.page, this.baseURL, "/room");
+    await this.gotoRoom();
+    await this.continueFromRoomToVote();
+  }
+
+  async continueFromRoomToVote() {
     await this.page.getByRole("link", { name: "I am a player voting" }).click();
     await this.expectPlayerSelector();
   }
@@ -69,21 +80,40 @@ export class VotePage {
     expectDuplicateWarning = false,
     expectedMessage = "Ballot Saved",
     playerName,
+    readSavedTimestamp = true,
     startFromRoom = true,
+    useCurrentRoom = false,
+    waitForCardsAfterConfirm = true,
   }: SubmitBallotOptions) {
-    await this.beginBallot({ expectDuplicateWarning, playerName, startFromRoom });
+    await this.beginBallot({
+      expectDuplicateWarning,
+      playerName,
+      startFromRoom,
+      useCurrentRoom,
+      waitForCardsAfterConfirm,
+    });
 
-    return this.finishCurrentBallot(banPlan, expectedMessage);
+    return this.finishCurrentBallot(banPlan, expectedMessage, { readSavedTimestamp });
   }
 
   async beginBallot(options: {
     expectDuplicateWarning?: boolean;
     playerName: string;
     startFromRoom?: boolean;
+    useCurrentRoom?: boolean;
+    waitForCardsAfterConfirm?: boolean;
   }) {
-    const { expectDuplicateWarning = false, playerName, startFromRoom = true } = options;
+    const {
+      expectDuplicateWarning = false,
+      playerName,
+      startFromRoom = true,
+      useCurrentRoom = false,
+      waitForCardsAfterConfirm = true,
+    } = options;
 
-    if (startFromRoom) {
+    if (useCurrentRoom) {
+      await this.continueFromRoomToVote();
+    } else if (startFromRoom) {
       await this.gotoFromRoom();
     } else {
       await this.goto();
@@ -94,19 +124,20 @@ export class VotePage {
     if (expectDuplicateWarning) {
       await this.expectDuplicateBallotWarning(playerName);
     }
-    await this.confirmSelectedPlayer();
+    await this.confirmSelectedPlayer({ waitForCards: waitForCardsAfterConfirm });
   }
 
   async finishCurrentBallot(
     banPlan: BallotBanPlan,
     expectedMessage: string | RegExp = "Ballot Saved",
+    options: { readSavedTimestamp?: boolean } = {},
   ) {
     const selectedCards = await this.completeBallotChoices(banPlan);
 
     await this.submitCurrentBallot(expectedMessage);
 
     return {
-      savedAt: await this.savedTimestamp(),
+      savedAt: options.readSavedTimestamp === false ? undefined : await this.savedTimestamp(),
       selectedCards,
     };
   }
@@ -211,11 +242,16 @@ export class VotePage {
     });
   }
 
-  private async confirmSelectedPlayer() {
-    await this.page.getByRole("button", { name: "Confirm" }).click();
-    await expect(this.page.getByTestId("ballot-chart-card")).toHaveCount(7, {
-      timeout: HOSTED_REFRESH_TIMEOUT_MS,
-    });
+  private async confirmSelectedPlayer(options: { waitForCards?: boolean } = {}) {
+    const confirmButton = this.page.getByRole("button", { name: "Confirm" });
+
+    await expect(confirmButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    await confirmButton.click();
+    if (options.waitForCards !== false) {
+      await expect(this.page.getByTestId("ballot-chart-card")).toHaveCount(7, {
+        timeout: HOSTED_REFRESH_TIMEOUT_MS,
+      });
+    }
   }
 
   private async completeBallotChoices(banPlan: BallotBanPlan) {
@@ -263,6 +299,7 @@ export class VotePage {
     await clickServerAction(this.page, this.page.getByRole("button", { name: "Submit Ballot" }), 0, {
       requireServerActionResponse: true,
       responseTimeoutMs: 60_000,
+      skipMinimumSettle: true,
     });
 
     const locator =

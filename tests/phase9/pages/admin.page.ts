@@ -271,6 +271,26 @@ export class AdminPage {
     }
   }
 
+  async bulkImportPlayers(names: readonly string[]) {
+    if (names.length === 0) {
+      return;
+    }
+
+    await this.loginAndTakeHost();
+
+    const bulkImportForm = this.page.locator("form", {
+      has: this.page.getByPlaceholder("Bulk import start.gg usernames"),
+    });
+
+    await expect(bulkImportForm).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    await bulkImportForm.getByPlaceholder("Bulk import start.gg usernames").fill(names.join("\n"));
+    await clickServerAction(this.page, bulkImportForm.getByRole("button", { name: "Bulk Import" }), 0, {
+      requireServerActionResponse: true,
+      responseTimeoutMs: 60_000,
+      submitForm: true,
+    });
+  }
+
   async addInactivePlayerToCurrentRound(name: string, reason: string) {
     await this.loginAndTakeHost();
 
@@ -472,6 +492,8 @@ export class AdminPage {
     await clickServerAction(
       this.page,
       this.page.getByRole("button", { name: "Open Voting", exact: true }),
+      0,
+      { skipMinimumSettle: true },
     );
   }
 
@@ -561,15 +583,14 @@ export class AdminPage {
 
   async verifyManualCsvDownload(roundNumber: number, savePath: string) {
     await this.loginAndTakeHost();
-
-    const downloadPromise = this.page.waitForEvent("download", {
-      timeout: 20_000,
-    });
+    await this.expectRevealPhaseAfterNavigation("final");
     const downloadButton = this.page.getByRole("button", { name: "Download private ballot CSV" });
 
-    await expect(downloadButton).toBeEnabled({ timeout: HOSTED_ACTION_TIMEOUT_MS });
-    await downloadButton.click();
-    const download = await downloadPromise;
+    await expect(downloadButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    const [download] = await Promise.all([
+      this.page.waitForEvent("download", { timeout: 20_000 }),
+      downloadButton.click(),
+    ]);
 
     await download.saveAs(savePath);
     const csv = await readFile(savePath, "utf8");

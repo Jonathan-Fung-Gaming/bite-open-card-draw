@@ -3,14 +3,142 @@
 ## Current Remediation Status
 
 Status: Production readiness remediation code is complete. Final tournament readiness still depends
-on applying the latest Supabase migration, completing the release checklist evidence, selecting or
-resetting the production event namespace, and any event-day data/operator checks.
+on merging/deploying the latest code, confirming Supabase migrations remain applied, completing the
+release checklist evidence, selecting or resetting the production event namespace, and any event-day
+data/operator checks.
 
 The app is not event-ready until every item in `docs/remediation-issue-checklist.md` is closed
 with evidence and the final closure gate in that checklist passes. The authoritative behavior
 sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
+
+## Production Readiness Remediation Phase 10 - Playwright Helper Upgrades - 2026-07-03
+
+Status: implemented and verified. The production-flow rehearsal now completes the required
+48 -> 36 -> 24 -> 12 active-voter browser path inside the real voting windows.
+
+### Scope
+
+- PRC-002/PRC-003 are covered by the full production-flow rehearsal helper and evidence run:
+  Round 1 starts with 48 active voting players, then exactly 12 voting players are removed before
+  each later round for 36, 24, and 12 active voting players.
+- PRC-011 is covered by replacing hard-coded public aggregate expectations with per-round
+  expectation objects.
+- PRC-012 is covered in helpers by per-round CSV row, submitted row, active-at-round-start, required
+  player, and revision assertions, with browser download paths configured for every round.
+- PRC-013 is extended by roster setup, active-count, attrition, voting eligibility, and Supabase
+  round-snapshot helper assertions.
+- Production-flow validation now rejects enabled e2e test routes and memory backend fallback. Local
+  production-flow start mode owns the route env directly; external production-flow mode now also
+  requires `E2E_DEPLOYED_TEST_ROUTE_TOKEN` so deployed `/api/e2e/*` 404 probes cannot be masked by a
+  token mismatch.
+- A deterministic planner fixture defines smoke and production-flow expectations, exact 12-player
+  attrition batches, submitted-player maps, revision maps, CSV expectations, and lightweight valid
+  no-ban ballots after the first three tie-shaping voters.
+- Voting throughput was improved by removing duplicate username-presence checks, using a row-scoped
+  normalized Supabase voter-presence RPC, allowing player ballot submits to rely on the SQL
+  transaction's database locks instead of an outer event-wide lock, prewarming voter room pages
+  before the voting window opens, and replacing strict Playwright ballot batches with a worker pool.
+- Public turnout denominator evidence now runs twice per round: immediately after opening voting
+  before any ballot submissions (`0 / activePlayerCount`) and after the planned submissions complete.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `package.json`
+- `playwright.phase9.config.ts`
+- `scripts/run-playwright.mjs`
+- `src/app/vote/BallotFlow.tsx`
+- `src/app/vote/actions.ts`
+- `src/app/vote/page.tsx`
+- `src/lib/server/normalized-ballots.ts`
+- `src/lib/server/normalized-rpc-locking.test.ts`
+- `src/lib/server/normalized-voter-presence.ts`
+- `src/lib/server/transactions/normalized-runtime.test.ts`
+- `src/lib/server/transactions/normalized-runtime.ts`
+- `supabase/migrations/20260704010000_normalized_voter_presence_rpc.sql`
+- `tests/phase9/assertions/public-ui.assert.ts`
+- `tests/phase9/fixtures/phase9-env.ts`
+- `tests/phase9/fixtures/private-csv.ts`
+- `tests/phase9/fixtures/production-flow-safety.ts`
+- `tests/phase9/fixtures/rehearsal-plan.ts`
+- `tests/phase9/fixtures/rehearsal-plan.test.ts`
+- `tests/phase9/fixtures/supabase-state.ts`
+- `tests/phase9/flows/ballot-submission.flow.ts`
+- `tests/phase9/flows/rehearsal.flow.ts`
+- `tests/phase9/flows/results-reveal.flow.ts`
+- `tests/phase9/flows/voting-window.flow.ts`
+- `tests/phase9/hosted-full-rehearsal.spec.ts`
+- `tests/phase9/pages/admin.page.ts`
+- `tests/phase9/pages/vote.page.ts`
+- `tests/phase9/production-flow-validation.spec.ts`
+- `vitest.config.ts`
+
+### Checks Run
+
+- `rtk npm run test -- tests/phase9/fixtures/rehearsal-plan.test.ts` - passed, 3 tests.
+- `rtk npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-rpc-locking.test.ts tests/phase9/fixtures/rehearsal-plan.test.ts` - passed, 22 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 53 files / 309 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
+  skipped under memory. The smoke run covered the new initial public voting denominator assertion.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `rtk npm run test:e2e:production-flow:validate` - passed against disposable Supabase event id
+  `rehearsal-2026-07-03-prod-db-01`; this now runs a lightweight `@validate` Playwright route
+  probe and verifies `/api/e2e/*` returns 404 with no token and with the configured test token.
+- `rtk npm run test:e2e:production-flow:list` - passed and selected exactly the two current
+  `@full` specs: host-lock two-session evidence and hosted four-round rehearsal.
+- `rtk npx supabase migration list` - passed before and after migration; it initially showed
+  `20260704010000` pending remotely and then showed local/remote in sync.
+- `rtk npx supabase db push` - applied
+  `20260704010000_normalized_voter_presence_rpc.sql` to the linked Supabase database. The CLI
+  exited successfully after applying the migration, with a post-apply pg-delta catalog cache warning.
+- `rtk npx supabase db lint` - could not run because the local Supabase Postgres instance was not
+  running (`LegacyDbConnectError`).
+- `rtk git diff --check` - passed.
+
+### Full Production-Flow Probe
+
+- `rtk npm run test:e2e:production-flow` passed against linked Supabase event
+  `rehearsal-2026-07-03-prod-db-01`: host-lock two-session evidence passed and the hosted four-round
+  rehearsal passed.
+- Round 1 prewarmed 48 voter room pages and submitted all 48 browser ballots before the real
+  10-minute voting window expired. The slowest logged Round 1 ballot submission completed in about
+  30.9 seconds after its worker started.
+- Round 2 marked exactly 12 voting players inactive and submitted 36 browser ballots.
+- Round 3 marked exactly 12 more voting players inactive and submitted 24 browser ballots.
+- Round 4 marked exactly 12 more voting players inactive and submitted 12 browser ballots.
+- Each round verified the initial `0 / active` public turnout denominator, public privacy states,
+  gated admin live counts, final reveal, downloaded private CSV content, submitted-player
+  revisions, active-at-round-start rows, and Supabase result/CSV reconciliation.
+
+### Manual Review
+
+- Product rules remain unchanged: 4 rounds, 2 sets per round, 7 charts per set, one round voting
+  window, explicit `No bans for this set`, least-ban winners, server-side tiebreaks, and final
+  two-chart reveal are unchanged.
+- The production-flow planner marks exactly 12 Round 1 voters inactive before Round 2, exactly 12
+  more before Round 3, and exactly 12 more before Round 4.
+- Test-only route access remains fail-closed in local production-flow validation; route files still
+  ship in the app tree and deployed probes with the deployed token remain Phase 11 evidence work.
+- Browser code still receives no service-role keys, password hashes, session secrets, plaintext
+  passwords, or tournament decision authority.
+- No `.github/workflows/*` files were added or changed.
+
+### Risks And Assumptions
+
+- The production-flow plan uses explicit no-ban ballots for most voters to reduce browser work
+  while preserving valid complete ballots and a deterministic supported tiebreak through the first
+  three voters.
+- `test:e2e:production-flow:list` performs a production build before listing because production-flow
+  validation intentionally rejects local start mode with skipped builds.
+- The disposable Supabase event namespace used by validation/list/full probes must not be reused as
+  the real tournament namespace.
+- The linked Supabase database has already received migration `20260704010000`; after merge/deploy,
+  re-run `rtk npx supabase migration list` to confirm there are no pending migrations.
 
 ## Production Readiness Remediation Phase 9 - Real Supabase And Load Confidence - 2026-07-03
 

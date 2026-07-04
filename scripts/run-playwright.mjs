@@ -205,6 +205,12 @@ function collectProductionFlowValidationErrors(config) {
     errors.push("external production-flow mode requires E2E_BASE_URL.");
   }
 
+  if (config.serverMode === "external" && !process.env.E2E_DEPLOYED_TEST_ROUTE_TOKEN) {
+    errors.push(
+      "external production-flow mode requires E2E_DEPLOYED_TEST_ROUTE_TOKEN so deployed e2e-route 404 probes cannot be masked by token mismatch.",
+    );
+  }
+
   if (config.allowLocalPublicUrl === "true") {
     errors.push("TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL must be false for production-flow.");
   }
@@ -231,6 +237,14 @@ function collectProductionFlowValidationErrors(config) {
 
   if (config.useAdminActionsOnly !== "true") {
     errors.push("E2E_USE_ADMIN_ACTIONS_ONLY=true is required for production-flow rehearsal.");
+  }
+
+  if (config.allowE2eRoutes !== "false") {
+    errors.push("TOURNAMENT_TEST_ALLOW_E2E_ROUTES=false is required for production-flow.");
+  }
+
+  if (config.allowMemoryBackend !== "false") {
+    errors.push("TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND=false is required for production-flow.");
   }
 
   if (config.allowRehearsalAdminControls !== "true") {
@@ -444,6 +458,7 @@ const env = sanitizeEnv({
   TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS: e2eAllowRehearsalAdminControls,
   TOURNAMENT_TEST_PUBLIC_SITE_URL: process.env.TOURNAMENT_TEST_PUBLIC_SITE_URL || e2eBaseURL,
   TOURNAMENT_TEST_ROUTE_TOKEN: e2eTestRouteToken,
+  E2E_DEPLOYED_TEST_ROUTE_TOKEN: process.env.E2E_DEPLOYED_TEST_ROUTE_TOKEN,
 });
 
 let exitStatus = 0;

@@ -52,6 +52,7 @@ const uuidSchema = z.string().uuid();
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 
 const activeVoterPresenceInputSchema = z.object({
+  roundNumber: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   playerId: uuidSchema,
   deviceId: z.string().trim().min(8),
   expiresAt: isoDateTimeSchema,
@@ -102,6 +103,7 @@ const adminSessionEndInputSchema = z.object({
 });
 
 export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
+  claimActiveVoterPresence: activeVoterPresenceInputSchema,
   submitBallot: submitBallotInputSchema,
   computeResults: computeResultsInputSchema,
   advanceVotingTimer: advanceVotingTimerInputSchema,
@@ -111,7 +113,6 @@ export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
 } as const;
 
 export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
-  claimActiveVoterPresence: activeVoterPresenceInputSchema,
   touchActiveVoterPresence: activeVoterPresenceInputSchema,
   acquireHostLock: acquireHostLockInputSchema,
   refreshHostLock: acquireHostLockInputSchema,
@@ -147,6 +148,7 @@ export type NormalizedTransactionalMutationInput<
 > = z.input<(typeof NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS)[TName]>;
 
 export const NORMALIZED_RUNTIME_RPC_NAMES = {
+  claimActiveVoterPresence: "normalized_claim_voter_presence",
   submitBallot: "normalized_submit_ballot",
   computeResults: "normalized_compute_results",
   advanceVotingTimer: "normalized_advance_voting_timer",
@@ -156,7 +158,6 @@ export const NORMALIZED_RUNTIME_RPC_NAMES = {
 } as const satisfies Record<NormalizedTransactionalMutationName, NormalizedRuntimeRpcName>;
 
 export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
-  claimActiveVoterPresence: "normalized_claim_voter_presence",
   touchActiveVoterPresence: "normalized_touch_voter_presence",
   acquireHostLock: "normalized_acquire_host_lock",
   refreshHostLock: "normalized_heartbeat_host_lock",

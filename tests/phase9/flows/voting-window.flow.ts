@@ -1,4 +1,8 @@
-import { expectSupabaseVotingStatus, expectSupabaseVotingStatusIn } from "../fixtures/supabase-state";
+import {
+  expectSupabaseVotingStatus,
+  expectSupabaseVotingStatusIn,
+  getSupabaseVotingStatusValue,
+} from "../fixtures/supabase-state";
 import { AdminPage } from "../pages/admin.page";
 
 const CLOSEABLE_VOTING_STATUSES = [
@@ -6,6 +10,7 @@ const CLOSEABLE_VOTING_STATUSES = [
   "final_30_seconds",
   "extension_1_minute",
 ] as const;
+const CLOSEABLE_VOTING_STATUS_VALUES: readonly string[] = CLOSEABLE_VOTING_STATUSES;
 
 export async function openVotingForRound(adminPage: AdminPage, roundNumber: number) {
   await adminPage.openVoting();
@@ -16,6 +21,16 @@ export async function openVotingForRound(adminPage: AdminPage, roundNumber: numb
 }
 
 export async function closeVotingForRound(adminPage: AdminPage, roundNumber: number) {
+  const supabaseStatus = await getSupabaseVotingStatusValue(roundNumber);
+
+  if (supabaseStatus === "voting_closed") {
+    return;
+  }
+
+  if (supabaseStatus && !CLOSEABLE_VOTING_STATUS_VALUES.includes(supabaseStatus)) {
+    throw new Error(`Round ${roundNumber} cannot be closed from status ${supabaseStatus}.`);
+  }
+
   if (!(await expectSupabaseVotingStatusIn(roundNumber, CLOSEABLE_VOTING_STATUSES))) {
     await adminPage.expectTextAfterNavigation("voting open");
   }

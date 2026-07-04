@@ -4,14 +4,27 @@ import {
   expectPublicComputedState,
   expectPublicDrawState,
   expectPublicFinalReveal,
+  expectPublicInitialVotingState,
   expectPublicRevealPhaseState,
   expectPublicVotingState,
 } from "../assertions/public-ui.assert";
-import { submitRehearsalBallots } from "./ballot-submission.flow";
+import {
+  closePreparedRehearsalBallotPages,
+  prepareRehearsalBallotPages,
+  submitRehearsalBallots,
+  type PreparedRehearsalBallotPage,
+} from "./ballot-submission.flow";
 import { drawRound } from "./draw-round.flow";
 import { computeAndRevealRoundResults, verifyRoundCsvExport } from "./results-reveal.flow";
 import { closeVotingForRound, openVotingForRound } from "./voting-window.flow";
-import { createSupabasePhase9Diagnostics } from "../fixtures/supabase-state";
+import {
+  createSupabasePhase9Diagnostics,
+  expectSupabaseRoundEligibilitySnapshot,
+} from "../fixtures/supabase-state";
+import {
+  createSmokeRoundExpectations,
+  type RehearsalRoundExpectation,
+} from "../fixtures/rehearsal-plan";
 import { AdminPage } from "../pages/admin.page";
 import { ChartsPage } from "../pages/charts.page";
 import { ResultsPage } from "../pages/results.page";
@@ -63,6 +76,7 @@ type RunHostedRoundOptions = {
   baseURL: string;
   browser: Browser;
   browserDownloadPath?: string;
+  expectation: RehearsalRoundExpectation;
   publicPages: RehearsalPublicPages;
   request: APIRequestContext;
   roundNumber: number;
@@ -73,25 +87,48 @@ export async function runHostedRound({
   baseURL,
   browser,
   browserDownloadPath,
+  expectation,
   publicPages,
   request,
   roundNumber,
 }: RunHostedRoundOptions) {
+  console.log(`[phase9] round ${roundNumber}: prepare roster`);
+  await prepareRosterForRound(adminPage, expectation);
   console.log(`[phase9] round ${roundNumber}: draw`);
   await drawRound(adminPage, roundNumber);
   console.log(`[phase9] round ${roundNumber}: assert public draw state`);
   await expectPublicDrawState(publicPages.stage, publicPages.charts);
-  console.log(`[phase9] round ${roundNumber}: open voting`);
-  await openVotingForRound(adminPage, roundNumber);
-  await submitRehearsalBallots({ baseURL, browser, roundNumber });
+  const preparedBallots: PreparedRehearsalBallotPage[] = await prepareRehearsalBallotPages({
+    baseURL,
+    browser,
+    expectation,
+    roundNumber,
+  });
+
+  try {
+    console.log(`[phase9] round ${roundNumber}: open voting`);
+    await openVotingForRound(adminPage, roundNumber);
+    await assertRoundEligibility(publicPages.vote, adminPage, roundNumber, expectation);
+    console.log(`[phase9] round ${roundNumber}: assert initial public voting denominator`);
+    await expectPublicInitialVotingState(publicPages, roundNumber, expectation);
+    await submitRehearsalBallots({
+      baseURL,
+      browser,
+      expectation,
+      preparedBallots,
+      roundNumber,
+    });
+  } finally {
+    await closePreparedRehearsalBallotPages(preparedBallots);
+  }
+  console.log(`[phase9] round ${roundNumber}: assert public voting privacy`);
+  await expectPublicVotingState(publicPages, roundNumber, expectation);
   console.log(`[phase9] round ${roundNumber}: assert admin live counts are gated`);
   await adminPage.expectLiveCountsHiddenByDefaultAndRevealable();
-  console.log(`[phase9] round ${roundNumber}: assert public voting privacy`);
-  await expectPublicVotingState(publicPages, roundNumber);
   console.log(`[phase9] round ${roundNumber}: close voting`);
   await closeVotingForRound(adminPage, roundNumber);
   console.log(`[phase9] round ${roundNumber}: assert public closed privacy`);
-  await expectPublicClosedState(publicPages, roundNumber);
+  await expectPublicClosedState(publicPages, roundNumber, expectation);
   console.log(`[phase9] round ${roundNumber}: compute and reveal`);
   await computeAndRevealRoundResults(adminPage, roundNumber, {
     afterComputed: async () => {
@@ -114,6 +151,7 @@ export async function runHostedRound({
     adminPage,
     baseURL,
     browserDownloadPath,
+    expectation,
     request,
     roundNumber,
   });
@@ -127,6 +165,7 @@ type RunHostedRehearsalOptions = {
   request: APIRequestContext;
   rounds: number[];
   browserDownloadPathForRound?: (roundNumber: number) => string | undefined;
+  roundExpectations?: readonly RehearsalRoundExpectation[];
 };
 
 export async function runHostedRehearsal({
@@ -137,18 +176,73 @@ export async function runHostedRehearsal({
   request,
   rounds,
   browserDownloadPathForRound,
+  roundExpectations,
 }: RunHostedRehearsalOptions) {
+  const expectations = roundExpectations ?? createSmokeRoundExpectations(rounds);
+
+  await ensureRehearsalRoster(adminPage, expectations);
+
   for (const roundNumber of rounds) {
+    const expectation = expectations.find((round) => round.roundNumber === roundNumber);
+
+    if (!expectation) {
+      throw new Error(`Missing rehearsal expectation for Round ${roundNumber}.`);
+    }
+
     await runHostedRound({
       adminPage,
       baseURL,
       browser,
       browserDownloadPath: browserDownloadPathForRound?.(roundNumber),
+      expectation,
       publicPages,
       request,
       roundNumber,
     });
   }
+}
+
+function uniquePlayers(expectations: readonly RehearsalRoundExpectation[]) {
+  return [...new Set(expectations.flatMap((expectation) => expectation.requiredCsvPlayers))];
+}
+
+async function ensureRehearsalRoster(
+  adminPage: AdminPage,
+  expectations: readonly RehearsalRoundExpectation[],
+) {
+  const requiredPlayers = uniquePlayers(expectations);
+
+  if (requiredPlayers.length === 0) {
+    throw new Error("Rehearsal requires at least one expected player.");
+  }
+
+  await adminPage.bulkImportPlayers(requiredPlayers);
+  await adminPage.expectActiveCount(expectations[0]?.activePlayerCount ?? requiredPlayers.length);
+}
+
+async function prepareRosterForRound(
+  adminPage: AdminPage,
+  expectation: RehearsalRoundExpectation,
+) {
+  if (expectation.playersToMarkInactiveBeforeRound.length > 0) {
+    console.log(
+      `[phase9] round ${expectation.roundNumber}: mark ${expectation.playersToMarkInactiveBeforeRound.length} players inactive before voting`,
+    );
+    await adminPage.markPlayersInactive(expectation.playersToMarkInactiveBeforeRound);
+  }
+
+  await adminPage.expectActiveCount(expectation.activePlayerCount);
+}
+
+async function assertRoundEligibility(
+  votePage: VotePage,
+  adminPage: AdminPage,
+  roundNumber: number,
+  expectation: RehearsalRoundExpectation,
+) {
+  await adminPage.expectVotingEligibleCount(expectation.activePlayerCount);
+  await expectSupabaseRoundEligibilitySnapshot(roundNumber, expectation);
+  await votePage.expectEligiblePlayers(expectation.activePlayers);
 }
 
 export async function releaseHostAndClosePages(

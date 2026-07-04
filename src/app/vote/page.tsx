@@ -116,7 +116,11 @@ export default async function VotePage() {
 
   return (
     <main className="min-h-screen">
-      <VoteAutoRefresh />
+      <VoteAutoRefresh
+        enabled={
+          !snapshot.canSubmit || process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true"
+        }
+      />
       <RoundHeader
         title="Player Ballot"
         status={`${formatVotingStatusLabel(snapshot.status)} - Round ${roundNumber}`}

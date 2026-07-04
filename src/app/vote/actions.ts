@@ -11,6 +11,7 @@ import {
 } from "@/lib/server/persistence";
 import { assertRateLimit } from "@/lib/server/rate-limit";
 import { submitNormalizedPlayerBallot } from "@/lib/server/normalized-ballots";
+import { claimNormalizedVoterPresence } from "@/lib/server/normalized-voter-presence";
 import {
   advanceVotingTimerIfDue,
   getRoundDrawRecords,
@@ -112,6 +113,10 @@ export async function claimVoterPresenceAction(input: {
     message: "Too many voter presence claims. Try again shortly.",
   });
 
+  if (getTournamentStateBackend() === "supabase") {
+    return claimNormalizedVoterPresence(input);
+  }
+
   await hydrateTournamentState();
 
   const nowMs = await getAuthoritativeNowMs();
@@ -146,19 +151,6 @@ export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInpu
   });
 
   const editTokenHash = hashBallotEditToken(input.editToken);
-  await hydrateTournamentState();
-  const activeDraws = getRoundDrawRecords(input.roundNumber);
-
-  validateRoundBallot(
-    {
-      roundNumber: input.roundNumber,
-      playerId: input.playerId,
-      playerStartggUsername: input.playerStartggUsername ?? input.playerId,
-      choices: input.choices,
-    },
-    activeDraws,
-  );
-
   if (getTournamentStateBackend() === "supabase") {
     const ballot = await submitNormalizedPlayerBallot({
       roundNumber: input.roundNumber,
@@ -183,6 +175,19 @@ export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInpu
       replacedExistingBallot: false,
     };
   }
+
+  await hydrateTournamentState();
+  const activeDraws = getRoundDrawRecords(input.roundNumber);
+
+  validateRoundBallot(
+    {
+      roundNumber: input.roundNumber,
+      playerId: input.playerId,
+      playerStartggUsername: input.playerStartggUsername ?? input.playerId,
+      choices: input.choices,
+    },
+    activeDraws,
+  );
 
   const publicBallot = await withPersistedVotingState(async () => {
     const nowMs = await getAuthoritativeNowMs();
