@@ -3,6 +3,10 @@
 Use this checklist to close the issues from the July 5 UX/UI validation pass. The companion
 execution plan is `docs/ux-ui-tournament-readiness-remediation-plan-2026-07-05.md`.
 
+Codex routing note: this is the active UX/UI remediation checklist. Use it with
+`docs/codex-current-brief.md` and the active phase section of the companion plan. Older checklists
+are historical unless the user explicitly references them.
+
 Do not check an item until:
 
 - the issue has been fixed or explicitly accepted as-is by the user,

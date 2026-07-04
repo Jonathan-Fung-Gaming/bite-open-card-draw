@@ -6,6 +6,10 @@ This plan addresses the validated July 5 UX/UI issues for the tournament app. It
 scoped to usability, operator confidence, route clarity, deployment image reliability, and reveal
 coordination. It must not change tournament rules unless the user explicitly asks.
 
+Codex routing note: this is the active remediation plan. Start from
+`docs/codex-current-brief.md`, then read only the current phase section here plus the matching
+checklist rows unless the task needs deeper source-of-truth review.
+
 Source of truth:
 
 - `docs/product-spec.md`

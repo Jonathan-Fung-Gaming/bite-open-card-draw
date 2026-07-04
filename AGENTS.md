@@ -4,18 +4,24 @@
 
 This project is a tournament voting and stage-visualization app for Pump It Up Open Stage.
 
-Read these files before making changes:
+Read this file before task work:
 
-1. `docs/product-spec.md`
-2. `docs/pump_open_stage_repo_validation_checklist.md`
-3. `docs/codex-execution-plan.md`
-4. `docs/phase-gates.md`
-5. `docs/security-notes.md`
+1. `docs/codex-current-brief.md`
 
-The product spec and repo validation checklist are the source of truth for final tournament behavior.
-If they conflict with older execution-plan text, follow `docs/product-spec.md` and
-`docs/pump_open_stage_repo_validation_checklist.md`. Do not change tournament rules unless explicitly
-asked.
+Then follow its read-routing rules. Do not load every long historical planning document by default.
+
+Current active remediation work is in:
+
+1. `docs/ux-ui-tournament-readiness-remediation-plan-2026-07-05.md`
+2. `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md`
+
+The product spec and repo validation checklist are still the source of truth for final tournament
+behavior. If they conflict with older execution-plan text, follow `docs/product-spec.md` and
+`docs/pump_open_stage_repo_validation_checklist.md`. Do not change tournament rules unless
+explicitly asked.
+
+Treat `docs/codex-execution-plan.md`, older phase plans, and older remediation/audit docs as
+historical unless the user explicitly references them or `docs/codex-current-brief.md` routes there.
 
 ## Local command rule
 
