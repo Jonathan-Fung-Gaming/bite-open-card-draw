@@ -8,6 +8,7 @@ import {
   getVotingRoundSnapshot,
 } from "@/lib/server/voting-round";
 import {
+  PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
   shouldShowFinalPhoneResults,
   shouldShowPhoneResultHoldingState,
 } from "@/lib/vote/phone-view";
@@ -50,6 +51,7 @@ export default async function VotePage() {
   if (showFinalPhoneResults && result) {
     return (
       <main className="min-h-screen">
+        <VoteAutoRefresh intervalMs={PUBLIC_INSPECTION_REFRESH_INTERVAL_MS} />
         <RoundHeader
           title={`Round ${roundNumber} Final Charts`}
           status={formatVotingStatusLabel(snapshot.status)}
@@ -70,7 +72,9 @@ export default async function VotePage() {
         <VoteAutoRefresh />
         <RoundHeader
           title={missingFinalResult ? `Round ${roundNumber} Final Charts` : "Voting Closed"}
-          status={missingFinalResult ? formatVotingStatusLabel(snapshot.status) : `Round ${roundNumber}`}
+          status={
+            missingFinalResult ? formatVotingStatusLabel(snapshot.status) : `Round ${roundNumber}`
+          }
         />
         <section className="mx-auto max-w-2xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300">

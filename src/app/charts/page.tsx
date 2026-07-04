@@ -80,6 +80,7 @@ export default async function ChartsPage() {
   if (showFinalResults && result) {
     return (
       <main className="min-h-screen">
+        <ChartsAutoRefresh />
         <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="View-only results" />
         <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
           <div className="metal-panel rounded-lg p-4" data-testid="view-only-status">

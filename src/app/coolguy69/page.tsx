@@ -31,6 +31,7 @@ import {
   drawRoundSetAction,
   editPlayerUsernameAction,
   releaseHostControlAction,
+  releaseFinalResultsAction,
   manualBallotAction,
   openVotingAction,
   overrideResultAction,
@@ -545,6 +546,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const currentRoundDraws = getRoundDrawRecords(currentRoundNumber);
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(currentRoundNumber);
   const result = adminState.resultStore.getRoundResult(currentRoundNumber);
+  const finalStageShown = result?.revealPhase === "final";
+  const finalResultsReleased =
+    finalStageShown &&
+    (votingSnapshot.status === "results_revealed" || votingSnapshot.status === "round_complete");
+  const finalStageAwaitingPublicRelease = finalStageShown && !finalResultsReleased;
   const auditRecords = adminState.auditStore.list(12);
   const allCharts = adminState.drawStateStore.getCharts();
   const drawControls = ROUND_SET_DEFINITIONS.map((set) => ({
@@ -1129,6 +1135,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   {nextRevealActionLabel(result?.revealPhase)}
                 </span>
               </p>
+              {finalStageShown ? (
+                <p className="text-metal-300 md:col-span-2">
+                  Public release:{" "}
+                  <span className="font-bold text-ember-300">
+                    {finalResultsReleased
+                      ? "Phones and results released"
+                      : "Holding phones until stage completion is confirmed"}
+                  </span>
+                </p>
+              ) : null}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <AdminActionButton
@@ -1149,18 +1165,28 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               >
                 {nextRevealActionLabel(result?.revealPhase)}
               </AdminActionButton>
+              <AdminActionButton
+                action={releaseFinalResultsAction}
+                className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                disabled={!canControl || !finalStageAwaitingPublicRelease}
+                fields={{ roundNumber: currentRoundNumber }}
+              >
+                Confirm Stage Reveal Complete
+              </AdminActionButton>
             </div>
             <div className="mt-4">
               <PrivateCsvDownload
                 roundNumber={currentRoundNumber}
-                enabled={canControl && Boolean(result && result.revealPhase === "final")}
+                enabled={canControl && finalResultsReleased}
                 disabledReason={
                   !canControl
                     ? "Take host control to download the private ballot CSV."
-                    : "Available after the final two-chart reveal finishes on stage."
+                    : "Available after the stage final reveal is confirmed and public results are released."
                 }
                 autoDownloadKey={
-                  result?.finalRevealedAt ? `${result.id}:${result.finalRevealedAt}` : null
+                  finalResultsReleased && result?.finalRevealedAt
+                    ? `${result.id}:${result.finalRevealedAt}`
+                    : null
                 }
                 action={downloadPrivateCsvAction}
               />

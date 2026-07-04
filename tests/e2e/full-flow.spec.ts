@@ -9,6 +9,7 @@ import {
   type TestInfo,
 } from "@playwright/test";
 import { captureEvidenceScreenshot, writeJsonEvidence } from "./evidence-artifacts";
+import { PUBLIC_INSPECTION_REFRESH_INTERVAL_MS } from "../../src/lib/vote/phone-view";
 import { expectPrivateCsvFinalContent } from "../phase9/fixtures/private-csv";
 import {
   clickAdminActionAndWait,
@@ -605,7 +606,7 @@ async function expectDetailsOpen(details: Locator) {
     .toBe(true);
 }
 
-async function expectFinalBanCountDetailsRemainOpenAfterWait(page: Page) {
+async function expectFinalBanCountDetailsRemainOpenAfterWait(page: Page, waitMs = 1_500) {
   const details = page.locator("details", { hasText: "ban counts" });
 
   await expect(details).toHaveCount(2);
@@ -621,11 +622,175 @@ async function expectFinalBanCountDetailsRemainOpenAfterWait(page: Page) {
     await expect(detail.getByTestId("result-selected-label")).toHaveCount(1);
   }
 
-  await page.waitForTimeout(1_500);
+  await page.waitForTimeout(waitMs);
 
   for (const index of [0, 1]) {
     await expectDetailsOpen(details.nth(index));
   }
+}
+
+type OpenPublicPages = {
+  chartsPage: Page;
+  resultsPage: Page;
+  stagePage: Page;
+  votePage: Page;
+};
+
+async function expectPhoneRoutesHoldFinalResults({
+  chartsPage,
+  resultsPage,
+  votePage,
+}: Pick<OpenPublicPages, "chartsPage" | "resultsPage" | "votePage">) {
+  await expect(votePage.getByText("Voting is closed.")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(votePage.getByText("Results are being revealed on stage.")).toBeVisible();
+  await expectNoFinalResultSpoilers(votePage);
+
+  await expect(chartsPage.getByTestId("view-only-status")).toContainText("Results being revealed", {
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expectNoFinalResultSpoilers(chartsPage);
+
+  await expect(resultsPage.getByText("Voting is closed.")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(resultsPage.getByText("Results are being revealed on stage.")).toBeVisible();
+  await expectNoFinalResultSpoilers(resultsPage);
+}
+
+async function expectOpenPublicPagesShowFinal({
+  chartsPage,
+  resultsPage,
+  stagePage,
+  votePage,
+}: OpenPublicPages) {
+  await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(
+    stagePage.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card"),
+  ).toHaveCount(2);
+  await expect(chartsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(resultsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(votePage.getByText("Full ban counts")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+}
+
+async function expectOpenPublicPagesShowChart(pages: OpenPublicPages, chartName: string) {
+  await expect(
+    pages.stagePage.getByTestId("stage-final-chart-list").getByText(chartName, { exact: true }),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect(pages.chartsPage.getByText(chartName, { exact: true }).first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(pages.resultsPage.getByText(chartName, { exact: true }).first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(pages.votePage.getByText(chartName, { exact: true }).first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+}
+
+async function expectOpenPublicPagesAfterReset({
+  chartsPage,
+  resultsPage,
+  stagePage,
+  votePage,
+}: OpenPublicPages) {
+  await stagePage.bringToFront();
+  await expect(stagePage.getByRole("heading", { name: "Round 1 Draw" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await chartsPage.bringToFront();
+  await expect(chartsPage.getByText("Awaiting host draw").first()).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await resultsPage.bringToFront();
+  await expect(resultsPage.getByRole("heading", { name: "Round 1 Results" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await votePage.bringToFront();
+  await expect(
+    votePage.getByText("Both chart sets must be drawn before voting opens."),
+  ).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+
+  for (const publicPage of [stagePage, chartsPage, resultsPage, votePage]) {
+    await expectNoFinalResultSpoilers(publicPage);
+  }
+}
+
+async function expectOpenPublicPagesAfterRoundAdvance({
+  chartsPage,
+  resultsPage,
+  stagePage,
+  votePage,
+}: OpenPublicPages) {
+  await stagePage.bringToFront();
+  await expect(stagePage.getByRole("heading", { name: "Round 2 Draw" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await chartsPage.bringToFront();
+  await expect(chartsPage.getByRole("heading", { name: "Round 2 - S18" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await resultsPage.bringToFront();
+  await expect(resultsPage.getByRole("heading", { name: "Round 2 Results" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await votePage.bringToFront();
+  await expect(votePage.locator("header").getByText("Round 2")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+}
+
+async function currentStageFinalChartNames(stagePage: Page) {
+  return stagePage
+    .getByTestId("stage-final-chart-list")
+    .getByTestId("stage-chart-title")
+    .allTextContents();
+}
+
+function chartNameFromOverrideLabel(label: string) {
+  const separatorIndex = label.indexOf(" - ");
+
+  return separatorIndex >= 0 ? label.slice(separatorIndex + 3).trim() : label.trim();
+}
+
+async function selectDifferentOverrideTarget(adminPage: Page, currentChartNames: string[]) {
+  const overrideForm = adminPage.locator("form", {
+    has: adminPage.getByRole("button", { name: "Override Result" }),
+  });
+  const options = await overrideForm
+    .locator('select[name="resultTarget"] option')
+    .evaluateAll((elements) =>
+      elements.map((element) => ({
+        label: element.textContent?.trim() ?? "",
+        value: (element as HTMLOptionElement).value,
+      })),
+    );
+  const target = options.find(
+    (option) =>
+      option.value && !currentChartNames.includes(chartNameFromOverrideLabel(option.label)),
+  );
+
+  if (!target) {
+    throw new Error("Could not find a non-selected result override target.");
+  }
+
+  await overrideForm.locator('select[name="resultTarget"]').selectOption(target.value);
+
+  return {
+    chartName: chartNameFromOverrideLabel(target.label),
+    form: overrideForm,
+  };
 }
 
 test("full round smoke flow reaches final reveal and downloads private CSV", async ({
@@ -633,7 +798,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   browser,
   baseURL,
 }, testInfo) => {
-  test.setTimeout(150_000);
+  test.setTimeout(240_000);
 
   await collectLogoRoutePerformanceEvidence(browser, baseURL, testInfo);
 
@@ -797,6 +962,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(duplicatePhonePage.getByTestId("ballot-chart-card")).toHaveCount(0);
   await duplicatePhonePage.close();
 
+  const resultsPage = await page.context().newPage();
+  await goto(resultsPage, "/results");
+
   await page.getByRole("button", { name: "Close Voting" }).click();
   await expect(page.getByText("voting closed")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -805,6 +973,10 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expect(phonePage.getByText("Results are being revealed on stage.")).toBeVisible();
+  await expect(resultsPage.getByText("Voting is closed.")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(resultsPage.getByText("Results are being revealed on stage.")).toBeVisible();
   await page.getByRole("button", { name: "Compute Results" }).click();
   await expect(page.getByText("results computed")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -816,6 +988,16 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expectResultRowsSortedLeastToMostBanned(stagePage);
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
+  await expect(stagePage.getByTestId("stage-auto-refresh")).toHaveAttribute(
+    "data-defer-during-tiebreak",
+    "true",
+    { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+  );
+  expect(
+    Number(
+      await stagePage.getByTestId("stage-auto-refresh").getAttribute("data-refresh-interval-ms"),
+    ),
+  ).toBeGreaterThan(5_000);
   await waitForVisibleTiebreakReveal(stagePage, 1);
   await advanceRevealAndWaitForAdminPhase(page, "set 2 counts");
   await expect(stagePage.locator("header").getByText("Set 2 counts")).toBeVisible({
@@ -827,8 +1009,37 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await advanceRevealAndWaitForAdminPhase(page, "set 2 resolved");
   await waitForVisibleTiebreakReveal(stagePage, 1);
   await expectNoStageVerticalScroll(stagePage);
-  const privateCsvDownloadPromise = page.waitForEvent("download");
+  await expectPhoneRoutesHoldFinalResults({ chartsPage, resultsPage, votePage: phonePage });
+  await captureEvidenceScreenshot(testInfo, "uxr-008-vote-holding-before-final.png", phonePage);
+  await captureEvidenceScreenshot(
+    testInfo,
+    "uxr-008-results-holding-before-final.png",
+    resultsPage,
+  );
   await advanceRevealAndWaitForAdminPhase(page, "final");
+  await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(
+    stagePage.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card"),
+  ).toHaveCount(2);
+  await expectPhoneRoutesHoldFinalResults({ chartsPage, resultsPage, votePage: phonePage });
+  const privateCsvDownloadPromise = page.waitForEvent("download");
+  await clickAdminActionAndWait(
+    page,
+    page.getByRole("button", { name: "Confirm Stage Reveal Complete" }),
+  );
+  await expect(page.getByText("Phones and results released")).toBeVisible();
+  await expectOpenPublicPagesShowFinal({
+    chartsPage,
+    resultsPage,
+    stagePage,
+    votePage: phonePage,
+  });
+  await captureEvidenceScreenshot(testInfo, "uxr-009-open-stage-final.png", stagePage);
+  await captureEvidenceScreenshot(testInfo, "uxr-009-open-vote-final.png", phonePage);
+  await captureEvidenceScreenshot(testInfo, "uxr-009-open-charts-final.png", chartsPage);
+  await captureEvidenceScreenshot(testInfo, "uxr-009-open-results-final.png", resultsPage);
   const privateCsvDownload = await privateCsvDownloadPromise;
   const privateCsvText = await readDownloadText(privateCsvDownload);
   const csvExpectation = {
@@ -848,8 +1059,6 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
       .locator("section", { hasText: "Result Reveal Controls" })
       .getByText("final", { exact: true }),
   ).toBeVisible();
-  await goto(stagePage, "/stage");
-  await goto(chartsPage, "/charts");
   await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -857,12 +1066,13 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expectRenderedRealStageImage(chartsPage);
-  await expectFinalBanCountDetailsRemainOpenAfterWait(chartsPage);
+  await expectFinalBanCountDetailsRemainOpenAfterWait(
+    chartsPage,
+    PUBLIC_INSPECTION_REFRESH_INTERVAL_MS + 1_500,
+  );
   await chartsPage.reload({ waitUntil: "domcontentloaded" });
   await expect(chartsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
   await expectFinalBanCountDetailsRemainOpenAfterWait(chartsPage);
-  await chartsPage.close();
-  await goto(phonePage, "/vote");
   await expect(phonePage.getByText("Full ban counts")).toBeVisible({ timeout: 7000 });
   await expectRenderedRealBackgroundImage(phonePage.getByTestId("phone-final-chart-card").first());
   await expectFinalBanCountDetailsRemainOpenAfterWait(phonePage);
@@ -926,6 +1136,63 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
       ),
     ),
   ).toBeVisible();
+
+  const currentFinalNames = await currentStageFinalChartNames(stagePage);
+  const { chartName: correctedChartName, form: overrideForm } = await selectDifferentOverrideTarget(
+    page,
+    currentFinalNames,
+  );
+  await overrideForm.locator("#override-reason").fill("e2e final correction freshness");
+  await overrideForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+  await clickAdminActionAndWait(
+    page,
+    overrideForm.getByRole("button", { name: "Override Result" }),
+  );
+  await expectOpenPublicPagesShowChart(
+    { chartsPage, resultsPage, stagePage, votePage: phonePage },
+    correctedChartName,
+  );
+  await writeJsonEvidence(testInfo, "uxr-009-open-route-correction.json", {
+    correctedChartName,
+    previousFinalNames: currentFinalNames,
+  });
+
+  const resetForm = page.locator("form", {
+    has: page.getByRole("button", { name: "Reset Round" }),
+  });
+  await resetForm.locator('select[name="roundNumber"]').selectOption("1");
+  await resetForm.locator("#reset-round-reason").fill("e2e reset freshness");
+  await resetForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+  await clickAdminActionAndWait(page, resetForm.getByRole("button", { name: "Reset Round" }));
+  await expectOpenPublicPagesAfterReset({
+    chartsPage,
+    resultsPage,
+    stagePage,
+    votePage: phonePage,
+  });
+
+  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Advance Round" }));
+  await expect(page.getByText("Current Round 2")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expectOpenPublicPagesAfterRoundAdvance({
+    chartsPage,
+    resultsPage,
+    stagePage,
+    votePage: phonePage,
+  });
+
+  const currentRoundForm = page.locator("form", {
+    has: page.getByRole("button", { name: "Set Current Round" }),
+  });
+  await currentRoundForm.locator('select[name="roundNumber"]').selectOption("1");
+  await clickAdminActionAndWait(
+    page,
+    currentRoundForm.getByRole("button", { name: "Set Current Round" }),
+  );
+  await expect(page.getByText("Current Round 1")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Release" }));
   await expect(page.getByRole("button", { name: "Release" })).toBeDisabled();

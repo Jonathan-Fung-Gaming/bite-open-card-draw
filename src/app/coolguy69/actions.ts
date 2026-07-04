@@ -14,10 +14,8 @@ import {
   createOperationalStateSnapshot,
   restoreOperationalStateSnapshot,
 } from "@/lib/persistence/operational-state";
-import {
-  buildPrivateBallotCsvFilename,
-  generatePrivateBallotCsv,
-} from "@/lib/results/private-csv";
+import { buildPrivateBallotCsvFilename, generatePrivateBallotCsv } from "@/lib/results/private-csv";
+import type { RoundResultSnapshot } from "@/lib/results/result-engine";
 import {
   assertNoFutureSelectedSongConflicts,
   selectedSongBlocksFromResultStoreBeforeRound,
@@ -248,6 +246,25 @@ function resetRoundState(roundNumber: 1 | 2 | 3 | 4) {
   adminState.drawStateStore.resetRound(roundNumber);
 }
 
+function holdFinalResultsForStageCompletion(roundNumber: 1 | 2 | 3 | 4) {
+  adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealing");
+  adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
+}
+
+function releaseFinalResultsToPublic(roundNumber: 1 | 2 | 3 | 4, result: RoundResultSnapshot) {
+  adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealed");
+  adminState.ballotStore.setPhoneStatus(roundNumber, {
+    phase: "revealed",
+    selectedCharts: result.sets.map((set) => ({
+      id: set.selectedChart.id,
+      name: set.selectedChart.name,
+      artist: set.selectedChart.artist,
+      displayDifficulty: set.selectedChart.displayDifficulty,
+      localImagePath: set.selectedChart.localImagePath,
+    })),
+  });
+}
+
 function invalidateRoundVotingForReroll(
   roundNumber: 1 | 2 | 3 | 4,
   reason: string,
@@ -362,7 +379,9 @@ export async function takeHostControlAction(formData: FormData) {
     });
 
     if (adminState.hostLockStore.getSnapshot(session.sessionId, acquiredAtMs).status !== "active") {
-      throw new Error("Host control changed before this request could save. Refresh and try again.");
+      throw new Error(
+        "Host control changed before this request could save. Refresh and try again.",
+      );
     }
 
     await setHostTokenCookie(hostToken);
@@ -415,17 +434,19 @@ export async function releaseHostControlAction() {
   const hostToken = await getHostTokenCookie();
   let releasedAtMs = 0;
 
-  const releaseResult = await withPersistedHostLockState(async (): Promise<HostLockReleaseOutcome> => {
-    const nowMs = await getAuthoritativeNowMs();
+  const releaseResult = await withPersistedHostLockState(
+    async (): Promise<HostLockReleaseOutcome> => {
+      const nowMs = await getAuthoritativeNowMs();
 
-    releasedAtMs = nowMs;
+      releasedAtMs = nowMs;
 
-    if (!hostToken) {
-      return "no_active_lock";
-    }
+      if (!hostToken) {
+        return "no_active_lock";
+      }
 
-    return adminState.hostLockStore.release(session.sessionId, hostToken, nowMs).outcome;
-  });
+      return adminState.hostLockStore.release(session.sessionId, hostToken, nowMs).outcome;
+    },
+  );
   let releaseOutcome = releaseResult;
 
   if (
@@ -598,9 +619,7 @@ export async function editPlayerUsernameAction(formData: FormData) {
       affectedRecords: [{ type: "player", id: player.id }],
     });
   } catch (error) {
-    redirectWithError(
-      error instanceof Error ? error.message : "Could not edit start.gg username.",
-    );
+    redirectWithError(error instanceof Error ? error.message : "Could not edit start.gg username.");
   }
 
   await persistTournamentState();
@@ -1192,18 +1211,7 @@ export async function advanceResultRevealAction(formData: FormData) {
       );
 
       if (result.revealPhase === "final") {
-        adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealed");
-        adminState.ballotStore.setPhoneStatus(roundNumber, {
-          phase: "revealed",
-          selectedCharts: result.sets.map((set) => ({
-            id: set.selectedChart.id,
-            name: set.selectedChart.name,
-            artist: set.selectedChart.artist,
-            displayDifficulty: set.selectedChart.displayDifficulty,
-            localImagePath: set.selectedChart.localImagePath,
-          })),
-        });
-
+        holdFinalResultsForStageCompletion(roundNumber);
         syncSelectedSongBlocks();
       } else {
         adminState.votingWindowStore.setResultsPhase(roundNumber, "results_revealing");
@@ -1218,6 +1226,34 @@ export async function advanceResultRevealAction(formData: FormData) {
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not advance result reveal.");
+  }
+
+  await persistTournamentState();
+  revalidateTournamentViews(revalidatePath);
+}
+
+export async function releaseFinalResultsAction(formData: FormData) {
+  try {
+    const roundNumber = getRoundNumber(formData);
+
+    await withActiveHostResultAdminState((session) => {
+      const result = adminState.resultStore.getRoundResult(roundNumber);
+
+      if (!result || result.revealPhase !== "final") {
+        throw new Error("Final charts must be shown on stage before public results are released.");
+      }
+
+      releaseFinalResultsToPublic(roundNumber, result);
+      syncSelectedSongBlocks();
+      audit(session, {
+        action: "release_final_results",
+        summary: `Released Round ${roundNumber} final charts to phones and results.`,
+        affectedRecords: [{ type: "result", id: result.id }],
+        metadata: { roundNumber, revealPhase: result.revealPhase },
+      });
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not release final results.");
   }
 
   await persistTournamentState();
@@ -1254,6 +1290,20 @@ export async function downloadPrivateCsvAction(roundNumber: 1 | 2 | 3 | 4) {
     await persistResultAdminState();
 
     throw new Error("Private CSV is available only after the final reveal.");
+  }
+
+  const roundSnapshot = getVotingRoundSnapshot(roundNumber, nowMs);
+
+  if (roundSnapshot.status !== "results_revealed" && roundSnapshot.status !== "round_complete") {
+    audit(session, {
+      action: "private_csv_export_denied",
+      summary: `Denied Round ${roundNumber} private CSV export before public result release.`,
+      tournamentChanging: false,
+      metadata: { roundNumber, reason: "public_release_required" },
+    });
+    await persistResultAdminState();
+
+    throw new Error("Private CSV is available only after the stage final reveal is confirmed.");
   }
 
   const filename = privateCsvFilename(roundNumber, nowMs);
@@ -1644,6 +1694,8 @@ export async function overrideResultAction(formData: FormData) {
     const reason = getRequiredReason(formData);
     const { setOrder, chartId } = getOverrideResultTarget(formData);
     const before = adminState.resultStore.getRoundResult(roundNumber);
+    const nowMs = await getAuthoritativeNowMs();
+    const roundSnapshot = getVotingRoundSnapshot(roundNumber, nowMs);
 
     if (!before) {
       throw new Error("Results must be computed before a result correction.");
@@ -1674,17 +1726,11 @@ export async function overrideResultAction(formData: FormData) {
 
     syncSelectedSongBlocks();
 
-    if (result.revealPhase === "final") {
-      adminState.ballotStore.setPhoneStatus(roundNumber, {
-        phase: "revealed",
-        selectedCharts: result.sets.map((set) => ({
-          id: set.selectedChart.id,
-          name: set.selectedChart.name,
-          artist: set.selectedChart.artist,
-          displayDifficulty: set.selectedChart.displayDifficulty,
-          localImagePath: set.selectedChart.localImagePath,
-        })),
-      });
+    if (
+      result.revealPhase === "final" &&
+      (roundSnapshot.status === "results_revealed" || roundSnapshot.status === "round_complete")
+    ) {
+      releaseFinalResultsToPublic(roundNumber, result);
     }
 
     audit(session, {

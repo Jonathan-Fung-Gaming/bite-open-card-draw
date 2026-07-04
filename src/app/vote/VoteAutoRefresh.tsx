@@ -27,5 +27,13 @@ export function VoteAutoRefresh({
     return () => window.clearInterval(interval);
   }, [enabled, intervalMs, router]);
 
-  return null;
+  return (
+    <span
+      aria-hidden="true"
+      data-refresh-enabled={enabled ? "true" : "false"}
+      data-refresh-interval-ms={String(intervalMs)}
+      data-testid="vote-auto-refresh"
+      hidden
+    />
+  );
 }
