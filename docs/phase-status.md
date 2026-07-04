@@ -2,14 +2,16 @@
 
 ## Current Remediation Status
 
-Status: Production readiness remediation code is complete. Final tournament readiness still depends
-on merging/deploying the latest code, confirming Supabase migrations remain applied, completing the
-release checklist evidence, selecting or resetting the production event namespace, and any event-day
-data/operator checks.
+Status: Production readiness remediation code is complete. The active Codex workstream is now
+`docs/ux-ui-tournament-readiness-remediation-plan-2026-07-05.md`, with
+`docs/ux-ui-tournament-readiness-checklist-2026-07-05.md` as its closure checklist. Start future
+work from `docs/codex-current-brief.md` and treat older remediation plans/checklists as historical
+unless the user explicitly references them.
 
-The app is not event-ready until every item in `docs/remediation-issue-checklist.md` is closed
-with evidence and the final closure gate in that checklist passes. The authoritative behavior
-sources during remediation are `docs/product-spec.md` and
+Final tournament readiness still depends on merging/deploying the latest code, confirming Supabase
+migrations remain applied, completing the active UX/UI checklist closure evidence, selecting or
+resetting the production event namespace, and any event-day data/operator checks. The authoritative
+behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
