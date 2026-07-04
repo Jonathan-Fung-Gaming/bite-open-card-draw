@@ -8,10 +8,7 @@ import {
   type Page,
   type TestInfo,
 } from "@playwright/test";
-import {
-  captureEvidenceScreenshot,
-  writeJsonEvidence,
-} from "./evidence-artifacts";
+import { captureEvidenceScreenshot, writeJsonEvidence } from "./evidence-artifacts";
 import { expectPrivateCsvFinalContent } from "../phase9/fixtures/private-csv";
 import {
   clickAdminActionAndWait,
@@ -19,6 +16,7 @@ import {
   goto,
   HOSTED_REFRESH_TIMEOUT_MS,
   loginAndTakeHost,
+  openRehearsalControls,
 } from "./admin-helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -151,11 +149,13 @@ async function expectRenderedRealBackgroundImage(locator: Locator) {
 async function expectReadableVotingAccess(page: Page) {
   const qrLink = page.getByTestId("room-qr-link");
   const qrCode = page.getByTestId("room-qr-code");
+  const qrPanel = page.getByTestId("room-qr-panel");
   const roomUrl = new URL("/room", page.url()).toString();
   const shortRoomUrl = `${new URL(roomUrl).host}/room`;
   const stageUrl = page.url();
   const votingBandBox = await page.getByTestId("stage-voting-band").boundingBox();
   const chartRowsBox = await page.getByTestId("stage-chart-rows").boundingBox();
+  const qrPanelBox = await qrPanel.boundingBox();
   const qrBox = await qrLink.boundingBox();
   const timerBox = await page.getByTestId("stage-countdown-display").boundingBox();
   const qrPathCount = await qrCode.locator("svg path").count();
@@ -169,11 +169,15 @@ async function expectReadableVotingAccess(page: Page) {
   expect(await qrLink.evaluate((element) => element.tagName.toLowerCase())).toBe("div");
   expect(qrPathCount).toBeGreaterThan(0);
   expect(qrBox).not.toBeNull();
+  expect(qrPanelBox).not.toBeNull();
   expect(timerBox).not.toBeNull();
   expect(votingBandBox).not.toBeNull();
   expect(chartRowsBox).not.toBeNull();
   expect(qrBox!.width).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
   expect(qrBox!.height).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
+  expect(
+    Math.abs(qrBox!.x + qrBox!.width / 2 - (qrPanelBox!.x + qrPanelBox!.width / 2)),
+  ).toBeLessThanOrEqual(4);
   expect(timerBox?.width).toBeGreaterThan(160);
   expect(timerBox?.height).toBeGreaterThanOrEqual(60);
   expect(qrBox!.x).toBeGreaterThan(timerBox!.x + timerBox!.width - 8);
@@ -217,6 +221,76 @@ function intersectionArea(left: EvidenceBox, right: EvidenceBox) {
   );
 
   return width * height;
+}
+
+async function visualTop(locator: Locator) {
+  const box = await locator.first().boundingBox();
+
+  expect(box).not.toBeNull();
+
+  return box!.y;
+}
+
+async function expectAdminEventDayFlow(page: Page) {
+  const hostControl = page.getByTestId("admin-host-control-panel");
+  const readiness = page.getByTestId("admin-readiness");
+  const draw = page
+    .getByRole("heading", { name: "Draw Current Round" })
+    .locator("xpath=ancestor::section[1]");
+  const stageReveal = page.getByTestId("admin-stage-reveal-check");
+  const voting = page
+    .getByText("Voting Controls", { exact: true })
+    .locator("xpath=ancestor::section[1]");
+  const manualCorrection = page.locator("form", {
+    has: page.getByRole("heading", { name: "Manual Ballot Correction" }),
+  });
+  const results = page
+    .getByText("Result Reveal Controls", { exact: true })
+    .locator("xpath=ancestor::section[1]");
+  const chartEligibility = page
+    .getByText("Chart Eligibility", { exact: true })
+    .locator("xpath=ancestor::section[1]");
+  const selectedPoolDetails = chartEligibility.locator("details").first();
+
+  await expect(hostControl).toContainText("Host Lock");
+  await expect(hostControl.getByRole("button", { name: "Release" })).toBeVisible();
+  await expect(readiness).toContainText("Host control");
+  await expect(readiness).toContainText("Active players");
+  await expect(page.getByTestId("admin-readiness-active-player-count")).toHaveAttribute(
+    "data-count",
+    /\d+/,
+  );
+  await expect(readiness).toContainText("Draw current round");
+  await expect(stageReveal).toContainText("Reveal Drawn Charts");
+  await expect(voting).toContainText("Open Voting");
+  await expect(manualCorrection).toContainText("Manual Ballot Correction");
+  await expect(results).toContainText("Compute Results");
+  await expect(results).toContainText("Download private ballot CSV");
+  await expect(chartEligibility).toContainText("Required Pools");
+  await expect(page.getByText(/This will replace only this chart in the active/)).toBeHidden();
+  await expect(page.getByTestId("admin-live-counts").locator("ol li")).toHaveCount(0);
+  await expect
+    .poll(async () =>
+      selectedPoolDetails.evaluate((element) => (element as HTMLDetailsElement).open),
+    )
+    .toBe(false);
+
+  const hostControlTop = await visualTop(hostControl);
+  const readinessTop = await visualTop(readiness);
+  const drawTop = await visualTop(draw);
+  const stageRevealTop = await visualTop(stageReveal);
+  const votingTop = await visualTop(voting);
+  const manualTop = await visualTop(manualCorrection);
+  const resultsTop = await visualTop(results);
+  const chartEligibilityTop = await visualTop(chartEligibility);
+
+  expect(hostControlTop).toBeLessThan(readinessTop);
+  expect(readinessTop).toBeLessThan(drawTop);
+  expect(drawTop).toBeLessThan(stageRevealTop);
+  expect(stageRevealTop).toBeLessThan(votingTop);
+  expect(votingTop).toBeLessThan(manualTop);
+  expect(manualTop).toBeLessThan(resultsTop);
+  expect(resultsTop).toBeLessThan(chartEligibilityTop);
 }
 
 async function collectLocatorBoxes(locator: Locator) {
@@ -422,9 +496,10 @@ async function collectLogoRoutePerformanceEvidence(
       logoResponses.filter((response) => isWebLogoUrl(response.decodedUrl)).length +
       resourceEntries.filter((entry) => isWebLogoUrl(entry.decodedName)).length;
 
-    expect(webLogoEvidenceCount, `${target.name} should request the optimized logo`).toBeGreaterThan(
-      0,
-    );
+    expect(
+      webLogoEvidenceCount,
+      `${target.name} should request the optimized logo`,
+    ).toBeGreaterThan(0);
     expect(
       logoResponses.filter((response) => isSourceLogoUrl(response.decodedUrl)),
       `${target.name} should not request the large source logo`,
@@ -570,6 +645,8 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(page.getByRole("link", { name: "View charts only" })).toBeVisible();
 
   await loginAndTakeHost(page);
+  await expectAdminEventDayFlow(page);
+  await captureEvidenceScreenshot(testInfo, "uxr-phase1-admin-event-day-flow.png", page);
   await page
     .getByPlaceholder("Bulk import start.gg usernames")
     .fill("Alpha\nBravo\nCharlie\nDelta");
@@ -593,15 +670,21 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
-  const firstChartRerollForm = page
-    .locator("form")
-    .filter({ has: page.getByRole("button", { name: "Reroll", exact: true }) })
+  const firstChartRerollDetails = page
+    .locator("details")
+    .filter({ has: page.getByText("Reroll chart", { exact: true }) })
     .first();
-  await firstChartRerollForm.getByPlaceholder("Password").fill(ADMIN_PASSWORD);
-  await firstChartRerollForm.getByPlaceholder("Reason").fill("e2e stage reroll");
-  await firstChartRerollForm.evaluate((form) => {
-    (form as HTMLFormElement).requestSubmit();
-  });
+  await firstChartRerollDetails.locator("summary").click();
+  const firstChartRerollForm = firstChartRerollDetails.locator("form").first();
+  await expect(firstChartRerollForm.getByTestId("dangerous-action-summary")).toContainText(
+    "replace only this chart in the active draw",
+  );
+  await firstChartRerollForm.getByLabel("Audit reason").fill("e2e stage reroll");
+  await firstChartRerollForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+  await clickAdminActionAndWait(
+    page,
+    firstChartRerollForm.getByRole("button", { name: "Confirm Chart Reroll" }),
+  );
   await expect(page.getByText(/Version 2/).first()).toBeVisible();
   await expect(stagePage.getByText(/Version 2 \/ (Revealing|Pool)/)).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -852,6 +935,7 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }) =>
   test.setTimeout(120_000);
 
   await loginAndTakeHost(page);
+  await openRehearsalControls(page);
   const rehearsalForm = page.locator("form", {
     has: page.getByRole("button", { name: "Start Rehearsal" }),
   });
@@ -864,7 +948,10 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }) =>
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(0));
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(1));
   await expect(page.getByText("ready to vote")).toBeVisible();
-  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Open Voting", exact: true }));
+  await clickAdminActionAndWait(
+    page,
+    page.getByRole("button", { name: "Open Voting", exact: true }),
+  );
   await expect(page.getByText("voting open")).toBeVisible();
 
   const phonePage = await page.context().newPage();
@@ -921,6 +1008,7 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   page,
 }) => {
   await loginAndTakeHost(page);
+  await openRehearsalControls(page);
   await page
     .locator("form", { has: page.getByRole("button", { name: "Start Rehearsal" }) })
     .getByPlaceholder("Admin password")

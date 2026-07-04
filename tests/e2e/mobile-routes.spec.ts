@@ -1,14 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import {
-  captureEvidenceScreenshot,
-  writeJsonEvidence,
-} from "./evidence-artifacts";
+import { captureEvidenceScreenshot, writeJsonEvidence } from "./evidence-artifacts";
 import {
   getAdminPassword,
   goto,
   HOSTED_REFRESH_TIMEOUT_MS,
   clickAdminActionAndWait,
   loginAndTakeHost,
+  openRehearsalControls,
 } from "./admin-helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -95,6 +93,7 @@ async function collectMobileBallotGeometry(page: Page) {
 }
 
 async function startRehearsalMode(page: Page) {
+  await openRehearsalControls(page);
   const rehearsalForm = page.locator("form", {
     has: page.getByRole("button", { name: "Start Rehearsal" }),
   });

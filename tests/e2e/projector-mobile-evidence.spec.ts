@@ -13,6 +13,7 @@ import {
   goto,
   HOSTED_REFRESH_TIMEOUT_MS,
   loginAndTakeHost,
+  openRehearsalControls,
 } from "./admin-helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -93,12 +94,13 @@ async function expectNoVerticalOverflow(page: Page) {
   const viewport = page.viewportSize();
 
   await expect
-    .poll(async () =>
-      page.evaluate(
-        () =>
-          Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) -
-          window.innerHeight,
-      ),
+    .poll(
+      async () =>
+        page.evaluate(
+          () =>
+            Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) -
+            window.innerHeight,
+        ),
       {
         message: `Expected no vertical overflow for ${viewport?.width ?? "unknown"}x${
           viewport?.height ?? "unknown"
@@ -150,6 +152,7 @@ async function collectStageViewportGeometry(page: Page) {
   const viewport = page.viewportSize();
   const rows = page.getByTestId("stage-set-row");
   const cardRows = page.getByTestId("stage-set-card-row");
+  const qrPanel = page.getByTestId("room-qr-panel");
   const qr = page.getByTestId("room-qr-link");
   const timer = page.getByTestId("stage-countdown-display");
   const votingBand = page.getByTestId("stage-voting-band");
@@ -196,16 +199,21 @@ async function collectStageViewportGeometry(page: Page) {
   }
 
   const qrBox = await qr.boundingBox();
+  const qrPanelBox = await qrPanel.boundingBox();
   const timerBox = await timer.boundingBox();
   const votingBandBox = await votingBand.boundingBox();
   const chartRowsBox = await chartRows.boundingBox();
 
   expect(qrBox).not.toBeNull();
+  expect(qrPanelBox).not.toBeNull();
   expect(timerBox).not.toBeNull();
   expect(votingBandBox).not.toBeNull();
   expect(chartRowsBox).not.toBeNull();
   expect(qrBox!.width).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
   expect(qrBox!.height).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
+  expect(
+    Math.abs(qrBox!.x + qrBox!.width / 2 - (qrPanelBox!.x + qrPanelBox!.width / 2)),
+  ).toBeLessThanOrEqual(4);
   expect(timerBox!.width).toBeGreaterThan(160);
   expect(timerBox!.height).toBeGreaterThanOrEqual(60);
   expect(intersectionArea(toEvidenceBox(qrBox!), toEvidenceBox(timerBox!))).toBeLessThanOrEqual(1);
@@ -224,6 +232,7 @@ async function collectStageViewportGeometry(page: Page) {
     ),
     regions: {
       chartRows: toEvidenceBox(chartRowsBox!),
+      qrPanel: toEvidenceBox(qrPanelBox!),
       qr: toEvidenceBox(qrBox!),
       timer: toEvidenceBox(timerBox!),
       votingBand: toEvidenceBox(votingBandBox!),
@@ -282,6 +291,7 @@ async function collectMobileVoteGeometry(page: Page) {
 }
 
 async function startRehearsalMode(page: Page) {
+  await openRehearsalControls(page);
   const rehearsalForm = page.locator("form", {
     has: page.getByRole("button", { name: "Start Rehearsal" }),
   });
