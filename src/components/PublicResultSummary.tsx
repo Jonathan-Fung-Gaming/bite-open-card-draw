@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawnChartSummary } from "@/lib/draw/draw-engine";
 import type { RoundResultSnapshot } from "@/lib/results/result-engine";
+import { ChartArtImage } from "./ChartArtImage";
 
 type PublicResultSummaryProps = {
   result: RoundResultSnapshot;
@@ -25,30 +26,31 @@ function SelectedChartCard({
 
   return (
     <article
-      className="relative min-h-44 overflow-hidden rounded-md border border-ember-300/35 bg-furnace-900 bg-cover bg-center p-4 shadow-ember-tight"
+      className="overflow-hidden rounded-md border border-ember-300/35 bg-furnace-900 shadow-ember-tight"
       data-chart-image-path={imagePath}
       data-testid={testId}
-      style={{
-        backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.88)), url(${imagePath})`,
-      }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={imagePath}
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-0"
-        data-testid="stage-chart-image"
-      />
-      <div className="relative flex min-h-36 flex-col justify-between">
+      <div className="relative aspect-[16/9] overflow-hidden border-b border-ember-300/15 bg-black/35">
+        <ChartArtImage src={imagePath} className="h-full w-full object-contain opacity-95" />
+      </div>
+      <div className="flex min-h-36 flex-col justify-between p-4">
         <div className="flex items-center justify-between text-xs font-black uppercase tracking-[0.16em] text-ember-300">
-          <span>{chart.displayDifficulty}</span>
+          <span data-testid="selected-chart-difficulty">{chart.displayDifficulty}</span>
           <span className="font-mono">{String(index).padStart(2, "0")}</span>
         </div>
         <div>
-          <h2 className="line-clamp-2 text-2xl font-black uppercase leading-tight text-white">
+          <h2
+            className="mt-4 break-words text-xl font-black uppercase leading-tight text-white sm:text-2xl"
+            data-testid="selected-chart-title"
+          >
             {chart.name}
           </h2>
-          <p className="mt-1 line-clamp-1 text-sm text-metal-300">{chart.artist}</p>
+          <p
+            className="mt-2 break-words text-sm text-metal-300 sm:text-base"
+            data-testid="selected-chart-artist"
+          >
+            {chart.artist}
+          </p>
         </div>
       </div>
     </article>

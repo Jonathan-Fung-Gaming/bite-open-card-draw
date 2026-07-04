@@ -102,8 +102,8 @@ export default async function VotePage() {
   if (!snapshot.canSubmit && snapshot.status !== "voting_paused") {
     const message =
       snapshot.status === "ready_to_vote"
-        ? "Both chart sets are drawn. Waiting for the host to open voting. If charts were rerolled after voting started, prior ballots were invalidated and players must submit again when voting reopens."
-        : "Both chart sets must be drawn before voting opens.";
+        ? "Both chart sets are drawn. The host has not opened the 10-minute voting window yet. Keep this page open; the ballot will appear when voting starts."
+        : "The host is drawing the two chart sets. Voting opens only after both sets are ready.";
 
     return (
       <main className="min-h-screen">

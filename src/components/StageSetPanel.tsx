@@ -70,16 +70,16 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
 
   return (
     <section
-      className="metal-panel rounded-lg p-2 2xl:p-4"
+      className="metal-panel rounded-lg p-1.5 2xl:p-4"
       data-set-order={set.setOrder}
       data-testid="stage-set-row"
     >
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-2 2xl:mb-4 2xl:gap-3">
+      <div className="mb-1 flex flex-wrap items-end justify-between gap-2 2xl:mb-4 2xl:gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
             Set {set.setOrder} / {set.drawCount} charts
           </p>
-          <h2 className="mt-1 text-lg font-black uppercase text-white lg:text-xl 2xl:text-3xl">
+          <h2 className="mt-0.5 text-base font-black uppercase text-white lg:text-lg 2xl:text-3xl">
             Round {set.roundNumber} - {set.displayLabel}
           </h2>
         </div>

@@ -15,6 +15,130 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## UX/UI Tournament Readiness Phase 3 - Phone And Stage Chart Readability - 2026-07-05
+
+Status: complete for local source, unit, build, and browser evidence. This phase did not change
+tournament rules or database schema. Supabase migrations are not applicable.
+
+### Scope
+
+- Added and reviewed the phase plan:
+  `docs/ux-ui-phase-3-phone-stage-readability-plan-2026-07-05.md`.
+- Added `ChartArtImage`, a shared client-side chart art primitive that keeps local cache paths as
+  the preferred source, switches to `/chart-images/fallback-card.svg` on render-time image errors,
+  and also recovers if a cache 404 completes before hydration attaches the error handler.
+- Replaced dim CSS-background chart art on mobile ballot, public chart, and selected result cards
+  with visible image bands plus separate metadata areas.
+- Removed selected-result title/artist clamps so primary final cards can preserve long chart
+  identity on `/vote`, `/charts`, and `/results`.
+- Tightened 720p stage chrome and raised standard stage card readability while preserving exactly
+  two horizontal rows of seven cards.
+- Moved the exact `No bans for this set` choice above the ballot grid, kept it as the only zero-ban
+  path, and enlarged phone secondary controls.
+- Added explicit server-confirmed saved-ballot copy and an unsaved-edit warning that the previous
+  server-confirmed ballot remains valid until a new save succeeds.
+- Moved duplicate active-device warning earlier by checking existing ballots on username selection
+  and reusing the existing server-side voter presence action at Confirm, before ballot cards render.
+  A detected active-device conflict stays on the identity screen for one explicit continue click; no
+  browser database writes or new secrets were added.
+- Rewrote `/vote` waiting copy for not-drawn and not-open states.
+- Strengthened Phase 11 visual evidence helpers so later release evidence uses the same projector
+  readability expectations.
+
+### Checklist Items Closed
+
+- `UXR-002`
+- `UXR-003`
+- `UXR-004`
+- `UXR-010`
+- `UXR-013`
+- `UXR-014`
+- `UXR-015`
+- `UXR-016`
+- `UXR-022`
+
+### Evidence
+
+- `tests/e2e/projector-mobile-evidence.spec.ts` forces `/chart-images/cache/*` failures and
+  captures fallback evidence for `/stage`, `/charts`, and `/vote`.
+- `tests/e2e/full-flow.spec.ts` forces final `/results` cache-image failures and captures
+  `uxr-002-mobile-results-image-fallback.png`.
+- Mobile route evidence captures readable `/charts` cards for both sets:
+  `uxr-003-*-mobile-charts-set-1.png` and `uxr-003-*-mobile-charts-set-2.png`.
+- Final results evidence captures `uxr-004-mobile-results-final.png` and
+  `uxr-004-mobile-results-corrected-long-name.png`.
+- Waiting-state evidence captures `uxr-013-mobile-vote-waiting-not-drawn.png`,
+  `uxr-013-mobile-vote-waiting-not-open.png`, `uxr-013-mobile-vote-paused.png`, and
+  `uxr-013-mobile-vote-closed-revealing.png`.
+- 720p projector evidence captures `pfr-031-stage-1280x720-voting.png` and asserts title, artist,
+  difficulty, minimum card height, no overlap, no scroll, and QR/timer geometry.
+- Mobile ballot evidence asserts no vague skip action, empty selection cannot advance, the explicit
+  no-ban choice advances, selecting a ban clears no-ban, and secondary controls meet minimum
+  tap-target height.
+- Browser save/edit evidence covers saved ballot, edit draft, forced failed save, previous
+  server-confirmed reassurance, and reload preserving the previous saved revision.
+- Duplicate identity evidence covers existing-ballot and active-device warnings before ballot cards
+  render on a second device, then verifies the second Confirm can continue.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `docs/ux-ui-phase-3-phone-stage-readability-plan-2026-07-05.md`
+- `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md`
+- `src/app/vote/BallotFlow.tsx`
+- `src/app/vote/page.tsx`
+- `src/components/ChartArtImage.tsx`
+- `src/components/PublicDrawSetPanel.tsx`
+- `src/components/PublicResultSummary.tsx`
+- `src/components/ResultSetPanel.tsx`
+- `src/components/RoundHeader.tsx`
+- `src/components/StageDrawCard.tsx`
+- `src/components/StageSetPanel.tsx`
+- `src/components/index.ts`
+- `tests/e2e/full-flow.spec.ts`
+- `tests/e2e/mobile-routes.spec.ts`
+- `tests/e2e/projector-mobile-evidence.spec.ts`
+- `tests/phase9/fixtures/phase11-visual-evidence.ts`
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test -- src/lib/vote/phone-view.test.ts` - passed, 6 tests.
+- `rtk npm run test` - passed, 53 files / 314 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- Earlier e2e attempts exposed 720p stage overflow, a hydration-missed image 404 fallback path, and
+  stale expected copy in tests. Those were fixed before the final passing gate run.
+
+### Manual Review
+
+- Product rules were unchanged: four rounds, two chart sets per round, seven charts per set, one
+  10-minute voting window, 1-2 bans or explicit no-ban completion, least-ban winner selection,
+  server-decided tiebreaks, and final two-chart reveal remain intact.
+- The stage draw layout still uses exactly two horizontal rows of seven charts.
+- The no-ban path remains explicit and uses the required label `No bans for this set`; no skip
+  action was added.
+- Save-failure behavior remains aligned with the product spec: if a later edit fails, the previous
+  server-confirmed ballot remains valid.
+- Duplicate-device behavior still warns but allows the latest valid submitted ballot to count.
+- Security boundaries remain server-side. The earlier active-device warning reuses
+  `claimVoterPresenceAction` only after the required username confirmation; no presence writes
+  happen while browsing dropdown options, and no browser Supabase writes, service-role keys,
+  password hashes, plaintext passwords, or client-side tournament decisions were added.
+
+### Risks And Assumptions
+
+- Phase 3 evidence is local memory-backend browser evidence. Release-blocking production-flow
+  48 -> 36 -> 24 -> 12 rehearsal evidence remains part of the later closure gate.
+- Forced image fallback evidence aborts cache requests in Playwright. It proves render-time
+  fallback behavior, not that the deployed production artifact includes cache images; `UXR-001`
+  remains open for deployed cache evidence.
+- 720p stage readability is balanced against the fixed two-row-by-seven layout and QR/timer
+  requirements. The automated geometry checks now guard this balance.
+- No database schema, RPC, or Supabase migration changed in this phase.
+
 ## UX/UI Tournament Readiness Phase 2 - Reveal Synchronization And Public Route Freshness - 2026-07-05
 
 Status: complete for local source, unit, build, and browser evidence. This phase did not change

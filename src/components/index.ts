@@ -1,4 +1,5 @@
 export { AdminLayout } from "./AdminLayout";
+export { ChartArtImage } from "./ChartArtImage";
 export { ChartCard } from "./ChartCard";
 export { CountdownTimer } from "./CountdownTimer";
 export { DangerousActionDialog } from "./DangerousActionDialog";

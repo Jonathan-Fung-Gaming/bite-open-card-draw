@@ -1,6 +1,7 @@
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import type { RoundSetDefinition } from "@/lib/tournament";
+import { ChartArtImage } from "./ChartArtImage";
 
 type PublicDrawSetPanelProps = {
   set: RoundSetDefinition;
@@ -33,28 +34,31 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
             return (
               <article
                 key={chart.id}
-                className="relative min-h-40 overflow-hidden rounded-md border border-ember-300/25 bg-furnace-900 shadow-ember-tight"
+                className="overflow-hidden rounded-md border border-ember-300/25 bg-furnace-900 shadow-ember-tight"
                 data-chart-image-path={imagePath}
                 data-testid="stage-chart-card"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imagePath}
-                  alt=""
-                  className="absolute inset-0 h-full w-full object-cover opacity-55"
-                  data-testid="stage-chart-image"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/10" />
-                <div className="relative flex min-h-40 flex-col justify-between p-3">
+                <div className="relative aspect-[16/9] overflow-hidden border-b border-ember-300/15 bg-black/35">
+                  <ChartArtImage
+                    src={imagePath}
+                    className="h-full w-full object-contain opacity-95"
+                  />
+                </div>
+                <div className="flex min-h-28 flex-col justify-between p-3">
                   <div className="flex items-center justify-between text-xs font-black uppercase tracking-[0.16em] text-ember-300">
-                    <span>{chart.displayDifficulty}</span>
+                    <span data-testid="chart-card-difficulty">{chart.displayDifficulty}</span>
                     <span className="font-mono">{String(index + 1).padStart(2, "0")}</span>
                   </div>
                   <div>
-                    <h3 className="line-clamp-2 text-lg font-black uppercase leading-tight text-white">
+                    <h3
+                      className="mt-3 break-words text-base font-black uppercase leading-tight text-white sm:text-lg"
+                      data-testid="chart-card-title"
+                    >
                       {chart.name}
                     </h3>
-                    <p className="mt-1 line-clamp-1 text-sm text-metal-300">{chart.artist}</p>
+                    <p className="mt-1 break-words text-sm text-metal-300" data-testid="chart-card-artist">
+                      {chart.artist}
+                    </p>
                   </div>
                 </div>
               </article>
