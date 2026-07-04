@@ -1432,17 +1432,24 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     results: OperationalStateSnapshot["result"]["results"],
   ) {
     const statusByRound = new Map<1 | 2 | 3 | 4, PhoneRoundStatus>();
+    const releasedRoundNumbers = new Set<1 | 2 | 3 | 4>();
 
     for (const window of votingWindows) {
-      statusByRound.set(window.round_number as 1 | 2 | 3 | 4, { phase: "voting_open" });
+      const roundNumber = window.round_number as 1 | 2 | 3 | 4;
+
+      statusByRound.set(roundNumber, { phase: "voting_open" });
 
       if (["voting_closed", "results_computed", "results_revealing"].includes(window.status)) {
-        statusByRound.set(window.round_number as 1 | 2 | 3 | 4, { phase: "closed_revealing" });
+        statusByRound.set(roundNumber, { phase: "closed_revealing" });
+      }
+
+      if (window.status === "results_revealed" || window.status === "round_complete") {
+        releasedRoundNumbers.add(roundNumber);
       }
     }
 
     for (const result of results) {
-      if (result.revealPhase === "final") {
+      if (result.revealPhase === "final" && releasedRoundNumbers.has(result.roundNumber)) {
         statusByRound.set(result.roundNumber, {
           phase: "revealed",
           selectedCharts: result.sets.map((set) => ({

@@ -73,7 +73,7 @@ describe("admin action production safeguards", () => {
     expect(inactivitySource).toContain("expireAdminSessionAction");
   });
 
-  it("persists final reveal state before public route revalidation", () => {
+  it("persists stage final reveal before public route revalidation", () => {
     const actionsSource = readFileSync(
       path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
       "utf8",
@@ -83,7 +83,24 @@ describe("admin action production safeguards", () => {
     const revalidateIndex = block.indexOf("revalidateTournamentViews(revalidatePath)");
 
     expect(block).toContain('if (result.revealPhase === "final")');
-    expect(block).toContain('setResultsPhase(roundNumber, "results_revealed")');
+    expect(block).toContain("holdFinalResultsForStageCompletion(roundNumber)");
+    expect(persistIndex).toBeGreaterThanOrEqual(0);
+    expect(revalidateIndex).toBeGreaterThanOrEqual(0);
+    expect(persistIndex).toBeLessThan(revalidateIndex);
+  });
+
+  it("persists explicit public result release before route revalidation", () => {
+    const actionsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
+      "utf8",
+    );
+    const block = getActionBlock(actionsSource, "releaseFinalResultsAction");
+    const persistIndex = block.indexOf("await persistTournamentState();");
+    const revalidateIndex = block.indexOf("revalidateTournamentViews(revalidatePath)");
+
+    expect(block).toContain('result.revealPhase !== "final"');
+    expect(block).toContain("releaseFinalResultsToPublic(roundNumber, result)");
+    expect(actionsSource).toContain('setResultsPhase(roundNumber, "results_revealed")');
     expect(persistIndex).toBeGreaterThanOrEqual(0);
     expect(revalidateIndex).toBeGreaterThanOrEqual(0);
     expect(persistIndex).toBeLessThan(revalidateIndex);
@@ -140,9 +157,7 @@ describe("admin action production safeguards", () => {
     expect(actionsSource).toContain("private_csv_export");
     expect(actionsSource).toContain("Active host control is required to download the private CSV.");
     expect(actionsSource).toContain("privateCsvFilename(roundNumber, nowMs)");
-    expect(pageSource).toContain(
-      'enabled={canControl && Boolean(result && result.revealPhase === "final")}',
-    );
+    expect(pageSource).toContain("enabled={canControl && finalResultsReleased}");
     expect(pageSource).toContain("Take host control to download the private ballot CSV.");
   });
 
@@ -158,9 +173,13 @@ describe("admin action production safeguards", () => {
       'result.revealPhase !== "final"',
       hostDeniedAudit,
     );
+    const publicReleaseCheck = actionsSource.indexOf(
+      'roundSnapshot.status !== "results_revealed"',
+      finalRevealCheck,
+    );
     const filenameBuild = actionsSource.indexOf(
       "const filename = privateCsvFilename",
-      finalRevealCheck,
+      publicReleaseCheck,
     );
     const successAudit = actionsSource.indexOf('action: "private_csv_export"', filenameBuild);
     const generateCsv = actionsSource.indexOf("generatePrivateBallotCsv({", successAudit);
@@ -169,7 +188,8 @@ describe("admin action production safeguards", () => {
     expect(hostCheck).toBeGreaterThan(exportStart);
     expect(hostDeniedAudit).toBeGreaterThan(hostCheck);
     expect(finalRevealCheck).toBeGreaterThan(hostDeniedAudit);
-    expect(filenameBuild).toBeGreaterThan(finalRevealCheck);
+    expect(publicReleaseCheck).toBeGreaterThan(finalRevealCheck);
+    expect(filenameBuild).toBeGreaterThan(publicReleaseCheck);
     expect(successAudit).toBeGreaterThan(filenameBuild);
     expect(generateCsv).toBeGreaterThan(successAudit);
     expect(actionsSource).toContain("roundEligibility,");
@@ -303,10 +323,7 @@ describe("admin action production safeguards", () => {
       path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
       "utf8",
     );
-    const pageSource = readFileSync(
-      path.join(process.cwd(), "src/app/coolguy69/page.tsx"),
-      "utf8",
-    );
+    const pageSource = readFileSync(path.join(process.cwd(), "src/app/coolguy69/page.tsx"), "utf8");
     const liveCountsSource = readFileSync(
       path.join(process.cwd(), "src/app/coolguy69/_components/AdminLiveCountsDisclosure.tsx"),
       "utf8",

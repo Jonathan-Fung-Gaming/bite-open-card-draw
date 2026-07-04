@@ -136,6 +136,7 @@ export default async function ResultsPage() {
 
   return (
     <main className="min-h-screen">
+      <ResultsAutoRefresh />
       <RoundHeader
         title={`ROUND ${roundNumber} FINAL CHARTS`}
         status={routeState.showPreviousRoundResult ? "Previous round results" : "Results revealed"}

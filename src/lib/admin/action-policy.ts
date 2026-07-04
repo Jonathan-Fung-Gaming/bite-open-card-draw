@@ -4,8 +4,7 @@ export const ADMIN_ACTION_POLICY_CLASSIFICATIONS = [
   "read-only or sensitive disclosure action",
 ] as const;
 
-export type AdminActionPolicyClassification =
-  (typeof ADMIN_ACTION_POLICY_CLASSIFICATIONS)[number];
+export type AdminActionPolicyClassification = (typeof ADMIN_ACTION_POLICY_CLASSIFICATIONS)[number];
 
 export type AdminActionPolicy = {
   serverAction: string;
@@ -180,7 +179,8 @@ export const ADMIN_ACTION_POLICIES = [
     audited: true,
     dangerousAudit: false,
     tournamentChanging: true,
-    rationale: "Username correction is host-controlled and audited before tournament history exists.",
+    rationale:
+      "Username correction is host-controlled and audited before tournament history exists.",
   },
   {
     serverAction: "updateChartExclusionAction",
@@ -337,6 +337,18 @@ export const ADMIN_ACTION_POLICIES = [
     dangerousAudit: false,
     tournamentChanging: true,
     rationale: "Reveal advancement is routine host-controlled stage operation.",
+  },
+  {
+    serverAction: "releaseFinalResultsAction",
+    classification: "active-host-only tournament action",
+    requiresAdminSession: true,
+    requiresActiveHost: true,
+    requiresPasswordReentry: false,
+    requiresAuditReason: false,
+    audited: true,
+    dangerousAudit: false,
+    tournamentChanging: true,
+    rationale: "Final public result release is host-controlled after stage confirmation.",
   },
   {
     serverAction: "downloadPrivateCsvAction",

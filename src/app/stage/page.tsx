@@ -12,6 +12,10 @@ import { advanceVotingTimerIfDue, getVotingRoundSnapshot } from "@/lib/server/vo
 import { buildStageRoundView } from "@/lib/stage/stage-view";
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
+import {
+  PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
+  STAGE_REVEAL_REFRESH_INTERVAL_MS,
+} from "@/lib/vote/phone-view";
 import { formatVotingTime, type VotingRoundSnapshot } from "@/lib/vote/voting-window";
 import { StageAutoRefresh } from "./StageAutoRefresh";
 
@@ -123,7 +127,7 @@ export default async function StagePage() {
     if (result.revealPhase === "final") {
       return (
         <>
-          <StageAutoRefresh enabled={false} />
+          <StageAutoRefresh intervalMs={PUBLIC_INSPECTION_REFRESH_INTERVAL_MS} />
           <main className="min-h-screen">
             <RoundHeader
               title={`ROUND ${roundNumber} FINAL CHARTS`}
@@ -157,7 +161,7 @@ export default async function StagePage() {
 
     return (
       <>
-        <StageAutoRefresh />
+        <StageAutoRefresh deferDuringTiebreak intervalMs={STAGE_REVEAL_REFRESH_INTERVAL_MS} />
         <main className="min-h-screen">
           <RoundHeader
             title={`Round ${roundNumber} Results Reveal`}

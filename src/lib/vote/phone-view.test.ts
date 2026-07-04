@@ -5,6 +5,7 @@ import {
   shouldShowFinalPhoneResults,
   shouldShowPhoneResultHoldingState,
   STAGE_PUBLIC_REFRESH_INTERVAL_MS,
+  STAGE_REVEAL_REFRESH_INTERVAL_MS,
   VOTE_PAGE_REFRESH_INTERVAL_MS,
   VOTER_PRESENCE_REFRESH_INTERVAL_MS,
   VOTE_LIVE_POLL_INTERVAL_MS,
@@ -19,6 +20,11 @@ describe("phone result display", () => {
   it("does not show final charts for non-final result phases", () => {
     expect(shouldShowFinalPhoneResults("round_complete", "computed")).toBe(false);
     expect(shouldShowFinalPhoneResults("results_revealing", "final")).toBe(false);
+  });
+
+  it("holds phones when the final stage screen exists but public release is not committed", () => {
+    expect(shouldShowFinalPhoneResults("results_revealing", "final")).toBe(false);
+    expect(shouldShowPhoneResultHoldingState("results_revealing", "final")).toBe(true);
   });
 
   it("holds phones in result-loading states when final result data is unavailable", () => {
@@ -48,6 +54,7 @@ describe("phone result display", () => {
     expect(VOTE_LIVE_POLL_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
     expect(VOTE_PAGE_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(8_000);
     expect(STAGE_PUBLIC_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
+    expect(STAGE_REVEAL_REFRESH_INTERVAL_MS).toBeGreaterThan(5_000);
     expect(PUBLIC_INSPECTION_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(10_000);
     expect(VOTER_PRESENCE_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(45_000);
   });

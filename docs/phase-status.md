@@ -15,6 +15,118 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## UX/UI Tournament Readiness Phase 2 - Reveal Synchronization And Public Route Freshness - 2026-07-05
+
+Status: complete for local source, unit, build, and browser evidence. This phase did not change
+tournament rules or database schema. Supabase migrations are not applicable.
+
+### Scope
+
+- Added and reviewed the phase plan:
+  `docs/ux-ui-phase-2-reveal-sync-public-freshness-plan-2026-07-05.md`.
+- Split the final stage reveal from public phone/result release. Advancing reveal to `final` now
+  lets `/stage` show the two final charts while `/vote`, `/charts`, and `/results` continue to show
+  the required holding copy until the host clicks `Confirm Stage Reveal Complete`.
+- Kept private CSV auto-download and manual download behind the final public release state, so CSV
+  export does not fire while phones/results are still intentionally held.
+- Kept final `/stage`, `/vote`, `/charts`, and `/results` pages refreshing so already-open tabs can
+  recover from final result correction, reset, and round advance.
+- Added tiebreak-aware stage refresh behavior: stage polling uses a separate reveal cadence and
+  skips `router.refresh()` while a rune-wheel or fallback tiebreak is still unrevealed.
+- Updated normalized Supabase-derived phone status so a final result snapshot alone does not reveal
+  phones unless the voting window is also `results_revealed` or `round_complete`.
+- Added Playwright evidence for already-open public tabs through final release, correction, reset,
+  and round advance without manual browser reload.
+
+### Checklist Items Closed
+
+- `UXR-007`
+- `UXR-008`
+- `UXR-009`
+
+### Evidence
+
+- `tests/e2e/full-flow.spec.ts` asserts `/stage` uses tiebreak refresh deferral during result
+  reveal, then waits for the tiebreak winner to reveal before advancing.
+- The same e2e flow captures `uxr-008-vote-holding-before-final.png` and
+  `uxr-008-results-holding-before-final.png`, proving phones/results hold before final public
+  release.
+- The same e2e flow captures `uxr-009-open-stage-final.png`, `uxr-009-open-vote-final.png`,
+  `uxr-009-open-charts-final.png`, and `uxr-009-open-results-final.png` after the explicit public
+  release action updates already-open tabs.
+- `uxr-009-open-route-correction.json` records the corrected chart target used to prove
+  already-open `/stage`, `/vote`, `/charts`, and `/results` update after a result override.
+- The same e2e flow keeps public tabs open and verifies they drop stale final content after reset
+  and then update after round advance.
+- Unit coverage proves the phone helper holds when a result is final but status is still
+  `results_revealing`, result-store tiebreak timing blocks final advance until second-set tiebreak
+  completion, and normalized persistence keeps phones held until the voting window is released.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `docs/ux-ui-phase-2-reveal-sync-public-freshness-plan-2026-07-05.md`
+- `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md`
+- `src/app/charts/ChartsAutoRefresh.tsx`
+- `src/app/charts/page.tsx`
+- `src/app/coolguy69/actions.ts`
+- `src/app/coolguy69/page.tsx`
+- `src/app/results/ResultsAutoRefresh.tsx`
+- `src/app/results/page.tsx`
+- `src/app/stage/StageAutoRefresh.tsx`
+- `src/app/stage/page.tsx`
+- `src/app/vote/VoteAutoRefresh.tsx`
+- `src/app/vote/page.tsx`
+- `src/lib/admin/action-policy.ts`
+- `src/lib/results/result-store.test.ts`
+- `src/lib/server/admin-actions.test.ts`
+- `src/lib/server/normalized-operational-state.test.ts`
+- `src/lib/server/normalized-operational-state.ts`
+- `src/lib/vote/phone-view.test.ts`
+- `src/lib/vote/phone-view.ts`
+- `tests/e2e/full-flow.spec.ts`
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test -- src/lib/vote/phone-view.test.ts src/lib/results/result-store.test.ts src/lib/server/admin-actions.test.ts src/lib/server/normalized-operational-state.test.ts`
+  - passed, 4 files / 40 tests.
+- `rtk npm run test` - passed, 53 files / 314 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- An earlier parallel typecheck/build attempt hit Next `.next/types` contention while build was
+  regenerating `.next`; the serial rerun of `rtk npm run typecheck` passed.
+
+### Manual Review
+
+- Product rules were unchanged: four rounds, two chart sets per round, seven charts per set, one
+  voting window, explicit no-ban completion, least-ban result selection, server-decided tiebreaks,
+  and final two-chart stage reveal remain intact.
+- The anti-spoiler requirement is stronger after this phase: `/stage` can show final charts before
+  phones/results are released, and phones/results continue to show `Voting is closed. Results are
+being revealed on stage.` until the host confirms stage completion.
+- Security boundaries remain server-side: reveal advancement, final public release, result
+  override, reset, round advance, and CSV export all go through server actions with existing host
+  lock/session checks. Dangerous actions still require password re-entry where required.
+- Public routes still do not expose chart-by-chart live counts during voting.
+- No browser randomness, client-side tournament decisions, secrets, service-role keys, password
+  hashes, or plaintext passwords were added.
+
+### Risks And Assumptions
+
+- The host must click `Confirm Stage Reveal Complete` after the projector visibly reaches the final
+  two-chart screen; this deliberate step is what releases phones/results and CSV download.
+- Final public pages refresh on a light polling cadence. Background browser tabs can throttle timers,
+  so the e2e evidence brings already-open tabs to the front before waiting for refresh-driven
+  assertions without manually reloading them.
+- No database schema, RPC, or Supabase migration changed in this phase. The public-release boundary
+  uses the existing voting-window status.
+- Full production-flow 48 -> 36 -> 24 -> 12 rehearsal evidence was not rerun because this phase
+  targeted one-round reveal synchronization and public route freshness. The release-blocking full
+  rehearsal remains part of the later closure gate.
+
 ## UX/UI Tournament Readiness Phase 1 - Event-Day Admin Flow And Reroll Confirmation Cleanup - 2026-07-05
 
 Status: complete for local source, unit, build, and browser evidence. This phase did not change

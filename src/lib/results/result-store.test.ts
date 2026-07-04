@@ -18,7 +18,12 @@ function chart(id: string, name: string): DrawnChartSummary {
   };
 }
 
-function draw(id: string, setOrder: 1 | 2, displayLabel: string, charts: DrawnChartSummary[]): DrawRecord {
+function draw(
+  id: string,
+  setOrder: 1 | 2,
+  displayLabel: string,
+  charts: DrawnChartSummary[],
+): DrawRecord {
   return {
     id,
     roundSetId: `static-${displayLabel.toLowerCase()}`,
@@ -92,7 +97,11 @@ describe("result store reveal timing", () => {
         draw("draw-2", 2, "S17", sevenCharts("set-two")),
       ],
       ballots: [ballot("p1", ["c", "d"]), ballot("p2", ["e", "f"]), ballot("p3", ["g"])],
-      eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
+      eligiblePlayers: [
+        { id: "p1", startggUsername: "p1" },
+        { id: "p2", startggUsername: "p2" },
+        { id: "p3", startggUsername: "p3" },
+      ],
       priorSelectedSongBlocks: [],
       now: computedAt,
     });
@@ -105,15 +114,56 @@ describe("result store reveal timing", () => {
 
     expect(resolved.revealPhase).toBe("set_1_resolved");
     expect(resolved.sets[0].winnerRevealStartedAt).toBe(setOneResolvedAt);
-    expect(() => store.advanceReveal(1, "2026-06-28T00:00:04.000Z")).toThrow(
-      /tiebreak reveal/,
-    );
+    expect(() => store.advanceReveal(1, "2026-06-28T00:00:04.000Z")).toThrow(/tiebreak reveal/);
 
     const afterReveal = new Date(
       Date.parse(setOneResolvedAt) + TIEBREAK_REVEAL_DURATION_MS,
     ).toISOString();
 
     expect(store.advanceReveal(1, afterReveal).revealPhase).toBe("set_2_counts");
+  });
+
+  it("keeps a second-set tiebreak sealed before the final two-chart reveal", () => {
+    const store = new ResultStore(() => 2);
+    const computedAt = "2026-06-28T00:00:00.000Z";
+    const setOneResolvedAt = "2026-06-28T00:00:02.000Z";
+    const setTwoResolvedAt = "2026-06-28T00:00:04.000Z";
+
+    store.computeRound({
+      roundNumber: 1,
+      draws: [
+        draw("draw-1", 1, "S16", sevenCharts("set-one")),
+        draw("draw-2", 2, "S17", sevenCharts("set-two")),
+      ],
+      ballots: [
+        ballot("p1", ["set-one-1", "set-one-2"]),
+        ballot("p2", ["set-one-3", "set-one-4"]),
+        ballot("p3", ["set-one-5", "set-one-6"]),
+      ],
+      eligiblePlayers: [
+        { id: "p1", startggUsername: "p1" },
+        { id: "p2", startggUsername: "p2" },
+        { id: "p3", startggUsername: "p3" },
+      ],
+      priorSelectedSongBlocks: [],
+      now: computedAt,
+    });
+
+    store.advanceReveal(1, "2026-06-28T00:00:01.000Z");
+    store.advanceReveal(1, setOneResolvedAt);
+    store.advanceReveal(1, "2026-06-28T00:00:03.000Z");
+    const setTwoResolved = store.advanceReveal(1, setTwoResolvedAt);
+
+    expect(setTwoResolved.revealPhase).toBe("set_2_resolved");
+    expect(setTwoResolved.sets[1].tiebreakUsed).toBe(true);
+    expect(setTwoResolved.sets[1].winnerRevealStartedAt).toBe(setTwoResolvedAt);
+    expect(() => store.advanceReveal(1, "2026-06-28T00:00:06.000Z")).toThrow(/tiebreak reveal/);
+
+    const afterReveal = new Date(
+      Date.parse(setTwoResolvedAt) + TIEBREAK_REVEAL_DURATION_MS,
+    ).toISOString();
+
+    expect(store.advanceReveal(1, afterReveal).revealPhase).toBe("final");
   });
 
   it("overrides a selected chart as an emergency correction", () => {

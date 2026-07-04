@@ -27,5 +27,13 @@ export function ChartsAutoRefresh({
     return () => window.clearInterval(intervalId);
   }, [enabled, intervalMs, router]);
 
-  return null;
+  return (
+    <span
+      aria-hidden="true"
+      data-refresh-enabled={enabled ? "true" : "false"}
+      data-refresh-interval-ms={String(intervalMs)}
+      data-testid="charts-auto-refresh"
+      hidden
+    />
+  );
 }

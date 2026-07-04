@@ -5,10 +5,27 @@ import { useRouter } from "next/navigation";
 import { STAGE_PUBLIC_REFRESH_INTERVAL_MS } from "@/lib/vote/phone-view";
 
 type StageAutoRefreshProps = {
+  deferDuringTiebreak?: boolean;
   enabled?: boolean;
+  intervalMs?: number;
 };
 
-export function StageAutoRefresh({ enabled = true }: StageAutoRefreshProps) {
+function activeTiebreakRevealIsRunning() {
+  return Boolean(
+    document.querySelector(
+      [
+        '[data-testid="rune-wheel"][data-winner-revealed="false"]',
+        '[data-testid="fallback-tiebreak-reveal"][data-winner-revealed="false"]',
+      ].join(","),
+    ),
+  );
+}
+
+export function StageAutoRefresh({
+  deferDuringTiebreak = false,
+  enabled = true,
+  intervalMs = STAGE_PUBLIC_REFRESH_INTERVAL_MS,
+}: StageAutoRefreshProps) {
   const router = useRouter();
 
   useEffect(() => {
@@ -17,11 +34,24 @@ export function StageAutoRefresh({ enabled = true }: StageAutoRefreshProps) {
     }
 
     const intervalId = window.setInterval(() => {
+      if (deferDuringTiebreak && activeTiebreakRevealIsRunning()) {
+        return;
+      }
+
       router.refresh();
-    }, STAGE_PUBLIC_REFRESH_INTERVAL_MS);
+    }, intervalMs);
 
     return () => window.clearInterval(intervalId);
-  }, [enabled, router]);
+  }, [deferDuringTiebreak, enabled, intervalMs, router]);
 
-  return null;
+  return (
+    <span
+      aria-hidden="true"
+      data-defer-during-tiebreak={deferDuringTiebreak ? "true" : "false"}
+      data-refresh-enabled={enabled ? "true" : "false"}
+      data-refresh-interval-ms={String(intervalMs)}
+      data-testid="stage-auto-refresh"
+      hidden
+    />
+  );
 }

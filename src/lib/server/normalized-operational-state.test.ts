@@ -50,10 +50,9 @@ class FakeNormalizedSupabaseClient {
         const existing = this.rows.get(table) ?? [];
 
         for (const row of this.cloneRows(rows)) {
-          const keyColumns =
-            options?.onConflict
-              ? options.onConflict.split(",").map((column) => column.trim())
-              : table === "host_locks"
+          const keyColumns = options?.onConflict
+            ? options.onConflict.split(",").map((column) => column.trim())
+            : table === "host_locks"
               ? ["event_id", "lock_name"]
               : table === "event_runtime_state"
                 ? ["event_id"]
@@ -223,10 +222,7 @@ describe("normalized operational state repository", () => {
     const baselineStores = createAdminStateStores();
     const firstWriter = createAdminStateStores();
     const secondWriter = createAdminStateStores();
-    const baseline = createOperationalStateSnapshot(
-      baselineStores,
-      "2026-07-03T00:00:00.000Z",
-    );
+    const baseline = createOperationalStateSnapshot(baselineStores, "2026-07-03T00:00:00.000Z");
     const firstAudit = firstWriter.auditStore.record({
       sessionId: "session-a",
       action: "pause_voting",
@@ -256,9 +252,12 @@ describe("normalized operational state repository", () => {
         (operation) => operation.operation === "delete" && operation.table === "admin_actions",
       ),
     ).toBe(false);
-    expect(supabase.rows.get("admin_actions")?.map((row) => row.id).sort()).toEqual(
-      [firstAudit.id, secondAudit.id].sort(),
-    );
+    expect(
+      supabase.rows
+        .get("admin_actions")
+        ?.map((row) => row.id)
+        .sort(),
+    ).toEqual([firstAudit.id, secondAudit.id].sort());
   });
 
   it("stores one current chart exclusion row while audit records preserve every change", async () => {
@@ -502,6 +501,62 @@ describe("normalized operational state repository", () => {
     expect(restored?.result.results).toEqual([]);
   });
 
+  it("keeps phones held when a final result is not publicly released", async () => {
+    const supabase = new FakeNormalizedSupabaseClient();
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "final-stage-held-test",
+      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
+      now: () => "2026-06-30T00:00:00.000Z",
+    });
+    const stores = createAdminStateStores();
+    const player = stores.rosterStore.createOrUpdatePlayer({
+      startggUsername: "Alpha",
+      active: true,
+      now: "2026-06-30T00:00:00.000Z",
+    });
+
+    stores.drawStateStore.setChartsForTest([
+      ...chartsFor("16", 10, "S16"),
+      ...chartsFor("17", 30, "S17"),
+    ]);
+    const firstDraw = stores.drawStateStore.drawRoundSet({ roundNumber: 1, setOrder: 1 });
+    const secondDraw = stores.drawStateStore.drawRoundSet({ roundNumber: 1, setOrder: 2 });
+
+    stores.votingWindowStore.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: [{ id: player.id, startggUsername: player.startggUsername }],
+      nowMs: 0,
+    });
+    stores.votingWindowStore.closeVoting(1, 10_000);
+    stores.resultStore.computeRound({
+      roundNumber: 1,
+      draws: [firstDraw, secondDraw],
+      ballots: stores.ballotStore.listForRound(1),
+      eligiblePlayers: stores.rosterStore.listEligiblePlayersForRound(1),
+      priorSelectedSongBlocks: [],
+      now: "2026-06-30T00:01:00.000Z",
+    });
+    stores.resultStore.setRevealPhase(1, "final", "2026-06-30T00:02:00.000Z");
+    stores.votingWindowStore.setResultsPhase(1, "results_revealing");
+
+    await repository.save(createOperationalStateSnapshot(stores, "2026-06-30T00:03:00.000Z"));
+
+    const held = await repository.load();
+
+    expect(held?.ballot.phoneStatus).toEqual([
+      { roundNumber: 1, status: { phase: "closed_revealing" } },
+    ]);
+
+    stores.votingWindowStore.setResultsPhase(1, "results_revealed");
+
+    await repository.save(createOperationalStateSnapshot(stores, "2026-06-30T00:04:00.000Z"));
+
+    const released = await repository.load();
+
+    expect(released?.ballot.phoneStatus[0]?.status.phase).toBe("revealed");
+  });
+
   it("persists passive host heartbeats without rewriting unrelated runtime tables", async () => {
     const supabase = new FakeNormalizedSupabaseClient();
     const repository = new NormalizedOperationalStateRepository({
@@ -597,9 +652,7 @@ describe("normalized operational state repository", () => {
     staleHeartbeatStore.hostLockStore.importSnapshot(baseline);
     takeoverStore.hostLockStore.importSnapshot(baseline);
 
-    expect(staleHeartbeatStore.hostLockStore.refresh("session-a", "host-token-a", 1500)).toBe(
-      true,
-    );
+    expect(staleHeartbeatStore.hostLockStore.refresh("session-a", "host-token-a", 1500)).toBe(true);
     takeoverStore.hostLockStore.acquire("session-b", "host-token-b", 2000, { force: true });
 
     await repository.persistHostLock({
@@ -637,11 +690,11 @@ describe("normalized operational state repository", () => {
     staleReleaseStore.hostLockStore.importSnapshot(baseline);
     takeoverStore.hostLockStore.importSnapshot(baseline);
 
-    expect(staleReleaseStore.hostLockStore.release("session-a", "host-token-a", 1500)).toMatchObject(
-      {
-        released: true,
-      },
-    );
+    expect(
+      staleReleaseStore.hostLockStore.release("session-a", "host-token-a", 1500),
+    ).toMatchObject({
+      released: true,
+    });
     takeoverStore.hostLockStore.acquire("session-b", "host-token-b", 2000, { force: true });
 
     await repository.persistHostLock({
