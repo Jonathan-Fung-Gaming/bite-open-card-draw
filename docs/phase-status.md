@@ -13,6 +13,113 @@ sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## UX/UI Tournament Readiness Phase 1 - Event-Day Admin Flow And Reroll Confirmation Cleanup - 2026-07-05
+
+Status: complete for local source, unit, build, and browser evidence. This phase did not change
+tournament rules or database schema. Supabase migrations are not applicable.
+
+### Scope
+
+- Added and reviewed the phase plan:
+  `docs/ux-ui-phase-1-event-day-admin-flow-plan-2026-07-05.md`.
+- Reordered `/coolguy69` visually around the event-day runbook path: host control, current
+  readiness, draw current round, reveal drawn charts on stage, open/monitor voting, manual
+  corrections, compute/reveal, and private CSV export.
+- Added a top current-round readiness panel with host lock status, current-round draw count,
+  active-player count, required pool readiness, and local image-cache metadata readiness.
+- Added a `Reveal Drawn Charts` stage checkpoint before voting controls so the host verifies the
+  projector has shown both seven-chart rows before voting opens.
+- Moved chart eligibility and tournament configuration below day-of controls and collapsed the
+  detailed chart eligibility list by default.
+- Moved manual ballot correction visually before result computation/reveal controls.
+- Replaced inline full-round, set, and chart reroll warning blocks with closed confirmation details
+  using the existing `DangerousActionDialog` summary-before-password pattern.
+- Centered the QR square inside `QRPanel`.
+- Added e2e evidence for admin flow order, hidden live counts, collapsed chart eligibility, hidden
+  reroll warning copy until confirmation, manual correction before result reveal, and QR centering.
+
+### Checklist Items Closed
+
+- `UXR-005`
+- `UXR-024`
+- `UXR-025`
+- `UXR-026`
+- `UXR-027`
+- `UXR-028`
+- `UXR-031`
+
+### Evidence
+
+- `tests/e2e/full-flow.spec.ts` now captures `uxr-phase1-admin-event-day-flow.png` and asserts the
+  `/coolguy69` visual order from host control through readiness, draw, stage reveal check, voting,
+  manual correction, result reveal, and secondary chart eligibility.
+- The same e2e evidence asserts chart eligibility details are closed by default and live counts have
+  no visible rows before deliberate disclosure.
+- The same e2e evidence asserts active roster count is visible in the top readiness panel.
+- The chart-reroll e2e path opens the new confirmation details, verifies the dangerous-action
+  summary/consequence before password entry, and then submits the reroll through the existing server
+  action.
+- `tests/e2e/full-flow.spec.ts`, `tests/e2e/projector-mobile-evidence.spec.ts`, and
+  `tests/phase9/fixtures/phase11-visual-evidence.ts` assert the QR square is centered within
+  `room-qr-panel` while retaining the `/room` QR target.
+- `rtk npm run test:e2e` passed with desktop admin/stage evidence, mobile route evidence, and
+  1280x720/desktop projector screenshots.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `docs/ux-ui-phase-1-event-day-admin-flow-plan-2026-07-05.md`
+- `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md`
+- `src/app/coolguy69/page.tsx`
+- `src/app/coolguy69/_components/ManualBallotForm.tsx`
+- `src/components/QRPanel.tsx`
+- `src/lib/server/admin-actions.test.ts`
+- `tests/e2e/admin-helpers.ts`
+- `tests/e2e/full-flow.spec.ts`
+- `tests/e2e/mobile-routes.spec.ts`
+- `tests/e2e/projector-mobile-evidence.spec.ts`
+- `tests/phase9/fixtures/phase11-visual-evidence.ts`
+- `tests/phase9/pages/admin.page.ts`
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test -- src/lib/server/admin-actions.test.ts src/lib/public-url.test.ts` - passed,
+  23 tests.
+- `rtk npm run test` - passed, 53 files / 310 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- An earlier parallel build/e2e attempt hit Next `.next` contention during page collection; the
+  serial `rtk npm run build` rerun passed.
+
+### Manual Review
+
+- Product rules were unchanged: four rounds, two chart sets per round, seven charts per set, one
+  10-minute voting window, explicit no-ban completion, least-ban result selection, server-decided
+  tiebreaks, and final two-chart reveal remain intact.
+- Security boundaries were unchanged: rerolls, manual ballots, result overrides, emergency reopen,
+  reset, and current-round eligibility changes still go through server actions with password
+  re-entry and audit reasons where required.
+- Admin live counts remain hidden by default behind `AdminLiveCountsDisclosure`; no public
+  chart-by-chart live counts were added.
+- QR behavior remains a general `/room` target, not a player-specific or `/vote` link.
+- The local image-cache readiness card is explicitly a local metadata signal. It does not close
+  `UXR-001`, which still requires deployed cache-asset evidence after merge/deploy.
+
+### Risks And Assumptions
+
+- The admin page uses CSS order classes to produce the event-day visual sequence while preserving
+  existing server-action component structure. Browser evidence verifies the current visual order.
+- Rehearsal controls are collapsed in the event mode panel to keep current-round draw/vote/reveal
+  controls primary. Tests that intentionally use rehearsal setup now open that disclosure
+  deliberately.
+- No database schema, RPC, or Supabase migration changed in this phase.
+- Full production-flow 48 -> 36 -> 24 -> 12 rehearsal evidence was not rerun because this phase
+  targeted admin/QR UX and the available e2e/projector evidence passed. The release-blocking full
+  rehearsal remains part of the later closure gate.
+
 ## UX/UI Tournament Readiness Phase 0 - Production Image And Environment Triage - 2026-07-05
 
 Status: triage complete. `UXR-001` remains open because the current production alias still serves
@@ -36,7 +143,7 @@ an absolute public `/room` URL.
 - Vercel production alias points to deployment `dpl_CbcYUupwVHcCXXPPH6gE3AquE8Y5`, created
   2026-07-02 01:11 JST from a 2026-07-01 UTC build.
 - Vercel build logs reported `Downloading 247 deployment files` and `Collected static files
-  (public/, static/, .next/static): 7.036ms`. Current `main` has 935 tracked files, including 640
+(public/, static/, .next/static): 7.036ms`. Current `main` has 935 tracked files, including 640
   tracked `public/chart-images` entries and 639 cache PNGs.
 - Direct live asset probe:
   `https://bite-open-card-draw.vercel.app/chart-images/cache/72c9c23d2dabd62504d6a6c5.png`
@@ -659,7 +766,7 @@ test-only private CSV parity with the admin export path.
   normalized Supabase RPC, so hosted Supabase parity for that workflow remains outside this phase.
 - A direct one-off Playwright runner invocation for only the Phase 8 spec passed the test body but
   did not exit before the tool timeout; the recorded evidence uses the normal `rtk npm run
-  test:phase9` command, which exited successfully.
+test:phase9` command, which exited successfully.
 
 ## Production Readiness Remediation Phase 6 - Chart Import And Release Data Gates - 2026-07-03
 

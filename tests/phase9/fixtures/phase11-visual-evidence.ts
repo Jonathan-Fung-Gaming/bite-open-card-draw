@@ -7,10 +7,7 @@ import {
   type Response,
   type TestInfo,
 } from "@playwright/test";
-import {
-  captureEvidenceScreenshot,
-  writeJsonEvidence,
-} from "../../e2e/evidence-artifacts";
+import { captureEvidenceScreenshot, writeJsonEvidence } from "../../e2e/evidence-artifacts";
 import { VotePage } from "../pages/vote.page";
 import { HOSTED_REFRESH_TIMEOUT_MS, goto } from "./phase9-env";
 
@@ -321,6 +318,7 @@ async function collectStageGeometry(page: Page) {
   const viewport = page.viewportSize();
   const rows = page.getByTestId("stage-set-row");
   const cardRows = page.getByTestId("stage-set-card-row");
+  const qrPanel = page.getByTestId("room-qr-panel");
   const qr = page.getByTestId("room-qr-link");
   const timer = page.getByTestId("stage-countdown-display");
   const votingBand = page.getByTestId("stage-voting-band");
@@ -385,16 +383,21 @@ async function collectStageGeometry(page: Page) {
   }
 
   const qrBox = await qr.boundingBox();
+  const qrPanelBox = await qrPanel.boundingBox();
   const timerBox = await timer.boundingBox();
   const votingBandBox = await votingBand.boundingBox();
   const chartRowsBox = await chartRows.boundingBox();
 
   expect(qrBox).not.toBeNull();
+  expect(qrPanelBox).not.toBeNull();
   expect(timerBox).not.toBeNull();
   expect(votingBandBox).not.toBeNull();
   expect(chartRowsBox).not.toBeNull();
   expect(qrBox!.width).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
   expect(qrBox!.height).toBeGreaterThanOrEqual(STAGE_QR_MIN_SIZE_PX);
+  expect(
+    Math.abs(qrBox!.x + qrBox!.width / 2 - (qrPanelBox!.x + qrPanelBox!.width / 2)),
+  ).toBeLessThanOrEqual(4);
   expect(intersectionArea(toEvidenceBox(qrBox!), toEvidenceBox(timerBox!))).toBeLessThanOrEqual(1);
   expect(votingBandBox!.y + votingBandBox!.height).toBeLessThanOrEqual(chartRowsBox!.y + 1);
 
@@ -411,6 +414,7 @@ async function collectStageGeometry(page: Page) {
     imagePaths: stageImagePaths.map((imagePath) => decodeUrl(imagePath ?? "")),
     regions: {
       chartRows: toEvidenceBox(chartRowsBox!),
+      qrPanel: toEvidenceBox(qrPanelBox!),
       qr: toEvidenceBox(qrBox!),
       timer: toEvidenceBox(timerBox!),
       votingBand: toEvidenceBox(votingBandBox!),
@@ -484,7 +488,9 @@ async function collectMobileVoteGeometry(page: Page) {
   const seventhBox = await page.getByTestId("ballot-chart-card").nth(6).boundingBox();
   const imagePaths = await page
     .getByTestId("ballot-chart-card")
-    .evaluateAll((elements) => elements.map((element) => element.getAttribute("data-chart-image-path")));
+    .evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("data-chart-image-path")),
+    );
 
   expect(viewport).not.toBeNull();
   expect(cards).toHaveLength(7);

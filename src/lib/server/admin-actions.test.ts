@@ -352,8 +352,8 @@ describe("admin action production safeguards", () => {
         serverActionName: "rerollOneChartAction",
         auditAction: 'action: "reroll_one_chart"',
         visibleSummarySnippets: [
-          "You are about to reroll this chart.",
-          "replace only this chart",
+          "Confirm Chart Reroll",
+          "replace only this chart in the active draw",
           "invalidate any submitted ballots",
         ],
         guardSnippets: ["invalidateRoundVotingForReroll"],
@@ -370,7 +370,7 @@ describe("admin action production safeguards", () => {
         serverActionName: "rerollRoundSetAction",
         auditAction: 'action: "reroll_round_set"',
         visibleSummarySnippets: [
-          "You are about to reroll Round",
+          "Confirm Set Reroll",
           "replace all currently drawn charts for this set",
           "voting window",
         ],
@@ -387,9 +387,9 @@ describe("admin action production safeguards", () => {
         serverActionName: "rerollFullRoundAction",
         auditAction: 'action: "reroll_full_round"',
         visibleSummarySnippets: [
-          "You are about to reroll a full round.",
+          'action="reroll a full round"',
           "replace both currently drawn sets",
-          "clear any computed result",
+          "Confirm Round Reroll",
         ],
         guardSnippets: ["invalidateRoundVotingForReroll"],
       },

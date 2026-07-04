@@ -101,6 +101,12 @@ export function ManualBallotForm({
   return (
     <form action={action} className="metal-panel rounded-lg p-4">
       <input type="hidden" name="roundNumber" value={roundNumber} />
+      <div className="mb-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+          Manual Correction
+        </p>
+        <h2 className="mt-1 text-2xl font-black uppercase text-white">Manual Ballot Correction</h2>
+      </div>
       <div className="flex items-start gap-3">
         <AlertTriangle aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-ember-300" />
         <div>

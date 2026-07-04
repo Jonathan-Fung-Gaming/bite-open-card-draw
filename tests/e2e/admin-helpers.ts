@@ -87,6 +87,18 @@ export async function clickAdminActionAndWait(page: Page, button: Locator) {
   await throwIfAdminError(page);
 }
 
+export async function openRehearsalControls(page: Page) {
+  const details = page.locator("details", { hasText: "Rehearsal controls" }).first();
+
+  await expect(details).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+
+  const isOpen = await details.evaluate((element) => (element as HTMLDetailsElement).open);
+
+  if (!isOpen) {
+    await details.locator("summary").click();
+  }
+}
+
 async function releaseButtonIsEnabled(page: Page) {
   const releaseButton = page.getByRole("button", { name: "Release" });
 

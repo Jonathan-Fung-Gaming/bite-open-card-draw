@@ -1,6 +1,8 @@
 import { AdminLayout, DangerousActionDialog, HostLockBadge, TournamentLogo } from "@/components";
 import { buildPoolCounts } from "@/lib/charts/importer";
+import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import { REQUIRED_CHART_POOLS, type NormalizedChart } from "@/lib/charts/types";
+import type { DrawRecord } from "@/lib/draw/draw-state";
 import { adminState } from "@/lib/server/admin-state";
 import { getAdminSessionFromCookies } from "@/lib/server/admin-auth";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
@@ -12,7 +14,7 @@ import {
   getSubmittedPlayerIdsForRound,
   getVotingRoundSnapshot,
 } from "@/lib/server/voting-round";
-import { ROUND_SET_DEFINITIONS } from "@/lib/tournament";
+import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
 import {
   addInactivePlayerToCurrentRoundAction,
   addPlayerAction,
@@ -140,6 +142,346 @@ function nextRevealActionLabel(phase: string | null | undefined) {
   }
 }
 
+type DrawControlView = {
+  set: RoundSetDefinition;
+  activeDraw: DrawRecord | null;
+  historyCount: number;
+};
+
+function readinessToneClass(isReady: boolean) {
+  return isReady ? "border-metal-700 bg-black/25" : "border-ember-300/45 bg-ember-900/15";
+}
+
+function readinessTextClass(isReady: boolean) {
+  return isReady ? "text-white" : "text-ember-300";
+}
+
+function RerollOneChartConfirmation({
+  activeDraw,
+  canControl,
+  chart,
+  index,
+  set,
+}: {
+  activeDraw: DrawRecord;
+  canControl: boolean;
+  chart: DrawRecord["charts"][number];
+  index: number;
+  set: RoundSetDefinition;
+}) {
+  const detailId = `reroll-chart-${set.roundNumber}-${set.setOrder}-${index}`;
+
+  return (
+    <details className="rounded border border-metal-700 bg-black/20 p-2">
+      <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-ember-300">
+        Reroll chart
+      </summary>
+      <form action={rerollOneChartAction} className="mt-3 grid gap-3">
+        <input type="hidden" name="roundNumber" value={set.roundNumber} />
+        <input type="hidden" name="setOrder" value={set.setOrder} />
+        <input type="hidden" name="chartId" value={chart.id} />
+        <DangerousActionDialog
+          action={`reroll ${chart.name} from Round ${set.roundNumber} - ${activeDraw.displayLabel}`}
+          consequence="replace only this chart in the active draw, invalidate any submitted ballots for this round, clear any computed result, and reset the round voting window"
+          disabled={!canControl}
+          passwordId={`${detailId}-password`}
+        >
+          <label
+            className="block text-sm font-semibold text-metal-300"
+            htmlFor={`${detailId}-reason`}
+          >
+            Audit reason
+          </label>
+          <textarea
+            id={`${detailId}-reason`}
+            name="reason"
+            required
+            disabled={!canControl}
+            rows={2}
+            className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+          />
+        </DangerousActionDialog>
+        <button
+          className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+          disabled={!canControl}
+          type="submit"
+        >
+          Confirm Chart Reroll
+        </button>
+      </form>
+    </details>
+  );
+}
+
+function RerollSetConfirmation({
+  activeDraw,
+  canControl,
+  set,
+}: {
+  activeDraw: DrawRecord;
+  canControl: boolean;
+  set: RoundSetDefinition;
+}) {
+  const detailId = `reroll-set-${set.roundNumber}-${set.setOrder}`;
+
+  return (
+    <details className="mt-3 rounded border border-metal-700 bg-black/20 p-3">
+      <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-ember-300">
+        Reroll this set
+      </summary>
+      <form action={rerollRoundSetAction} className="mt-3 grid gap-3">
+        <input type="hidden" name="roundNumber" value={set.roundNumber} />
+        <input type="hidden" name="setOrder" value={set.setOrder} />
+        <DangerousActionDialog
+          action={`reroll Round ${set.roundNumber} - ${activeDraw.displayLabel}`}
+          consequence="replace all currently drawn charts for this set, invalidate any submitted ballots for this round, clear any computed result, and reset the round voting window"
+          disabled={!canControl}
+          passwordId={`${detailId}-password`}
+        >
+          <label
+            className="block text-sm font-semibold text-metal-300"
+            htmlFor={`${detailId}-reason`}
+          >
+            Audit reason
+          </label>
+          <textarea
+            id={`${detailId}-reason`}
+            name="reason"
+            required
+            disabled={!canControl}
+            rows={2}
+            className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+          />
+        </DangerousActionDialog>
+        <button
+          className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+          disabled={!canControl}
+          type="submit"
+        >
+          Confirm Set Reroll
+        </button>
+      </form>
+    </details>
+  );
+}
+
+function RerollFullRoundConfirmation({
+  canControl,
+  currentRoundNumber,
+  selectRound = false,
+}: {
+  canControl: boolean;
+  currentRoundNumber: 1 | 2 | 3 | 4;
+  selectRound?: boolean;
+}) {
+  return (
+    <details className="rounded border border-metal-700 bg-black/20 p-3">
+      <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-ember-300">
+        Reroll full round
+      </summary>
+      <form action={rerollFullRoundAction} className="mt-3 grid gap-3">
+        {selectRound ? (
+          <label className="block text-sm font-semibold text-metal-300" htmlFor="reroll-round">
+            Round
+            <select
+              id="reroll-round"
+              name="roundNumber"
+              disabled={!canControl}
+              defaultValue={currentRoundNumber}
+              className="mt-2 block w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+            >
+              <option value="1">Round 1</option>
+              <option value="2">Round 2</option>
+              <option value="3">Round 3</option>
+              <option value="4">Round 4</option>
+            </select>
+          </label>
+        ) : (
+          <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+        )}
+        <DangerousActionDialog
+          action="reroll a full round"
+          consequence="replace both currently drawn sets for that round, invalidate any submitted ballots for that round, clear any computed result, and reset the voting window for that round"
+          disabled={!canControl}
+          passwordId={selectRound ? "reroll-any-round-password" : "reroll-current-round-password"}
+          summaryItems={[{ label: "Round", fieldName: "roundNumber" }]}
+        >
+          <label
+            className="block text-sm font-semibold text-metal-300"
+            htmlFor={selectRound ? "reroll-any-round-reason" : "reroll-current-round-reason"}
+          >
+            Audit reason
+          </label>
+          <textarea
+            id={selectRound ? "reroll-any-round-reason" : "reroll-current-round-reason"}
+            name="reason"
+            required
+            disabled={!canControl}
+            rows={2}
+            className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+          />
+        </DangerousActionDialog>
+        <button
+          className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+          disabled={!canControl}
+          type="submit"
+        >
+          Confirm Round Reroll
+        </button>
+      </form>
+    </details>
+  );
+}
+
+function DrawControlCard({
+  canControl,
+  control,
+  includeRerollControls,
+}: {
+  canControl: boolean;
+  control: DrawControlView;
+  includeRerollControls: boolean;
+}) {
+  const { activeDraw, historyCount, set } = control;
+
+  return (
+    <section className="rounded border border-metal-700 bg-black/20 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-ember-300">
+            Round {set.roundNumber} - Set {set.setOrder}
+          </p>
+          <h3 className="text-xl font-black text-white">{set.displayLabel}</h3>
+        </div>
+        <form action={drawRoundSetAction}>
+          <input type="hidden" name="roundNumber" value={set.roundNumber} />
+          <input type="hidden" name="setOrder" value={set.setOrder} />
+          <button
+            className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+            disabled={!canControl || Boolean(activeDraw)}
+            type="submit"
+          >
+            Draw Set
+          </button>
+        </form>
+      </div>
+      {activeDraw ? (
+        <div className="mt-3 grid gap-2">
+          <p className="text-xs uppercase tracking-[0.16em] text-metal-300">
+            Version {activeDraw.version} / Pool {activeDraw.eligiblePoolCount} / History{" "}
+            {historyCount}
+          </p>
+          {activeDraw.charts.map((chart, index) => (
+            <div
+              key={chart.id}
+              className="grid gap-2 rounded border border-metal-700 bg-black/25 p-2 text-sm md:grid-cols-[minmax(0,1fr)_170px]"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-white">
+                  {index + 1}. {chart.name}
+                </p>
+                <p className="truncate text-xs text-metal-300">{chart.artist}</p>
+              </div>
+              {includeRerollControls ? (
+                <RerollOneChartConfirmation
+                  activeDraw={activeDraw}
+                  canControl={canControl}
+                  chart={chart}
+                  index={index}
+                  set={set}
+                />
+              ) : null}
+            </div>
+          ))}
+          {includeRerollControls ? (
+            <RerollSetConfirmation activeDraw={activeDraw} canControl={canControl} set={set} />
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-metal-300">No active draw.</p>
+      )}
+    </section>
+  );
+}
+
+function HostControlPanel({
+  canControl,
+  hostStatus,
+}: {
+  canControl: boolean;
+  hostStatus: "inactive" | "active" | "readonly";
+}) {
+  return (
+    <section className="metal-panel rounded-lg p-4" data-testid="admin-host-control-panel">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+            Host Lock
+          </p>
+          <h2 className="mt-1 text-2xl font-black uppercase text-white">Control</h2>
+        </div>
+        <HostLockBadge status={hostStatus} />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {hostStatus === "readonly" ? (
+          <form action={takeHostControlAction} className="grid gap-3">
+            <input type="hidden" name="forceHostTakeover" value="true" />
+            <DangerousActionDialog
+              action="force takeover of the active host lock"
+              consequence="make this browser the active host and put other admin browsers in read-only mode"
+              disabled={false}
+              passwordId="force-host-takeover-password"
+            >
+              <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
+                Another admin has an unexpired host lock. Force takeover only if that host is
+                unavailable or explicitly handed control to you.
+              </p>
+              <label
+                className="mt-4 block text-sm font-semibold text-metal-300"
+                htmlFor="forceHostTakeoverReason"
+              >
+                Audit reason
+              </label>
+              <textarea
+                id="forceHostTakeoverReason"
+                name="reason"
+                required
+                rows={3}
+                className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+              />
+            </DangerousActionDialog>
+            <button
+              className="rounded border border-ember-300/40 px-4 py-2 font-bold uppercase text-ember-300"
+              type="submit"
+            >
+              Force Host Takeover
+            </button>
+          </form>
+        ) : (
+          <form action={takeHostControlAction}>
+            <button
+              className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+              disabled={hostStatus === "active"}
+              type="submit"
+            >
+              Take Host Control
+            </button>
+          </form>
+        )}
+        <form action={releaseHostControlAction}>
+          <button
+            className="rounded border border-metal-700 px-4 py-2 font-bold uppercase text-metal-300 disabled:opacity-40"
+            disabled={!canControl}
+            type="submit"
+          >
+            Release
+          </button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const session = await getAdminSessionFromCookies();
   const params = await searchParams;
@@ -191,8 +533,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const activeCount = adminState.rosterStore.getActivePlayerCount();
   const canControl = hostSnapshot.status === "active";
   const deploymentSafety = getDeploymentSafetySnapshot();
-  const canUseRehearsalControls =
-    canControl && deploymentSafety.rehearsalAdminControlsAllowed;
+  const canUseRehearsalControls = canControl && deploymentSafety.rehearsalAdminControlsAllowed;
   const rehearsalControlsDisabledReason = !canControl
     ? "Take host control to use rehearsal controls."
     : deploymentSafety.rehearsalControlBlockReason;
@@ -205,13 +546,31 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const submittedPlayerIds = getSubmittedPlayerIdsForRound(currentRoundNumber);
   const result = adminState.resultStore.getRoundResult(currentRoundNumber);
   const auditRecords = adminState.auditStore.list(12);
+  const allCharts = adminState.drawStateStore.getCharts();
   const drawControls = ROUND_SET_DEFINITIONS.map((set) => ({
     set,
     activeDraw: adminState.drawStateStore.getActiveDraw(set.roundNumber, set.setOrder),
     historyCount: adminState.drawStateStore.getDrawHistory(set.roundNumber, set.setOrder).length,
   }));
-  const chartPoolRows = buildChartPoolRows(adminState.drawStateStore.getCharts());
+  const currentRoundDrawControls = drawControls.filter(
+    ({ set }) => set.roundNumber === currentRoundNumber,
+  );
+  const secondaryDrawControls = drawControls.filter(
+    ({ set }) => set.roundNumber !== currentRoundNumber,
+  );
+  const chartPoolRows = buildChartPoolRows(allCharts);
   const selectedChartPoolRow = chartPoolRows.find((row) => row.pool === selectedChartPool);
+  const requiredPoolsReady = chartPoolRows.every((row) => row.valid);
+  const currentRoundDrawnCount = currentRoundDrawControls.filter(
+    ({ activeDraw }) => activeDraw !== null,
+  ).length;
+  const currentRoundDrawsReady = currentRoundDrawnCount === 2;
+  const tournamentCharts = allCharts.filter((chart) => chart.tournamentScope);
+  const cachedImageCount = tournamentCharts.filter(
+    (chart) => chart.localImagePath && chart.localImagePath !== FALLBACK_CHART_IMAGE_PATH,
+  ).length;
+  const localImageMetadataReady =
+    tournamentCharts.length > 0 && cachedImageCount === tournamentCharts.length;
   const resultRevealStarted = Boolean(result && result.revealPhase !== "computed");
   const canReopenVoting =
     canControl &&
@@ -231,13 +590,108 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       <AdminSessionHeartbeat />
       <HostHeartbeat active={hostSnapshot.status === "active"} />
       <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
-        <div className="grid gap-5">
+        <div className="flex flex-col gap-5">
           {error ? (
-            <section className="rounded-lg border border-ember-500/35 bg-ember-900/20 p-4 text-sm text-ember-300">
+            <section className="order-0 rounded-lg border border-ember-500/35 bg-ember-900/20 p-4 text-sm text-ember-300">
               {error}
             </section>
           ) : null}
-          <section className="metal-panel rounded-lg p-4">
+          <div className="order-1">
+            <HostControlPanel canControl={canControl} hostStatus={hostSnapshot.status} />
+          </div>
+          <section className="metal-panel order-2 rounded-lg p-4" data-testid="admin-readiness">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Event-Day Flow
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                  Current Round Readiness
+                </h2>
+              </div>
+              <HostLockBadge status={hostSnapshot.status} />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className={`rounded border p-3 ${readinessToneClass(canControl)}`}>
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Host lock</p>
+                <p
+                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(canControl)}`}
+                >
+                  {canControl ? "Active" : "Standby"}
+                </p>
+                <p className="mt-1 text-xs text-metal-300">
+                  {canControl
+                    ? "This browser can run tournament controls."
+                    : "Take host control before changing tournament state."}
+                </p>
+              </div>
+              <div className={`rounded border p-3 ${readinessToneClass(currentRoundDrawsReady)}`}>
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                  Current round draws
+                </p>
+                <p
+                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(
+                    currentRoundDrawsReady,
+                  )}`}
+                  data-testid="admin-current-round-draw-readiness"
+                >
+                  {currentRoundDrawnCount} / 2
+                </p>
+                <p className="mt-1 text-xs text-metal-300">Draw both sets before opening voting.</p>
+              </div>
+              <div className="rounded border border-metal-700 bg-black/25 p-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Active players</p>
+                <p
+                  className="mt-2 text-2xl font-black uppercase text-white"
+                  data-count={activeCount}
+                  data-testid="admin-readiness-active-player-count"
+                >
+                  {activeCount}
+                </p>
+                <p className="mt-1 text-xs text-metal-300">
+                  Current active roster count before round snapshot.
+                </p>
+              </div>
+              <div className={`rounded border p-3 ${readinessToneClass(requiredPoolsReady)}`}>
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Required pools</p>
+                <p
+                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(requiredPoolsReady)}`}
+                >
+                  {requiredPoolsReady ? "Ready" : "Review"}
+                </p>
+                <p className="mt-1 text-xs text-metal-300">
+                  {chartPoolRows.filter((row) => row.valid).length} / {chartPoolRows.length} pools
+                  have at least 7 eligible charts.
+                </p>
+              </div>
+              <div className={`rounded border p-3 ${readinessToneClass(localImageMetadataReady)}`}>
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                  Local image cache
+                </p>
+                <p
+                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(localImageMetadataReady)}`}
+                >
+                  {cachedImageCount} / {tournamentCharts.length}
+                </p>
+                <p className="mt-1 text-xs text-metal-300">
+                  Local metadata signal only; deployed cache-art evidence remains separate.
+                </p>
+              </div>
+              <div className="rounded border border-metal-700 bg-black/25 p-3 md:col-span-2 xl:col-span-5">
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Runbook order</p>
+                <ol className="mt-2 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.12em] text-metal-300">
+                  <li>Host control</li>
+                  <li>Draw current round</li>
+                  <li>Reveal drawn charts</li>
+                  <li>Open voting</li>
+                  <li>Manual corrections</li>
+                  <li>Compute and reveal</li>
+                  <li>Export CSV</li>
+                </ol>
+              </div>
+            </div>
+          </section>
+          <section className="metal-panel order-3 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -289,131 +743,135 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </form>
             </div>
             {deploymentSafety.rehearsalAdminControlsAllowed ? (
-              <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                <form
-                  action={startRehearsalModeAction}
-                  className="rounded border border-metal-700 bg-black/20 p-3"
-                >
-                  <p className="text-sm font-bold text-white">Start rehearsal mode</p>
-                  <p className="mt-1 text-xs text-metal-300">
-                    This resets {deploymentSafety.operationalDataDescription} and loads a 12-player
-                    test roster.
-                  </p>
-                  <p className="mt-2 text-xs font-bold text-ember-300">
-                    Dangerous action: this clears current tournament operation data for this
-                    deployment context.
-                  </p>
-                  <input
-                    name="adminPassword"
-                    type="password"
-                    required
-                    disabled={!canUseRehearsalControls}
-                    placeholder="Admin password"
-                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                  />
-                  <textarea
-                    name="reason"
-                    required
-                    disabled={!canUseRehearsalControls}
-                    rows={2}
-                    placeholder="Audit reason"
-                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                  />
-                  <button
-                    className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                    disabled={!canUseRehearsalControls}
-                    type="submit"
+              <details
+                className="mt-4 rounded border border-metal-700 bg-black/20 p-3"
+                open={roundSnapshot.rehearsalMode}
+              >
+                <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
+                  Rehearsal controls
+                </summary>
+                <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                  <form
+                    action={startRehearsalModeAction}
+                    className="rounded border border-metal-700 bg-black/20 p-3"
                   >
-                    Start Rehearsal
-                  </button>
-                </form>
-                <form
-                  action={seedRehearsalTiebreakAction}
-                  className="rounded border border-metal-700 bg-black/20 p-3"
-                >
-                  <p className="text-sm font-bold text-white">Force rehearsal tiebreak</p>
-                  <p className="mt-1 text-xs text-metal-300">
-                    After both current-round sets are drawn, seed ballots that create a two-chart
-                    least-ban tie.
-                  </p>
-                  <p className="mt-2 text-xs font-bold text-ember-300">
-                    Dangerous action: this can open voting and creates manual-admin rehearsal
-                    ballots.
-                  </p>
-                  <input
-                    name="adminPassword"
-                    type="password"
-                    required
-                    disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
-                    placeholder="Admin password"
-                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                  />
-                  <textarea
-                    name="reason"
-                    required
-                    disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
-                    rows={2}
-                    placeholder="Audit reason"
-                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                  />
-                  <button
-                    className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                    disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
-                    type="submit"
+                    <p className="text-sm font-bold text-white">Start rehearsal mode</p>
+                    <p className="mt-1 text-xs text-metal-300">
+                      This resets {deploymentSafety.operationalDataDescription} and loads a
+                      12-player test roster.
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-ember-300">
+                      Dangerous action: this clears current tournament operation data for this
+                      deployment context.
+                    </p>
+                    <input
+                      name="adminPassword"
+                      type="password"
+                      required
+                      disabled={!canUseRehearsalControls}
+                      placeholder="Admin password"
+                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                    <textarea
+                      name="reason"
+                      required
+                      disabled={!canUseRehearsalControls}
+                      rows={2}
+                      placeholder="Audit reason"
+                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                    <button
+                      className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                      disabled={!canUseRehearsalControls}
+                      type="submit"
+                    >
+                      Start Rehearsal
+                    </button>
+                  </form>
+                  <form
+                    action={seedRehearsalTiebreakAction}
+                    className="rounded border border-metal-700 bg-black/20 p-3"
                   >
-                    Seed Tiebreak
-                  </button>
-                </form>
-                <form
-                  action={resetRehearsalModeAction}
-                  className="rounded border border-metal-700 bg-black/20 p-3"
-                >
-                  <p className="text-sm font-bold text-white">Reset rehearsal data</p>
-                  <p className="mt-1 text-xs text-metal-300">
-                    This clears {deploymentSafety.operationalDataDescription} and returns to
-                    tournament mode.
-                  </p>
-                  <p className="mt-2 text-xs font-bold text-ember-300">
-                    Dangerous action: this clears current rehearsal operation data for this
-                    deployment context.
-                  </p>
-                  <input
-                    name="adminPassword"
-                    type="password"
-                    required
-                    disabled={!canUseRehearsalControls}
-                    placeholder="Admin password"
-                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                  />
-                  <textarea
-                    name="reason"
-                    required
-                    disabled={!canUseRehearsalControls}
-                    rows={2}
-                    placeholder="Audit reason"
-                    className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                  />
-                  <button
-                    className="mt-3 w-full rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                    disabled={!canUseRehearsalControls}
-                    type="submit"
+                    <p className="text-sm font-bold text-white">Force rehearsal tiebreak</p>
+                    <p className="mt-1 text-xs text-metal-300">
+                      After both current-round sets are drawn, seed ballots that create a two-chart
+                      least-ban tie.
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-ember-300">
+                      Dangerous action: this can open voting and creates manual-admin rehearsal
+                      ballots.
+                    </p>
+                    <input
+                      name="adminPassword"
+                      type="password"
+                      required
+                      disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                      placeholder="Admin password"
+                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                    <textarea
+                      name="reason"
+                      required
+                      disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                      rows={2}
+                      placeholder="Audit reason"
+                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                    <button
+                      className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                      disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                      type="submit"
+                    >
+                      Seed Tiebreak
+                    </button>
+                  </form>
+                  <form
+                    action={resetRehearsalModeAction}
+                    className="rounded border border-metal-700 bg-black/20 p-3"
                   >
-                    Reset Rehearsal
-                  </button>
-                </form>
-              </div>
+                    <p className="text-sm font-bold text-white">Reset rehearsal data</p>
+                    <p className="mt-1 text-xs text-metal-300">
+                      This clears {deploymentSafety.operationalDataDescription} and returns to
+                      tournament mode.
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-ember-300">
+                      Dangerous action: this clears current rehearsal operation data for this
+                      deployment context.
+                    </p>
+                    <input
+                      name="adminPassword"
+                      type="password"
+                      required
+                      disabled={!canUseRehearsalControls}
+                      placeholder="Admin password"
+                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                    <textarea
+                      name="reason"
+                      required
+                      disabled={!canUseRehearsalControls}
+                      rows={2}
+                      placeholder="Audit reason"
+                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                    <button
+                      className="mt-3 w-full rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                      disabled={!canUseRehearsalControls}
+                      type="submit"
+                    >
+                      Reset Rehearsal
+                    </button>
+                  </form>
+                </div>
+              </details>
             ) : (
               <div className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
-                <p className="text-sm font-bold text-white">
-                  Rehearsal reset controls unavailable
-                </p>
-                <p className="mt-1 text-xs text-metal-300">
-                  {rehearsalControlsDisabledReason}
-                </p>
+                <p className="text-sm font-bold text-white">Rehearsal reset controls unavailable</p>
+                <p className="mt-1 text-xs text-metal-300">{rehearsalControlsDisabledReason}</p>
               </div>
             )}
           </section>
-          <section className="metal-panel rounded-lg p-4">
+          <section className="metal-panel order-11 rounded-lg p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -439,7 +897,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               ))}
             </div>
           </section>
-          <section className="metal-panel rounded-lg p-4">
+          <section className="metal-panel order-12 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -493,7 +951,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 Review Pool
               </button>
             </form>
-            <details className="mt-4 rounded border border-metal-700 bg-black/20 p-3" open>
+            <details className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
               <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
                 {selectedChartPoolRow?.pool} - {selectedChartPoolRow?.eligibleCount} eligible
               </summary>
@@ -551,11 +1009,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </details>
           </section>
-          <AdminLiveCountsDisclosure
-            roundNumber={currentRoundNumber}
-            action={getAdminLiveCountsAction}
-          />
-          <section className="metal-panel rounded-lg p-4">
+          <div className="order-7">
+            <AdminLiveCountsDisclosure
+              roundNumber={currentRoundNumber}
+              action={getAdminLiveCountsAction}
+            />
+          </div>
+          <section className="metal-panel order-6 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -638,7 +1098,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </AdminActionButton>
             </div>
           </section>
-          <section className="metal-panel rounded-lg p-4">
+          <section className="metal-panel order-9 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -706,18 +1166,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               />
             </div>
           </section>
-          <ManualBallotForm
-            action={manualBallotAction}
-            roundNumber={currentRoundNumber}
-            players={votingSnapshot.eligiblePlayers}
-            draws={currentRoundDraws}
-            existingPlayerIds={submittedPlayerIds}
-            canControl={canControl}
-            canSubmitManualBallot={
-              votingSnapshot.canAcceptManualBallot && (!result || result.revealPhase === "computed")
-            }
-          />
-          <section className="grid gap-4 xl:grid-cols-3">
+          <div className="order-8">
+            <ManualBallotForm
+              action={manualBallotAction}
+              roundNumber={currentRoundNumber}
+              players={votingSnapshot.eligiblePlayers}
+              draws={currentRoundDraws}
+              existingPlayerIds={submittedPlayerIds}
+              canControl={canControl}
+              canSubmitManualBallot={
+                votingSnapshot.canAcceptManualBallot &&
+                (!result || result.revealPhase === "computed")
+              }
+            />
+          </div>
+          <section className="order-10 grid gap-4 xl:grid-cols-3">
             <form action={reopenVotingAction}>
               <input type="hidden" name="roundNumber" value={currentRoundNumber} />
               <DangerousActionDialog
@@ -884,180 +1347,98 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </DangerousActionDialog>
             </form>
           </section>
-          <section className="metal-panel rounded-lg p-4">
+          <section className="metal-panel order-4 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
                   Draw Controls
                 </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">All Rounds</h2>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                  Draw Current Round
+                </h2>
               </div>
-              <form
-                action={rerollFullRoundAction}
-                className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-              >
-                <p className="sm:col-span-3 text-xs font-bold text-ember-300">
-                  You are about to reroll a full round. This will replace both currently drawn sets
-                  for that round, invalidate any submitted ballots for that round, clear any
-                  computed result, and reset the voting window for that round.
-                </p>
-                <select
-                  name="roundNumber"
-                  disabled={!canControl}
-                  defaultValue={currentRoundNumber}
-                  className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                >
-                  <option value="1">Round 1</option>
-                  <option value="2">Round 2</option>
-                  <option value="3">Round 3</option>
-                  <option value="4">Round 4</option>
-                </select>
-                <input
-                  name="adminPassword"
-                  type="password"
-                  required
-                  disabled={!canControl}
-                  placeholder="Admin password"
-                  className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                />
-                <input
-                  name="reason"
-                  required
-                  disabled={!canControl}
-                  placeholder="Reroll reason"
-                  className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                />
-                <button
-                  className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl}
-                  type="submit"
-                >
-                  Reroll Round
-                </button>
-              </form>
+              <RerollFullRoundConfirmation
+                canControl={canControl}
+                currentRoundNumber={currentRoundNumber}
+              />
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              {drawControls.map(({ set, activeDraw, historyCount }) => (
-                <section
-                  key={set.displayLabel}
-                  className="rounded border border-metal-700 bg-black/20 p-3"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-ember-300">
-                        Round {set.roundNumber} - Set {set.setOrder}
-                      </p>
-                      <h3 className="text-xl font-black text-white">{set.displayLabel}</h3>
-                    </div>
-                    <form action={drawRoundSetAction}>
-                      <input type="hidden" name="roundNumber" value={set.roundNumber} />
-                      <input type="hidden" name="setOrder" value={set.setOrder} />
-                      <button
-                        className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                        disabled={!canControl || Boolean(activeDraw)}
-                        type="submit"
-                      >
-                        Draw Set
-                      </button>
-                    </form>
-                  </div>
-                  {activeDraw ? (
-                    <div className="mt-3 grid gap-2">
-                      <p className="text-xs uppercase tracking-[0.16em] text-metal-300">
-                        Version {activeDraw.version} / Pool {activeDraw.eligiblePoolCount} / History{" "}
-                        {historyCount}
-                      </p>
-                      {activeDraw.charts.map((chart, index) => (
-                        <div
-                          key={chart.id}
-                          className="grid gap-2 rounded border border-metal-700 bg-black/25 p-2 text-sm md:grid-cols-[1fr_auto]"
-                        >
-                          <div>
-                            <p className="font-semibold text-white">
-                              {index + 1}. {chart.name}
-                            </p>
-                            <p className="text-xs text-metal-300">{chart.artist}</p>
-                          </div>
-                          <form action={rerollOneChartAction} className="grid gap-2 sm:grid-cols-3">
-                            <p className="sm:col-span-3 text-xs font-bold text-ember-300">
-                              You are about to reroll this chart. This will replace only this chart
-                              in the active
-                              {` ${activeDraw.displayLabel}`} draw, invalidate any submitted ballots
-                              for this round, clear any computed result, and reset the round voting
-                              window.
-                            </p>
-                            <input type="hidden" name="roundNumber" value={set.roundNumber} />
-                            <input type="hidden" name="setOrder" value={set.setOrder} />
-                            <input type="hidden" name="chartId" value={chart.id} />
-                            <input
-                              name="adminPassword"
-                              type="password"
-                              required
-                              disabled={!canControl}
-                              placeholder="Password"
-                              className="rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white"
-                            />
-                            <input
-                              name="reason"
-                              required
-                              disabled={!canControl}
-                              placeholder="Reason"
-                              className="rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white"
-                            />
-                            <button
-                              className="rounded border border-ember-300/30 px-2 py-1 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                              disabled={!canControl}
-                              type="submit"
-                            >
-                              Reroll
-                            </button>
-                          </form>
-                        </div>
-                      ))}
-                      <form
-                        action={rerollRoundSetAction}
-                        className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-                      >
-                        <p className="sm:col-span-3 text-xs font-bold text-ember-300">
-                          You are about to reroll Round {set.roundNumber} - {set.displayLabel}. This
-                          will replace all currently drawn charts for this set, invalidate any
-                          submitted ballots for this round, clear any computed result, and reset the
-                          round voting window.
-                        </p>
-                        <input type="hidden" name="roundNumber" value={set.roundNumber} />
-                        <input type="hidden" name="setOrder" value={set.setOrder} />
-                        <input
-                          name="adminPassword"
-                          type="password"
-                          required
-                          disabled={!canControl}
-                          placeholder="Admin password"
-                          className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                        />
-                        <input
-                          name="reason"
-                          required
-                          disabled={!canControl}
-                          placeholder="Set reroll reason"
-                          className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                        />
-                        <button
-                          className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                          disabled={!canControl}
-                          type="submit"
-                        >
-                          Reroll Set
-                        </button>
-                      </form>
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-sm text-metal-300">No active draw.</p>
-                  )}
-                </section>
+              {currentRoundDrawControls.map((control) => (
+                <DrawControlCard
+                  key={control.set.displayLabel}
+                  canControl={canControl}
+                  control={control}
+                  includeRerollControls
+                />
               ))}
             </div>
+            <details className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
+              <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
+                Secondary all-round draw controls
+              </summary>
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                {secondaryDrawControls.map((control) => (
+                  <DrawControlCard
+                    key={control.set.displayLabel}
+                    canControl={canControl}
+                    control={control}
+                    includeRerollControls
+                  />
+                ))}
+              </div>
+              <div className="mt-4">
+                <RerollFullRoundConfirmation
+                  canControl={canControl}
+                  currentRoundNumber={currentRoundNumber}
+                  selectRound
+                />
+              </div>
+            </details>
           </section>
-          <section className="metal-panel rounded-lg p-4">
+          <section
+            className="metal-panel order-5 rounded-lg p-4"
+            data-testid="admin-stage-reveal-check"
+          >
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Stage Reveal Check
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                  Reveal Drawn Charts
+                </h2>
+              </div>
+              <a
+                className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 hover:border-ember-300 hover:text-white"
+                href="/stage"
+                target="_blank"
+              >
+                Open Stage
+              </a>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className={`rounded border p-3 ${readinessToneClass(currentRoundDrawsReady)}`}>
+                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Draw status</p>
+                <p
+                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(currentRoundDrawsReady)}`}
+                >
+                  {currentRoundDrawsReady ? "Both drawn" : `${currentRoundDrawnCount} / 2 drawn`}
+                </p>
+              </div>
+              <div className="rounded border border-metal-700 bg-black/25 p-3 md:col-span-2">
+                <p className="text-sm font-bold text-white">
+                  {currentRoundDrawsReady
+                    ? "Verify the projector has shown both seven-chart rows before opening voting."
+                    : "Draw both current-round sets before the projector can reveal the complete voting slate."}
+                </p>
+                <p className="mt-2 text-xs text-metal-300">
+                  The stage reveal uses the existing `/stage` screen and keeps the required two
+                  horizontal rows of seven charts.
+                </p>
+              </div>
+            </div>
+          </section>
+          <section className="metal-panel order-last rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -1193,68 +1574,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </form>
             </div>
             <DebugSnapshotDownload action={downloadDebugSnapshotAction} disabled={!canControl} />
-          </section>
-          <section className="metal-panel rounded-lg p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              Host Lock
-            </p>
-            <h2 className="mt-1 text-2xl font-black uppercase text-white">Control</h2>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {hostSnapshot.status === "readonly" ? (
-                <form action={takeHostControlAction} className="grid gap-3">
-                  <input type="hidden" name="forceHostTakeover" value="true" />
-                  <DangerousActionDialog
-                    action="force takeover of the active host lock"
-                    consequence="make this browser the active host and put other admin browsers in read-only mode"
-                    disabled={false}
-                    passwordId="force-host-takeover-password"
-                  >
-                    <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
-                      Another admin has an unexpired host lock. Force takeover only if that host is
-                      unavailable or explicitly handed control to you.
-                    </p>
-                    <label
-                      className="mt-4 block text-sm font-semibold text-metal-300"
-                      htmlFor="forceHostTakeoverReason"
-                    >
-                      Audit reason
-                    </label>
-                    <textarea
-                      id="forceHostTakeoverReason"
-                      name="reason"
-                      required
-                      rows={3}
-                      className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                    />
-                  </DangerousActionDialog>
-                  <button
-                    className="rounded border border-ember-300/40 px-4 py-2 font-bold uppercase text-ember-300"
-                    type="submit"
-                  >
-                    Force Host Takeover
-                  </button>
-                </form>
-              ) : (
-                <form action={takeHostControlAction}>
-                  <button
-                    className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                    disabled={hostSnapshot.status === "active"}
-                    type="submit"
-                  >
-                    Take Host Control
-                  </button>
-                </form>
-              )}
-              <form action={releaseHostControlAction}>
-                <button
-                  className="rounded border border-metal-700 px-4 py-2 font-bold uppercase text-metal-300 disabled:opacity-40"
-                  disabled={!canControl}
-                  type="submit"
-                >
-                  Release
-                </button>
-              </form>
-            </div>
           </section>
           <section className="metal-panel rounded-lg p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">

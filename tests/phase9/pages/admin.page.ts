@@ -314,11 +314,16 @@ export class AdminPage {
 
     await expect(bulkImportForm).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
     await bulkImportForm.getByPlaceholder("Bulk import start.gg usernames").fill(names.join("\n"));
-    await clickServerAction(this.page, bulkImportForm.getByRole("button", { name: "Bulk Import" }), 0, {
-      requireServerActionResponse: true,
-      responseTimeoutMs: 60_000,
-      submitForm: true,
-    });
+    await clickServerAction(
+      this.page,
+      bulkImportForm.getByRole("button", { name: "Bulk Import" }),
+      0,
+      {
+        requireServerActionResponse: true,
+        responseTimeoutMs: 60_000,
+        submitForm: true,
+      },
+    );
   }
 
   async addInactivePlayerToCurrentRound(name: string, reason: string) {
@@ -411,6 +416,16 @@ export class AdminPage {
     ) {
       await this.expectSupabaseRehearsalMode();
       return;
+    }
+
+    const rehearsalDetails = this.page
+      .locator("details", { hasText: "Rehearsal controls" })
+      .first();
+
+    await expect(rehearsalDetails).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+
+    if (!(await rehearsalDetails.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await rehearsalDetails.locator("summary").click();
     }
 
     const rehearsalForm = this.page.locator("form", {
