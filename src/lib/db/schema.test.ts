@@ -57,6 +57,11 @@ describe("Phase 2 database schema", () => {
     expect(migration).toContain("where active = true");
   });
 
+  it("indexes event-scoped player reads for public runtime hydration", () => {
+    expect(migration).toContain("players_event_idx");
+    expect(migration).toContain("on public.players (event_id)");
+  });
+
   it("requires completed per-set ballot choices", () => {
     expect(migration).toContain("ballot_choices_completion_check");
     expect(migration).toContain("cardinality(banned_chart_ids) between 1 and 2");

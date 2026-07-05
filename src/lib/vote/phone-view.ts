@@ -7,6 +7,7 @@ export const VOTE_PAGE_REFRESH_INTERVAL_MS = 8_000;
 export const STAGE_PUBLIC_REFRESH_INTERVAL_MS = 5_000;
 export const STAGE_REVEAL_REFRESH_INTERVAL_MS = 8_000;
 export const PUBLIC_INSPECTION_REFRESH_INTERVAL_MS = 10_000;
+export const PUBLIC_REFRESH_JITTER_MS = 2_000;
 
 const SAVE_FAILURE_REASSURANCE = "Previous server-confirmed ballot remains valid.";
 

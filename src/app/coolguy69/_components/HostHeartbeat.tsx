@@ -12,7 +12,7 @@ type HostHeartbeatProps = {
   status: "inactive" | "active" | "readonly";
 };
 
-const HOST_LOCK_TTL_MS = 60_000;
+const HOST_LOCK_TTL_MS = 30 * 60_000;
 
 function sessionPrefix(sessionId: string | null) {
   return sessionId ? sessionId.slice(0, 8) : "none";

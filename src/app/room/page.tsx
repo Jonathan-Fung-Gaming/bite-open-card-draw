@@ -5,7 +5,7 @@ import { TournamentLogo } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import type { RoundResultSnapshot } from "@/lib/results/result-engine";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
-import { hydrateTournamentState } from "@/lib/server/persistence";
+import { hydratePublicTournamentState } from "@/lib/server/persistence";
 import {
   advanceVotingTimerIfDue,
   getRoundDrawRecords,
@@ -100,7 +100,7 @@ function roomStatus(
 }
 
 export default async function RoomPage() {
-  await hydrateTournamentState();
+  await hydratePublicTournamentState();
 
   const { currentRound } = adminState.roundStateStore.getSnapshot();
   const nowMs = await getAuthoritativeNowMs();
