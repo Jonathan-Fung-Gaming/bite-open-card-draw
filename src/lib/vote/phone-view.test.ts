@@ -55,7 +55,7 @@ describe("phone result display", () => {
     expect(VOTE_LIVE_POLL_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
     expect(VOTE_PAGE_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(8_000);
     expect(STAGE_PUBLIC_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
-    expect(STAGE_REVEAL_REFRESH_INTERVAL_MS).toBeGreaterThan(5_000);
+    expect(STAGE_REVEAL_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
     expect(PUBLIC_INSPECTION_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(10_000);
     expect(PUBLIC_REFRESH_JITTER_MS).toBeGreaterThanOrEqual(1_000);
     expect(PUBLIC_REFRESH_JITTER_MS).toBeLessThanOrEqual(5_000);

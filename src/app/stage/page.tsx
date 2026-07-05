@@ -224,7 +224,7 @@ export default async function StagePage() {
 
   return (
     <>
-      <StageAutoRefresh />
+      <StageAutoRefresh deferDuringStageDrawReveal />
       <main className="min-h-screen">
         <RoundHeader
           title={`Round ${view.roundNumber} Draw`}

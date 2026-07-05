@@ -214,6 +214,8 @@ export const startRehearsalModeInputSchema = z.object({
 
 export const resetRehearsalModeInputSchema = startRehearsalModeInputSchema;
 
+export const resetTournamentDataInputSchema = startRehearsalModeInputSchema;
+
 export const exportPrivateCsvInputSchema = z.object({
   roundNumber: roundNumberSchema.optional(),
 });
@@ -250,6 +252,7 @@ export const MUTATION_CONTRACTS = {
   advanceCurrentRound: advanceCurrentRoundInputSchema,
   startRehearsalMode: startRehearsalModeInputSchema,
   resetRehearsalMode: resetRehearsalModeInputSchema,
+  resetTournamentData: resetTournamentDataInputSchema,
   exportPrivateCsv: exportPrivateCsvInputSchema,
 } as const;
 

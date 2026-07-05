@@ -38,6 +38,7 @@ import {
   getTournamentStateBackend,
   getOperationalStateRepository,
   hydrateTournamentState,
+  replaceTournamentState,
   withPersistedResultAdminState,
   persistResultAdminState,
   persistTournamentState,
@@ -1475,6 +1476,42 @@ export async function resetRehearsalModeAction(formData: FormData) {
 
   await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
+}
+
+export async function resetTournamentDataAction(formData: FormData) {
+  const session = await requireActiveHost();
+
+  try {
+    await verifyDangerousActionPassword(getAdminPassword(formData));
+    const reason = getRequiredReason(formData);
+
+    resetTournamentOperationalState();
+    adminState.roundStateStore.setCurrentRound(1);
+    adminState.roundStateStore.setRehearsalMode(false);
+    audit(session, {
+      action: "reset_tournament_data",
+      summary:
+        "Reset tournament operation data to a clean Round 1 state while preserving admin access.",
+      reason,
+      dangerous: true,
+      tournamentChanging: true,
+      metadata: {
+        preservedHostLock: true,
+        resetRoster: true,
+        resetDraws: true,
+        resetBallots: true,
+        resetVotingWindows: true,
+        resetResults: true,
+        resetChartExclusions: true,
+      },
+    });
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Could not reset tournament data.");
+  }
+
+  await replaceTournamentState();
+  revalidateTournamentViews(revalidatePath);
+  redirect("/coolguy69");
 }
 
 export async function seedRehearsalTiebreakAction(formData: FormData) {

@@ -537,6 +537,22 @@ describe("admin action production safeguards", () => {
         ],
         guardSnippets: ['assertSupabaseTransactionalMutationImplemented("resetRound")'],
       },
+      {
+        productRule: "reset all tournament data",
+        contractName: "resetTournamentData",
+        validInput: {
+          adminPassword: "password",
+          reason: "audit reason",
+        },
+        serverActionName: "resetTournamentDataAction",
+        auditAction: 'action: "reset_tournament_data"',
+        visibleSummarySnippets: [
+          "reset all tournament data",
+          "clear the roster, draws, ballots, voting windows, result snapshots, chart exclusions, current round, and rehearsal flag",
+          "Reset Website",
+        ],
+        guardSnippets: ["resetTournamentOperationalState", "replaceTournamentState"],
+      },
     ];
 
     for (const row of dangerousActions) {

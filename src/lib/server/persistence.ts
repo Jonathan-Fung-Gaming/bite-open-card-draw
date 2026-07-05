@@ -247,6 +247,19 @@ export async function persistTournamentState(
   return withPersistenceWriteQueue(() => persistTournamentStateUnlocked(stores, repository));
 }
 
+export async function replaceTournamentState(
+  stores: AdminStateStores = adminState,
+  repository = getOperationalStateRepository(),
+) {
+  return withPersistenceWriteQueue(async () => {
+    const snapshot = createOperationalStateSnapshot(stores);
+
+    await repository.save(snapshot);
+    restoreHydratedTournamentState(stores, snapshot);
+    invalidateTournamentReadCaches();
+  });
+}
+
 export async function persistHostLockState(
   stores: AdminStateStores = adminState,
   repository = getOperationalStateRepository(),

@@ -423,6 +423,18 @@ export const ADMIN_ACTION_POLICIES = [
     rationale: "Rehearsal reset clears operational data and is deployment-gated.",
   },
   {
+    serverAction: "resetTournamentDataAction",
+    classification: "password-required dangerous action",
+    requiresAdminSession: true,
+    requiresActiveHost: true,
+    requiresPasswordReentry: true,
+    requiresAuditReason: true,
+    audited: true,
+    dangerousAudit: true,
+    tournamentChanging: true,
+    rationale: "Full tournament reset clears live operational data for a fresh event run.",
+  },
+  {
     serverAction: "seedRehearsalTiebreakAction",
     classification: "password-required dangerous action",
     requiresAdminSession: true,

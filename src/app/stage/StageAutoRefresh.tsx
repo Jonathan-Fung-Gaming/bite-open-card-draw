@@ -8,6 +8,7 @@ import {
 } from "@/lib/vote/phone-view";
 
 type StageAutoRefreshProps = {
+  deferDuringStageDrawReveal?: boolean;
   deferDuringTiebreak?: boolean;
   enabled?: boolean;
   intervalMs?: number;
@@ -24,7 +25,14 @@ function activeTiebreakRevealIsRunning() {
   );
 }
 
+function activeStageDrawRevealIsRunning() {
+  return Boolean(
+    document.querySelector('[data-testid="stage-set-row"][data-reveal-transition-active="true"]'),
+  );
+}
+
 export function StageAutoRefresh({
+  deferDuringStageDrawReveal = false,
   deferDuringTiebreak = false,
   enabled = true,
   intervalMs = STAGE_PUBLIC_REFRESH_INTERVAL_MS,
@@ -35,12 +43,18 @@ export function StageAutoRefresh({
     enabled,
     intervalMs,
     jitterMs: PUBLIC_REFRESH_JITTER_MS,
-    shouldDefer: deferDuringTiebreak ? activeTiebreakRevealIsRunning : undefined,
+    shouldDefer:
+      deferDuringTiebreak || deferDuringStageDrawReveal
+        ? () =>
+            (deferDuringTiebreak && activeTiebreakRevealIsRunning()) ||
+            (deferDuringStageDrawReveal && activeStageDrawRevealIsRunning())
+        : undefined,
   });
 
   return (
     <span
       aria-hidden="true"
+      data-defer-during-stage-draw-reveal={deferDuringStageDrawReveal ? "true" : "false"}
       data-defer-during-tiebreak={deferDuringTiebreak ? "true" : "false"}
       data-refresh-enabled={enabled ? "true" : "false"}
       data-refresh-interval-ms={String(intervalMs)}

@@ -19,7 +19,7 @@ export function StageDrawCard({ chart, index, variant = "standard" }: StageDrawC
         featured
           ? "min-h-[min(58vh,34rem)]"
           : "min-h-[clamp(5.625rem,12.5vh,9.25rem)] 2xl:min-h-44",
-        chart && "border-ember-300/45",
+        chart && "stage-card-revealed border-ember-300/45",
       )}
       data-chart-image-path={chart?.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
       data-has-chart={chart ? "true" : "false"}
@@ -29,11 +29,11 @@ export function StageDrawCard({ chart, index, variant = "standard" }: StageDrawC
       {chart ? (
         <ChartArtImage
           src={chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
-          className="absolute inset-0 h-full w-full object-cover opacity-65"
+          className="absolute inset-0 h-full w-full object-cover opacity-90"
           loading={featured ? "eager" : "lazy"}
         />
       ) : null}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/5" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
       <div
         className={clsx(
           "relative flex h-full flex-col justify-between",
