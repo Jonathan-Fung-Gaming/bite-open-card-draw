@@ -4,6 +4,7 @@ import {
   createProductionFlowRoundExpectations,
   createSmokeRoundExpectation,
   rehearsalPlayerName,
+  visualEvidencePlayerName,
 } from "./rehearsal-plan";
 
 describe("Phase 10 rehearsal planner", () => {
@@ -79,6 +80,19 @@ describe("Phase 10 rehearsal planner", () => {
         }
       }
     }
+  });
+
+  it("selects a visual-evidence player outside the planned production-flow submitters", () => {
+    const [roundOne] = createProductionFlowRoundExpectations();
+
+    if (!roundOne) {
+      throw new Error("Missing round one production-flow expectation.");
+    }
+
+    const playerName = visualEvidencePlayerName(roundOne);
+
+    expect(roundOne.activePlayers).toContain(playerName);
+    expect(roundOne.ballotPlans.map((plan) => plan.playerName)).not.toContain(playerName);
   });
 
   it("keeps the smaller smoke plan explicit", () => {

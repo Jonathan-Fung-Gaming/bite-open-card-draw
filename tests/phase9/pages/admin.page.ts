@@ -586,6 +586,17 @@ export class AdminPage {
     await clickServerAction(this.page, nextButton);
   }
 
+  async confirmStageRevealComplete() {
+    await this.loginAndTakeHost();
+
+    const confirmButton = this.page.getByRole("button", {
+      name: "Confirm Stage Reveal Complete",
+    });
+
+    await expect(confirmButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+    await clickServerAction(this.page, confirmButton);
+  }
+
   async advanceToFinalReveal(roundNumber: number, options: AdvanceRevealOptions = {}) {
     const targetPhases = [
       "computed",
@@ -602,6 +613,14 @@ export class AdminPage {
         const currentPhase = currentState?.revealPhase;
 
         if (currentPhase === "final") {
+          if (
+            currentState?.votingStatus !== "results_revealed" &&
+            currentState?.votingStatus !== "round_complete"
+          ) {
+            console.log(`[phase9] round ${roundNumber}: confirm final reveal complete`);
+            await this.confirmStageRevealComplete();
+          }
+
           await expectSupabaseFinalRevealComplete(roundNumber);
           return;
         }
@@ -642,6 +661,7 @@ export class AdminPage {
       }
 
       if (phase === "final") {
+        await this.confirmStageRevealComplete();
         return;
       }
     }
