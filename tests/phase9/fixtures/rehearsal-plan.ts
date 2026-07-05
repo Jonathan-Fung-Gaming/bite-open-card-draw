@@ -325,6 +325,22 @@ export function expectedAllProductionFlowPlayers() {
   return createRehearsalPlayers(FULL_REHEARSAL_PLAYER_COUNT);
 }
 
+export function visualEvidencePlayerName(expectation: RehearsalRoundExpectation) {
+  const submittedPlayers = new Set(expectation.ballotPlans.map((plan) => plan.playerName));
+  const nonSubmittingActivePlayers = expectation.activePlayers.filter(
+    (playerName) => !submittedPlayers.has(playerName),
+  );
+  const playerName =
+    nonSubmittingActivePlayers[nonSubmittingActivePlayers.length - 1] ??
+    expectation.activePlayers[expectation.activePlayers.length - 1];
+
+  if (!playerName) {
+    throw new Error("Phase 11 visual evidence requires at least one active player.");
+  }
+
+  return playerName;
+}
+
 export function assertRoundAttritionPlan(expectations: readonly RehearsalRoundExpectation[]) {
   const activeCounts = expectations.map((expectation) => expectation.activePlayerCount);
 

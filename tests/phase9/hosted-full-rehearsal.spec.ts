@@ -3,6 +3,7 @@ import { requireBaseURL } from "./fixtures/phase9-env";
 import {
   assertRoundAttritionPlan,
   createProductionFlowRoundExpectations,
+  visualEvidencePlayerName,
 } from "./fixtures/rehearsal-plan";
 import { collectPhase11VisualEvidence } from "./fixtures/phase11-visual-evidence";
 import { expectProductionFlowTestRoutesDisabled } from "./fixtures/production-flow-safety";
@@ -57,18 +58,12 @@ test("hosted Supabase four-round rehearsal covers result reveal and CSV @full", 
           return;
         }
 
-        const votePlayerName = expectation.activePlayers[expectation.activePlayers.length - 1];
-
-        if (!votePlayerName) {
-          throw new Error("Phase 11 visual evidence requires at least one active player.");
-        }
-
         await collectPhase11VisualEvidence({
           baseURL: resolvedBaseURL,
           browser,
           roundNumber,
           testInfo,
-          votePlayerName,
+          votePlayerName: visualEvidencePlayerName(expectation),
         });
         phase11VisualEvidenceCaptured = true;
       },
