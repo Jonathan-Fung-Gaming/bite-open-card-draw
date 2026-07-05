@@ -46,14 +46,19 @@ export function CountdownTimer({
 
   return (
     <div
-      className={clsx("metal-panel rounded-lg", compact ? "px-4 py-3" : "px-5 py-4")}
+      className={clsx(
+        "metal-panel rounded-lg",
+        compact ? "flex min-h-60 flex-col justify-between px-5 py-4" : "px-5 py-4",
+      )}
       data-testid="stage-countdown"
     >
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">{label}</p>
       <div
         className={clsx(
-          "mt-2 font-mono font-black tabular-nums text-white",
-          compact ? "text-5xl lg:text-6xl 2xl:text-7xl" : "text-5xl sm:text-7xl",
+          "font-mono font-black leading-none tabular-nums text-white",
+          compact
+            ? "mt-3 text-7xl md:text-[7.5rem] 2xl:text-[9rem]"
+            : "mt-2 text-5xl sm:text-7xl",
         )}
         data-testid="stage-countdown-display"
       >

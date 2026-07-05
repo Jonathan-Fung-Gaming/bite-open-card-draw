@@ -146,6 +146,10 @@ select {
   width: 100%;
 }
 
+.stage-card-revealed {
+  animation: stage-card-reveal 520ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
+}
+
 @media (min-width: 768px) {
   .public-chart-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -171,5 +175,24 @@ select {
   to {
     transform: translateX(-58%);
     filter: brightness(1);
+  }
+}
+
+@keyframes stage-card-reveal {
+  from {
+    filter: brightness(0.64) saturate(0.8);
+    opacity: 0;
+    transform: translateY(0.65rem) scale(0.975);
+  }
+
+  70% {
+    filter: brightness(1.18) saturate(1.08);
+    opacity: 1;
+  }
+
+  to {
+    filter: brightness(1) saturate(1);
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }

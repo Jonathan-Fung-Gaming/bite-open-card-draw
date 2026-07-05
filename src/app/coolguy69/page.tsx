@@ -45,6 +45,7 @@ import {
   resetRoundAction,
   resumeVotingAction,
   resetRehearsalModeAction,
+  resetTournamentDataAction,
   seedRehearsalTiebreakAction,
   setPlayerActiveStatusAction,
   setCurrentRoundAction,
@@ -691,7 +692,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     <AdminLayout hostStatus={hostSnapshot.status}>
       <AdminLiveRefresh />
       <AdminSessionHeartbeat />
-      <section className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_440px] 2xl:grid-cols-[minmax(0,1fr)_520px]">
         <div className="flex min-w-0 flex-col gap-5">
           {error ? (
             <section className="order-0 rounded-lg border border-ember-500/35 bg-ember-900/20 p-4 text-sm text-ember-300">
@@ -798,7 +799,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </div>
           </section>
-          <section className="metal-panel order-3 rounded-lg p-4">
+          <section className="metal-panel order-10 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -978,7 +979,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             )}
           </section>
-          <section className="metal-panel order-11 rounded-lg p-4">
+          <section className="metal-panel order-12 rounded-lg p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -1004,7 +1005,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               ))}
             </div>
           </section>
-          <section className="metal-panel order-12 rounded-lg p-4">
+          <section className="metal-panel order-last rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -1116,13 +1117,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </details>
           </section>
-          <div className="order-7">
+          <div className="order-11">
             <AdminLiveCountsDisclosure
               roundNumber={currentRoundNumber}
               action={getAdminLiveCountsAction}
             />
           </div>
-          <section className="metal-panel order-6 rounded-lg p-4">
+          <section className="metal-panel order-5 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -1205,7 +1206,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </AdminActionButton>
             </div>
           </section>
-          <section className="metal-panel order-9 rounded-lg p-4">
+          <section className="metal-panel order-8 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -1293,7 +1294,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               />
             </div>
           </section>
-          <div className="order-8">
+          <div className="order-7">
             <ManualBallotForm
               action={manualBallotAction}
               roundNumber={currentRoundNumber}
@@ -1307,7 +1308,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               }
             />
           </div>
-          <section className="order-10 grid gap-4 xl:grid-cols-3">
+          <section className="order-9 grid gap-4 xl:grid-cols-4">
             <form action={reopenVotingAction}>
               <input type="hidden" name="roundNumber" value={currentRoundNumber} />
               <DangerousActionDialog
@@ -1415,6 +1416,40 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </button>
               </DangerousActionDialog>
             </form>
+            <form action={resetTournamentDataAction}>
+              <DangerousActionDialog
+                action="reset all tournament data"
+                consequence="clear the roster, draws, ballots, voting windows, result snapshots, chart exclusions, current round, and rehearsal flag; your admin session and active host control stay in place"
+                disabled={!canControl}
+                passwordId="reset-tournament-data-password"
+              >
+                <p className="text-sm font-bold text-white">Full website reset</p>
+                <p className="mt-1 text-xs text-metal-300">
+                  Clean Round 1 event state without the rehearsal workflow.
+                </p>
+                <label
+                  className="mt-4 block text-sm font-semibold text-metal-300"
+                  htmlFor="reset-tournament-data-reason"
+                >
+                  Audit reason
+                </label>
+                <textarea
+                  id="reset-tournament-data-reason"
+                  name="reason"
+                  required
+                  disabled={!canControl}
+                  rows={3}
+                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                />
+                <button
+                  className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                  disabled={!canControl}
+                  type="submit"
+                >
+                  Reset Website
+                </button>
+              </DangerousActionDialog>
+            </form>
             <form action={overrideResultAction}>
               <input type="hidden" name="roundNumber" value={currentRoundNumber} />
               <DangerousActionDialog
@@ -1474,7 +1509,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </DangerousActionDialog>
             </form>
           </section>
-          <section className="metal-panel order-4 rounded-lg p-4">
+          <section className="metal-panel order-3 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -1523,7 +1558,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </details>
           </section>
           <section
-            className="metal-panel order-5 rounded-lg p-4"
+            className="metal-panel order-4 rounded-lg p-4"
             data-testid="admin-stage-reveal-check"
           >
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -1565,7 +1600,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </div>
           </section>
-          <section className="metal-panel order-last rounded-lg p-4">
+          <section className="metal-panel order-6 rounded-lg p-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">

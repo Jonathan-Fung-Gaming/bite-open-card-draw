@@ -40,6 +40,7 @@ const requiredMutationNames: MutationName[] = [
   "advanceCurrentRound",
   "startRehearsalMode",
   "resetRehearsalMode",
+  "resetTournamentData",
   "exportPrivateCsv",
 ];
 
@@ -61,6 +62,7 @@ describe("Phase 2 mutation contracts", () => {
       "overrideResult",
       "startRehearsalMode",
       "resetRehearsalMode",
+      "resetTournamentData",
     ] as const) {
       const result = MUTATION_CONTRACTS[name].safeParse({});
 

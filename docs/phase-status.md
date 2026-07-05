@@ -4183,3 +4183,69 @@ Status: complete for local memory, load, browser-smoke, and Supabase production-
   removes the live-count HTML leak, but it does not replace the public/admin read model.
 - No Supabase migration is applicable for this phase; changes are UI, server action, docs, and test
   coverage only.
+
+## UX/UI Tournament Readiness Remediation - Host Reset, Stage Reveal, Admin Flow - 2026-07-05
+
+Status: complete for local memory-dev validation and Playwright evidence.
+
+### Scope
+
+- Added a production-use full website reset action on `/coolguy69` for a clean Round 1 event state
+  without starting rehearsal mode. It is password re-entry, audit-reason, active-host, and dangerous
+  action-policy gated, and it preserves the current admin session and host lock.
+- Reworked the host console layout around the event-day workflow: host control, readiness, draw
+  controls, stage reveal check, voting controls, roster, manual correction, results, then dangerous
+  reset/repair controls. The admin shell now uses more width for 1080p operation.
+- Enlarged the stage timer so the compact timer display better fills its panel beside the QR code.
+- Fixed deployed chart-art fallback behavior by trusting generated public chart image paths instead
+  of requiring serverless filesystem visibility before serializing them.
+- Smoothed stage draw/result transitions: drawn chart rows now advance from a local monotonic visual
+  clock seeded from server time, stage refresh defers only during short card entrance animations, and
+  tiebreak refresh deferral still protects the five-second rune-wheel reveal.
+
+### Changed Files
+
+- Updated `/coolguy69` page ordering, width, and reset controls in `src/app/coolguy69/page.tsx`.
+- Added reset action handling and action-policy/mutation-contract coverage in
+  `src/app/coolguy69/actions.ts`, `src/lib/admin/action-policy.ts`, and
+  `src/lib/server/mutation-contracts.ts`.
+- Added full-state replacement persistence support in `src/lib/server/persistence.ts`.
+- Updated admin/action/mutation tests in `src/lib/server/admin-actions.test.ts`,
+  `src/lib/server/mutation-contracts.test.ts`, and `src/lib/admin/action-policy.test.ts`.
+- Updated stage refresh, reveal, timer, and chart card rendering in `src/app/stage/page.tsx`,
+  `src/app/stage/StageAutoRefresh.tsx`, `src/components/StageSetPanel.tsx`,
+  `src/components/StageDrawCard.tsx`, `src/components/CountdownTimer.tsx`,
+  `src/app/globals.css`, and `src/lib/vote/phone-view.ts`.
+- Updated chart image resolution and coverage in `src/lib/charts/runtime-catalog.ts` and
+  `src/lib/charts/runtime-catalog.test.ts`.
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 57 files / 333 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "stage tiebreak"` - passed during
+  targeted regression validation.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+
+### Manual Review
+
+- Voting deadlines remain server/database-authoritative per `docs/product-spec.md`; local computer
+  time is used only for visual reveal interpolation after a server timestamp seed.
+- The full reset clears roster, draws, ballots, voting windows, result snapshots, chart exclusions,
+  current round, and rehearsal mode while retaining the active host session so a host can recover a
+  live test run without losing control.
+- Dangerous action password re-entry, audit reason, active host lock, and mutation-contract policy
+  coverage remain in place for the new reset action.
+- Deployed chart art should no longer require browser cache clearing after redeploy: the server now
+  serializes deterministic public cache paths that the static asset server can answer.
+
+### Risks And Assumptions
+
+- The new full website reset intentionally clears live tournament operation data. It must only be
+  used by the active host after confirming the password and audit summary.
+- Existing deployed state must receive this code in a new deployment before the cached chart paths and
+  full reset action are available on the live site.
+- No Supabase migration is applicable for this remediation; changes are application code, UI, docs,
+  and tests.

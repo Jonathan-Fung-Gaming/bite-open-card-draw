@@ -6,6 +6,8 @@ import { STAGE_CHART_REVEAL_INTERVAL_MS } from "@/lib/stage/stage-view";
 import type { RoundSetDefinition } from "@/lib/tournament";
 import { StageDrawCard } from "./StageDrawCard";
 
+const STAGE_CHART_REVEAL_ANIMATION_GUARD_MS = 700;
+
 type StageSetPanelProps = {
   set: RoundSetDefinition;
   draw: DrawRecord | null;
@@ -39,9 +41,35 @@ function visibleCardCount(
   return Math.min(draw.charts.length, Math.floor(elapsedMs / STAGE_CHART_REVEAL_INTERVAL_MS) + 1);
 }
 
+function cardRevealAnimationActive(
+  draw: DrawRecord | null,
+  revealStartsAt: string | null | undefined,
+  nowMs: number,
+) {
+  if (!draw || !revealStartsAt) {
+    return false;
+  }
+
+  const elapsedMs = nowMs - Date.parse(revealStartsAt);
+
+  if (elapsedMs < 0) {
+    return false;
+  }
+
+  const activeRevealIndex = Math.floor(elapsedMs / STAGE_CHART_REVEAL_INTERVAL_MS);
+
+  if (activeRevealIndex >= draw.charts.length) {
+    return false;
+  }
+
+  return elapsedMs - activeRevealIndex * STAGE_CHART_REVEAL_INTERVAL_MS <= STAGE_CHART_REVEAL_ANIMATION_GUARD_MS;
+}
+
 export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageSetPanelProps) {
+  const drawId = draw?.id ?? null;
   const [nowMs, setNowMs] = useState(serverNowMs ?? Date.now());
   const revealedCount = visibleCardCount(draw, revealStartsAt, nowMs);
+  const revealAnimationActive = cardRevealAnimationActive(draw, revealStartsAt, nowMs);
   const cards = Array.from({ length: set.drawCount }, (_, index) =>
     draw && revealedCount > index ? (draw.charts[index] ?? null) : null,
   );
@@ -54,7 +82,9 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
     : "Awaiting host draw";
 
   useEffect(() => {
-    if (!draw || !revealStartsAt || revealedCount >= set.drawCount) {
+    if (!drawId || !revealStartsAt) {
+      setNowMs(serverNowMs ?? Date.now());
+
       return;
     }
 
@@ -66,11 +96,15 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
     updateNow();
 
     return () => window.clearInterval(intervalId);
-  }, [draw, revealStartsAt, revealedCount, serverNowMs, set.drawCount]);
+  }, [drawId, revealStartsAt, serverNowMs]);
 
   return (
     <section
       className="metal-panel rounded-lg p-1.5 2xl:p-4"
+      data-reveal-complete={
+        !draw || revealStartsAt === undefined || revealedCount >= set.drawCount ? "true" : "false"
+      }
+      data-reveal-transition-active={revealAnimationActive ? "true" : "false"}
       data-set-order={set.setOrder}
       data-testid="stage-set-row"
     >

@@ -8,23 +8,16 @@ import type { NormalizedChart } from "./types";
 export const GENERATED_CHARTS_WITH_IMAGES_PATH = "data/generated/charts-with-images.json";
 export const SOURCE_CHART_CSV_PATH = "data/source/charts.csv";
 
-function publicAssetExists(localImagePath: string, projectRoot: string) {
-  if (!localImagePath.startsWith("/") || localImagePath.startsWith("//")) {
-    return false;
-  }
-
-  return existsSync(path.join(projectRoot, "public", localImagePath.replace(/^\/+/, "")));
+function isPublicAssetPath(localImagePath: string) {
+  return localImagePath.startsWith("/") && !localImagePath.startsWith("//");
 }
 
-export function resolveRuntimeChartImages(
-  charts: readonly NormalizedChart[],
-  projectRoot = process.cwd(),
-): NormalizedChart[] {
+export function resolveRuntimeChartImages(charts: readonly NormalizedChart[]): NormalizedChart[] {
   return charts.map((chart) => {
     if (
       chart.localImagePath &&
       chart.localImagePath !== FALLBACK_CHART_IMAGE_PATH &&
-      publicAssetExists(chart.localImagePath, projectRoot)
+      isPublicAssetPath(chart.localImagePath)
     ) {
       return chart;
     }
@@ -32,7 +25,7 @@ export function resolveRuntimeChartImages(
     if (chart.sourceBgImg) {
       const deterministicCachePath = localImagePathForRemoteUrl(chart.sourceBgImg);
 
-      if (publicAssetExists(deterministicCachePath, projectRoot)) {
+      if (isPublicAssetPath(deterministicCachePath)) {
         return {
           ...chart,
           localImagePath: deterministicCachePath,
@@ -61,7 +54,7 @@ export function loadRuntimeCharts(projectRoot = process.cwd()) {
   const generatedCharts = readGeneratedCharts(projectRoot);
 
   if (generatedCharts) {
-    return resolveRuntimeChartImages(generatedCharts, projectRoot);
+    return resolveRuntimeChartImages(generatedCharts);
   }
 
   const sourcePath = path.join(projectRoot, SOURCE_CHART_CSV_PATH);
@@ -74,5 +67,5 @@ export function loadRuntimeCharts(projectRoot = process.cwd()) {
     sourcePath: SOURCE_CHART_CSV_PATH,
   });
 
-  return resolveRuntimeChartImages(charts, projectRoot);
+  return resolveRuntimeChartImages(charts);
 }
