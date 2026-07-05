@@ -14,6 +14,10 @@ import {
 } from "@/lib/persistence/repository";
 import { getTournamentEventId, isProductionDeploymentEnv } from "@/lib/server/env";
 import { NormalizedOperationalStateRepository } from "@/lib/server/normalized-operational-state";
+import {
+  invalidateTournamentReadCaches,
+  readCachedPublicOperationalStateSnapshot,
+} from "@/lib/server/public-hydration-cache";
 
 export type TournamentStateBackend = "memory" | "supabase";
 
@@ -23,6 +27,17 @@ const globalForPersistence = globalThis as typeof globalThis & {
 };
 
 const hydrationBaselines = new WeakMap<AdminStateStores, OperationalStateSnapshot | null>();
+
+function restoreHydratedTournamentState(
+  stores: AdminStateStores,
+  snapshot: OperationalStateSnapshot | null,
+) {
+  if (snapshot) {
+    restoreOperationalStateSnapshot(stores, snapshot);
+  }
+
+  hydrationBaselines.set(stores, createOperationalStateSnapshot(stores));
+}
 
 async function withPersistenceWriteQueue<T>(callback: () => Promise<T>) {
   const previous = globalForPersistence.biteOpenPersistenceWriteQueue ?? Promise.resolve();
@@ -94,6 +109,7 @@ async function persistTournamentStateUnlocked(
 
     restoreOperationalStateSnapshot(stores, merged);
     hydrationBaselines.set(stores, cloneOperationalStateSnapshot(merged));
+    invalidateTournamentReadCaches();
 
     return;
   }
@@ -108,6 +124,7 @@ async function persistTournamentStateUnlocked(
   await repository.save(merged);
   restoreOperationalStateSnapshot(stores, merged);
   hydrationBaselines.set(stores, cloneOperationalStateSnapshot(merged));
+  invalidateTournamentReadCaches();
 }
 
 async function persistVotingStateUnlocked(
@@ -128,6 +145,7 @@ async function persistVotingStateUnlocked(
 
   restoreOperationalStateSnapshot(stores, merged);
   hydrationBaselines.set(stores, cloneOperationalStateSnapshot(merged));
+  invalidateTournamentReadCaches();
 }
 
 async function persistVotingAdminStateUnlocked(
@@ -151,6 +169,7 @@ async function persistVotingAdminStateUnlocked(
 
   restoreOperationalStateSnapshot(stores, merged);
   hydrationBaselines.set(stores, cloneOperationalStateSnapshot(merged));
+  invalidateTournamentReadCaches();
 }
 
 async function persistResultAdminStateUnlocked(
@@ -174,6 +193,7 @@ async function persistResultAdminStateUnlocked(
 
   restoreOperationalStateSnapshot(stores, merged);
   hydrationBaselines.set(stores, cloneOperationalStateSnapshot(merged));
+  invalidateTournamentReadCaches();
 }
 
 async function persistHostLockStateUnlocked(
@@ -194,6 +214,7 @@ async function persistHostLockStateUnlocked(
 
   stores.hostLockStore.importSnapshot(persisted);
   hydrationBaselines.set(stores, createOperationalStateSnapshot(stores));
+  invalidateTournamentReadCaches();
 }
 
 export async function hydrateTournamentState(
@@ -202,11 +223,21 @@ export async function hydrateTournamentState(
 ) {
   const snapshot = await repository.load();
 
-  if (snapshot) {
-    restoreOperationalStateSnapshot(stores, snapshot);
-  }
+  restoreHydratedTournamentState(stores, snapshot);
+}
 
-  hydrationBaselines.set(stores, createOperationalStateSnapshot(stores));
+export async function hydratePublicTournamentState(
+  stores: AdminStateStores = adminState,
+  repository = getOperationalStateRepository(),
+) {
+  const snapshot =
+    getTournamentStateBackend() === "supabase"
+      ? await readCachedPublicOperationalStateSnapshot(getTournamentEventId(), () =>
+          repository.load(),
+        )
+      : await repository.load();
+
+  restoreHydratedTournamentState(stores, snapshot);
 }
 
 export async function persistTournamentState(
@@ -300,11 +331,7 @@ export async function withPersistedVotingAdminState<T>(
       ? await repository.loadVotingAdminState()
       : await repository.load();
 
-    if (snapshot) {
-      restoreOperationalStateSnapshot(stores, snapshot);
-    }
-
-    hydrationBaselines.set(stores, createOperationalStateSnapshot(stores));
+    restoreHydratedTournamentState(stores, snapshot);
     const rollbackSnapshot = createOperationalStateSnapshot(stores);
 
     try {
@@ -331,11 +358,7 @@ export async function withPersistedResultAdminState<T>(
       ? await repository.loadResultAdminState()
       : await repository.load();
 
-    if (snapshot) {
-      restoreOperationalStateSnapshot(stores, snapshot);
-    }
-
-    hydrationBaselines.set(stores, createOperationalStateSnapshot(stores));
+    restoreHydratedTournamentState(stores, snapshot);
     const rollbackSnapshot = createOperationalStateSnapshot(stores);
 
     try {

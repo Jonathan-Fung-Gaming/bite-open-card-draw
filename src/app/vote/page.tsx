@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
-import { hydrateTournamentState } from "@/lib/server/persistence";
+import { hydratePublicTournamentState } from "@/lib/server/persistence";
 import {
   advanceVotingTimerIfDue,
   getRoundDrawRecords,
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 export default async function VotePage() {
-  await hydrateTournamentState();
+  await hydratePublicTournamentState();
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const nowMs = await getAuthoritativeNowMs();

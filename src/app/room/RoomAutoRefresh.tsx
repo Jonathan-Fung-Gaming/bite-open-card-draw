@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { PUBLIC_INSPECTION_REFRESH_INTERVAL_MS } from "@/lib/vote/phone-view";
+import { useJitteredRouterRefresh } from "@/lib/client/use-jittered-router-refresh";
+import {
+  PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
+  PUBLIC_REFRESH_JITTER_MS,
+} from "@/lib/vote/phone-view";
 
 type RoomAutoRefreshProps = {
   enabled?: boolean;
@@ -15,23 +18,18 @@ export function RoomAutoRefresh({
 }: RoomAutoRefreshProps) {
   const router = useRouter();
 
-  useEffect(() => {
-    if (!enabled) {
-      return undefined;
-    }
-
-    const intervalId = window.setInterval(() => {
-      router.refresh();
-    }, intervalMs);
-
-    return () => window.clearInterval(intervalId);
-  }, [enabled, intervalMs, router]);
+  useJitteredRouterRefresh(router.refresh, {
+    enabled,
+    intervalMs,
+    jitterMs: PUBLIC_REFRESH_JITTER_MS,
+  });
 
   return (
     <span
       aria-hidden="true"
       data-refresh-enabled={enabled ? "true" : "false"}
       data-refresh-interval-ms={String(intervalMs)}
+      data-refresh-jitter-ms={String(PUBLIC_REFRESH_JITTER_MS)}
       data-testid="room-auto-refresh"
       hidden
     />

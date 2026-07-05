@@ -118,6 +118,36 @@ const EVENT_TABLE_DELETE_BATCHES: readonly (readonly TableName[])[] = [
 const EVENT_LOCK_TTL_MS = 30_000;
 const EVENT_LOCK_TIMEOUT_MS = 35_000;
 const EVENT_LOCK_RETRY_MS = 100;
+const EVENT_SELECT_COLUMNS: Partial<Record<TableName, string>> = {
+  active_voter_presence: "round_number,player_id,device_id,claimed_at,expires_at",
+  admin_actions:
+    "id,admin_session_id,action_type,action_summary,reason,requires_password_reentry,metadata,created_at",
+  ballot_choices: "ballot_id,draw_id,round_set_id,no_bans,banned_chart_ids",
+  ballot_invalidations:
+    "id,round_number,invalidated_at,reason,admin_session_id,ballot_ids,payload",
+  ballot_revisions: "ballot_id,payload",
+  ballots:
+    "id,round_number,player_id,submitted_at,last_revision_at,updated_at,created_at,latest_revision_number,edit_token_hash,override_reason,manual_override,replaced_existing_ballot",
+  chart_exclusions: "chart_id,excluded,reason,updated_at",
+  drawn_charts: "draw_id,chart_id,draw_order",
+  draws:
+    "id,round_set_id,draw_version,eligible_pool_count,eligible_chart_ids,excluded_chart_keys_snapshot,selected_song_keys_snapshot,same_round_blocked_song_keys_snapshot,created_at,superseded_at,reason",
+  event_runtime_state: "current_round,rehearsal_mode",
+  host_locks:
+    "owner_session_id,admin_session_id,host_token_hash,acquired_at,heartbeat_at,expires_at",
+  players:
+    "id,startgg_username,startgg_username_normalized,active,has_tournament_history,created_at,updated_at",
+  result_rows:
+    "result_snapshot_id,draw_id,round_set_id,chart_id,ban_count,reveal_order,is_selected,is_tiebreak_candidate",
+  result_snapshots:
+    "id,round_number,computed_at,eligible_players,reveal_phase,reveal_phase_started_at,final_revealed_at",
+  round_player_eligibility:
+    "player_id,round_number,active_at_round_start,reason,added_at,created_at",
+  tiebreaks:
+    "result_snapshot_id,draw_id,candidate_chart_ids,winner_chart_id,decision_source,winner_reveal_started_at",
+  voting_windows:
+    "round_number,status,eligible_players,opened_at,created_at,closes_at,closed_at,extension_used,final_warning_started_at,paused_at,paused_from_status,remaining_ms_when_paused,remaining_seconds_at_pause,updated_at",
+};
 
 function createNormalizedSupabaseClient() {
   return createServiceRoleSupabaseClient() as unknown as NormalizedOperationalSupabaseClient;
@@ -683,7 +713,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
   private async selectEventRows<TTable extends TableName>(table: TTable) {
     const { data, error } = await this.supabase
       .from(table)
-      .select("*")
+      .select(EVENT_SELECT_COLUMNS[table] ?? "*")
       .eq("event_id", this.eventId);
 
     if (error) {

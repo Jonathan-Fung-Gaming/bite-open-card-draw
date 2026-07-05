@@ -8,6 +8,7 @@ import {
   hydrateTournamentState,
   withPersistedVotingState,
 } from "@/lib/server/persistence";
+import { invalidateTournamentReadCaches } from "@/lib/server/public-hydration-cache";
 import { withNormalizedEventPersistenceLock } from "@/lib/server/normalized-operational-state";
 import { executeNormalizedTransactionalMutation } from "@/lib/server/transactions/normalized-runtime";
 import { isPlayerSubmissionOpen, type VotingWindowRecord } from "@/lib/vote/voting-window";
@@ -144,6 +145,7 @@ export async function advanceVotingTimerIfDue(roundNumber: 1 | 2 | 3 | 4, nowMs:
 }
 
 export function revalidateTournamentViews(revalidatePath: (path: string) => void) {
+  invalidateTournamentReadCaches();
   revalidatePath("/coolguy69");
   revalidatePath("/stage");
   revalidatePath("/vote");

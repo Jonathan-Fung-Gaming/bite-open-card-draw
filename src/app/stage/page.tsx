@@ -8,7 +8,7 @@ import {
   StageSetPanel,
 } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
-import { hydrateTournamentState } from "@/lib/server/persistence";
+import { hydratePublicTournamentState } from "@/lib/server/persistence";
 import { advanceVotingTimerIfDue, getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
@@ -117,7 +117,7 @@ function StageResolvedSetSummary({ set }: { set: ResultSetSnapshot }) {
 }
 
 export default async function StagePage() {
-  await hydrateTournamentState();
+  await hydratePublicTournamentState();
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const serverNowMs = await getAuthoritativeNowMs();

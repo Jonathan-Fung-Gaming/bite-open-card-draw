@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatBallotSaveFailureMessage,
   PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
+  PUBLIC_REFRESH_JITTER_MS,
   shouldShowFinalPhoneResults,
   shouldShowPhoneResultHoldingState,
   STAGE_PUBLIC_REFRESH_INTERVAL_MS,
@@ -56,6 +57,8 @@ describe("phone result display", () => {
     expect(STAGE_PUBLIC_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
     expect(STAGE_REVEAL_REFRESH_INTERVAL_MS).toBeGreaterThan(5_000);
     expect(PUBLIC_INSPECTION_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(10_000);
+    expect(PUBLIC_REFRESH_JITTER_MS).toBeGreaterThanOrEqual(1_000);
+    expect(PUBLIC_REFRESH_JITTER_MS).toBeLessThanOrEqual(5_000);
     expect(VOTER_PRESENCE_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(45_000);
   });
 });

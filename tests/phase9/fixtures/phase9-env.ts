@@ -108,6 +108,10 @@ export async function clickServerAction(
         throw new Error("Target is not a form submit button.");
       }
 
+      if (element.disabled) {
+        throw new Error("Target server action button is disabled.");
+      }
+
       element.form.requestSubmit(element);
     });
   } else {

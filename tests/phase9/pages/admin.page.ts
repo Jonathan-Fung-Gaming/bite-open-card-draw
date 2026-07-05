@@ -56,10 +56,17 @@ function isAdminActionsOnly() {
 }
 
 function isTransientSupabaseFetchFailure(error: unknown) {
-  return (
-    error instanceof Error &&
-    error.message.includes("Supabase rate limit failed: TypeError: fetch failed")
-  );
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return [
+    "Supabase rate limit failed: TypeError: fetch failed",
+    "TypeError: fetch failed",
+    "522",
+    "Connection timed out",
+    "supabase.co",
+  ].some((message) => error.message.includes(message));
 }
 
 export class AdminPage {
@@ -116,6 +123,9 @@ export class AdminPage {
   }
 
   async loginAndTakeHost() {
+    const hostControlObservationTimeoutMs = getSupabaseE2eConfig()
+      ? HOSTED_REFRESH_TIMEOUT_MS
+      : HOSTED_ACTION_TIMEOUT_MS;
     const hostControlIsActive = async () =>
       (await this.page
         .getByText("Host control active", { exact: true })
@@ -141,7 +151,9 @@ export class AdminPage {
         : await this.installSupabaseHostLockForCurrentAdmin();
 
       if (installedSupabaseHost) {
-        await expect(this.page.getByText("Voting Controls")).toBeVisible();
+        await expect(this.page.getByText("Voting Controls")).toBeVisible({
+          timeout: HOSTED_REFRESH_TIMEOUT_MS,
+        });
         return;
       }
 
@@ -190,14 +202,14 @@ export class AdminPage {
 
             return hostControlIsActive();
           },
-          { timeout: HOSTED_ACTION_TIMEOUT_MS },
+          { timeout: hostControlObservationTimeoutMs },
         )
         .toBe(true);
       return;
     }
 
     await expect
-      .poll(async () => hostControlIsActive(), { timeout: HOSTED_ACTION_TIMEOUT_MS })
+      .poll(async () => hostControlIsActive(), { timeout: hostControlObservationTimeoutMs })
       .toBe(true);
   }
 
@@ -455,7 +467,9 @@ export class AdminPage {
           }
 
           return this.page
-            .getByRole("cell", { name: "Rehearsal Player 01", exact: true })
+            .getByTestId("admin-roster-row")
+            .filter({ hasText: "Rehearsal Player 01" })
+            .first()
             .isVisible();
         },
         { timeout: HOSTED_REFRESH_TIMEOUT_MS },
@@ -489,12 +503,21 @@ export class AdminPage {
     const setSection = this.page
       .getByText(`Round ${roundNumber} - Set ${setOrder}`, { exact: true })
       .locator("xpath=ancestor::section[1]");
+    const drawButton = setSection.getByRole("button", { name: "Draw Set" });
+
+    await expect(drawButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 
     await clickServerAction(
       this.page,
-      setSection.getByRole("button", { name: "Draw Set" }),
+      drawButton,
       5_000,
       {
+        postDataIncludes: [
+          "roundNumber",
+          `\r\n${roundNumber}\r\n`,
+          "setOrder",
+          `\r\n${setOrder}\r\n`,
+        ],
         requireServerActionResponse: true,
         responseTimeoutMs: 60_000,
         submitForm: true,
@@ -700,20 +723,24 @@ export class AdminPage {
       has: this.page.getByRole("button", { name: "Force Host Takeover" }),
     });
 
-    await expect(forceHostForm).toHaveCount(1);
+    await expect(forceHostForm).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
     await forceHostForm.getByLabel("Audit reason").fill(reason);
     await forceHostForm.getByLabel("Admin password").fill(ADMIN_PASSWORD);
+    const forceHostButton = forceHostForm.getByRole("button", { name: "Force Host Takeover" });
+
+    await expect(forceHostButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
     await clickServerAction(
       this.page,
-      forceHostForm.getByRole("button", { name: "Force Host Takeover" }),
+      forceHostButton,
       5_000,
       {
+        postDataIncludes: ["forceHostTakeover", reason],
         requireServerActionResponse: true,
         responseTimeoutMs: 60_000,
       },
     );
     await expect(this.page.getByRole("button", { name: "Release" })).toBeEnabled({
-      timeout: HOSTED_ACTION_TIMEOUT_MS,
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
   }
 
@@ -799,23 +826,40 @@ export class AdminPage {
       },
     ]);
 
-    await this.goto();
+    try {
+      await expect
+        .poll(
+          async () => {
+            const visited = await this.visit().catch((error: unknown) => {
+              if (!isTransientSupabaseFetchFailure(error)) {
+                throw error;
+              }
 
-    const releaseEnabled = await this.page
-      .getByRole("button", { name: "Release" })
-      .isEnabled()
-      .catch(() => false);
+              return false;
+            });
 
-    if (!releaseEnabled && getSupabaseE2eConfig()) {
+            if (!visited) {
+              return false;
+            }
+
+            return this.page
+              .getByRole("button", { name: "Release" })
+              .isEnabled()
+              .catch(() => false);
+          },
+          { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+        )
+        .toBe(true);
+
+      return true;
+    } catch (error) {
       const hostCookie = await this.getContextCookie(HOST_TOKEN_COOKIE);
       const hostLockDebug = await getSupabaseHostLockDebug(sessionId, hostToken);
 
       throw new Error(
-        `Installed Supabase host lock for admin session ${sessionId}, but page stayed inactive; hostCookie=${hostCookie ? "present" : "missing"}; hostLock=${JSON.stringify(hostLockDebug)}.`,
+        `Installed Supabase host lock for admin session ${sessionId}, but page stayed inactive; hostCookie=${hostCookie ? "present" : "missing"}; hostLock=${JSON.stringify(hostLockDebug)}; observedError=${error instanceof Error ? error.message : "unknown"}.`,
       );
     }
-
-    return releaseEnabled;
   }
 
   private async getCurrentAdminSessionId() {

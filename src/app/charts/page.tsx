@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PublicResultSummary, RoundHeader } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
-import { hydrateTournamentState } from "@/lib/server/persistence";
+import { hydratePublicTournamentState } from "@/lib/server/persistence";
 import { advanceVotingTimerIfDue, getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView } from "@/lib/stage/stage-view";
 import {
@@ -82,7 +82,7 @@ function chartsStatus(snapshot: VotingRoundSnapshot, drawnSetCount: number) {
 }
 
 export default async function ChartsPage() {
-  await hydrateTournamentState();
+  await hydratePublicTournamentState();
 
   const { currentRound: roundNumber } = adminState.roundStateStore.getSnapshot();
   const nowMs = await getAuthoritativeNowMs();

@@ -22,6 +22,7 @@ import {
   resumeVotingWindowInputSchema,
   submitBallotInputSchema,
 } from "@/lib/server/mutation-contracts";
+import { invalidateTournamentReadCaches } from "@/lib/server/public-hydration-cache";
 import { createServiceRoleSupabaseClient } from "@/lib/server/supabase";
 
 type NormalizedRuntimeRpcName = keyof Database["public"]["Functions"];
@@ -277,6 +278,8 @@ export async function executeNormalizedTransactionalMutation<
       `Normalized runtime mutation ${name} returned a placeholder commit acknowledgement without row changes.`,
     );
   }
+
+  invalidateTournamentReadCaches();
 
   return data;
 }
