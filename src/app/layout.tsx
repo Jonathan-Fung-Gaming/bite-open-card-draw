@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
-const amazdoom = localFont({
-  src: "./fonts/Amazdoomright-o1B0.ttf",
-  variable: "--font-amazdoom",
+const oxanium = localFont({
+  src: "./fonts/Oxanium-Medium.ttf",
+  variable: "--font-oxanium",
   display: "swap",
   fallback: ["Arial", "sans-serif"],
+  weight: "500",
 });
 
 export const metadata: Metadata = {
@@ -24,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={amazdoom.variable}>{children}</body>
+      <body className={oxanium.variable}>{children}</body>
     </html>
   );
 }

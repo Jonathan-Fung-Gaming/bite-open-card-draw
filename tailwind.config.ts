@@ -30,9 +30,9 @@ const config: Config = {
         "ember-tight": "0 0 12px rgba(255, 122, 26, 0.35)",
       },
       fontFamily: {
-        body: ["var(--font-amazdoom)", "Arial", "sans-serif"],
-        display: ["var(--font-amazdoom)", "Arial", "sans-serif"],
-        mono: ["var(--font-amazdoom)", "Arial", "sans-serif"],
+        body: ["var(--font-oxanium)", "Arial", "sans-serif"],
+        display: ["var(--font-oxanium)", "Arial", "sans-serif"],
+        mono: ["var(--font-oxanium)", "Arial", "sans-serif"],
       },
       backgroundImage: {
         "steel-lines":
