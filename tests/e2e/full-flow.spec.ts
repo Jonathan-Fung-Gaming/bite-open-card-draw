@@ -391,18 +391,18 @@ async function expectAdminPanelOpenStatePersists(page: Page, testId: string) {
     .toBe(false);
 }
 
-async function expectAmazdoomFontLoaded(page: Page) {
+async function expectOxaniumFontLoaded(page: Page) {
   const fontState = await page.evaluate(() => {
     const style = window.getComputedStyle(document.body);
 
     return {
       family: style.fontFamily,
-      variable: style.getPropertyValue("--font-amazdoom"),
+      variable: style.getPropertyValue("--font-oxanium"),
     };
   });
 
-  expect(fontState.variable.toLowerCase()).toContain("amazdoom");
-  expect(fontState.family.toLowerCase()).toContain("amazdoom");
+  expect(fontState.variable.toLowerCase()).toContain("oxanium");
+  expect(fontState.family.toLowerCase()).toContain("oxanium");
 }
 
 async function expectDifficultyComparableToTitle(cards: Locator, label: string) {
@@ -1080,7 +1080,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Log In" }));
   await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
-  await expectAmazdoomFontLoaded(page);
+  await expectOxaniumFontLoaded(page);
   await expect(page.getByTestId("admin-host-lock-context")).toContainText("No active host");
   await expect(page.getByTestId("host-heartbeat-confidence")).toContainText("No active heartbeat");
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Take Host Control" }));
