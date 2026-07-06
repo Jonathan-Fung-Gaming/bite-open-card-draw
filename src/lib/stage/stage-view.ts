@@ -1,5 +1,6 @@
 import type { DrawRecord, DrawStateStore } from "@/lib/draw/draw-state";
 import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
+import type { VotingRoundStatus } from "@/lib/vote/voting-window";
 
 export type StageSetView = {
   set: RoundSetDefinition;
@@ -15,6 +16,17 @@ export type StageRoundView = {
 
 export const STAGE_CHART_REVEAL_INTERVAL_MS = 1800;
 export const STAGE_SET_REVEAL_GAP_MS = 900;
+
+const STAGE_RESULT_STATUSES = new Set<VotingRoundStatus>([
+  "results_computed",
+  "results_revealing",
+  "results_revealed",
+  "round_complete",
+]);
+
+export function stageShouldUseResultMode(status: VotingRoundStatus, hasResult: boolean) {
+  return hasResult || STAGE_RESULT_STATUSES.has(status);
+}
 
 export function buildStageRoundView(
   drawStateStore: Pick<DrawStateStore, "getActiveDraw">,

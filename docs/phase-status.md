@@ -15,6 +15,83 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## UX/UI Follow-Up Remediation - Stage Stability, Host Run Controls, Font, And Phone Fit - 2026-07-06
+
+Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not
+change tournament rules, voting logic, result selection, host-lock enforcement, dangerous-action
+confirmation rules, database schema, RPCs, or Supabase migrations.
+
+### Scope
+
+- Stabilized `/stage` so result-status rounds stay in result mode even if result hydration is briefly
+  missing, with a holding shell instead of falling back to draw rows.
+- Reworked `/coolguy69` around one default-open `Host Run Controls` panel for the normal host flow:
+  host control, Set 1/Set 2 draw, voting controls, result computation/reveal, CSV download, stage
+  completion, and next-round advance.
+- Moved recovery/setup/support admin areas behind collapsed panels by default, with persisted
+  open/closed state through auto-refresh.
+- Copied and loaded the attached `Amazdoomright-o1B0.ttf` with `next/font/local`, removed Geist usage,
+  and mapped body/display/mono Tailwind font families to the local Doom font with fallbacks.
+- Compressed `/vote` mobile layout with a dense header, tighter ballot cards, and the required
+  `No bans for this set` option as the eighth grid tile beside the seventh chart.
+- Enlarged difficulty labels in stage reveal/final cards and public/phone result cards so difficulty
+  reads at a comparable weight and scale to chart titles.
+
+### Changed Files
+
+- `src/app/coolguy69/_components/AdminCollapsiblePanel.tsx`
+- `src/app/coolguy69/page.tsx`
+- `src/app/fonts/Amazdoomright-o1B0.ttf`
+- `src/app/globals.css`
+- `src/app/layout.tsx`
+- `src/app/stage/page.tsx`
+- `src/app/vote/BallotFlow.tsx`
+- `src/app/vote/page.tsx`
+- `src/components/PublicResultSummary.tsx`
+- `src/components/ResultSetPanel.tsx`
+- `src/components/StageDrawCard.tsx`
+- `src/lib/stage/stage-view.ts`
+- `src/lib/stage/stage-view.test.ts`
+- `tailwind.config.ts`
+- `tests/e2e/admin-helpers.ts`
+- `tests/e2e/full-flow.spec.ts`
+- `tests/e2e/mobile-routes.spec.ts`
+- `tests/e2e/projector-mobile-evidence.spec.ts`
+- `tests/phase9/pages/admin.page.ts`
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed after rerun; an earlier parallel run raced with `next build`
+  deleting/regenerating `.next/types`.
+- `rtk npm run test` - passed, 57 files / 334 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+
+### Evidence
+
+- Unit coverage now verifies stage result statuses remain in result mode even without a hydrated
+  result snapshot.
+- Full e2e now samples `/stage` during Set 1 counts and Set 1 resolved reveal phases and asserts it
+  never returns to draw mode.
+- Full e2e verifies the new admin run controls order, collapsed secondary/support defaults, persisted
+  panel state across refresh, local Amazdoom font usage, final difficulty/title comparability, and
+  Host Run Controls CSV download.
+- Mobile and projector e2e verify the `/vote` 390px layout has no horizontal overflow, keeps the
+  no-bans tile visible beside the seventh chart, preserves 44px touch targets, and renders with the
+  compressed mobile ballot layout.
+
+### Risks And Assumptions
+
+- Secondary admin tools remain available but are intentionally hidden behind collapsed recovery
+  panels; Playwright helpers now open those panels when tests need rehearsal, manual setup, or
+  recovery controls.
+- The attached font is applied globally, including `font-mono` surfaces. Fallback fonts remain only
+  for unsupported glyphs.
+- The next-round action is surfaced after final public release; it advances the round so the next
+  Set 1/Set 2 draw controls are immediately available, but it does not auto-draw charts.
+- No database schema, RPC, or Supabase migration changed in this phase.
+
 ## UX/UI Tournament Readiness Phase 5 - Admin Secondary Panels, Host Lock, Counts, And Data Exposure - 2026-07-05
 
 Status: complete for local source, unit, build, and browser evidence. This phase did not change

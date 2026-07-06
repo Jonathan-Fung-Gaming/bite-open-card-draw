@@ -54,6 +54,7 @@ import {
   updateChartExclusionAction,
 } from "./actions";
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
+import { AdminCollapsiblePanel } from "./_components/AdminCollapsiblePanel";
 import { AdminLiveRefresh } from "./_components/AdminLiveRefresh";
 import { AdminLiveCountsDisclosure } from "./_components/AdminLiveCountsDisclosure";
 import { AdminSessionHeartbeat } from "./_components/AdminSessionHeartbeat";
@@ -217,7 +218,10 @@ function RerollOneChartConfirmation({
   const detailId = `reroll-chart-${set.roundNumber}-${set.setOrder}-${index}`;
 
   return (
-    <details className="rounded border border-metal-700 bg-black/20 p-2">
+    <details
+      className="rounded border border-metal-700 bg-black/20 p-2"
+      data-testid="admin-chart-reroll-panel"
+    >
       <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-ember-300">
         Reroll chart
       </summary>
@@ -523,39 +527,47 @@ function HostControlPanel({
       />
       <div className="mt-4 flex flex-wrap gap-2">
         {hostStatus === "readonly" ? (
-          <form action={takeHostControlAction} className="grid gap-3">
-            <input type="hidden" name="forceHostTakeover" value="true" />
-            <DangerousActionDialog
-              action="force takeover of the active host lock"
-              consequence="make this browser the active host and put other admin browsers in read-only mode"
-              disabled={false}
-              passwordId="force-host-takeover-password"
-            >
-              <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
-                Another admin has an unexpired host lock. Force takeover only if that host is
-                unavailable or explicitly handed control to you.
-              </p>
-              <label
-                className="mt-4 block text-sm font-semibold text-metal-300"
-                htmlFor="forceHostTakeoverReason"
+          <details
+            className="w-full rounded border border-metal-700 bg-black/20 p-3"
+            data-testid="admin-force-host-takeover-panel"
+          >
+            <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
+              Force host takeover
+            </summary>
+            <form action={takeHostControlAction} className="mt-3 grid gap-3">
+              <input type="hidden" name="forceHostTakeover" value="true" />
+              <DangerousActionDialog
+                action="force takeover of the active host lock"
+                consequence="make this browser the active host and put other admin browsers in read-only mode"
+                disabled={false}
+                passwordId="force-host-takeover-password"
               >
-                Audit reason
-              </label>
-              <textarea
-                id="forceHostTakeoverReason"
-                name="reason"
-                required
-                rows={3}
-                className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-              />
-            </DangerousActionDialog>
-            <button
-              className="rounded border border-ember-300/40 px-4 py-2 font-bold uppercase text-ember-300"
-              type="submit"
-            >
-              Force Host Takeover
-            </button>
-          </form>
+                <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
+                  Another admin has an unexpired host lock. Force takeover only if that host is
+                  unavailable or explicitly handed control to you.
+                </p>
+                <label
+                  className="mt-4 block text-sm font-semibold text-metal-300"
+                  htmlFor="forceHostTakeoverReason"
+                >
+                  Audit reason
+                </label>
+                <textarea
+                  id="forceHostTakeoverReason"
+                  name="reason"
+                  required
+                  rows={3}
+                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                />
+              </DangerousActionDialog>
+              <button
+                className="rounded border border-ember-300/40 px-4 py-2 font-bold uppercase text-ember-300"
+                type="submit"
+              >
+                Force Host Takeover
+              </button>
+            </form>
+          </details>
         ) : (
           <form action={takeHostControlAction}>
             <button
@@ -700,13 +712,222 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </section>
           ) : null}
           <div className="order-1">
-            <HostControlPanel
-              canControl={canControl}
-              currentSessionId={session.sessionId}
-              hostSnapshot={hostSnapshot}
-              serverNowMs={nowMs}
-            />
+            <AdminCollapsiblePanel
+              defaultOpen
+              eyebrow="Event-Day Flow"
+              id="host-run-controls"
+              summary={`Round ${currentRoundNumber} - ${votingSnapshot.status.replaceAll("_", " ")}`}
+              testId="admin-host-run-controls"
+              title="Host Run Controls"
+            >
+              <div className="grid gap-4">
+                <HostControlPanel
+                  canControl={canControl}
+                  currentSessionId={session.sessionId}
+                  hostSnapshot={hostSnapshot}
+                  serverNowMs={nowMs}
+                />
+                <section className="rounded border border-metal-700 bg-black/20 p-3">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-ember-300">
+                        Current Round
+                      </p>
+                      <h3 className="mt-1 text-2xl font-black uppercase text-white">
+                        Draw Cards
+                      </h3>
+                    </div>
+                    <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                      {currentRoundDrawnCount} / 2 drawn
+                    </p>
+                  </div>
+                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                    {currentRoundDrawControls.map((control) => (
+                      <DrawControlCard
+                        key={`run-${control.set.displayLabel}`}
+                        canControl={canControl}
+                        control={control}
+                        includeRerollControls={false}
+                      />
+                    ))}
+                  </div>
+                </section>
+                <section className="rounded border border-metal-700 bg-black/20 p-3">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-ember-300">
+                        Voting Controls
+                      </p>
+                      <h3 className="mt-1 text-2xl font-black uppercase text-white">
+                        Start And Monitor Voting
+                      </h3>
+                    </div>
+                    <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                      {votingSnapshot.status.replaceAll("_", " ")}
+                    </p>
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <div className="rounded border border-metal-700 bg-black/25 p-3">
+                      <p className="text-xs uppercase text-ember-300">Timer</p>
+                      <p className="mt-1 font-mono text-3xl font-black tabular-nums text-white">
+                        {formatVotingTime(votingSnapshot.remainingMs)}
+                      </p>
+                    </div>
+                    <div className="rounded border border-metal-700 bg-black/25 p-3">
+                      <p className="text-xs uppercase text-ember-300">Ballots</p>
+                      <p className="mt-1 text-3xl font-black text-white">
+                        {votingSnapshot.submittedCount} / {votingSnapshot.eligibleCount}
+                      </p>
+                    </div>
+                    <div className="rounded border border-metal-700 bg-black/25 p-3">
+                      <p className="text-xs uppercase text-ember-300">Ban selections</p>
+                      <p className="mt-1 text-3xl font-black text-white">
+                        {votingSnapshot.banSelectionsCast}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <AdminActionButton
+                      action={openVotingAction}
+                      className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                      disabled={!canControl || !votingSnapshot.canOpen}
+                      fields={{ roundNumber: currentRoundNumber }}
+                    >
+                      Open Voting
+                    </AdminActionButton>
+                    <AdminActionButton
+                      action={pauseVotingAction}
+                      className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
+                      disabled={!canControl || !votingSnapshot.canPause}
+                      fields={{ roundNumber: currentRoundNumber }}
+                    >
+                      Pause
+                    </AdminActionButton>
+                    <AdminActionButton
+                      action={resumeVotingAction}
+                      className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
+                      disabled={!canControl || !votingSnapshot.canResume}
+                      fields={{ roundNumber: currentRoundNumber }}
+                    >
+                      Resume
+                    </AdminActionButton>
+                    <AdminActionButton
+                      action={closeVotingAction}
+                      className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                      disabled={!canControl || !votingSnapshot.canClose}
+                      fields={{ roundNumber: currentRoundNumber }}
+                    >
+                      Close Voting
+                    </AdminActionButton>
+                  </div>
+                </section>
+                <section className="rounded border border-metal-700 bg-black/20 p-3">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-ember-300">
+                        Result Reveal Controls
+                      </p>
+                      <h3 className="mt-1 text-2xl font-black uppercase text-white">
+                        Calculate And Reveal Results
+                      </h3>
+                    </div>
+                    <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                      {result?.revealPhase.replaceAll("_", " ") ?? "not computed"}
+                    </p>
+                  </div>
+                  <div className="mt-3 grid gap-2 rounded border border-metal-700 bg-black/25 p-3 text-sm md:grid-cols-2">
+                    <p className="text-metal-300">
+                      Current phase:{" "}
+                      <span className="font-bold text-white">
+                        {revealPhaseLabel(result?.revealPhase)}
+                      </span>
+                    </p>
+                    <p className="text-metal-300">
+                      Next action:{" "}
+                      <span className="font-bold text-ember-300">
+                        {nextRevealActionLabel(result?.revealPhase)}
+                      </span>
+                    </p>
+                    {finalStageShown ? (
+                      <p className="text-metal-300 md:col-span-2">
+                        Public release:{" "}
+                        <span className="font-bold text-ember-300">
+                          {finalResultsReleased
+                            ? "Phones and results released"
+                            : "Holding phones until stage completion is confirmed"}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <AdminActionButton
+                      action={computeResultsAction}
+                      className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                      disabled={
+                        !canControl || votingSnapshot.status !== "voting_closed" || Boolean(result)
+                      }
+                      fields={{ roundNumber: currentRoundNumber }}
+                    >
+                      Compute Results
+                    </AdminActionButton>
+                    <AdminActionButton
+                      action={advanceResultRevealAction}
+                      className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                      disabled={!canControl || !result || result.revealPhase === "final"}
+                      fields={{ roundNumber: currentRoundNumber }}
+                    >
+                      {nextRevealActionLabel(result?.revealPhase)}
+                    </AdminActionButton>
+                    <AdminActionButton
+                      action={releaseFinalResultsAction}
+                      className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                      disabled={!canControl || !finalStageAwaitingPublicRelease}
+                      fields={{ roundNumber: currentRoundNumber }}
+                    >
+                      Confirm Stage Reveal Complete
+                    </AdminActionButton>
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <PrivateCsvDownload
+                      roundNumber={currentRoundNumber}
+                      enabled={canControl && finalResultsReleased}
+                      disabledReason={
+                        !canControl
+                          ? "Take host control to download the private ballot CSV."
+                          : "Available after the stage final reveal is confirmed and public results are released."
+                      }
+                      autoDownloadKey={
+                        finalResultsReleased && result?.finalRevealedAt
+                          ? `${result.id}:${result.finalRevealedAt}`
+                          : null
+                      }
+                      action={downloadPrivateCsvAction}
+                    />
+                    <form action={advanceCurrentRoundAction}>
+                      <button
+                        className="button-metal h-full min-h-12 w-full rounded px-4 py-3 text-sm font-black uppercase disabled:opacity-40"
+                        disabled={!canControl || !finalResultsReleased || currentRoundNumber === 4}
+                        type="submit"
+                      >
+                        {currentRoundNumber === 4
+                          ? "Final Round Complete"
+                          : `Advance To Round ${currentRoundNumber + 1}`}
+                      </button>
+                    </form>
+                  </div>
+                </section>
+              </div>
+            </AdminCollapsiblePanel>
           </div>
+          <div className="order-20">
+            <AdminCollapsiblePanel
+              eyebrow="Recovery And Setup"
+              id="admin-secondary-panels"
+              summary="Roster, chart eligibility, manual corrections, emergency controls, and setup details."
+              testId="admin-secondary-panels"
+              title="Secondary Admin Panels"
+            >
+              <div className="grid gap-5">
           <section className="metal-panel order-2 rounded-lg p-4" data-testid="admin-readiness">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -853,6 +1074,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             {deploymentSafety.rehearsalAdminControlsAllowed ? (
               <details
                 className="mt-4 rounded border border-metal-700 bg-black/20 p-3"
+                data-testid="admin-rehearsal-controls"
                 open={roundSnapshot.rehearsalMode}
               >
                 <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
@@ -1285,11 +1507,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     ? "Take host control to download the private ballot CSV."
                     : "Available after the stage final reveal is confirmed and public results are released."
                 }
-                autoDownloadKey={
-                  finalResultsReleased && result?.finalRevealedAt
-                    ? `${result.id}:${result.finalRevealedAt}`
-                    : null
-                }
+                autoDownloadKey={null}
                 action={downloadPrivateCsvAction}
               />
             </div>
@@ -1731,8 +1949,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
             </div>
           </section>
+              </div>
+            </AdminCollapsiblePanel>
+          </div>
         </div>
         <aside className="grid min-w-0 content-start gap-5">
+          <AdminCollapsiblePanel
+            eyebrow="Operator Support"
+            id="admin-support-panels"
+            summary="Session, audit, debug snapshot, and emergency current-round eligibility."
+            testId="admin-support-panels"
+            title="Support Panels"
+          >
+            <div className="grid gap-5">
           <section className="metal-panel rounded-lg p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
               Session
@@ -1834,6 +2063,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </button>
             </DangerousActionDialog>
           </form>
+            </div>
+          </AdminCollapsiblePanel>
         </aside>
       </section>
     </AdminLayout>

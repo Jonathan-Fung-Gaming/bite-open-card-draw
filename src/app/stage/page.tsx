@@ -10,7 +10,7 @@ import {
 import { adminState } from "@/lib/server/admin-state";
 import { hydratePublicTournamentState } from "@/lib/server/persistence";
 import { advanceVotingTimerIfDue, getVotingRoundSnapshot } from "@/lib/server/voting-round";
-import { buildStageRoundView } from "@/lib/stage/stage-view";
+import { buildStageRoundView, stageShouldUseResultMode } from "@/lib/stage/stage-view";
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import {
@@ -116,6 +116,38 @@ function StageResolvedSetSummary({ set }: { set: ResultSetSnapshot }) {
   );
 }
 
+function StageResultModeHolding({ roundNumber, status }: { roundNumber: number; status: string }) {
+  return (
+    <>
+      <StageAutoRefresh intervalMs={STAGE_REVEAL_REFRESH_INTERVAL_MS} />
+      <main className="min-h-screen" data-testid="stage-result-mode-holding">
+        <RoundHeader
+          title={`Round ${roundNumber} Results Reveal`}
+          status="Awaiting result state"
+          compact
+        />
+        <section className="grid min-h-[calc(100vh-96px)] place-items-center px-5 py-4 lg:px-8">
+          <div className="metal-panel w-full max-w-3xl rounded-lg p-6 text-center">
+            <p className="text-sm font-semibold uppercase text-ember-300">
+              Result reveal in progress
+            </p>
+            <h1 className="mt-3 text-4xl font-black uppercase text-white">
+              Holding Stage Screen
+            </h1>
+            <p className="mt-3 text-lg font-bold text-metal-300">
+              The round has moved past voting into results. Waiting for the latest result snapshot
+              before showing the next reveal step.
+            </p>
+            <p className="mt-4 rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+              {status.replaceAll("_", " ")}
+            </p>
+          </div>
+        </section>
+      </main>
+    </>
+  );
+}
+
 export default async function StagePage() {
   await hydratePublicTournamentState();
 
@@ -125,8 +157,13 @@ export default async function StagePage() {
   const view = buildStageRoundView(adminState.drawStateStore, roundNumber);
   const snapshot = getVotingRoundSnapshot(roundNumber, serverNowMs);
   const result = adminState.resultStore.getRoundResult(roundNumber);
+  const useResultMode = stageShouldUseResultMode(snapshot.status, Boolean(result));
 
-  if (result) {
+  if (useResultMode) {
+    if (!result) {
+      return <StageResultModeHolding roundNumber={roundNumber} status={snapshot.status} />;
+    }
+
     const [setOne, setTwo] = result.sets;
 
     if (result.revealPhase === "final") {
@@ -147,10 +184,10 @@ export default async function StagePage() {
                 {result.sets.map((set, index) => (
                   <section key={set.roundSetId} className="grid content-stretch gap-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-black uppercase tracking-[0.2em] text-ember-300">
+                      <p className="text-sm font-black uppercase text-ember-300">
                         Set {set.setOrder} - {set.displayLabel}
                       </p>
-                      <p className="font-mono text-sm font-black text-metal-300">
+                      <p className="text-2xl font-black uppercase leading-none text-ember-300">
                         {set.selectedChart.displayDifficulty}
                       </p>
                     </div>

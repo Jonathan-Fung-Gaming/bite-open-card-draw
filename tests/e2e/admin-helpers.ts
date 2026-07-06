@@ -87,8 +87,22 @@ export async function clickAdminActionAndWait(page: Page, button: Locator) {
   await throwIfAdminError(page);
 }
 
+export async function openAdminPanel(page: Page, testId: string) {
+  const panel = page.getByTestId(testId);
+
+  await expect(panel).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+
+  const isOpen = await panel.evaluate((element) => (element as HTMLDetailsElement).open);
+
+  if (!isOpen) {
+    await panel.locator("summary").first().click();
+  }
+}
+
 export async function openRehearsalControls(page: Page) {
-  const details = page.locator("details", { hasText: "Rehearsal controls" }).first();
+  await openAdminPanel(page, "admin-secondary-panels");
+
+  const details = page.getByTestId("admin-rehearsal-controls");
 
   await expect(details).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
 
@@ -117,7 +131,9 @@ async function waitForActiveHost(page: Page, timeout = HOSTED_REFRESH_TIMEOUT_MS
         timeout,
       })
       .toBe(true);
-    await expect(page.getByText("Voting Controls")).toBeVisible();
+    await expect(
+      page.getByTestId("admin-host-run-controls").getByText("Voting Controls").first(),
+    ).toBeVisible();
     await throwIfAdminError(page);
     return true;
   } catch {
@@ -133,10 +149,33 @@ async function submitHostRequest(page: Page, takeoverReason: string) {
     return;
   }
 
-  const forceHostButton = page.getByRole("button", { name: "Force Host Takeover" });
-  const forceHostForm = page.locator("form", { has: forceHostButton });
+  if (await releaseButtonIsEnabled(page)) {
+    return;
+  }
+
+  const forceHostDetails = page.getByTestId("admin-force-host-takeover-panel");
+
+  await expect(forceHostDetails).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+
+  const isOpen = await forceHostDetails.evaluate(
+    (element) => (element as HTMLDetailsElement).open,
+  );
+
+  if (!isOpen) {
+    await forceHostDetails.locator("summary").first().click();
+  }
+
+  await expect
+    .poll(async () =>
+      forceHostDetails.evaluate((element) => (element as HTMLDetailsElement).open),
+    )
+    .toBe(true);
+
+  const forceHostButton = forceHostDetails.getByRole("button", { name: "Force Host Takeover" });
+  const forceHostForm = forceHostDetails.locator("form").first();
 
   await expect(forceHostButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect(forceHostForm).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await forceHostForm.getByLabel("Audit reason").fill(takeoverReason);
   await forceHostForm.getByLabel("Admin password").fill(getAdminPassword());
   await clickAdminActionAndWait(page, forceHostButton);
