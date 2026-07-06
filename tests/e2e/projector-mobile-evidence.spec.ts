@@ -151,14 +151,11 @@ async function expectTextReadable(locator: Locator, minimumFontSizePx: number, l
 async function expectStageCardTextReadable(page: Page) {
   const titles = page.getByTestId("stage-chart-title");
   const artists = page.getByTestId("stage-chart-artist");
-  const difficulties = page.getByTestId("stage-chart-difficulty");
 
   await expect(titles).toHaveCount(14);
   await expect(artists).toHaveCount(14);
-  await expect(difficulties).toHaveCount(14);
   await expectTextReadable(titles, STAGE_TITLE_MIN_FONT_SIZE_PX, "stage title");
   await expectTextReadable(artists, STAGE_SECONDARY_MIN_FONT_SIZE_PX, "stage artist");
-  await expectTextReadable(difficulties, STAGE_SECONDARY_MIN_FONT_SIZE_PX, "stage difficulty");
 }
 
 async function collectStageViewportGeometry(page: Page) {

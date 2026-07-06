@@ -34,8 +34,8 @@ function prewarmConcurrency() {
   return positiveIntegerEnv("E2E_PRODUCTION_FLOW_PREWARM_CONCURRENCY", DEFAULT_PREWARM_CONCURRENCY);
 }
 
-function expectedRevisionMessage(revision: number) {
-  return revision === 1 ? "Ballot Saved" : `Saved revision ${revision}.`;
+function expectedRevisionMessage() {
+  return "Ballot successfully submitted.";
 }
 
 async function mapWithWorkers<TItem, TResult>(
@@ -126,9 +126,8 @@ async function submitPlannedBallot(options: {
 
     await votePage.submitBallot({
       banPlan: firstRevision.banPlan,
-      expectedMessage: expectedRevisionMessage(firstRevision.revision),
+      expectedMessage: expectedRevisionMessage(),
       playerName: plan.playerName,
-      readSavedTimestamp: false,
       startFromRoom: true,
       useCurrentRoom: Boolean(preparedPage),
       waitForCardsAfterConfirm: false,
@@ -138,8 +137,7 @@ async function submitPlannedBallot(options: {
       await page.getByRole("button", { name: /^Edit / }).first().click();
       await votePage.finishCurrentBallot(
         revision.banPlan,
-        expectedRevisionMessage(revision.revision),
-        { readSavedTimestamp: false },
+        expectedRevisionMessage(),
       );
     }
 

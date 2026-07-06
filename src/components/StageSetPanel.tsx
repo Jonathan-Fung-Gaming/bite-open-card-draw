@@ -124,7 +124,6 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
           <StageDrawCard
             key={`stage-${set.roundNumber}-${set.setOrder}-${index}`}
             chart={chart ?? undefined}
-            index={index + 1}
           />
         ))}
       </div>

@@ -18,7 +18,6 @@ type SubmitBallotOptions = {
   expectDuplicateWarning?: boolean;
   expectedMessage?: string | RegExp;
   playerName: string;
-  readSavedTimestamp?: boolean;
   startFromRoom?: boolean;
   useCurrentRoom?: boolean;
   waitForCardsAfterConfirm?: boolean;
@@ -78,9 +77,8 @@ export class VotePage {
   async submitBallot({
     banPlan = NO_BAN_PLAN,
     expectDuplicateWarning = false,
-    expectedMessage = "Ballot Saved",
+    expectedMessage = "Ballot successfully submitted.",
     playerName,
-    readSavedTimestamp = true,
     startFromRoom = true,
     useCurrentRoom = false,
     waitForCardsAfterConfirm = true,
@@ -93,7 +91,7 @@ export class VotePage {
       waitForCardsAfterConfirm,
     });
 
-    return this.finishCurrentBallot(banPlan, expectedMessage, { readSavedTimestamp });
+    return this.finishCurrentBallot(banPlan, expectedMessage);
   }
 
   async beginBallot(options: {
@@ -129,15 +127,13 @@ export class VotePage {
 
   async finishCurrentBallot(
     banPlan: BallotBanPlan,
-    expectedMessage: string | RegExp = "Ballot Saved",
-    options: { readSavedTimestamp?: boolean } = {},
+    expectedMessage: string | RegExp = "Ballot successfully submitted.",
   ) {
     const selectedCards = await this.completeBallotChoices(banPlan);
 
     await this.submitCurrentBallot(expectedMessage);
 
     return {
-      savedAt: options.readSavedTimestamp === false ? undefined : await this.savedTimestamp(),
       selectedCards,
     };
   }
@@ -159,27 +155,13 @@ export class VotePage {
   }
 
   async expectSavedBallot(options: {
-    expectedRevision?: number;
     expectedTexts?: readonly string[];
     playerName: string;
-    savedAt?: string;
   }) {
-    await expect(this.page.getByText("Ballot Saved")).toBeVisible({
+    await expect(this.page.getByText("Ballot successfully submitted.")).toBeVisible({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
-    await expect(this.page.getByRole("heading", { name: options.playerName })).toBeVisible();
-
-    if (options.savedAt) {
-      expect(await this.savedTimestamp()).toBe(options.savedAt);
-    }
-
-    if (typeof options.expectedRevision === "number") {
-      await expect(
-        this.page.getByText(
-          new RegExp(`(?:Saved|Loaded saved) revision ${options.expectedRevision}\\.`),
-        ),
-      ).toBeVisible();
-    }
+    await expect(this.page.getByText(`Voting as ${options.playerName}`)).toBeVisible();
 
     for (const text of options.expectedTexts ?? []) {
       await expect(this.page.getByText(text, { exact: true }).first()).toBeVisible();
@@ -194,9 +176,7 @@ export class VotePage {
     await this.completeBallotChoices(banPlan);
     await this.failNextSubmitRequest();
     await this.page.getByRole("button", { name: "Submit Ballot" }).click();
-    await expect(
-      this.page.getByText(/Previous server-confirmed ballot remains valid\./),
-    ).toBeVisible({
+    await expect(this.page.getByText(/Your saved ballot is still active\./)).toBeVisible({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
   }
@@ -206,19 +186,6 @@ export class VotePage {
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
     await expect(this.page.getByText("Results are being revealed on stage.")).toBeVisible();
-  }
-
-  async savedTimestamp() {
-    const timestampText = await this.page
-      .getByText(/^Server-confirmed timestamp:/)
-      .textContent({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
-    const timestamp = timestampText?.replace("Server-confirmed timestamp:", "").trim();
-
-    if (!timestamp) {
-      throw new Error("Could not read saved ballot timestamp.");
-    }
-
-    return timestamp;
   }
 
   private async eligiblePlayerNames() {

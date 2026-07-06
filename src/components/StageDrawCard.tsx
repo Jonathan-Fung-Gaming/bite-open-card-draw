@@ -5,11 +5,10 @@ import { ChartArtImage } from "./ChartArtImage";
 
 type StageDrawCardProps = {
   chart?: DrawnChartSummary;
-  index: number;
   variant?: "standard" | "featured";
 };
 
-export function StageDrawCard({ chart, index, variant = "standard" }: StageDrawCardProps) {
+export function StageDrawCard({ chart, variant = "standard" }: StageDrawCardProps) {
   const featured = variant === "featured";
 
   return (
@@ -42,18 +41,7 @@ export function StageDrawCard({ chart, index, variant = "standard" }: StageDrawC
             : "min-h-[clamp(5.625rem,12.5vh,9.25rem)] p-2.5 2xl:min-h-44 2xl:p-3",
         )}
       >
-        <div className="flex items-start justify-between gap-2 font-black uppercase text-ember-300">
-          <span
-            className={clsx(
-              "leading-none",
-              featured ? "text-4xl xl:text-5xl" : "text-sm lg:text-base 2xl:text-lg",
-            )}
-            data-testid="stage-chart-difficulty"
-          >
-            {chart?.displayDifficulty ?? "LOCKED"}
-          </span>
-          <span className="font-mono text-xs">{String(index).padStart(2, "0")}</span>
-        </div>
+        <div className={featured ? "min-h-6" : "min-h-3"} />
         <div>
           <h3
             className={clsx(

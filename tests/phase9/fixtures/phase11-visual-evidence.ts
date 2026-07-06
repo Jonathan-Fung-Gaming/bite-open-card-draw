@@ -321,22 +321,15 @@ async function collectReadableTextEvidence(
 async function collectStageTextEvidence(page: Page) {
   const titles = page.getByTestId("stage-chart-title");
   const artists = page.getByTestId("stage-chart-artist");
-  const difficulties = page.getByTestId("stage-chart-difficulty");
 
   await expect(titles).toHaveCount(14);
   await expect(artists).toHaveCount(14);
-  await expect(difficulties).toHaveCount(14);
 
   return {
     artists: await collectReadableTextEvidence(
       artists,
       STAGE_SECONDARY_MIN_FONT_SIZE_PX,
       "stage artist",
-    ),
-    difficulties: await collectReadableTextEvidence(
-      difficulties,
-      STAGE_SECONDARY_MIN_FONT_SIZE_PX,
-      "stage difficulty",
     ),
     titles: await collectReadableTextEvidence(titles, STAGE_TITLE_MIN_FONT_SIZE_PX, "stage title"),
   };

@@ -111,7 +111,7 @@ function StageResolvedSetSummary({ set }: { set: ResultSetSnapshot }) {
         </p>
       </div>
       <div className="max-w-sm">
-        <StageDrawCard chart={set.selectedChart} index={set.setOrder} />
+        <StageDrawCard chart={set.selectedChart} />
       </div>
     </section>
   );
@@ -183,7 +183,7 @@ export default async function StagePage() {
                   className="grid min-h-[calc(100vh-220px)] gap-6 md:grid-cols-2"
                   data-testid="stage-final-chart-list"
                 >
-                  {result.sets.map((set, index) => (
+                  {result.sets.map((set) => (
                     <section key={set.roundSetId} className="grid content-stretch gap-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-black uppercase text-ember-300">
@@ -193,11 +193,7 @@ export default async function StagePage() {
                           {set.selectedChart.displayDifficulty}
                         </p>
                       </div>
-                      <StageDrawCard
-                        chart={set.selectedChart}
-                        index={index + 1}
-                        variant="featured"
-                      />
+                      <StageDrawCard chart={set.selectedChart} variant="featured" />
                     </section>
                   ))}
                 </div>

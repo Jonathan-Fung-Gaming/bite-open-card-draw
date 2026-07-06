@@ -9,7 +9,7 @@ export const STAGE_REVEAL_REFRESH_INTERVAL_MS = 5_500;
 export const PUBLIC_INSPECTION_REFRESH_INTERVAL_MS = 10_000;
 export const PUBLIC_REFRESH_JITTER_MS = 2_000;
 
-const SAVE_FAILURE_REASSURANCE = "Previous server-confirmed ballot remains valid.";
+const SAVE_FAILURE_REASSURANCE = "Your saved ballot is still active.";
 
 export function shouldShowFinalPhoneResults(
   status: VotingRoundStatus,
