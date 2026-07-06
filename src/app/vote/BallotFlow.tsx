@@ -752,12 +752,12 @@ export function BallotFlow({
 
   const identityCorrection =
     selectedPlayer && !savedAt && !alreadySubmitted && !existingBallot ? (
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded border border-metal-700 bg-black/25 p-3">
-        <p className="text-sm font-bold text-metal-300">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded border border-metal-700 bg-black/25 p-2">
+        <p className="text-xs font-bold text-metal-300 sm:text-sm">
           Voting as <span className="text-white">{selectedPlayer.startggUsername}</span>
         </p>
         <button
-          className="min-h-11 rounded border border-ember-300/35 px-4 py-3 text-sm font-black uppercase text-ember-300"
+          className="min-h-9 rounded border border-ember-300/35 px-3 py-2 text-xs font-black uppercase text-ember-300"
           onClick={changeUsernameBeforeSubmit}
           type="button"
         >
@@ -1046,11 +1046,23 @@ export function BallotFlow({
   }
 
   return (
-    <section className="metal-panel rounded-lg p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-        Step {step + 1}: Set {step + 1}
-      </p>
-      <h1 className="mt-2 text-3xl font-black uppercase text-white">{currentDraw?.displayLabel}</h1>
+    <section className="metal-panel rounded-lg p-2 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase text-ember-300">
+            Step {step + 1}: Set {step + 1}
+          </p>
+          <h1 className="mt-0.5 truncate text-xl font-black uppercase text-white sm:mt-1 sm:text-3xl">
+            {currentDraw?.displayLabel}
+          </h1>
+        </div>
+        <p
+          className="shrink-0 rounded border border-metal-700 bg-black/25 px-2 py-1.5 text-xs font-black uppercase text-white sm:px-3 sm:py-2 sm:text-sm"
+          data-testid="ban-selection-counter"
+        >
+          {currentChoice?.bannedChartIds.length ?? 0}/2 bans selected
+        </p>
+      </div>
       {identityCorrection}
       {presenceWarningBanner}
       {editingServerConfirmedBallot ? (
@@ -1063,14 +1075,6 @@ export function BallotFlow({
           save succeeds.
         </p>
       ) : null}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-metal-700 bg-black/25 p-3">
-        <p className="text-sm font-black uppercase text-white" data-testid="ban-selection-counter">
-          {currentChoice?.bannedChartIds.length ?? 0}/2 bans selected
-        </p>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-metal-300">
-          Choose up to two charts or explicit no-bans
-        </p>
-      </div>
       {selectionMessage ? (
         <p
           className="mt-3 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300"
@@ -1085,42 +1089,8 @@ export function BallotFlow({
           {changesUnavailableCopy}
         </p>
       ) : null}
-      <label
-        className={clsx(
-          "mt-4 flex min-h-16 items-center gap-3 rounded border p-4 text-base font-black text-white",
-          currentChoice?.noBans
-            ? "border-ember-300 bg-ember-900/35 shadow-ember-tight"
-            : "border-ember-300/35 bg-black/25",
-        )}
-        data-testid="no-bans-choice"
-      >
-        <input
-          className="h-6 w-6 accent-[#ffb95c]"
-          type="checkbox"
-          checked={currentChoice?.noBans ?? false}
-          disabled={!liveCanSubmit}
-          onChange={(event) => {
-            if (!currentChoice) {
-              return;
-            }
-
-            setSelectionMessage(null);
-            updateChoice({
-              ...currentChoice,
-              noBans: event.target.checked,
-              bannedChartIds: [],
-            });
-          }}
-        />
-        <span>
-          <span className="block uppercase">No bans for this set</span>
-          <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.14em] text-metal-300">
-            Explicit zero-ban choice
-          </span>
-        </span>
-      </label>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        {currentDraw?.charts.map((chart, index) => {
+      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:mt-3 sm:gap-3">
+        {currentDraw?.charts.map((chart) => {
           const selected = currentChoice?.bannedChartIds.includes(chart.id) ?? false;
           const imagePath = chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH;
 
@@ -1134,7 +1104,6 @@ export function BallotFlow({
                 selected
                   ? "border-ember-300 shadow-ember-tight"
                   : "border-metal-700 bg-black/25",
-                index === 6 ? "col-span-2 mx-auto w-[calc((100%_-_0.75rem)/2)] min-w-0" : "",
               )}
               data-chart-image-path={imagePath}
               data-chart-id={chart.id}
@@ -1145,7 +1114,7 @@ export function BallotFlow({
               type="button"
             >
               <span className="block">
-                <span className="relative block aspect-[4/3] overflow-hidden border-b border-ember-300/15 bg-black/35">
+                <span className="relative block h-8 overflow-hidden border-b border-ember-300/15 bg-black/35 sm:h-auto sm:aspect-[4/3]">
                   <ChartArtImage
                     src={imagePath}
                     className="h-full w-full object-contain opacity-95"
@@ -1155,12 +1124,12 @@ export function BallotFlow({
                     <span className="absolute inset-0 border-2 border-ember-300/80" />
                   ) : null}
                 </span>
-                <span className="flex min-h-28 flex-col justify-between p-3">
-                  <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.14em] text-ember-300">
+                <span className="flex min-h-12 flex-col justify-between p-1.5 sm:min-h-28 sm:p-3">
+                  <span className="flex items-center justify-between gap-1 text-[10px] font-bold uppercase text-ember-300 sm:gap-2 sm:text-xs">
                     <span>{chart.displayDifficulty}</span>
                     <span
                       className={clsx(
-                        "rounded border px-2 py-1 font-black tracking-normal",
+                        "rounded border px-1 py-0.5 font-black sm:px-1.5",
                         selected
                           ? "border-ember-300 bg-ember-900/45 text-white"
                           : "border-metal-700 bg-black/35 text-metal-300",
@@ -1171,10 +1140,10 @@ export function BallotFlow({
                     </span>
                   </span>
                   <span>
-                    <span className="mt-3 block break-words text-sm font-black uppercase leading-tight text-white line-clamp-3 sm:text-base">
+                    <span className="mt-1 block break-words text-[10px] font-black uppercase leading-tight text-white line-clamp-1 sm:mt-1.5 sm:text-base sm:line-clamp-3">
                       {chart.name}
                     </span>
-                    <span className="mt-1 block break-words text-xs text-metal-300 line-clamp-2 sm:text-sm">
+                    <span className="mt-0.5 hidden break-words text-[10px] text-metal-300 line-clamp-1 sm:block sm:text-sm sm:line-clamp-2">
                       {chart.artist}
                     </span>
                   </span>
@@ -1183,10 +1152,44 @@ export function BallotFlow({
             </button>
           );
         })}
+        <label
+          className={clsx(
+            "flex min-h-20 items-center gap-2 rounded border p-2 text-xs font-black text-white sm:min-h-[11rem] sm:gap-3 sm:p-4 sm:text-base",
+            currentChoice?.noBans
+              ? "border-ember-300 bg-ember-900/35 shadow-ember-tight"
+              : "border-ember-300/35 bg-black/25",
+          )}
+          data-testid="no-bans-choice"
+        >
+          <input
+            className="h-5 w-5 shrink-0 accent-[#ffb95c] sm:h-6 sm:w-6"
+            type="checkbox"
+            checked={currentChoice?.noBans ?? false}
+            disabled={!liveCanSubmit}
+            onChange={(event) => {
+              if (!currentChoice) {
+                return;
+              }
+
+              setSelectionMessage(null);
+              updateChoice({
+                ...currentChoice,
+                noBans: event.target.checked,
+                bannedChartIds: [],
+              });
+            }}
+          />
+          <span className="min-w-0">
+            <span className="block break-words uppercase">No bans for this set</span>
+            <span className="mt-1 hidden text-xs font-semibold uppercase text-metal-300 sm:block">
+              Explicit zero-ban choice
+            </span>
+          </span>
+        </label>
       </div>
-      <div className="mt-5 flex flex-wrap gap-3">
+      <div className="mt-3 flex flex-wrap gap-2 sm:mt-5 sm:gap-3">
         <button
-          className="min-h-11 rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300 disabled:opacity-40"
+          className="min-h-11 rounded border border-metal-700 px-3 py-2 text-sm font-bold uppercase text-metal-300 disabled:opacity-40 sm:px-4 sm:py-3 sm:text-base"
           disabled={step === 0}
           onClick={() => {
             setSelectionMessage(null);
@@ -1197,7 +1200,7 @@ export function BallotFlow({
           Back
         </button>
         <button
-          className="button-metal min-h-11 rounded px-4 py-3 font-black uppercase disabled:opacity-40"
+          className="button-metal min-h-11 rounded px-3 py-2 text-sm font-black uppercase disabled:opacity-40 sm:px-4 sm:py-3 sm:text-base"
           disabled={
             !liveCanSubmit ||
             !currentChoice ||

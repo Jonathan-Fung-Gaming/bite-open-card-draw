@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PublicResultSummary, RoundHeader } from "@/components";
+import { PublicResultSummary, TournamentLogo } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydratePublicTournamentState } from "@/lib/server/persistence";
@@ -23,6 +23,34 @@ export const metadata: Metadata = {
   title: "Player Voting",
 };
 
+function VoteDenseHeader({
+  meta,
+  status,
+  title,
+}: {
+  meta?: string;
+  status: string;
+  title: string;
+}) {
+  return (
+    <header
+      className="flex items-center gap-3 border-b border-ember-300/15 px-3 py-2 sm:px-5"
+      data-testid="vote-dense-header"
+    >
+      <TournamentLogo priority className="shrink-0" size="compact" />
+      <div className="min-w-0 flex-1 text-right">
+        <p className="truncate text-xs font-semibold uppercase text-ember-300">{status}</p>
+        <h1 className="mt-0.5 truncate text-xl font-black uppercase leading-none text-white sm:text-3xl">
+          {title}
+        </h1>
+        {meta ? (
+          <p className="mt-1 truncate text-xs font-semibold uppercase text-metal-300">{meta}</p>
+        ) : null}
+      </div>
+    </header>
+  );
+}
+
 export default async function VotePage() {
   await hydratePublicTournamentState();
 
@@ -43,7 +71,7 @@ export default async function VotePage() {
     return (
       <main className="min-h-screen">
         <VoteAutoRefresh />
-        <RoundHeader title="Voting Paused" status={`Round ${roundNumber}`} />
+        <VoteDenseHeader title="Voting Paused" status={`Round ${roundNumber}`} />
         <section className="mx-auto max-w-2xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300">
             Voting is paused. The timer and ballot changes are frozen until the host resumes.
@@ -57,7 +85,7 @@ export default async function VotePage() {
     return (
       <main className="min-h-screen">
         <VoteAutoRefresh intervalMs={PUBLIC_INSPECTION_REFRESH_INTERVAL_MS} />
-        <RoundHeader
+        <VoteDenseHeader
           title={`Round ${roundNumber} Final Charts`}
           status={formatVotingStatusLabel(snapshot.status)}
         />
@@ -75,7 +103,7 @@ export default async function VotePage() {
     return (
       <main className="min-h-screen">
         <VoteAutoRefresh />
-        <RoundHeader
+        <VoteDenseHeader
           title={missingFinalResult ? `Round ${roundNumber} Final Charts` : "Voting Closed"}
           status={
             missingFinalResult ? formatVotingStatusLabel(snapshot.status) : `Round ${roundNumber}`
@@ -113,7 +141,7 @@ export default async function VotePage() {
     return (
       <main className="min-h-screen">
         <VoteAutoRefresh />
-        <RoundHeader title="Player Ballot" status={`Round ${roundNumber}`} />
+        <VoteDenseHeader title="Player Ballot" status={`Round ${roundNumber}`} />
         <section className="mx-auto max-w-2xl px-5 py-5">
           <div className="metal-panel rounded-lg p-5 text-lg font-bold text-metal-300">
             {message}
@@ -130,11 +158,12 @@ export default async function VotePage() {
           !snapshot.canSubmit || process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true"
         }
       />
-      <RoundHeader
+      <VoteDenseHeader
         title="Player Ballot"
         status={`${formatVotingStatusLabel(snapshot.status)} - Round ${roundNumber}`}
+        meta={`${formatVotingTime(snapshot.remainingMs)} | ${snapshot.submittedCount}/${snapshot.eligibleCount} ballots`}
       />
-      <section className="mx-auto max-w-4xl px-5 py-5">
+      <section className="mx-auto max-w-4xl px-3 py-3 sm:px-5 sm:py-5">
         <BallotFlow
           roundNumber={roundNumber}
           players={snapshot.eligiblePlayers}

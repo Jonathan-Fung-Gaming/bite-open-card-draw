@@ -34,9 +34,11 @@ function SelectedChartCard({
         <ChartArtImage src={imagePath} className="h-full w-full object-contain opacity-95" />
       </div>
       <div className="flex min-h-36 flex-col justify-between p-4">
-        <div className="flex items-center justify-between text-xs font-black uppercase tracking-[0.16em] text-ember-300">
-          <span data-testid="selected-chart-difficulty">{chart.displayDifficulty}</span>
-          <span className="font-mono">{String(index).padStart(2, "0")}</span>
+        <div className="flex items-start justify-between gap-3 font-black uppercase text-ember-300">
+          <span className="text-xl leading-tight sm:text-2xl" data-testid="selected-chart-difficulty">
+            {chart.displayDifficulty}
+          </span>
+          <span className="font-mono text-xs">{String(index).padStart(2, "0")}</span>
         </div>
         <div>
           <h2
@@ -99,7 +101,7 @@ export function PublicResultSummary({
                     )}
                   >
                     <div className="min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300">
+                      <p className="text-base font-black uppercase leading-tight text-ember-300">
                         {row.chart.displayDifficulty}
                       </p>
                       <p className="mt-1 break-words font-bold text-white">{row.chart.name}</p>

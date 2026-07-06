@@ -165,12 +165,18 @@ export function ResultSetPanel({
                   </p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
+                  <p
+                    className={clsx(
+                      "font-black uppercase leading-tight text-ember-300",
+                      stageMode ? "text-sm" : "text-xl",
+                    )}
+                    data-testid="result-row-difficulty"
+                  >
                     {row.chart.displayDifficulty}
                   </p>
                   <h3
                     className={clsx(
-                      "mt-1 line-clamp-2 font-black uppercase text-white",
+                      "mt-1 line-clamp-2 font-black uppercase leading-tight text-white",
                       stageMode ? "text-sm leading-tight" : "text-xl",
                     )}
                   >

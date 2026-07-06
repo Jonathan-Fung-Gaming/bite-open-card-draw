@@ -37,14 +37,16 @@ async function expectCenteredSeventhCard(page: Page) {
   const cards = page.getByTestId("ballot-chart-card");
   const sixthBox = await cards.nth(5).boundingBox();
   const seventhBox = await cards.nth(6).boundingBox();
+  const noBansBox = await page.getByTestId("no-bans-choice").boundingBox();
 
   expect(viewport).not.toBeNull();
   expect(sixthBox).not.toBeNull();
   expect(seventhBox).not.toBeNull();
+  expect(noBansBox).not.toBeNull();
   expect(seventhBox!.y).toBeGreaterThan(sixthBox!.y);
-  expect(Math.abs(seventhBox!.x + seventhBox!.width / 2 - viewport!.width / 2)).toBeLessThanOrEqual(
-    8,
-  );
+  expect(Math.abs(seventhBox!.y - noBansBox!.y)).toBeLessThanOrEqual(2);
+  expect(noBansBox!.x).toBeGreaterThan(seventhBox!.x);
+  expect(noBansBox!.x + noBansBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
   expect(seventhBox!.width).toBeGreaterThan(120);
 }
 
@@ -153,40 +155,52 @@ async function expectVisibleCardMetadata(scope: Locator, expectedCount: number) 
 
 async function startRehearsalMode(page: Page) {
   await openRehearsalControls(page);
-  const rehearsalForm = page.locator("form", {
-    has: page.getByRole("button", { name: "Start Rehearsal" }),
-  });
+  const rehearsalForm = page
+    .getByTestId("admin-rehearsal-controls")
+    .locator("form", { has: page.getByRole("button", { name: "Start Rehearsal" }) })
+    .first();
 
   await rehearsalForm.getByPlaceholder("Admin password").fill(ADMIN_PASSWORD);
   await rehearsalForm.getByPlaceholder("Audit reason").fill("mobile route e2e reset");
-  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Start Rehearsal" }));
+  await clickAdminActionAndWait(
+    page,
+    rehearsalForm.getByRole("button", { name: "Start Rehearsal" }),
+  );
   await expect(page.getByText("Rehearsal mode", { exact: true }).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 }
 
 async function drawFirstSet(page: Page) {
-  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(0));
+  await clickAdminActionAndWait(
+    page,
+    page.getByTestId("admin-host-run-controls").getByRole("button", { name: "Draw Set" }).nth(0),
+  );
   await expect(page.getByText(/Version 1/).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 }
 
 async function drawSecondSet(page: Page) {
-  await clickAdminActionAndWait(page, page.getByRole("button", { name: "Draw Set" }).nth(1));
-  await expect(page.getByText("ready to vote")).toBeVisible({
-    timeout: HOSTED_REFRESH_TIMEOUT_MS,
-  });
+  await clickAdminActionAndWait(
+    page,
+    page.getByTestId("admin-host-run-controls").getByRole("button", { name: "Draw Set" }).nth(1),
+  );
+  await expect(
+    page.getByTestId("admin-host-run-controls").getByText("ready to vote", { exact: true }),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 
 async function openVoting(page: Page) {
   await clickAdminActionAndWait(
     page,
-    page.getByRole("button", { name: "Open Voting", exact: true }),
+    page
+      .getByTestId("admin-host-run-controls")
+      .getByRole("button", { name: "Open Voting", exact: true }),
   );
-  await expect(page.getByText("voting open")).toBeVisible({
-    timeout: HOSTED_REFRESH_TIMEOUT_MS,
-  });
+  await expect(
+    page.getByTestId("admin-host-run-controls").getByText("voting open", { exact: true }),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 
 async function drawBothSetsAndOpenVoting(page: Page) {

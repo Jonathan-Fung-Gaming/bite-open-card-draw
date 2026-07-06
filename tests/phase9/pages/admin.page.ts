@@ -151,9 +151,9 @@ export class AdminPage {
         : await this.installSupabaseHostLockForCurrentAdmin();
 
       if (installedSupabaseHost) {
-        await expect(this.page.getByText("Voting Controls")).toBeVisible({
-          timeout: HOSTED_REFRESH_TIMEOUT_MS,
-        });
+        await expect(
+          this.page.getByTestId("admin-host-run-controls").getByText("Voting Controls").first(),
+        ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
         return;
       }
 
@@ -171,9 +171,15 @@ export class AdminPage {
           responseTimeoutMs: 60_000,
         });
       } else {
-        const forceHostForm = this.page.locator("form", {
-          has: this.page.getByRole("button", { name: "Force Host Takeover" }),
-        });
+        if (await hostControlIsActive()) {
+          return;
+        }
+
+        await this.openForceHostTakeoverDetails();
+        const forceHostForm = this.page
+          .getByTestId("admin-force-host-takeover-panel")
+          .locator("form")
+          .first();
 
         if ((await forceHostForm.count()) === 0) {
           continue;
@@ -219,7 +225,9 @@ export class AdminPage {
       timeout: HOSTED_ACTION_TIMEOUT_MS,
     });
     await expect(this.page.getByRole("button", { name: "Release" })).toBeEnabled();
-    await expect(this.page.getByText("Voting Controls")).toBeVisible();
+    await expect(
+      this.page.getByTestId("admin-host-run-controls").getByText("Voting Controls").first(),
+    ).toBeVisible();
   }
 
   async expectActiveCount(count: number) {
@@ -284,9 +292,11 @@ export class AdminPage {
 
   async markPlayersInactive(names: readonly string[]) {
     await this.loginAndTakeHost();
+    await this.openSecondaryPanels();
 
     for (const name of names) {
       await this.visit();
+      await this.openSecondaryPanels();
       const row = this.rosterRow(name);
 
       await expect(row).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
@@ -319,6 +329,7 @@ export class AdminPage {
     }
 
     await this.loginAndTakeHost();
+    await this.openSecondaryPanels();
 
     const bulkImportForm = this.page.locator("form", {
       has: this.page.getByPlaceholder("Bulk import start.gg usernames"),
@@ -340,6 +351,7 @@ export class AdminPage {
 
   async addInactivePlayerToCurrentRound(name: string, reason: string) {
     await this.loginAndTakeHost();
+    await this.openSupportPanels();
 
     const eligibilityForm = this.page.locator("form", {
       has: this.page.getByRole("button", { name: "Confirm Eligibility Change" }),
@@ -430,19 +442,17 @@ export class AdminPage {
       return;
     }
 
-    const rehearsalDetails = this.page
-      .locator("details", { hasText: "Rehearsal controls" })
-      .first();
-
+    await this.openSecondaryPanels();
+    const rehearsalDetails = this.page.getByTestId("admin-rehearsal-controls");
     await expect(rehearsalDetails).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
 
     if (!(await rehearsalDetails.evaluate((element) => (element as HTMLDetailsElement).open))) {
       await rehearsalDetails.locator("summary").click();
     }
 
-    const rehearsalForm = this.page.locator("form", {
-      has: this.page.getByRole("button", { name: "Start Rehearsal" }),
-    });
+    const rehearsalForm = rehearsalDetails
+      .locator("form", { has: this.page.getByRole("button", { name: "Start Rehearsal" }) })
+      .first();
 
     await expect(rehearsalForm.getByRole("button", { name: "Start Rehearsal" })).toBeEnabled({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -451,7 +461,7 @@ export class AdminPage {
     await rehearsalForm.getByPlaceholder("Audit reason").fill(reason);
     await clickServerAction(
       this.page,
-      this.page.getByRole("button", { name: "Start Rehearsal" }),
+      rehearsalForm.getByRole("button", { name: "Start Rehearsal" }),
       10_000,
     );
     await this.expectSupabaseRehearsalMode();
@@ -484,6 +494,7 @@ export class AdminPage {
     }
 
     await this.loginAndTakeHost();
+    await this.openSecondaryPanels();
 
     const currentRoundForm = this.page.locator("form", {
       has: this.page.getByRole("button", { name: "Set Current Round" }),
@@ -739,9 +750,11 @@ export class AdminPage {
   async forceHostTakeover(reason: string) {
     await this.visit();
 
-    const forceHostForm = this.page.locator("form", {
-      has: this.page.getByRole("button", { name: "Force Host Takeover" }),
-    });
+    await this.openForceHostTakeoverDetails();
+    const forceHostForm = this.page
+      .getByTestId("admin-force-host-takeover-panel")
+      .locator("form")
+      .first();
 
     await expect(forceHostForm).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
     await forceHostForm.getByLabel("Audit reason").fill(reason);
@@ -773,6 +786,7 @@ export class AdminPage {
 
   async expectLiveCountsHiddenByDefaultAndRevealable() {
     await this.loginAndTakeHost();
+    await this.openSecondaryPanels();
 
     const liveCounts = this.page.getByTestId("admin-live-counts");
     const liveCountRows = liveCounts.locator("ol li");
@@ -811,6 +825,42 @@ export class AdminPage {
     await expect(
       refreshedLiveCounts.getByRole("button", { name: "Show live counts" }),
     ).toBeVisible();
+  }
+
+  private async openAdminPanel(testId: string) {
+    const panel = this.page.getByTestId(testId);
+
+    await expect(panel).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+
+    const isOpen = await panel.evaluate((element) => (element as HTMLDetailsElement).open);
+
+    if (!isOpen) {
+      await panel.locator("summary").first().click();
+    }
+  }
+
+  private async openSecondaryPanels() {
+    await this.openAdminPanel("admin-secondary-panels");
+  }
+
+  private async openSupportPanels() {
+    await this.openAdminPanel("admin-support-panels");
+  }
+
+  private async openForceHostTakeoverDetails() {
+    const details = this.page.getByTestId("admin-force-host-takeover-panel");
+
+    await expect(details).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+
+    const isOpen = await details.evaluate((element) => (element as HTMLDetailsElement).open);
+
+    if (!isOpen) {
+      await details.locator("summary").first().click();
+    }
+
+    await expect
+      .poll(async () => details.evaluate((element) => (element as HTMLDetailsElement).open))
+      .toBe(true);
   }
 
   private async installSupabaseHostLockForCurrentAdmin() {

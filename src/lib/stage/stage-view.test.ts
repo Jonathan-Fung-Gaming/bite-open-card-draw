@@ -4,6 +4,7 @@ import {
   buildStageRoundView,
   STAGE_CHART_REVEAL_INTERVAL_MS,
   STAGE_SET_REVEAL_GAP_MS,
+  stageShouldUseResultMode,
 } from "./stage-view";
 
 function draw(setOrder: 1 | 2, createdAt: string): DrawRecord {
@@ -60,5 +61,15 @@ describe("stage round view", () => {
     expect(Date.parse(view.sets[1]?.revealStartsAt ?? "")).toBe(
       Date.parse(setOneCreatedAt) + 7 * STAGE_CHART_REVEAL_INTERVAL_MS + STAGE_SET_REVEAL_GAP_MS,
     );
+  });
+
+  it("keeps stage in result mode once result statuses begin", () => {
+    expect(stageShouldUseResultMode("ready_to_vote", false)).toBe(false);
+    expect(stageShouldUseResultMode("voting_closed", false)).toBe(false);
+    expect(stageShouldUseResultMode("results_computed", false)).toBe(true);
+    expect(stageShouldUseResultMode("results_revealing", false)).toBe(true);
+    expect(stageShouldUseResultMode("results_revealed", false)).toBe(true);
+    expect(stageShouldUseResultMode("round_complete", false)).toBe(true);
+    expect(stageShouldUseResultMode("voting_closed", true)).toBe(true);
   });
 });

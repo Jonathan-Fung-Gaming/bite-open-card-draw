@@ -42,9 +42,17 @@ export function StageDrawCard({ chart, index, variant = "standard" }: StageDrawC
             : "min-h-[clamp(5.625rem,12.5vh,9.25rem)] p-2.5 2xl:min-h-44 2xl:p-3",
         )}
       >
-        <div className="flex items-center justify-between gap-2 text-xs font-black uppercase tracking-[0.14em] text-ember-300">
-          <span data-testid="stage-chart-difficulty">{chart?.displayDifficulty ?? "LOCKED"}</span>
-          <span className="font-mono">{String(index).padStart(2, "0")}</span>
+        <div className="flex items-start justify-between gap-2 font-black uppercase text-ember-300">
+          <span
+            className={clsx(
+              "leading-none",
+              featured ? "text-4xl xl:text-5xl" : "text-sm lg:text-base 2xl:text-lg",
+            )}
+            data-testid="stage-chart-difficulty"
+          >
+            {chart?.displayDifficulty ?? "LOCKED"}
+          </span>
+          <span className="font-mono text-xs">{String(index).padStart(2, "0")}</span>
         </div>
         <div>
           <h3
