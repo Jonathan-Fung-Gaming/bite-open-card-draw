@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 type AdminActionButtonProps = {
@@ -20,17 +20,22 @@ export function AdminActionButton({
 }: AdminActionButtonProps) {
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const isDisabled = disabled || !hydrated || isPending;
+  const submittedRef = useRef(false);
+  const isDisabled = disabled || !hydrated || isPending || locked;
 
   useEffect(() => {
     setHydrated(true);
   }, []);
 
   function invokeAction() {
-    if (isDisabled) {
+    if (isDisabled || submittedRef.current) {
       return;
     }
+
+    submittedRef.current = true;
+    setLocked(true);
 
     const formData = new FormData();
 
@@ -39,14 +44,19 @@ export function AdminActionButton({
     }
 
     startTransition(async () => {
-      await action(formData);
-      router.refresh();
+      try {
+        await action(formData);
+        router.refresh();
+      } finally {
+        submittedRef.current = false;
+        setLocked(false);
+      }
     });
   }
 
   return (
     <button
-      aria-busy={isPending}
+      aria-busy={isPending || locked}
       className={className}
       disabled={isDisabled}
       onClick={invokeAction}

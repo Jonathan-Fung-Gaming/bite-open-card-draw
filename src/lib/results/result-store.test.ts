@@ -77,6 +77,30 @@ function ballot(playerId: string, setOneBans: string[], setTwoBans: string[] = [
 }
 
 describe("result store reveal timing", () => {
+  it("rejects stale reveal actions when the phase changed first", () => {
+    const store = new ResultStore(() => 0);
+
+    store.computeRound({
+      roundNumber: 1,
+      draws: [
+        draw("draw-1", 1, "S16", sevenCharts("set-one")),
+        draw("draw-2", 2, "S17", sevenCharts("set-two")),
+      ],
+      ballots: [ballot("p1", ["set-one-1"], ["set-two-1"])],
+      eligiblePlayers: [{ id: "p1", startggUsername: "p1" }],
+      priorSelectedSongBlocks: [],
+      now: "2026-06-28T00:00:00.000Z",
+    });
+
+    expect(store.advanceReveal(1, "2026-06-28T00:00:01.000Z").revealPhase).toBe(
+      "set_1_counts",
+    );
+    expect(() =>
+      store.advanceReveal(1, "2026-06-28T00:00:02.000Z", "computed"),
+    ).toThrow(/Reveal phase changed/);
+    expect(store.getRoundResult(1)?.revealPhase).toBe("set_1_counts");
+  });
+
   it("keeps a backend-decided tiebreak winner sealed for five seconds", () => {
     const store = new ResultStore(() => 1);
     const computedAt = "2026-06-28T00:00:00.000Z";

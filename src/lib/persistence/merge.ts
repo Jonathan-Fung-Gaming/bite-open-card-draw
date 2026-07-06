@@ -2,6 +2,8 @@ import {
   cloneOperationalStateSnapshot,
   type OperationalStateSnapshot,
 } from "@/lib/persistence/operational-state";
+import type { RoundResultSnapshot } from "@/lib/results/result-engine";
+import { resultRevealPhaseRank } from "@/lib/results/reveal-phase-order";
 import type { RoundBallot } from "@/lib/vote/ballot";
 
 type MergeInput = {
@@ -91,6 +93,55 @@ function latestBallot(current: RoundBallot, latest: RoundBallot | undefined) {
   }
 
   return ballotTime(current) >= ballotTime(latest) ? current : latest;
+}
+
+function resultTime(value: string | null | undefined) {
+  const parsed = value ? Date.parse(value) : NaN;
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function monotonicResult(
+  current: RoundResultSnapshot,
+  latest: RoundResultSnapshot | undefined,
+): RoundResultSnapshot {
+  if (!latest) {
+    return current;
+  }
+
+  const currentRank = resultRevealPhaseRank(current.revealPhase);
+  const latestRank = resultRevealPhaseRank(latest.revealPhase);
+
+  if (currentRank > latestRank) {
+    return current;
+  }
+
+  if (currentRank < latestRank) {
+    return latest;
+  }
+
+  const chosen =
+    resultTime(current.revealPhaseStartedAt) >= resultTime(latest.revealPhaseStartedAt)
+      ? current
+      : latest;
+  const other = chosen === current ? latest : current;
+
+  return {
+    ...chosen,
+    finalRevealedAt: chosen.finalRevealedAt ?? other.finalRevealedAt,
+    sets: [
+      {
+        ...chosen.sets[0],
+        winnerRevealStartedAt:
+          chosen.sets[0].winnerRevealStartedAt ?? other.sets[0].winnerRevealStartedAt,
+      },
+      {
+        ...chosen.sets[1],
+        winnerRevealStartedAt:
+          chosen.sets[1].winnerRevealStartedAt ?? other.sets[1].winnerRevealStartedAt,
+      },
+    ],
+  };
 }
 
 function sortByCreatedAtDesc<T extends { createdAt: string }>(items: T[]) {
@@ -244,6 +295,7 @@ export function mergeOperationalStateSnapshots({
       current.result.results,
       latest.result.results,
       (result) => String(result.roundNumber),
+      monotonicResult,
     ),
   );
 

@@ -874,7 +874,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       action={advanceResultRevealAction}
                       className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
                       disabled={!canControl || !result || result.revealPhase === "final"}
-                      fields={{ roundNumber: currentRoundNumber }}
+                      fields={{
+                        expectedRevealPhase: result?.revealPhase ?? "",
+                        roundNumber: currentRoundNumber,
+                      }}
                     >
                       {nextRevealActionLabel(result?.revealPhase)}
                     </AdminActionButton>
@@ -1485,7 +1488,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 action={advanceResultRevealAction}
                 className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
                 disabled={!canControl || !result || result.revealPhase === "final"}
-                fields={{ roundNumber: currentRoundNumber }}
+                fields={{
+                  expectedRevealPhase: result?.revealPhase ?? "",
+                  roundNumber: currentRoundNumber,
+                }}
               >
                 {nextRevealActionLabel(result?.revealPhase)}
               </AdminActionButton>

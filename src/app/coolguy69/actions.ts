@@ -16,6 +16,7 @@ import {
 } from "@/lib/persistence/operational-state";
 import { buildPrivateBallotCsvFilename, generatePrivateBallotCsv } from "@/lib/results/private-csv";
 import type { RoundResultSnapshot } from "@/lib/results/result-engine";
+import type { ResultRevealPhase } from "@/lib/results/reveal-phase-order";
 import {
   assertNoFutureSelectedSongConflicts,
   selectedSongBlocksFromResultStoreBeforeRound,
@@ -117,6 +118,12 @@ function getSetOrder(formData: FormData) {
 
 function getDurationMinutes(formData: FormData) {
   return durationMinutesInputSchema.parse(getString(formData, "durationMinutes"));
+}
+
+function getExpectedRevealPhase(formData: FormData) {
+  const phase = getString(formData, "expectedRevealPhase").trim();
+
+  return phase ? (phase as ResultRevealPhase) : undefined;
 }
 
 function getOverrideResultTarget(formData: FormData) {
@@ -1204,11 +1211,13 @@ export async function computeResultsAction(formData: FormData) {
 export async function advanceResultRevealAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
+    const expectedRevealPhase = getExpectedRevealPhase(formData);
 
     await withActiveHostResultAdminState((session, nowMs) => {
       const result = adminState.resultStore.advanceReveal(
         roundNumber,
         new Date(nowMs).toISOString(),
+        expectedRevealPhase,
       );
 
       if (result.revealPhase === "final") {

@@ -5,6 +5,7 @@ import { assertRoundDrawsReady } from "@/lib/draw/round-readiness";
 import type { PriorSelectedSongBlock } from "@/lib/results/selected-song-blocks";
 import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
 import type { RoundBallot } from "@/lib/vote/ballot";
+import type { ResultRevealPhase } from "./reveal-phase-order";
 
 export type ResultChartRow = {
   chart: DrawnChartSummary;
@@ -43,17 +44,7 @@ export type RoundResultSnapshot = {
   finalRevealedAt: string | null;
 };
 
-export type ResultRevealPhase =
-  "computed" | "set_1_counts" | "set_1_resolved" | "set_2_counts" | "set_2_resolved" | "final";
-
-export const RESULT_REVEAL_PHASES: ResultRevealPhase[] = [
-  "computed",
-  "set_1_counts",
-  "set_1_resolved",
-  "set_2_counts",
-  "set_2_resolved",
-  "final",
-];
+export { RESULT_REVEAL_PHASES, type ResultRevealPhase } from "./reveal-phase-order";
 
 function sortResultRows(left: ResultChartRow, right: ResultChartRow) {
   if (left.banCount !== right.banCount) {

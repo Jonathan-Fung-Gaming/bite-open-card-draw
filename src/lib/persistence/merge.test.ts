@@ -1,4 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { DrawnChartSummary } from "@/lib/draw/draw-engine";
+import type {
+  ResultRevealPhase,
+  ResultSetSnapshot,
+  RoundResultSnapshot,
+} from "@/lib/results/result-engine";
 import { createAdminStateStores, createOperationalStateSnapshot } from "./operational-state";
 import { mergeOperationalStateSnapshots } from "./merge";
 
@@ -14,6 +20,81 @@ function snapshotWithHostLock(
   }
 
   return createOperationalStateSnapshot(stores, new Date(acquiredAt).toISOString());
+}
+
+function chart(id: string): DrawnChartSummary {
+  return {
+    id,
+    name: `Chart ${id}`,
+    artist: "Artist",
+    displayDifficulty: "S16",
+    songKey: `song-${id}`,
+    chartKey: `chart-${id}`,
+    sourceBgImg: "",
+    localImagePath: "/chart-images/fallback-card.svg",
+  };
+}
+
+function resultSet(setOrder: 1 | 2, winnerRevealStartedAt: string | null): ResultSetSnapshot {
+  const selectedChart = chart(`set-${setOrder}-selected`);
+
+  return {
+    drawId: `draw-${setOrder}`,
+    drawVersion: 1,
+    roundSetId: `round-set-${setOrder}`,
+    setOrder,
+    displayLabel: setOrder === 1 ? "S16" : "S17",
+    rows: [
+      {
+        chart: selectedChart,
+        banCount: 0,
+        selected: true,
+        tiedForFewest: false,
+      },
+    ],
+    maxBanCount: 1,
+    leastBanCount: 0,
+    selectedChart,
+    tiebreakUsed: false,
+    tiebreakCandidateIds: [],
+    tiebreakWinnerChartId: null,
+    wheelSlots: [],
+    wheelSupported: false,
+    winnerRevealStartedAt,
+  };
+}
+
+function resultSnapshot(
+  revealPhase: ResultRevealPhase,
+  revealPhaseStartedAt: string,
+  options: {
+    finalRevealedAt?: string | null;
+    setOneWinnerRevealStartedAt?: string | null;
+    setTwoWinnerRevealStartedAt?: string | null;
+  } = {},
+): RoundResultSnapshot {
+  return {
+    id: "result-round-1",
+    roundNumber: 1,
+    computedAt: "2026-07-03T00:00:00.000Z",
+    eligiblePlayers: [],
+    sets: [
+      resultSet(1, options.setOneWinnerRevealStartedAt ?? null),
+      resultSet(2, options.setTwoWinnerRevealStartedAt ?? null),
+    ],
+    revealPhase,
+    revealPhaseStartedAt,
+    finalRevealedAt: options.finalRevealedAt ?? null,
+  };
+}
+
+function snapshotWithResult(result: RoundResultSnapshot, savedAt: string) {
+  const stores = createAdminStateStores();
+  const snapshot = createOperationalStateSnapshot(stores, savedAt);
+
+  snapshot.result.results = [result];
+
+  return snapshot;
 }
 
 describe("operational state merge", () => {
@@ -77,5 +158,36 @@ describe("operational state merge", () => {
 
     expect(staleAfterTakeover.hostLock.lock?.ownerSessionId).toBe("session-b");
     expect(takeoverAfterStale.hostLock.lock?.ownerSessionId).toBe("session-b");
+  });
+
+  it("keeps the furthest result reveal phase when merging stale snapshots", () => {
+    const baseline = snapshotWithResult(
+      resultSnapshot("set_1_resolved", "2026-07-03T00:00:01.000Z", {
+        setOneWinnerRevealStartedAt: "2026-07-03T00:00:01.000Z",
+      }),
+      "2026-07-03T00:00:01.000Z",
+    );
+    const current = snapshotWithResult(
+      resultSnapshot("set_2_counts", "2026-07-03T00:00:02.000Z", {
+        setOneWinnerRevealStartedAt: "2026-07-03T00:00:01.000Z",
+      }),
+      "2026-07-03T00:00:02.000Z",
+    );
+    const latest = snapshotWithResult(
+      resultSnapshot("final", "2026-07-03T00:00:04.000Z", {
+        finalRevealedAt: "2026-07-03T00:00:04.000Z",
+        setOneWinnerRevealStartedAt: "2026-07-03T00:00:01.000Z",
+        setTwoWinnerRevealStartedAt: "2026-07-03T00:00:03.000Z",
+      }),
+      "2026-07-03T00:00:04.000Z",
+    );
+
+    const merged = mergeOperationalStateSnapshots({ baseline, current, latest });
+
+    expect(merged.result.results[0]?.revealPhase).toBe("final");
+    expect(merged.result.results[0]?.finalRevealedAt).toBe("2026-07-03T00:00:04.000Z");
+    expect(merged.result.results[0]?.sets[1].winnerRevealStartedAt).toBe(
+      "2026-07-03T00:00:03.000Z",
+    );
   });
 });

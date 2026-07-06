@@ -12,6 +12,8 @@ type StageAutoRefreshProps = {
   deferDuringTiebreak?: boolean;
   enabled?: boolean;
   intervalMs?: number;
+  jitterMs?: number;
+  leading?: boolean;
 };
 
 function activeTiebreakRevealIsRunning() {
@@ -27,7 +29,7 @@ function activeTiebreakRevealIsRunning() {
 
 function activeStageDrawRevealIsRunning() {
   return Boolean(
-    document.querySelector('[data-testid="stage-set-row"][data-reveal-transition-active="true"]'),
+    document.querySelector('[data-testid="stage-set-row"][data-reveal-complete="false"]'),
   );
 }
 
@@ -36,13 +38,16 @@ export function StageAutoRefresh({
   deferDuringTiebreak = false,
   enabled = true,
   intervalMs = STAGE_PUBLIC_REFRESH_INTERVAL_MS,
+  jitterMs = PUBLIC_REFRESH_JITTER_MS,
+  leading = false,
 }: StageAutoRefreshProps) {
   const router = useRouter();
 
   useJitteredRouterRefresh(router.refresh, {
     enabled,
     intervalMs,
-    jitterMs: PUBLIC_REFRESH_JITTER_MS,
+    jitterMs,
+    leading,
     shouldDefer:
       deferDuringTiebreak || deferDuringStageDrawReveal
         ? () =>
@@ -58,7 +63,7 @@ export function StageAutoRefresh({
       data-defer-during-tiebreak={deferDuringTiebreak ? "true" : "false"}
       data-refresh-enabled={enabled ? "true" : "false"}
       data-refresh-interval-ms={String(intervalMs)}
-      data-refresh-jitter-ms={String(PUBLIC_REFRESH_JITTER_MS)}
+      data-refresh-jitter-ms={String(jitterMs)}
       data-testid="stage-auto-refresh"
       hidden
     />
