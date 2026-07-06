@@ -107,24 +107,20 @@ test("Phase 8 phone roster regressions cover snapshots, duplicate username, and 
     const saveFailureContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     openedContexts.push(saveFailureContext);
     const saveFailureVote = new VotePage(await saveFailureContext.newPage(), resolvedBaseURL);
-    const initialSave = await saveFailureVote.submitBallot({
+    await saveFailureVote.submitBallot({
       banPlan: [[], []],
       playerName: PLAYER_TWO,
     });
 
     await saveFailureVote.expectSavedBallot({
-      expectedRevision: 1,
       expectedTexts: ["No bans for this set"],
       playerName: PLAYER_TWO,
-      savedAt: initialSave.savedAt,
     });
     await saveFailureVote.editSavedBallotAndForceSubmitFailure([[2], [2]]);
     await saveFailureVote.reload();
     await saveFailureVote.expectSavedBallot({
-      expectedRevision: 1,
       expectedTexts: ["No bans for this set"],
       playerName: PLAYER_TWO,
-      savedAt: initialSave.savedAt,
     });
 
     await closeVotingForRound(adminPage, ROUND_ONE);

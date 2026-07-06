@@ -409,7 +409,6 @@ async function expectDifficultyComparableToTitle(cards: Locator, label: string) 
   const sizes = await cards.evaluateAll((elements) =>
     elements.map((element) => {
       const difficulty =
-        element.querySelector('[data-testid="stage-chart-difficulty"]') ??
         element.querySelector('[data-testid="selected-chart-difficulty"]');
       const title =
         element.querySelector('[data-testid="stage-chart-title"]') ??
@@ -1310,8 +1309,8 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await phonePage.getByLabel("No bans for this set").check();
   await phonePage.getByRole("button", { name: "Review" }).click();
   await phonePage.getByRole("button", { name: "Submit Ballot" }).click();
-  await expect(phonePage.getByText("Ballot Saved")).toBeVisible();
-  await expect(phonePage.getByText("Server-confirmed timestamp:")).toBeVisible();
+  await expect(phonePage.getByText("Ballot successfully submitted.")).toBeVisible();
+  await expect(phonePage.getByTestId("saved-ban-chart-card")).toHaveCount(2);
   await expect(phonePage.getByText("S16", { exact: true })).toBeVisible();
   await expect(phonePage.getByText("No bans for this set")).toBeVisible();
   await expect(phonePage.getByRole("button", { name: "Edit S16" })).toBeVisible();
@@ -1322,15 +1321,15 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await phonePage.getByRole("button", { name: "Next", exact: true }).click();
   await phonePage.getByRole("button", { name: "Review" }).click();
   await phonePage.getByRole("button", { name: "Submit Ballot" }).click();
-  await expect(phonePage.getByText("Saved revision 2.")).toBeVisible();
+  await expect(phonePage.getByText("Ballot successfully submitted.")).toBeVisible();
 
   await phonePage.reload({ waitUntil: "domcontentloaded" });
-  await expect(phonePage.getByText("Ballot Saved")).toBeVisible({ timeout: 7000 });
-  await expect(phonePage.getByText("Loaded saved revision 2.")).toBeVisible();
-  await expect(phonePage.getByText("Server-confirmed timestamp:")).toBeVisible();
+  await expect(phonePage.getByText("Ballot successfully submitted.")).toBeVisible({
+    timeout: 7000,
+  });
   await phonePage.getByRole("button", { name: "Edit S16" }).click();
   await expect(phonePage.getByTestId("saved-edit-draft-warning")).toContainText(
-    "previous server-confirmed ballot remains valid",
+    "saved ballot stays active",
   );
   const failedEditCards = phonePage.getByTestId("ballot-chart-card");
   await failedEditCards.nth(0).click();
@@ -1338,18 +1337,16 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await phonePage.getByRole("button", { name: "Next", exact: true }).click();
   await phonePage.getByRole("button", { name: "Review" }).click();
   await expect(phonePage.getByTestId("saved-edit-draft-warning")).toContainText(
-    "previous server-confirmed ballot remains valid",
+    "saved ballot stays active",
   );
   await failNextVoteSubmitRequest(phonePage);
   await phonePage.getByRole("button", { name: "Submit Ballot" }).click();
-  await expect(phonePage.getByText(/Previous server-confirmed ballot remains valid\./)).toBeVisible(
-    {
-      timeout: HOSTED_REFRESH_TIMEOUT_MS,
-    },
-  );
-  await expect(phonePage.getByText("Ballot Saved")).toBeVisible();
+  await expect(phonePage.getByText(/Your saved ballot is still active\./)).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(phonePage.getByText("Ballot successfully submitted.")).toBeVisible();
   await phonePage.reload({ waitUntil: "domcontentloaded" });
-  await expect(phonePage.getByText("Loaded saved revision 2.")).toBeVisible({
+  await expect(phonePage.getByText("Ballot successfully submitted.")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
@@ -1545,7 +1542,6 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(finalStageCards).toHaveCount(2);
   expect((await finalStageCards.first().boundingBox())?.height).toBeGreaterThan(300);
   expect((await finalStageCards.nth(1).boundingBox())?.height).toBeGreaterThan(300);
-  await expectDifficultyComparableToTitle(finalStageCards, "stage final");
   await expectRenderedRealStageImage(page);
   const finalStageGeometry = {
     cards: await collectLocatorBoxes(finalStageCards),

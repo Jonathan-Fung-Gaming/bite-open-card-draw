@@ -38,17 +38,17 @@ describe("phone result display", () => {
     expect(shouldShowPhoneResultHoldingState("ready_to_vote", null)).toBe(false);
   });
 
-  it("only reassures failed edits when a server-confirmed ballot exists", () => {
+  it("only reassures failed edits when a saved ballot exists", () => {
     expect(formatBallotSaveFailureMessage("Save failed.", false)).toBe("Save failed.");
     expect(formatBallotSaveFailureMessage("Save failed.", true)).toBe(
-      "Save failed. Previous server-confirmed ballot remains valid.",
+      "Save failed. Your saved ballot is still active.",
     );
     expect(
       formatBallotSaveFailureMessage(
-        "Save failed. Previous server-confirmed ballot remains valid.",
+        "Save failed. Your saved ballot is still active.",
         true,
       ),
-    ).toBe("Save failed. Previous server-confirmed ballot remains valid.");
+    ).toBe("Save failed. Your saved ballot is still active.");
   });
 
   it("uses light phone and public polling cadences", () => {

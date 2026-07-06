@@ -345,7 +345,7 @@ async function submitNoBanVoteThroughPlayerRoute(
     await routePage.getByLabel("No bans for this set").check();
     await routePage.getByRole("button", { name: "Review" }).click();
     await routePage.getByRole("button", { name: "Submit Ballot" }).click();
-    await expect(routePage.getByText("Ballot Saved")).toBeVisible({
+    await expect(routePage.getByText("Ballot successfully submitted.")).toBeVisible({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
 

@@ -91,7 +91,7 @@ async function submitNoBanBallot(page: Page, baseURL: string, playerStartggUsern
     requireServerActionResponse: true,
     responseTimeoutMs: 60_000,
   });
-  await expect(page.getByText("Ballot Saved")).toBeVisible({
+  await expect(page.getByText("Ballot successfully submitted.")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 }
@@ -260,7 +260,7 @@ test("PFR-019 browser timer evidence covers pause, resume, manual close, and reo
     expect(reopenedTimerSeconds).toBeLessThanOrEqual(60);
 
     await phonePage.reload({ waitUntil: "domcontentloaded" });
-    await expect(phonePage.getByText("Ballot Saved")).toBeVisible({
+    await expect(phonePage.getByText("Ballot successfully submitted.")).toBeVisible({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
     await expectSavedBallotEditsVisible(phonePage);

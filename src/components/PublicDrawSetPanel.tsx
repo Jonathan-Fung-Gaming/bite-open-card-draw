@@ -41,14 +41,10 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
                     className="h-full w-full object-contain opacity-95"
                   />
                 </div>
-                <div className="flex min-h-28 flex-col justify-between p-3">
-                  <div className="flex items-center justify-between text-xs font-black uppercase tracking-[0.16em] text-ember-300">
-                    <span data-testid="chart-card-difficulty">{chart.displayDifficulty}</span>
-                    <span className="font-mono">{String(chart.order).padStart(2, "0")}</span>
-                  </div>
+                <div className="flex min-h-28 flex-col justify-end p-3">
                   <div>
                     <h3
-                      className="mt-3 break-words text-base font-black uppercase leading-tight text-white sm:text-lg"
+                      className="break-words text-base font-black uppercase leading-tight text-white sm:text-lg"
                       data-testid="chart-card-title"
                     >
                       {chart.name}

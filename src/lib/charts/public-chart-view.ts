@@ -9,11 +9,9 @@ export type PublicChartsSetDefinition = Pick<
 
 export type PublicChartsChart = {
   artist: string;
-  displayDifficulty: string;
   id: string;
   imagePath: string;
   name: string;
-  order: number;
 };
 
 export type PublicChartsDraw = {
@@ -40,13 +38,11 @@ export function toPublicChartsSetView({ draw, set }: PublicChartsSetInput): Publ
     },
     draw: draw
       ? {
-          charts: draw.charts.map((chart, index) => ({
+          charts: draw.charts.map((chart) => ({
             artist: chart.artist,
-            displayDifficulty: chart.displayDifficulty,
             id: chart.id,
             imagePath: chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH,
             name: chart.name,
-            order: index + 1,
           })),
         }
       : null,

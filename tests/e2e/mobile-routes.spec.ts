@@ -116,12 +116,10 @@ async function expectVisibleCardMetadata(scope: Locator, expectedCount: number) 
   const images = scope.getByTestId("stage-chart-image");
   const titles = scope.getByTestId("chart-card-title");
   const artists = scope.getByTestId("chart-card-artist");
-  const difficulties = scope.getByTestId("chart-card-difficulty");
 
   await expect(images).toHaveCount(expectedCount);
   await expect(titles).toHaveCount(expectedCount);
   await expect(artists).toHaveCount(expectedCount);
-  await expect(difficulties).toHaveCount(expectedCount);
 
   await expect
     .poll(async () =>
@@ -131,7 +129,7 @@ async function expectVisibleCardMetadata(scope: Locator, expectedCount: number) 
     )
     .toBe(true);
 
-  for (const locator of [titles, artists, difficulties]) {
+  for (const locator of [titles, artists]) {
     const boxes = await locator.evaluateAll((elements) =>
       elements.map((element) => {
         const style = window.getComputedStyle(element);
@@ -388,7 +386,7 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   await page.getByRole("button", { name: "Review" }).click();
   await expectTouchTarget(page.getByRole("button", { name: "Submit Ballot" }), "submit button");
   await page.getByRole("button", { name: "Submit Ballot" }).click();
-  await expect(page.getByText("Ballot Saved")).toBeVisible();
+  await expect(page.getByText("Ballot successfully submitted.")).toBeVisible();
   await expectTouchTarget(page.getByRole("button", { name: "Edit S16" }), "saved edit S16");
   await expectTouchTarget(page.getByRole("button", { name: "Edit S17" }), "saved edit S17");
 

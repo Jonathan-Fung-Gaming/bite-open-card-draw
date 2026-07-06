@@ -306,6 +306,16 @@ function describeChoice(draw: DrawRecord | undefined, choice: BallotSetChoice) {
   return names.join(", ");
 }
 
+function selectedBanCharts(draw: DrawRecord | undefined, choice: BallotSetChoice) {
+  if (!draw || choice.noBans) {
+    return [];
+  }
+
+  return choice.bannedChartIds
+    .map((chartId) => draw.charts.find((candidate) => candidate.id === chartId))
+    .filter((chart): chart is DrawRecord["charts"][number] => Boolean(chart));
+}
+
 function feedbackRole(message: string) {
   return /failed|could not|not open|disabled|warning|another active device/i.test(message)
     ? "alert"
@@ -365,7 +375,7 @@ export function BallotFlow({
   const changesUnavailableCopy = isPaused
     ? "Voting is paused. The host has frozen the timer and ballot changes. Your selections on this phone are still here; leave this page open and continue after voting resumes."
     : "Voting is not accepting ballot changes right now.";
-  const editingServerConfirmedBallot = confirmed && !savedAt && Boolean(existingBallot);
+  const editingSavedBallot = confirmed && !savedAt && Boolean(existingBallot);
   const currentDraw = draws[step];
   const currentChoice = choices[step];
   const canSubmit = choices.every(
@@ -422,7 +432,7 @@ export function BallotFlow({
           setChoices(choicesFromBallot(draws, ballot));
           setSavedAt(ballot.submittedAt);
           setStep(0);
-          setMessage(`Loaded saved revision ${ballot.revision}.`);
+          setMessage(null);
 
           if (options.autoConfirmExisting) {
             setConfirmed(true);
@@ -805,7 +815,7 @@ export function BallotFlow({
           ballot,
         });
         setSavedAt(ballot.submittedAt);
-        setMessage(`Saved revision ${ballot.revision}.`);
+        setMessage(null);
       } catch (error) {
         const hadServerConfirmedBallot =
           Boolean(existingBallot) || Boolean(savedAt) || existingBallotLookup?.exists === true;
@@ -1001,24 +1011,61 @@ export function BallotFlow({
     return (
       <section className="metal-panel rounded-lg p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-          Ballot Saved
+          Round {roundNumber} ballot
         </p>
         <h1 className="mt-2 text-3xl font-black uppercase text-white">
-          {selectedPlayer?.startggUsername}
+          Ballot successfully submitted.
         </h1>
-        <p className="mt-3 text-metal-300">
-          Server-confirmed ballot. This ballot remains valid unless a later save succeeds.
-        </p>
-        <p className="mt-2 text-metal-300">Server-confirmed timestamp: {savedAt}</p>
+        {selectedPlayer ? (
+          <p className="mt-3 text-metal-300">Voting as {selectedPlayer.startggUsername}</p>
+        ) : null}
         {presenceWarningBanner}
         <div className="mt-5 grid gap-3">
           {choices.map((choice, index) => {
             const draw = draws.find((candidate) => candidate.id === choice.drawId);
+            const selectedCharts = selectedBanCharts(draw, choice);
 
             return (
               <div key={choice.drawId} className="rounded border border-metal-700 bg-black/25 p-3">
                 <p className="font-bold text-white">{choice.displayLabel}</p>
-                <p className="mt-1 text-sm text-metal-300">{describeChoice(draw, choice)}</p>
+                {selectedCharts.length > 0 ? (
+                  <div className="mt-3 grid grid-cols-2 gap-1.5 sm:gap-3">
+                    {selectedCharts.map((chart) => {
+                      const imagePath = chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH;
+
+                      return (
+                        <article
+                          key={chart.id}
+                          className="relative min-h-24 min-w-0 overflow-hidden rounded border border-ember-300/35 bg-furnace-900 sm:min-h-56"
+                          data-chart-image-path={imagePath}
+                          data-chart-id={chart.id}
+                          data-chart-name={chart.name}
+                          data-testid="saved-ban-chart-card"
+                        >
+                          <ChartArtImage
+                            src={imagePath}
+                            className="absolute inset-0 h-full w-full object-cover opacity-90"
+                            testId="saved-ban-chart-image"
+                          />
+                          <span className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/10" />
+                          <span className="relative flex min-h-24 flex-col justify-end p-2 sm:min-h-56 sm:p-3">
+                            <span
+                              className="block break-words text-[11px] font-black uppercase leading-tight text-white line-clamp-2 sm:text-base sm:line-clamp-3"
+                              data-testid="saved-ban-chart-title"
+                            >
+                              {chart.name}
+                            </span>
+                            <span className="mt-1 block break-words text-[10px] font-semibold text-metal-300 line-clamp-1 sm:text-sm sm:line-clamp-2">
+                              {chart.artist}
+                            </span>
+                          </span>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-metal-300">{describeChoice(draw, choice)}</p>
+                )}
                 {liveCanSubmit ? (
                   <button
                     className="mt-3 min-h-11 rounded border border-ember-300/35 px-4 py-3 text-sm font-black uppercase text-ember-300"
@@ -1075,14 +1122,13 @@ export function BallotFlow({
         </h1>
         {identityCorrection}
         {presenceWarningBanner}
-        {editingServerConfirmedBallot ? (
+        {editingSavedBallot ? (
           <p
             className="mt-4 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300"
             data-testid="saved-edit-draft-warning"
             role="status"
           >
-            Editing unsaved changes. Your previous server-confirmed ballot remains valid until this
-            save succeeds.
+            Editing unsaved changes. Your saved ballot stays active until this save succeeds.
           </p>
         ) : null}
         <div className="mt-5 grid gap-3">
@@ -1161,14 +1207,13 @@ export function BallotFlow({
       </div>
       {identityCorrection}
       {presenceWarningBanner}
-      {editingServerConfirmedBallot ? (
+      {editingSavedBallot ? (
         <p
           className="mt-4 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300"
           data-testid="saved-edit-draft-warning"
           role="status"
         >
-          Editing unsaved changes. Your previous server-confirmed ballot remains valid until this
-          save succeeds.
+          Editing unsaved changes. Your saved ballot stays active until this save succeeds.
         </p>
       ) : null}
       {selectionMessage ? (
@@ -1193,7 +1238,7 @@ export function BallotFlow({
           return (
             <button
               key={chart.id}
-              aria-label={`Ban ${chart.name} (${chart.displayDifficulty})`}
+              aria-label={`Ban ${chart.name}`}
               aria-pressed={selected}
               className={clsx(
                 "relative min-h-24 min-w-0 overflow-hidden rounded border bg-furnace-900 text-left disabled:opacity-55 sm:min-h-56",
@@ -1219,8 +1264,7 @@ export function BallotFlow({
                 <span className="absolute inset-0 border-2 border-ember-300/80" />
               ) : null}
               <span className="relative flex min-h-24 flex-col justify-between p-2 sm:min-h-56 sm:p-3">
-                <span className="flex items-start justify-between gap-1 text-[10px] font-bold uppercase text-ember-300 sm:gap-2 sm:text-xs">
-                  <span>{chart.displayDifficulty}</span>
+                <span className="flex items-start justify-end gap-1 text-[10px] font-bold uppercase text-ember-300 sm:gap-2 sm:text-xs">
                   <span
                     className={clsx(
                       "rounded border px-1 py-0.5 font-black sm:px-1.5",

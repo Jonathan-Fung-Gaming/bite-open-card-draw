@@ -81,19 +81,15 @@ describe("public charts view", () => {
     expect(Object.keys(view.draw ?? {})).toEqual(["charts"]);
     expect(Object.keys(view.draw?.charts[0] ?? {}).sort()).toEqual([
       "artist",
-      "displayDifficulty",
       "id",
       "imagePath",
       "name",
-      "order",
     ]);
     expect(view.draw?.charts[0]).toEqual({
       artist: "Open Stage",
-      displayDifficulty: "S16",
       id: "chart-visible-id",
       imagePath: FALLBACK_CHART_IMAGE_PATH,
       name: "Arc Furnace",
-      order: 1,
     });
 
     expect([...collectKeys(view)].sort()).not.toEqual(
