@@ -20,15 +20,34 @@ import {
   submitRoundBallotAction,
 } from "./actions";
 
-type BallotFlowProps = {
+export type BallotFlowProps = {
+  closesAt: string | null;
+  eligibleCount: number;
+  remainingMs: number;
   roundNumber: 1 | 2 | 3 | 4;
   players: EligiblePlayerSnapshot[];
   draws: DrawRecord[];
+  serverNowMs: number;
   statusLabel: string;
   status: VotingRoundStatus;
+  submittedCount: number;
   timerText: string;
   turnoutText: string;
   canSubmit: boolean;
+  onLiveStateChange?: (state: VoteLiveState) => void;
+};
+
+export type VoteLiveState = {
+  canSubmit: boolean;
+  closesAt: string | null;
+  eligibleCount: number;
+  remainingMs: number;
+  serverNowMs: number;
+  status: VotingRoundStatus;
+  statusLabel: string;
+  submittedCount: number;
+  timerText: string;
+  turnoutText: string;
 };
 
 const IDENTITY_STORAGE_KEY = "bite-open-card-draw:startgg-identity:v1";
@@ -294,14 +313,20 @@ function feedbackRole(message: string) {
 }
 
 export function BallotFlow({
+  closesAt,
+  eligibleCount,
   roundNumber,
   players,
   draws,
+  serverNowMs,
   statusLabel,
   status,
+  submittedCount,
+  remainingMs,
   timerText,
   turnoutText,
   canSubmit: initialCanSubmit,
+  onLiveStateChange,
 }: BallotFlowProps) {
   const router = useRouter();
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
@@ -328,7 +353,12 @@ export function BallotFlow({
   const [isPending, startTransition] = useTransition();
   const initializedIdentityRef = useRef(false);
   const lastPresenceClaimRef = useRef<{ claimedAtMs: number; key: string } | null>(null);
+  const lookupRequestRef = useRef(0);
   const refreshRequestedRef = useRef(false);
+  const confirmedRef = useRef(false);
+  const existingBallotRef = useRef<PublicEditableBallot | null>(null);
+  const existingBallotLookupExistsRef = useRef(false);
+  const savedAtRef = useRef<string | null>(null);
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null;
   const alreadySubmitted = existingBallotLookup?.exists === true;
   const isPaused = liveStatus === "voting_paused";
@@ -348,11 +378,29 @@ export function BallotFlow({
     setHydrated(true);
   }, []);
 
+  useEffect(() => {
+    confirmedRef.current = confirmed;
+  }, [confirmed]);
+
+  useEffect(() => {
+    existingBallotRef.current = existingBallot;
+  }, [existingBallot]);
+
+  useEffect(() => {
+    existingBallotLookupExistsRef.current = existingBallotLookup?.exists === true;
+  }, [existingBallotLookup?.exists]);
+
+  useEffect(() => {
+    savedAtRef.current = savedAt;
+  }, [savedAt]);
+
   const loadExistingBallot = useCallback(
     async (
       playerId: string,
       options: { autoConfirmExisting?: boolean; resetWhenMissing?: boolean } = {},
     ) => {
+      const requestId = ++lookupRequestRef.current;
+
       setLookupPending(true);
 
       try {
@@ -362,6 +410,10 @@ export function BallotFlow({
           getBallotEditToken(roundNumber, playerId),
         );
         const ballot = lookup.ballot;
+
+        if (requestId !== lookupRequestRef.current) {
+          return;
+        }
 
         setExistingBallotLookup(lookup);
         setExistingBallot(ballot);
@@ -399,9 +451,13 @@ export function BallotFlow({
           setSavedAt(null);
         }
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Could not load saved ballot.");
+        if (requestId === lookupRequestRef.current) {
+          setMessage(error instanceof Error ? error.message : "Could not load saved ballot.");
+        }
       } finally {
-        setLookupPending(false);
+        if (requestId === lookupRequestRef.current) {
+          setLookupPending(false);
+        }
       }
     },
     [draws, roundNumber],
@@ -480,7 +536,31 @@ export function BallotFlow({
     setLiveStatus(status);
     setLiveTimerText(timerText);
     setLiveTurnoutText(turnoutText);
-  }, [initialCanSubmit, status, statusLabel, timerText, turnoutText]);
+    onLiveStateChange?.({
+      canSubmit: initialCanSubmit,
+      closesAt,
+      eligibleCount,
+      remainingMs,
+      serverNowMs,
+      status,
+      statusLabel,
+      submittedCount,
+      timerText,
+      turnoutText,
+    });
+  }, [
+    closesAt,
+    eligibleCount,
+    initialCanSubmit,
+    onLiveStateChange,
+    remainingMs,
+    serverNowMs,
+    status,
+    statusLabel,
+    submittedCount,
+    timerText,
+    turnoutText,
+  ]);
 
   useEffect(() => {
     setChoices((current) => choicesForDraws(draws, current));
@@ -541,6 +621,18 @@ export function BallotFlow({
         setLiveStatusLabel(state.statusLabel);
         setLiveTimerText(state.timerText);
         setLiveTurnoutText(state.turnoutText);
+        onLiveStateChange?.({
+          canSubmit: state.canSubmit,
+          closesAt: state.closesAt,
+          eligibleCount: state.eligibleCount,
+          remainingMs: state.remainingMs,
+          serverNowMs: Date.parse(state.serverNow),
+          status: state.status,
+          statusLabel: state.statusLabel,
+          submittedCount: state.submittedCount,
+          timerText: state.timerText,
+          turnoutText: state.turnoutText,
+        });
 
         if (state.canSubmit) {
           refreshRequestedRef.current = false;
@@ -553,12 +645,14 @@ export function BallotFlow({
         if (state.existingBallotLookup) {
           const ballot = state.existingBallotLookup.ballot;
           const hadServerConfirmedBallot =
-            Boolean(existingBallot) || Boolean(savedAt) || existingBallotLookup?.exists === true;
+            Boolean(existingBallotRef.current) ||
+            Boolean(savedAtRef.current) ||
+            existingBallotLookupExistsRef.current;
 
           setExistingBallotLookup(state.existingBallotLookup);
           setExistingBallot(ballot);
 
-          if (ballot && (savedAt || !confirmed)) {
+          if (ballot && (savedAtRef.current || !confirmedRef.current)) {
             setChoices(choicesFromBallot(draws, ballot));
             setSavedAt(ballot.submittedAt);
           } else if (!state.existingBallotLookup.exists && hadServerConfirmedBallot) {
@@ -593,6 +687,8 @@ export function BallotFlow({
       }
     }
 
+    void poll();
+
     const interval = window.setInterval(() => {
       void poll();
     }, VOTE_LIVE_POLL_INTERVAL_MS);
@@ -603,14 +699,11 @@ export function BallotFlow({
     };
   }, [
     changesUnavailableCopy,
-    confirmed,
     draws,
-    existingBallot,
-    existingBallotLookup?.exists,
+    onLiveStateChange,
     players.length,
     roundNumber,
     router,
-    savedAt,
     selectedPlayerId,
   ]);
 
@@ -816,6 +909,7 @@ export function BallotFlow({
           onChange={(event) => {
             const playerId = event.target.value;
 
+            lookupRequestRef.current += 1;
             setSelectedPlayerId(playerId);
             setConfirmed(false);
             setSavedAt(null);
@@ -829,6 +923,8 @@ export function BallotFlow({
             setSelectionMessage(null);
             if (playerId) {
               void loadExistingBallot(playerId, { resetWhenMissing: true });
+            } else {
+              setLookupPending(false);
             }
           }}
         >
@@ -1100,7 +1196,7 @@ export function BallotFlow({
               aria-label={`Ban ${chart.name} (${chart.displayDifficulty})`}
               aria-pressed={selected}
               className={clsx(
-                "min-w-0 overflow-hidden rounded border bg-furnace-900 text-left disabled:opacity-55",
+                "relative min-h-24 min-w-0 overflow-hidden rounded border bg-furnace-900 text-left disabled:opacity-55 sm:min-h-56",
                 selected
                   ? "border-ember-300 shadow-ember-tight"
                   : "border-metal-700 bg-black/25",
@@ -1113,39 +1209,36 @@ export function BallotFlow({
               disabled={!liveCanSubmit}
               type="button"
             >
-              <span className="block">
-                <span className="relative block h-8 overflow-hidden border-b border-ember-300/15 bg-black/35 sm:h-auto sm:aspect-[4/3]">
-                  <ChartArtImage
-                    src={imagePath}
-                    className="h-full w-full object-contain opacity-95"
-                    testId="ballot-chart-image"
-                  />
-                  {selected ? (
-                    <span className="absolute inset-0 border-2 border-ember-300/80" />
-                  ) : null}
-                </span>
-                <span className="flex min-h-12 flex-col justify-between p-1.5 sm:min-h-28 sm:p-3">
-                  <span className="flex items-center justify-between gap-1 text-[10px] font-bold uppercase text-ember-300 sm:gap-2 sm:text-xs">
-                    <span>{chart.displayDifficulty}</span>
-                    <span
-                      className={clsx(
-                        "rounded border px-1 py-0.5 font-black sm:px-1.5",
-                        selected
-                          ? "border-ember-300 bg-ember-900/45 text-white"
-                          : "border-metal-700 bg-black/35 text-metal-300",
-                      )}
-                      data-testid="ban-selected-label"
-                    >
-                      {selected ? "Ban selected" : "Tap to ban"}
-                    </span>
+              <ChartArtImage
+                src={imagePath}
+                className="absolute inset-0 h-full w-full object-cover opacity-90"
+                testId="ballot-chart-image"
+              />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/10" />
+              {selected ? (
+                <span className="absolute inset-0 border-2 border-ember-300/80" />
+              ) : null}
+              <span className="relative flex min-h-24 flex-col justify-between p-2 sm:min-h-56 sm:p-3">
+                <span className="flex items-start justify-between gap-1 text-[10px] font-bold uppercase text-ember-300 sm:gap-2 sm:text-xs">
+                  <span>{chart.displayDifficulty}</span>
+                  <span
+                    className={clsx(
+                      "rounded border px-1 py-0.5 font-black sm:px-1.5",
+                      selected
+                        ? "border-ember-300 bg-ember-900/65 text-white"
+                        : "border-metal-700 bg-black/55 text-metal-300",
+                    )}
+                    data-testid="ban-selected-label"
+                  >
+                    {selected ? "Ban selected" : "Tap to ban"}
                   </span>
-                  <span>
-                    <span className="mt-1 block break-words text-[10px] font-black uppercase leading-tight text-white line-clamp-1 sm:mt-1.5 sm:text-base sm:line-clamp-3">
-                      {chart.name}
-                    </span>
-                    <span className="mt-0.5 hidden break-words text-[10px] text-metal-300 line-clamp-1 sm:block sm:text-sm sm:line-clamp-2">
-                      {chart.artist}
-                    </span>
+                </span>
+                <span>
+                  <span className="block break-words text-[11px] font-black uppercase leading-tight text-white line-clamp-2 sm:text-base sm:line-clamp-3">
+                    {chart.name}
+                  </span>
+                  <span className="mt-1 block break-words text-[10px] font-semibold text-metal-300 line-clamp-1 sm:text-sm sm:line-clamp-2">
+                    {chart.artist}
                   </span>
                 </span>
               </span>

@@ -12,6 +12,7 @@ import {
   type ResultSetSnapshot,
   type RoundResultSnapshot,
 } from "./result-engine";
+import { resultRevealPhaseIsBefore } from "./reveal-phase-order";
 import { getTiebreakRevealRemainingMs } from "./reveal-timing";
 
 export type ResultStoreSnapshot = {
@@ -115,8 +116,18 @@ export class ResultStore {
     return result;
   }
 
-  advanceReveal(roundNumber: 1 | 2 | 3 | 4, now = new Date().toISOString()) {
+  advanceReveal(
+    roundNumber: 1 | 2 | 3 | 4,
+    now = new Date().toISOString(),
+    expectedPhase?: ResultRevealPhase,
+  ) {
     const result = this.requireResult(roundNumber);
+
+    if (expectedPhase && result.revealPhase !== expectedPhase) {
+      throw new Error(
+        `Reveal phase changed before this action could run. Expected ${expectedPhase}, found ${result.revealPhase}.`,
+      );
+    }
 
     this.requireTiebreakRevealComplete(result, now);
 
@@ -136,6 +147,10 @@ export class ResultStore {
 
   setRevealPhase(roundNumber: 1 | 2 | 3 | 4, phase: ResultRevealPhase, now = new Date().toISOString()) {
     const result = this.requireResult(roundNumber);
+
+    if (resultRevealPhaseIsBefore(phase, result.revealPhase)) {
+      throw new Error(`Cannot move result reveal backward from ${result.revealPhase} to ${phase}.`);
+    }
 
     result.revealPhase = phase;
     result.revealPhaseStartedAt = now;

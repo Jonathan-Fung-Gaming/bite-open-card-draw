@@ -23,8 +23,8 @@ function activeElementIsEditing() {
   return element instanceof HTMLElement && element.isContentEditable;
 }
 
-function formHasDirtyEditableField() {
-  const fields = document.querySelectorAll("input, textarea, select");
+function formHasDirtyEditableField(form: HTMLFormElement) {
+  const fields = form.querySelectorAll("input, textarea, select");
 
   return Array.from(fields).some((field) => {
     if (
@@ -55,12 +55,20 @@ function formHasDirtyEditableField() {
   });
 }
 
+function blockingFormHasDirtyEditableField() {
+  const forms = document.querySelectorAll("form[data-admin-live-refresh-blocking='true']");
+
+  return Array.from(forms).some(
+    (form) => form instanceof HTMLFormElement && formHasDirtyEditableField(form),
+  );
+}
+
 export function AdminLiveRefresh() {
   const router = useRouter();
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      if (document.hidden || activeElementIsEditing() || formHasDirtyEditableField()) {
+      if (document.hidden || activeElementIsEditing() || blockingFormHasDirtyEditableField()) {
         return;
       }
 

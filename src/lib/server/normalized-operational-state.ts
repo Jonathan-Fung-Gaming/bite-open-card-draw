@@ -23,6 +23,7 @@ import type {
   PersistMergedStateInput,
 } from "@/lib/persistence/repository";
 import type { ResultRevealPhase, ResultSetSnapshot } from "@/lib/results/result-engine";
+import { resultRevealPhaseRank } from "@/lib/results/reveal-phase-order";
 import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
 import type { BallotSetChoice, PhoneRoundStatus, RoundBallot } from "@/lib/vote/ballot";
 import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
@@ -281,6 +282,12 @@ function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function resultRevealTime(value: string | null | undefined) {
+  const parsed = value ? Date.parse(value) : NaN;
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -356,10 +363,63 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
 
   async persistResultAdminState(input: PersistMergedStateInput): Promise<OperationalStateSnapshot> {
     return this.withEventPersistenceLock(async () => {
-      await this.saveResultAdminStateUnlocked(input);
+      const merged = await this.mergeLatestResultRevealPhases(input.current);
 
-      return cloneOperationalStateSnapshot(input.current);
+      await this.saveResultAdminStateUnlocked({
+        ...input,
+        current: merged,
+      });
+
+      return cloneOperationalStateSnapshot(merged);
     });
+  }
+
+  private async mergeLatestResultRevealPhases(snapshot: OperationalStateSnapshot) {
+    const latestRows = await this.selectEventRows("result_snapshots");
+
+    if (latestRows.length === 0) {
+      return cloneOperationalStateSnapshot(snapshot);
+    }
+
+    const latestByRound = new Map(latestRows.map((row) => [row.round_number, row]));
+    const merged = cloneOperationalStateSnapshot(snapshot);
+
+    merged.result.results = merged.result.results.map((result) => {
+      const latest = latestByRound.get(result.roundNumber);
+
+      if (!latest) {
+        return result;
+      }
+
+      const latestPhase = latest.reveal_phase as ResultRevealPhase;
+      const currentRank = resultRevealPhaseRank(result.revealPhase);
+      const latestRank = resultRevealPhaseRank(latestPhase);
+      const latestRevealPhaseStartedAt =
+        latest.reveal_phase_started_at ?? result.revealPhaseStartedAt;
+      const latestStartedLater =
+        latestRank === currentRank &&
+        resultRevealTime(latestRevealPhaseStartedAt) > resultRevealTime(result.revealPhaseStartedAt);
+
+      if (latestRank >= 0 && (latestRank > currentRank || latestStartedLater)) {
+        return {
+          ...result,
+          revealPhase: latestPhase,
+          revealPhaseStartedAt: latestRevealPhaseStartedAt,
+          finalRevealedAt: latest.final_revealed_at ?? result.finalRevealedAt,
+        };
+      }
+
+      if (latestRank >= 0 && latestRank === currentRank) {
+        return {
+          ...result,
+          finalRevealedAt: result.finalRevealedAt ?? latest.final_revealed_at,
+        };
+      }
+
+      return result;
+    });
+
+    return merged;
   }
 
   private async loadUnlocked(
@@ -627,7 +687,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.upsertVotingWindows(snapshot),
       this.saveRoundPlayerEligibility(snapshot),
       this.upsertResultSnapshots(snapshot),
-      this.upsertTiebreaks(snapshot),
+      this.upsertTiebreaks(snapshot, { skipNullWinnerRevealStartedAt: true }),
       this.saveAdminActions(snapshot),
       this.savePresence(snapshot),
       this.persistHostLockSnapshot(input.baseline?.hostLock ?? null, snapshot.hostLock),
@@ -1152,12 +1212,18 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     );
   }
 
-  private async upsertTiebreaks(snapshot: OperationalStateSnapshot) {
+  private async upsertTiebreaks(
+    snapshot: OperationalStateSnapshot,
+    options: { skipNullWinnerRevealStartedAt?: boolean } = {},
+  ) {
     await this.upsertMany(
       "tiebreaks",
       snapshot.result.results.flatMap((result) =>
         result.sets
           .filter((set) => set.tiebreakUsed && set.tiebreakWinnerChartId)
+          .filter(
+            (set) => !options.skipNullWinnerRevealStartedAt || set.winnerRevealStartedAt !== null,
+          )
           .map((set) => ({
             event_id: this.eventId,
             result_snapshot_id: result.id,

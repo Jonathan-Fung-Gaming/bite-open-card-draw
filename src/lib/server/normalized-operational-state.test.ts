@@ -1050,7 +1050,7 @@ describe("normalized operational state repository", () => {
       supabase.operations
         .filter((operation) => operation.operation === "select")
         .map((operation) => operation.table),
-    ).toEqual(["host_locks"]);
+    ).toEqual(["result_snapshots", "host_locks"]);
     expect(supabase.rpcCalls.map((call) => call.functionName)).toEqual([
       "normalized_acquire_event_persistence_lock",
       "normalized_release_event_persistence_lock",

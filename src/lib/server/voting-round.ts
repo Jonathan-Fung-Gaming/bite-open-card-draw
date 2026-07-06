@@ -126,10 +126,16 @@ export async function advanceVotingTimerIfDue(roundNumber: 1 | 2 | 3 | 4, nowMs:
     );
     await hydrateTournamentState();
 
-    return normalizedTimerResultChanged(result);
+    const changed = normalizedTimerResultChanged(result);
+
+    if (changed) {
+      invalidateTournamentReadCaches();
+    }
+
+    return changed;
   }
 
-  return withPersistedVotingState(async () => {
+  const changed = await withPersistedVotingState(async () => {
     if (!isVotingTimerAdvancementDue(roundNumber, nowMs)) {
       return false;
     }
@@ -142,6 +148,12 @@ export async function advanceVotingTimerIfDue(roundNumber: 1 | 2 | 3 | 4, nowMs:
 
     return true;
   });
+
+  if (changed) {
+    invalidateTournamentReadCaches();
+  }
+
+  return changed;
 }
 
 export function revalidateTournamentViews(revalidatePath: (path: string) => void) {

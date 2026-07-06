@@ -14,8 +14,8 @@ import {
   shouldShowPhoneResultHoldingState,
 } from "@/lib/vote/phone-view";
 import { formatVotingStatusLabel, formatVotingTime } from "@/lib/vote/voting-window";
-import { BallotFlow } from "./BallotFlow";
 import { VoteAutoRefresh } from "./VoteAutoRefresh";
+import { VoteLiveShell } from "./VoteLiveShell";
 
 export const dynamic = "force-dynamic";
 
@@ -158,23 +158,22 @@ export default async function VotePage() {
           !snapshot.canSubmit || process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true"
         }
       />
-      <VoteDenseHeader
+      <VoteLiveShell
+        canSubmit={snapshot.canSubmit}
+        closesAt={snapshot.closesAt}
+        draws={draws}
+        eligibleCount={snapshot.eligibleCount}
+        players={snapshot.eligiblePlayers}
+        remainingMs={snapshot.remainingMs}
+        roundNumber={roundNumber}
+        serverNowMs={nowMs}
+        status={snapshot.status}
+        statusLabel={formatVotingStatusLabel(snapshot.status)}
+        submittedCount={snapshot.submittedCount}
+        timerText={formatVotingTime(snapshot.remainingMs)}
         title="Player Ballot"
-        status={`${formatVotingStatusLabel(snapshot.status)} - Round ${roundNumber}`}
-        meta={`${formatVotingTime(snapshot.remainingMs)} | ${snapshot.submittedCount}/${snapshot.eligibleCount} ballots`}
+        turnoutText={`Ballots submitted: ${snapshot.submittedCount} / ${snapshot.eligibleCount}`}
       />
-      <section className="mx-auto max-w-4xl px-3 py-3 sm:px-5 sm:py-5">
-        <BallotFlow
-          roundNumber={roundNumber}
-          players={snapshot.eligiblePlayers}
-          draws={draws}
-          statusLabel={formatVotingStatusLabel(snapshot.status)}
-          status={snapshot.status}
-          timerText={formatVotingTime(snapshot.remainingMs)}
-          turnoutText={`Ballots submitted: ${snapshot.submittedCount} / ${snapshot.eligibleCount}`}
-          canSubmit={snapshot.canSubmit}
-        />
-      </section>
     </main>
   );
 }

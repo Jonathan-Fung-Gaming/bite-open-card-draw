@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { AdminLiveCountSet } from "@/lib/admin/live-counts";
+
+const LIVE_COUNT_REFRESH_MS = 5000;
 
 type AdminLiveCountsDisclosureProps = {
   roundNumber: 1 | 2 | 3 | 4;
@@ -12,12 +14,14 @@ export function AdminLiveCountsDisclosure({ roundNumber, action }: AdminLiveCoun
   const [liveCountRows, setLiveCountRows] = useState<AdminLiveCountSet[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const requestPendingRef = useRef(false);
 
-  function revealLiveCounts() {
-    if (isPending) {
+  const loadLiveCounts = useCallback(() => {
+    if (requestPendingRef.current) {
       return;
     }
 
+    requestPendingRef.current = true;
     startTransition(async () => {
       try {
         const rows = await action(roundNumber);
@@ -26,14 +30,36 @@ export function AdminLiveCountsDisclosure({ roundNumber, action }: AdminLiveCoun
         setMessage(null);
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Could not load live counts.");
+      } finally {
+        requestPendingRef.current = false;
       }
     });
+  }, [action, roundNumber]);
+
+  function revealLiveCounts() {
+    loadLiveCounts();
   }
 
   function hideLiveCounts() {
     setLiveCountRows(null);
     setMessage("Live counts hidden.");
   }
+
+  useEffect(() => {
+    if (!liveCountRows) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      if (document.hidden) {
+        return;
+      }
+
+      loadLiveCounts();
+    }, LIVE_COUNT_REFRESH_MS);
+
+    return () => window.clearInterval(interval);
+  }, [liveCountRows, loadLiveCounts]);
 
   return (
     <section className="metal-panel rounded-lg p-4" data-testid="admin-live-counts">

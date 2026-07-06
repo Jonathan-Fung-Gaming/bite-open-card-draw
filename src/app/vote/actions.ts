@@ -93,6 +93,9 @@ export async function getVoteLiveStateAction(
     turnoutText: `Ballots submitted: ${snapshot.submittedCount} / ${snapshot.eligibleCount}`,
     eligibleCount: snapshot.eligibleCount,
     submittedCount: snapshot.submittedCount,
+    serverNow: snapshot.serverNow,
+    closesAt: snapshot.closesAt,
+    remainingMs: snapshot.remainingMs,
     existingBallotLookup: playerId
       ? buildPublicBallotLookup(adminState.ballotStore.get(roundNumber, playerId), editToken)
       : null,
