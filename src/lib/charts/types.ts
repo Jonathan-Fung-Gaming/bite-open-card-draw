@@ -74,6 +74,7 @@ export type ChartImportReport = {
   importedCharts: number;
   repairedRows: ChartImportRowDiagnostic[];
   skippedRows: ChartImportRowDiagnostic[];
+  filteredRows: ChartImportRowDiagnostic[];
   outOfScopeRows: ChartImportRowDiagnostic[];
   duplicateChartKeys: ChartDuplicate[];
   poolCounts: Record<RequiredChartPool, number>;

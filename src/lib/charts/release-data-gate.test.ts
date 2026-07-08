@@ -31,6 +31,7 @@ function baseReport(sourceSha256: string): ChartImportReport {
     importedCharts: 1,
     repairedRows: [],
     skippedRows: [],
+    filteredRows: [],
     outOfScopeRows: [],
     duplicateChartKeys: [],
     poolCounts: poolCounts(),

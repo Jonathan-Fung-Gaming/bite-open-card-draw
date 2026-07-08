@@ -15,6 +15,94 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Vote, Results, And Chart Filtering Follow-Up Phase 6 - Short Cut And Full Song Filtering - 2026-07-09
+
+Status: complete for local source, unit, build, memory-dev browser evidence, and regenerated ignored
+chart artifacts. This phase did not change draw randomness, round rules, result computation,
+persistence schema, RPCs, Supabase migrations, or tournament-changing action boundaries.
+
+### Scope
+
+- Confirmed `data/source/charts.csv` has no category field for Short Cuts, Full Songs, or Remixes;
+  it contains only `name`, `name_kr`, `artist`, `label`, `type`, `level`, and `bg_img`.
+- Added normalized title matching for disallowed `Short Cut`, `Shortcut`, and `Full Song` markers
+  across both `name` and `name_kr`.
+- Kept Remix charts eligible unless they also contain a disallowed Short Cut or Full Song marker.
+- Filtered disallowed special charts before chart normalization, dedupe, pool counting, and draw
+  eligibility.
+- Added a dedicated `filteredRows` import-report bucket with source row numbers and clear reasons so
+  intentional special-chart filtering is not mixed with malformed skipped rows.
+- Added a runtime stale-artifact filter so ignored generated catalogs cannot reintroduce Short Cut or
+  Full Song charts if local generated files lag behind source code.
+- Regenerated local ignored chart artifacts with `import:charts` and `cache:chart-images` for
+  validation.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `scripts/import-charts.ts`
+- `src/lib/charts/importer.ts`
+- `src/lib/charts/importer.test.ts`
+- `src/lib/charts/normalize.ts`
+- `src/lib/charts/normalize.test.ts`
+- `src/lib/charts/release-data-gate.test.ts`
+- `src/lib/charts/runtime-catalog.ts`
+- `src/lib/charts/runtime-catalog.test.ts`
+- `src/lib/charts/types.ts`
+
+### Checks Run
+
+- `rtk npx prettier --write src/lib/charts/normalize.ts src/lib/charts/normalize.test.ts src/lib/charts/importer.ts src/lib/charts/importer.test.ts src/lib/charts/runtime-catalog.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/release-data-gate.test.ts src/lib/charts/types.ts scripts/import-charts.ts` - passed.
+- `rtk npx vitest run src/lib/charts/normalize.test.ts src/lib/charts/importer.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/release-data-gate.test.ts` - passed, 4 files / 32 tests.
+- `rtk npm run import:charts` - passed; imported 4,135 charts and filtered 295 Short Cut or Full
+  Song source rows.
+- `rtk npm run cache:chart-images` - passed; prepared 559 image assets, all cached, against the
+  filtered local chart catalog.
+- `rtk npm run verify:release-data` - failed after artifact regeneration only because the existing
+  source import still has unsigned repaired/skipped diagnostics requiring `reviewedBy`,
+  `reviewedAt`, and `reviewedCommit` release evidence; chart/image artifact identity and pool counts
+  no longer failed.
+- `rtk git diff --check` - passed.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 60 files / 365 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+
+### Evidence
+
+- Local regenerated `chart-import-report.json` recorded 295 filtered rows with source-row reasons:
+  232 raw Short Cut rows and 63 raw Full Song rows; no `Shortcut` rows existed in the source CSV.
+- Local regenerated `charts.json` and `charts-with-images.json` had 4,135 charts with zero remaining
+  Short Cut, Shortcut, or Full Song matches.
+- Remix rows remained present: 40 generated remix charts remained after filtering.
+- Required pool counts after filtering were S16 175, S17 184, S18 166, S19 154, S20 124, S21 131,
+  S22 90, and D23 113; every required pool stayed far above the 7-chart minimum.
+- Unit tests cover Short Cut, Shortcut, Full Song, `name_kr` filtering, Remix preservation, false
+  positives such as `Short Fuse`, import-report `filteredRows`, pool-count effects, and stale
+  generated runtime catalog filtering.
+
+### Manual Review
+
+- Reviewed against `docs/product-spec.md` chart and draw requirements: only eligible chart catalog
+  inputs changed; draw randomness, selected-song blocking, result rules, and voting behavior remain
+  unchanged.
+- No browser-side tournament-changing actions, secrets, service-role keys, admin password data, or
+  database mutations were added.
+
+### Risks And Assumptions
+
+- Because the source CSV has no category field, filtering depends on normalized title markers in
+  `name` and `name_kr`.
+- A chart containing both `Remix` and `Short Cut` is intentionally filtered as a Short Cut, not kept
+  by the Remix preservation rule.
+- Already-persisted draws or results from before this phase are not retroactively invalidated; reset
+  and redraw any active event namespace that already contains a now-filtered chart.
+- Generated chart artifacts are ignored by git in this repository; they were regenerated locally for
+  validation, and runtime loading now defensively filters stale generated catalogs.
+- Full release-data validation still needs signed review evidence for pre-existing repaired/skipped
+  source diagnostics.
+
 ## Vote, Results, And Chart Filtering Follow-Up Phase 5 - Route Transition Flicker Guard - 2026-07-09
 
 Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not

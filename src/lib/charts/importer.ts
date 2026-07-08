@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { parse } from "csv-parse/sync";
 import { applyChartExclusions, getEligibleTournamentCharts } from "./exclusions";
-import { normalizeChartRow } from "./normalize";
+import { getDisallowedSpecialChartNameReason, normalizeChartRow } from "./normalize";
 import {
   EXPECTED_CHART_CSV_COLUMNS,
   REQUIRED_CHART_POOLS,
@@ -247,11 +247,21 @@ export function importChartRows(
 } {
   const chartsByKey = new Map<string, NormalizedChart>();
   const duplicateChartKeys: ChartDuplicate[] = [];
+  const filteredRows: ChartImportReport["filteredRows"] = [];
   const skippedRows: ChartImportReport["skippedRows"] = [];
   const outOfScopeRows: ChartImportReport["outOfScopeRows"] = [];
 
   rows.forEach((row, index) => {
     const sourceRowNumber = index + 2;
+    const disallowedSpecialChartReason = getDisallowedSpecialChartNameReason(row.name, row.name_kr);
+
+    if (disallowedSpecialChartReason) {
+      filteredRows.push({
+        sourceRowNumber,
+        reason: disallowedSpecialChartReason,
+      });
+      return;
+    }
 
     try {
       const chart = normalizeChartRow(row, sourceRowNumber);
@@ -288,9 +298,7 @@ export function importChartRows(
   const repairedRows = [...(options.repairedRows ?? [])];
   const strictFailures = options.strict
     ? [
-        ...repairedRows.map(
-          (row) => `Row ${row.sourceRowNumber} was repaired: ${row.reason}`,
-        ),
+        ...repairedRows.map((row) => `Row ${row.sourceRowNumber} was repaired: ${row.reason}`),
         ...skippedRows.map((row) => `Row ${row.sourceRowNumber} was skipped: ${row.reason}`),
         ...duplicateChartKeys.map(
           (duplicate) =>
@@ -317,6 +325,7 @@ export function importChartRows(
       importedCharts: charts.length,
       repairedRows,
       skippedRows,
+      filteredRows,
       outOfScopeRows,
       duplicateChartKeys,
       poolCounts,

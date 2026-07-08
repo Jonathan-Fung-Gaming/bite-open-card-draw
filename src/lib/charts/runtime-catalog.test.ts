@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { localImagePathForRemoteUrl } from "./image-cache";
 import { normalizeChartRow } from "./normalize";
-import { resolveRuntimeChartImages } from "./runtime-catalog";
+import { filterDisallowedRuntimeCharts, resolveRuntimeChartImages } from "./runtime-catalog";
 
 function chartWithLocalImagePath(localImagePath: string | null) {
   return {
@@ -37,8 +37,35 @@ describe("runtime chart catalog", () => {
   it("derives deployed cache paths from source bg_img when generated metadata is absent", () => {
     const expectedLocalPath = localImagePathForRemoteUrl("https://example.com/runtime.png");
 
-    expect(
-      resolveRuntimeChartImages([chartWithLocalImagePath(null)])[0]?.localImagePath,
-    ).toBe(expectedLocalPath);
+    expect(resolveRuntimeChartImages([chartWithLocalImagePath(null)])[0]?.localImagePath).toBe(
+      expectedLocalPath,
+    );
+  });
+
+  it("filters stale generated Short Cut and Full Song charts before runtime use", () => {
+    const normal = chartWithLocalImagePath("/chart-images/cache/runtime.png");
+    const filtered = filterDisallowedRuntimeCharts([
+      normal,
+      {
+        ...normal,
+        id: "short-cut",
+        name: "Runtime - SHORT CUT -",
+        nameKr: "Runtime - SHORT CUT -",
+      },
+      {
+        ...normal,
+        id: "full-song",
+        name: "Runtime - FULL SONG -",
+        nameKr: "Runtime - FULL SONG -",
+      },
+      {
+        ...normal,
+        id: "remix",
+        name: "Runtime Remix",
+        nameKr: "Runtime Remix",
+      },
+    ]);
+
+    expect(filtered.map((chart) => chart.id)).toEqual([normal.id, "remix"]);
   });
 });
