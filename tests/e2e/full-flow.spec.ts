@@ -59,9 +59,7 @@ const PHASE5_LONG_CHART_FIXTURE =
   "Phase5DeterministicLiveCountChartNameWithoutNaturalBreakpointsABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 function hostRunButton(page: Page, name: string | RegExp, options: { exact?: boolean } = {}) {
-  return page
-    .getByTestId("admin-host-run-controls")
-    .getByRole("button", { name, ...options });
+  return page.getByTestId("admin-host-run-controls").getByRole("button", { name, ...options });
 }
 
 type EvidenceBox = {
@@ -115,6 +113,35 @@ async function failNextVoteSubmitRequest(page: Page) {
   };
 
   await page.route("**/*", routeHandler);
+}
+
+async function expectBanInstructionThenBallotCards(page: Page) {
+  const popin = page.getByTestId("ban-instruction-popin");
+  const cards = page.getByTestId("ballot-chart-card");
+
+  await expect(popin).toContainText("Please ban up to two charts");
+  await expect(popin).toHaveAttribute("data-controls-paused", "true");
+  await expect(cards.first()).toBeDisabled();
+  await expect(popin).toHaveAttribute("data-controls-paused", "false", { timeout: 4_000 });
+  await expect(popin).toBeHidden({ timeout: 5_000 });
+  await expect(cards).toHaveCount(7);
+}
+
+async function confirmVoteIdentity(
+  page: Page,
+  playerName: string,
+  options: { waitForCards?: boolean } = {},
+) {
+  const confirmButton = page.getByRole("button", { name: "Confirm" });
+
+  await expect(confirmButton).toBeDisabled();
+  await page.getByLabel(`I confirm that I am ${playerName}`).check();
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
+
+  if (options.waitForCards !== false) {
+    await expectBanInstructionThenBallotCards(page);
+  }
 }
 
 async function expectStageRows(page: Page) {
@@ -456,7 +483,9 @@ async function expectStageFitsProjectorViewport(page: Page, label: string) {
     const wheel = document.querySelector('[data-testid="rune-wheel"] .rune-wheel-shell');
     const wheelRect = wheel?.getBoundingClientRect();
     const finalCards = Array.from(
-      document.querySelectorAll('[data-testid="stage-final-chart-list"] [data-testid="stage-chart-card"]'),
+      document.querySelectorAll(
+        '[data-testid="stage-final-chart-list"] [data-testid="stage-chart-card"]',
+      ),
     ).map((element) => {
       const rect = element.getBoundingClientRect();
 
@@ -613,8 +642,7 @@ async function expectOxaniumFontLoaded(page: Page) {
 async function expectDifficultyComparableToTitle(cards: Locator, label: string) {
   const sizes = await cards.evaluateAll((elements) =>
     elements.map((element) => {
-      const difficulty =
-        element.querySelector('[data-testid="selected-chart-difficulty"]');
+      const difficulty = element.querySelector('[data-testid="selected-chart-difficulty"]');
       const title =
         element.querySelector('[data-testid="stage-chart-title"]') ??
         element.querySelector('[data-testid="selected-chart-title"]');
@@ -997,9 +1025,9 @@ async function expectNoFinalResultSpoilers(page: Page) {
 
 async function expectStageDoesNotReturnToDrawMode(stagePage: Page, roundNumber: number) {
   for (let sample = 0; sample < 3; sample += 1) {
-    await expect(
-      stagePage.getByRole("heading", { name: `Round ${roundNumber} Draw` }),
-    ).toHaveCount(0);
+    await expect(stagePage.getByRole("heading", { name: `Round ${roundNumber} Draw` })).toHaveCount(
+      0,
+    );
     await expect(stagePage.getByTestId("stage-chart-rows")).toHaveCount(0);
     await expect(
       stagePage
@@ -1288,9 +1316,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(page.getByTestId("admin-host-lock-context")).toContainText("No active host");
   await expect(page.getByTestId("host-heartbeat-confidence")).toContainText("No active heartbeat");
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Take Host Control" }));
-  await expect(
-    hostRunButton(page, "Release"),
-  ).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect(hostRunButton(page, "Release")).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await expect(page).toHaveTitle("Host Console | Pump It Up Open Stage");
   await expectAdminEventDayFlow(page);
   await expectAdminPanelOpenStatePersists(page, "admin-secondary-panels");
@@ -1490,8 +1516,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await phonePage.setViewportSize({ width: 390, height: 844 });
   await goto(phonePage, "/vote");
   await phonePage.getByLabel("Select your start.gg username").selectOption({ label: "Alpha" });
-  await phonePage.getByRole("button", { name: "Confirm" }).click();
-  await expect(phonePage.getByTestId("ballot-chart-card")).toHaveCount(7);
+  await confirmVoteIdentity(phonePage, "Alpha");
   await expectCenteredSeventhCard(phonePage);
   const mobileVoteGeometry = await collectMobileVoteGeometry(phonePage);
 
@@ -1568,6 +1593,8 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(
     duplicatePhonePage.getByText("A ballot already exists for this start.gg username"),
   ).toBeVisible({ timeout: 7000 });
+  await expect(duplicatePhonePage.getByRole("button", { name: "Confirm" })).toBeDisabled();
+  await duplicatePhonePage.getByLabel("I confirm that I am Alpha").check();
   await expect(duplicatePhonePage.getByRole("button", { name: "Confirm" })).toBeEnabled();
   await duplicatePhonePage.getByRole("button", { name: "Confirm" }).click();
   await expect(
@@ -1578,6 +1605,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(duplicatePhonePage.getByRole("button", { name: "Confirm" })).toBeEnabled();
   await expect(duplicatePhonePage.getByTestId("ballot-chart-card")).toHaveCount(0);
   await duplicatePhonePage.getByRole("button", { name: "Confirm" }).click();
+  await expectBanInstructionThenBallotCards(duplicatePhonePage);
   await expect(duplicatePhonePage.getByTestId("ballot-chart-card").first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -1661,10 +1689,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expectStageFitsProjectorViewport(stagePage, "final charts");
   await expectPhoneRoutesHoldFinalResults({ chartsPage, resultsPage, votePage: phonePage });
   const privateCsvDownloadPromise = page.waitForEvent("download");
-  await clickAdminActionAndWait(
-    page,
-    hostRunButton(page, "Confirm Stage Reveal Complete"),
-  );
+  await clickAdminActionAndWait(page, hostRunButton(page, "Confirm Stage Reveal Complete"));
   await expect(
     page.getByTestId("admin-host-run-controls").getByText("Phones and results released"),
   ).toBeVisible();
@@ -1927,10 +1952,7 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }, te
   await expect(
     page.getByTestId("admin-host-run-controls").getByText("ready to vote", { exact: true }),
   ).toBeVisible();
-  await clickAdminActionAndWait(
-    page,
-    hostRunButton(page, "Open Voting", { exact: true }),
-  );
+  await clickAdminActionAndWait(page, hostRunButton(page, "Open Voting", { exact: true }));
   await expect(
     page.getByTestId("admin-host-run-controls").getByText("voting open", { exact: true }),
   ).toBeVisible();
@@ -1941,8 +1963,7 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }, te
   await phonePage
     .getByLabel("Select your start.gg username")
     .selectOption({ label: "Rehearsal Player 01" });
-  await phonePage.getByRole("button", { name: "Confirm" }).click();
-  await expect(phonePage.getByTestId("ballot-chart-card")).toHaveCount(7);
+  await confirmVoteIdentity(phonePage, "Rehearsal Player 01");
   const firstCard = phonePage.getByTestId("ballot-chart-card").first();
 
   await firstCard.click();
@@ -2055,9 +2076,7 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
         ),
     )
     .toBe(1);
-  await expect(stagePage.getByTestId("rune-wheel-status")).toContainText(
-    "Selected chart:",
-  );
+  await expect(stagePage.getByTestId("rune-wheel-status")).toContainText("Selected chart:");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Release"));

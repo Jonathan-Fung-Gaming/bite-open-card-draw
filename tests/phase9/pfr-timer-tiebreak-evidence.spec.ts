@@ -76,7 +76,20 @@ async function submitNoBanBallot(page: Page, baseURL: string, playerStartggUsern
   await expect(
     page.getByText(`Are you sure you are voting as ${playerStartggUsername}?`),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
-  await page.getByRole("button", { name: "Confirm" }).click();
+  const confirmButton = page.getByRole("button", { name: "Confirm" });
+  const instructionPopin = page.getByTestId("ban-instruction-popin");
+
+  await expect(confirmButton).toBeDisabled();
+  await page.getByLabel(`I confirm that I am ${playerStartggUsername}`).check();
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
+  await expect(instructionPopin).toContainText("Please ban up to two charts");
+  await expect(instructionPopin).toHaveAttribute("data-controls-paused", "true");
+  await expect(page.getByTestId("ballot-chart-card").first()).toBeDisabled();
+  await expect(instructionPopin).toHaveAttribute("data-controls-paused", "false", {
+    timeout: 4_000,
+  });
+  await expect(instructionPopin).toBeHidden({ timeout: 5_000 });
   await expect(page.getByTestId("ballot-chart-card")).toHaveCount(7, {
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -318,7 +331,9 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
     await expect(stageRawPage.getByTestId("rune-wheel-status")).toHaveText(
       "Selector locking onto the sealed chart.",
     );
-    await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0, { timeout: 500 });
+    await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0, {
+      timeout: 500,
+    });
 
     const hiddenSlotLabels = await readRuneSlotLabels(stageRawPage);
     const hiddenSlotCounts = countLabels(hiddenSlotLabels);
@@ -327,9 +342,7 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
     expect(Object.values(hiddenSlotCounts).sort((left, right) => left - right)).toEqual([6, 6]);
 
     await expect(wheel).toHaveAttribute("data-winner-revealed", "true", { timeout: 13_000 });
-    await expect(stageRawPage.getByTestId("rune-wheel-status")).toContainText(
-      "Selected chart:",
-    );
+    await expect(stageRawPage.getByTestId("rune-wheel-status")).toContainText("Selected chart:");
     await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0);
     const revealedSelectedSlotCount = await stageRawPage
       .getByTestId("rune-wheel-slot")

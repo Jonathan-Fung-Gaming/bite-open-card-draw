@@ -32,6 +32,28 @@ async function expectNoVagueSkipAction(page: Page) {
   await expect(page.getByText(/skip/i)).toHaveCount(0);
 }
 
+async function expectBanInstructionThenBallotCards(page: Page) {
+  const popin = page.getByTestId("ban-instruction-popin");
+  const cards = page.getByTestId("ballot-chart-card");
+
+  await expect(popin).toContainText("Please ban up to two charts");
+  await expect(popin).toHaveAttribute("data-controls-paused", "true");
+  await expect(cards.first()).toBeDisabled();
+  await expect(popin).toHaveAttribute("data-controls-paused", "false", { timeout: 4_000 });
+  await expect(popin).toBeHidden({ timeout: 5_000 });
+  await expect(cards).toHaveCount(7);
+}
+
+async function confirmSelectedVoter(page: Page, playerName: string) {
+  const confirmButton = page.getByRole("button", { name: "Confirm" });
+
+  await expect(confirmButton).toBeDisabled();
+  await page.getByLabel(`I confirm that I am ${playerName}`).check();
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
+  await expectBanInstructionThenBallotCards(page);
+}
+
 async function expectCenteredSeventhCard(page: Page) {
   const viewport = page.viewportSize();
   const cards = page.getByTestId("ballot-chart-card");
@@ -347,8 +369,11 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
   });
   await expect(page.getByText(`Are you sure you are voting as ${voterName}?`)).toBeVisible();
   await expectTouchTarget(page.getByRole("button", { name: "Confirm" }), "confirm button");
-  await page.getByRole("button", { name: "Confirm" }).click();
-  await expect(page.getByTestId("ballot-chart-card")).toHaveCount(7);
+  await expectTouchTarget(
+    page.getByTestId("identity-confirmation-checkbox"),
+    "identity confirmation",
+  );
+  await confirmSelectedVoter(page, voterName);
   await expectNoVagueSkipAction(page);
   await expectCenteredSeventhCard(page);
   await expect(page.getByRole("button", { name: /skip/i })).toHaveCount(0);
