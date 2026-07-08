@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { normalizeChartRow } from "@/lib/charts/normalize";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import { BallotStore } from "./ballot-store";
-import { countBanSelections, isSetChoiceComplete, validateRoundBallot } from "./ballot";
+import {
+  MAX_BANS_PER_ROUND_BALLOT,
+  MAX_BANS_PER_SET,
+  countBanSelections,
+  isSetChoiceComplete,
+  validateRoundBallot,
+} from "./ballot";
 
 function draw(id: string, displayLabel: string, level: string): DrawRecord {
   const charts = Array.from({ length: 7 }, (_, index) =>
@@ -79,6 +85,105 @@ describe("ballot validation and store", () => {
         bannedChartIds: ["1", "2"],
       }),
     ).toBe(true);
+  });
+
+  it("documents that one ballot can cast up to four bans across both sets", () => {
+    const store = new BallotStore();
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+
+    for (const playerNumber of [1, 2, 3, 4]) {
+      store.submit(
+        {
+          roundNumber: 1,
+          playerId: `player-${playerNumber}`,
+          playerStartggUsername: `Player ${playerNumber}`,
+          choices: draws.map((candidate) => ({
+            drawId: candidate.id,
+            roundSetId: candidate.roundSetId,
+            displayLabel: candidate.displayLabel,
+            noBans: false,
+            bannedChartIds: candidate.charts
+              .slice(playerNumber - 1, playerNumber + 1)
+              .map((chart) => chart.id),
+          })),
+        },
+        draws,
+        `submitted-${playerNumber}`,
+      );
+    }
+
+    const ballots = store.listForRound(1);
+    const perSetBanTotals = draws.map((candidate) =>
+      ballots.reduce((total, ballot) => {
+        const choice = ballot.choices.find((ballotChoice) => ballotChoice.drawId === candidate.id);
+
+        return total + (choice?.bannedChartIds.length ?? 0);
+      }, 0),
+    );
+
+    expect(ballots).toHaveLength(4);
+    expect(countBanSelections(ballots)).toBe(ballots.length * MAX_BANS_PER_ROUND_BALLOT);
+    expect(countBanSelections(ballots)).toBeLessThanOrEqual(
+      ballots.length * MAX_BANS_PER_ROUND_BALLOT,
+    );
+    for (const perSetBanTotal of perSetBanTotals) {
+      expect(perSetBanTotal).toBeLessThanOrEqual(ballots.length * MAX_BANS_PER_SET);
+    }
+  });
+
+  it("treats fifteen ban selections from four ballots as a valid across-both-sets total", () => {
+    const store = new BallotStore();
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const fullBanChoices = (playerNumber: number) =>
+      draws.map((candidate) => ({
+        drawId: candidate.id,
+        roundSetId: candidate.roundSetId,
+        displayLabel: candidate.displayLabel,
+        noBans: false,
+        bannedChartIds: candidate.charts
+          .slice(playerNumber - 1, playerNumber + 1)
+          .map((chart) => chart.id),
+      }));
+
+    for (const playerNumber of [1, 2, 3]) {
+      store.submit(
+        {
+          roundNumber: 1,
+          playerId: `player-${playerNumber}`,
+          playerStartggUsername: `Player ${playerNumber}`,
+          choices: fullBanChoices(playerNumber),
+        },
+        draws,
+        `submitted-${playerNumber}`,
+      );
+    }
+    store.submit(
+      {
+        roundNumber: 1,
+        playerId: "player-4",
+        playerStartggUsername: "Player 4",
+        choices: [
+          fullBanChoices(4)[0]!,
+          {
+            drawId: draws[1]!.id,
+            roundSetId: draws[1]!.roundSetId,
+            displayLabel: draws[1]!.displayLabel,
+            noBans: false,
+            bannedChartIds: [draws[1]!.charts[4]!.id],
+          },
+        ],
+      },
+      draws,
+      "submitted-4",
+    );
+
+    const ballots = store.listForRound(1);
+
+    expect(ballots).toHaveLength(4);
+    expect(countBanSelections(ballots)).toBe(15);
+    expect(countBanSelections(ballots)).toBeLessThanOrEqual(
+      ballots.length * MAX_BANS_PER_ROUND_BALLOT,
+    );
   });
 
   it("keeps the latest valid submitted ballot for a player", () => {

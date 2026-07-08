@@ -15,6 +15,62 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Vote, Results, And Chart Filtering Follow-Up Phase 2 - Ban Count Clarification And Invariants - 2026-07-08
+
+Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not
+change tournament rules, result selection, persistence schema, RPCs, or Supabase migrations.
+
+### Scope
+
+- Documented the existing rule in code with constants for 2 bans per set and 4 bans per round
+  ballot.
+- Strengthened tests proving valid submitted ballots can cast up to 4 bans total across both sets.
+- Added result-engine invariant coverage proving total counted bans stay within
+  `ballotCount * 4`, per-set bans stay within `ballotCount * 2`, and each chart count stays within
+  the counted ballot count for that set.
+- Added admin live-count invariant coverage proving live per-set and per-chart rows stay within the
+  same valid maxima.
+- Kept duplicate chart-id rejection coverage in ballot validation.
+- Clarified public/stage/admin copy from `Ban selections cast` to
+  `Ban selections cast across both sets` where the full label is shown, and clarified compact admin
+  voting controls as across both sets.
+
+### Changed Files
+
+- `src/app/coolguy69/page.tsx`
+- `src/app/stage/page.tsx`
+- `src/lib/admin/live-counts.test.ts`
+- `src/lib/results/result-engine.test.ts`
+- `src/lib/vote/ballot.ts`
+- `src/lib/vote/ballot.test.ts`
+- `tests/phase9/assertions/public-ui.assert.ts`
+
+### Checks Run
+
+- `rtk npx vitest run src/lib/vote/ballot.test.ts src/lib/results/result-engine.test.ts src/lib/admin/live-counts.test.ts` - passed, 3 files / 29 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed after rerun; an earlier parallel run raced with `next build`
+  deleting/regenerating `.next/types`.
+- `rtk npm run test` - passed, 58 files / 342 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+
+### Evidence
+
+- Unit tests now explicitly show that totals like 15 bans from 4 ballots are valid because each
+  ballot may cast up to 4 bans across the two sets.
+- Result-engine tests prove valid counted result rows cannot exceed the round, set, or per-chart
+  maxima.
+- Admin live-count tests prove live count rows stay within the same valid maxima.
+- Browser e2e confirms the clarified public/admin/stage copy does not break the public voting flow.
+
+### Risks And Assumptions
+
+- No counting algorithm changed; the new constants and tests document existing validated-ballot
+  behavior.
+- The `Ban selections cast across both sets` label is intentionally longer. The compact admin card
+  uses the same concept and remains covered by build/e2e layout smoke checks.
+
 ## Vote, Results, And Chart Filtering Follow-Up Phase 1 - Player Identity And Ban Instruction UX - 2026-07-08
 
 Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not
