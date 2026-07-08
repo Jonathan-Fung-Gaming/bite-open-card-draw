@@ -26,6 +26,13 @@ async function attachJsonEvidence(testInfo: TestInfo, name: string, payload: unk
   });
 }
 
+async function attachScreenshotEvidence(testInfo: TestInfo, name: string, page: Page) {
+  await testInfo.attach(name, {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: "image/png",
+  });
+}
+
 function parseTimerSeconds(timerText: string) {
   const match = timerText.trim().match(/^(\d{2}):(\d{2})$/);
 
@@ -185,6 +192,15 @@ async function readRuneSlotLabels(page: Page) {
   );
 }
 
+async function readRuneSlotOrientations(page: Page) {
+  return page.getByTestId("rune-wheel-slot").evaluateAll((slots) =>
+    slots.map((slot) => ({
+      bottomFacesCenter: slot.getAttribute("data-image-bottom-faces-center") === "true",
+      rotation: Number(slot.getAttribute("data-slot-radial-image-rotation-deg")),
+    })),
+  );
+}
+
 function countLabels(labels: string[]) {
   return labels.reduce<Record<string, number>>((counts, label) => {
     counts[label] = (counts[label] ?? 0) + 1;
@@ -328,6 +344,12 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
 
     await expect(wheel).toHaveAttribute("data-winner-revealed", "false", { timeout: 1_500 });
     await expect(stageRawPage.getByTestId("rune-wheel-slot")).toHaveCount(12);
+    const slotOrientations = await readRuneSlotOrientations(stageRawPage);
+
+    expect(slotOrientations.map((slot) => slot.rotation)).toEqual(
+      Array.from({ length: 12 }, (_, index) => index * 30),
+    );
+    expect(slotOrientations.every((slot) => slot.bottomFacesCenter)).toBe(true);
     await expect(stageRawPage.getByTestId("rune-wheel-status")).toHaveText(
       "Selector locking onto the sealed chart.",
     );
@@ -340,6 +362,12 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
 
     expect(Object.keys(hiddenSlotCounts)).toHaveLength(2);
     expect(Object.values(hiddenSlotCounts).sort((left, right) => left - right)).toEqual([6, 6]);
+
+    await attachScreenshotEvidence(
+      testInfo,
+      "pfr-023-rune-wheel-radial-orientation.png",
+      stageRawPage,
+    );
 
     await expect(wheel).toHaveAttribute("data-winner-revealed", "true", { timeout: 13_000 });
     await expect(stageRawPage.getByTestId("rune-wheel-status")).toContainText("Selected chart:");
@@ -360,6 +388,7 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
       hiddenSelectedLabelCount: 0,
       slotCount: hiddenSlotLabels.length,
       slotCountsByChart: hiddenSlotCounts,
+      slotOrientations,
       revealedWinnerAttribute: "true",
       revealedSelectedLabelCount: 0,
       revealedSelectedSlotCount,

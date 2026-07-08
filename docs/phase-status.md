@@ -15,6 +15,74 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Vote, Results, And Chart Filtering Follow-Up Phase 4 - Rune Wheel Radial Image Orientation - 2026-07-08
+
+Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not
+change result computation, tiebreak selection, winner persistence, RPCs, or Supabase migrations. The
+first full e2e run exposed an unrelated manual private CSV download timeout; focused reruns for the
+affected desktop specs passed.
+
+### Scope
+
+- Kept the backend-decided winner and existing final wheel landing math unchanged.
+- Removed the viewport-upright slot counter-rotation so each rune wheel chart image is oriented
+  radially with its bottom edge facing the wheel center.
+- Added a small rotation helper for slot image orientation and unit coverage for the 12-slot wheel.
+- Added DOM evidence attributes for radial orientation without adding new chart identity or
+  selected-winner data beyond the existing slot markup.
+- Added full-flow and Phase 9 tiebreak evidence assertions for the 12 slot rotations and a Phase 9
+  screenshot attachment after the wheel renders.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `src/app/globals.css`
+- `src/components/RuneWheel.tsx`
+- `src/components/rune-wheel-rotation.ts`
+- `src/components/rune-wheel-rotation.test.ts`
+- `tests/e2e/full-flow.spec.ts`
+- `tests/phase9/pfr-timer-tiebreak-evidence.spec.ts`
+
+### Checks Run
+
+- `rtk npx prettier --write src/components/RuneWheel.tsx src/components/rune-wheel-rotation.ts src/components/rune-wheel-rotation.test.ts src/app/globals.css tests/e2e/full-flow.spec.ts tests/phase9/pfr-timer-tiebreak-evidence.spec.ts` - passed.
+- `rtk npx vitest run src/components/rune-wheel-rotation.test.ts` - passed, 1 file / 4 tests.
+- `rtk git diff --check` - passed.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 59 files / 346 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - first run failed in the desktop full-flow smoke on
+  `Download private ballot CSV` after final reveal; the mobile route projects and visual evidence
+  project passed before the run aborted.
+- `rtk npm run test:e2e:no-build -- --project=desktop-chromium --grep "full round smoke flow reaches final reveal and downloads private CSV"` - passed on rerun.
+- `rtk npm run test:e2e:no-build -- --project=desktop-chromium --grep "unsaved vote draft survives pause"` - passed.
+- `rtk npm run test:e2e:no-build -- --project=desktop-chromium --grep "stage tiebreak wheel hides"` - passed.
+
+### Additional Observed Gate Debt
+
+- `rtk npm run test:e2e:no-build -- --config=playwright.phase9.config.ts --grep "PFR-023 browser tiebreak evidence"` failed before the Phase 4 assertions during Phase 9 rehearsal setup.
+- `rtk npm run test:phase9` failed in the same existing Phase 9 memory-profile rehearsal setup path:
+  the admin page stayed in tournament mode/host-lock-inactive while waiting for `Rehearsal mode`.
+
+### Evidence
+
+- Unit tests verify the 12-slot radial orientation sequence `[0, 30, 60, ... 330]` and invalid input
+  fallbacks.
+- The focused stage tiebreak e2e verifies all 12 wheel slots report the radial orientation data while
+  visible selected styling and status text remain hidden until reveal completion.
+- Phase 9 tiebreak evidence code now records `slotOrientations` and attaches
+  `pfr-023-rune-wheel-radial-orientation.png` once that broader rehearsal setup reaches the wheel.
+
+### Risks And Assumptions
+
+- The actual wheel selection math remains covered by the existing final-rotation tests; only per-slot
+  visual orientation changed.
+- The new DOM orientation attributes are evidence markers; they do not add chart names, chart
+  difficulties, or selected-winner status beyond the existing sealed-slot markup.
+- The Phase 9 setup failure is outside this phase's code path and should be handled separately; the
+  Phase 4-specific full-flow tiebreak browser evidence passed under the memory-dev profile.
+
 ## Vote, Results, And Chart Filtering Follow-Up Phase 3 - Result Reveal And Least-Ban Presentation - 2026-07-08
 
 Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not

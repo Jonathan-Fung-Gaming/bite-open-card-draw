@@ -218,6 +218,21 @@ async function expectStageResultRowsRevealProgressively(page: Page) {
     .toBe(7);
 }
 
+async function expectRuneWheelSlotsRadiallyOriented(page: Page) {
+  const slotOrientations = await page.getByTestId("rune-wheel-slot").evaluateAll((slots) =>
+    slots.map((slot) => ({
+      bottomFacesCenter: slot.getAttribute("data-image-bottom-faces-center"),
+      rotation: Number(slot.getAttribute("data-slot-radial-image-rotation-deg")),
+    })),
+  );
+
+  expect(slotOrientations).toHaveLength(12);
+  expect(slotOrientations.map((slot) => slot.rotation)).toEqual(
+    Array.from({ length: 12 }, (_, index) => index * 30),
+  );
+  expect(slotOrientations.every((slot) => slot.bottomFacesCenter === "true")).toBe(true);
+}
+
 async function expectRenderedImageElement(image: Locator) {
   await expect(image).toBeVisible({ timeout: 7_000 });
   await expect
@@ -2070,6 +2085,7 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
   await expectStageAcceptedResultPhase(stagePage, "set_1_resolved");
 
   await expect(stagePage.getByTestId("rune-wheel-slot")).toHaveCount(12);
+  await expectRuneWheelSlotsRadiallyOriented(stagePage);
   await expect(stagePage.getByTestId("rune-wheel")).not.toContainText("Sealed rune");
   await expect(stagePage.getByTestId("rune-wheel-slot").first()).not.toContainText(/\d|S\d/);
   await expectStageFitsProjectorViewport(stagePage, "focused tiebreak wheel");

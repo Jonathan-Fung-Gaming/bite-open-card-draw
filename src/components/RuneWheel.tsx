@@ -6,7 +6,7 @@ import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawnChartSummary } from "@/lib/draw/draw-engine";
 import { TIEBREAK_REVEAL_DURATION_MS } from "@/lib/results/reveal-timing";
 import { ChartArtImage } from "./ChartArtImage";
-import { getRuneWheelFinalRotation } from "./rune-wheel-rotation";
+import { getRuneWheelFinalRotation, getRuneWheelRadialImageRotation } from "./rune-wheel-rotation";
 
 type RuneWheelProps = {
   slots: DrawnChartSummary[];
@@ -32,7 +32,6 @@ export function RuneWheel({
   stageMode = false,
 }: RuneWheelProps) {
   const winner = slots.find((slot) => slot.id === winnerChartId);
-  const slotAngle = slots.length > 0 ? 360 / slots.length : 0;
   const winnerSlotIndex = slots.findIndex((slot) => slot.id === winnerChartId);
   const finalRotation = getRuneWheelFinalRotation(slots.length, winnerSlotIndex);
   const [animationProgress, setAnimationProgress] = useState(winnerRevealed ? 1 : 0);
@@ -107,19 +106,21 @@ export function RuneWheel({
             <div className="rune-wheel-hub" aria-hidden="true" />
             {slots.map((slot, index) => {
               const selectedSlot = winnerRevealed && index === winnerSlotIndex;
+              const slotRotation = getRuneWheelRadialImageRotation(slots.length, index);
 
               return (
                 <div
                   key={`${slot.id}-${index}`}
                   style={
                     {
-                      "--rune-slot-angle": `${index * slotAngle}deg`,
-                      "--rune-slot-counter-angle": `${index * -slotAngle}deg`,
+                      "--rune-slot-angle": `${slotRotation}deg`,
                     } as CSSProperties
                   }
                   aria-label={slot.name}
                   data-chart-id={slot.id}
+                  data-image-bottom-faces-center="true"
                   data-slot-winner={selectedSlot ? "true" : "false"}
+                  data-slot-radial-image-rotation-deg={slotRotation}
                   data-testid="rune-wheel-slot"
                   className={clsx("rune-wheel-slot", selectedSlot && "rune-wheel-slot-selected")}
                 >
@@ -141,8 +142,7 @@ export function RuneWheel({
       >
         {winnerRevealed ? (
           <>
-            Selected chart:{" "}
-            <span className="text-ember-300">{winner?.name ?? winnerChartId}</span>
+            Selected chart: <span className="text-ember-300">{winner?.name ?? winnerChartId}</span>
           </>
         ) : (
           "Selector locking onto the sealed chart."
