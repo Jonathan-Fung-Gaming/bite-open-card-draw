@@ -48,6 +48,7 @@ import {
 } from "@/lib/server/persistence";
 import { getTournamentEventId } from "@/lib/server/env";
 import {
+  closeNormalizedVotingWindow,
   reopenNormalizedVotingWindow,
   resetNormalizedRound,
   submitNormalizedManualBallotOverride,
@@ -978,6 +979,17 @@ export async function resumeVotingAction(formData: FormData) {
 export async function closeVotingAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
+
+    if (getTournamentStateBackend() === "supabase") {
+      const session = await requireActiveHostForNormalizedAction();
+
+      await closeNormalizedVotingWindow({
+        roundNumber,
+        adminSessionId: session.sessionId,
+      });
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
 
     await withActiveHostVotingAdminState((session, nowMs) => {
       adminState.votingWindowStore.closeVoting(roundNumber, nowMs);

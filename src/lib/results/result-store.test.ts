@@ -101,7 +101,7 @@ describe("result store reveal timing", () => {
     expect(store.getRoundResult(1)?.revealPhase).toBe("set_1_counts");
   });
 
-  it("keeps a backend-decided tiebreak winner sealed for five seconds", () => {
+  it("keeps a backend-decided tiebreak winner sealed for the configured reveal duration", () => {
     const store = new ResultStore(() => 1);
     const computedAt = "2026-06-28T00:00:00.000Z";
     const setOneResolvedAt = "2026-06-28T00:00:02.000Z";

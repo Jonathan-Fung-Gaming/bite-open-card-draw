@@ -2,10 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useJitteredRouterRefresh } from "@/lib/client/use-jittered-router-refresh";
-import {
-  PUBLIC_REFRESH_JITTER_MS,
-  STAGE_PUBLIC_REFRESH_INTERVAL_MS,
-} from "@/lib/vote/phone-view";
+import { STAGE_LIVE_REFRESH_INTERVAL_MS } from "@/lib/vote/phone-view";
 
 type StageAutoRefreshProps = {
   deferDuringStageDrawReveal?: boolean;
@@ -37,8 +34,8 @@ export function StageAutoRefresh({
   deferDuringStageDrawReveal = false,
   deferDuringTiebreak = false,
   enabled = true,
-  intervalMs = STAGE_PUBLIC_REFRESH_INTERVAL_MS,
-  jitterMs = PUBLIC_REFRESH_JITTER_MS,
+  intervalMs = STAGE_LIVE_REFRESH_INTERVAL_MS,
+  jitterMs = 0,
   leading = false,
 }: StageAutoRefreshProps) {
   const router = useRouter();

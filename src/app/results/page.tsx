@@ -152,7 +152,7 @@ export default async function ResultsPage() {
         title={`ROUND ${roundNumber} FINAL CHARTS`}
         status={routeState.showPreviousRoundResult ? "Previous round results" : "Results revealed"}
       />
-      <section className="mx-auto grid max-w-6xl gap-5 px-5 py-5">
+      <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
         {routeState.showPreviousRoundResult ? (
           <div
             className="metal-panel rounded-lg border border-ember-300/30 p-4 text-center"

@@ -29,6 +29,14 @@ const normalizedResetRoundResultSchema = z.object({
   adminActionId: z.string().uuid(),
 });
 
+const normalizedCloseVotingWindowResultSchema = z.object({
+  roundNumber: z.number().int().min(1).max(4),
+  status: z.literal("voting_closed"),
+  closedAt: z.string(),
+  adminActionId: z.string().uuid(),
+  rowsChanged: z.number().int().nonnegative(),
+});
+
 export type NormalizedManualBallotOverrideResult = z.infer<
   typeof normalizedManualBallotOverrideResultSchema
 >;
@@ -36,6 +44,9 @@ export type NormalizedReopenVotingWindowResult = z.infer<
   typeof normalizedReopenVotingWindowResultSchema
 >;
 export type NormalizedResetRoundResult = z.infer<typeof normalizedResetRoundResultSchema>;
+export type NormalizedCloseVotingWindowResult = z.infer<
+  typeof normalizedCloseVotingWindowResultSchema
+>;
 
 export async function submitNormalizedManualBallotOverride(input: {
   roundNumber: 1 | 2 | 3 | 4;
@@ -96,4 +107,18 @@ export async function resetNormalizedRound(input: {
   );
 
   return normalizedResetRoundResultSchema.parse(result);
+}
+
+export async function closeNormalizedVotingWindow(input: {
+  roundNumber: 1 | 2 | 3 | 4;
+  adminSessionId: string;
+}): Promise<NormalizedCloseVotingWindowResult> {
+  const result = await withNormalizedEventPersistenceLock(() =>
+    executeNormalizedTransactionalMutation("closeVotingWindow", {
+      roundNumber: input.roundNumber,
+      adminSessionId: input.adminSessionId,
+    }),
+  );
+
+  return normalizedCloseVotingWindowResultSchema.parse(result);
 }

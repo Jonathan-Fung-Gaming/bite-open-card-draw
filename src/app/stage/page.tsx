@@ -13,8 +13,8 @@ import { buildStageRoundView, stageShouldUseResultMode } from "@/lib/stage/stage
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import {
-  PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
-  STAGE_REVEAL_REFRESH_INTERVAL_MS,
+  STAGE_LIVE_REFRESH_INTERVAL_MS,
+  STAGE_LIVE_REFRESH_JITTER_MS,
 } from "@/lib/vote/phone-view";
 import { formatVotingTime, type VotingRoundSnapshot } from "@/lib/vote/voting-window";
 import { StageAutoRefresh } from "./StageAutoRefresh";
@@ -98,15 +98,15 @@ function revealLabel(phase: string) {
 
 function StageResolvedSetSummary({ set }: { set: ResultSetSnapshot }) {
   return (
-    <section className="metal-panel rounded-lg p-3" data-testid="stage-resolved-set-summary">
+    <section className="metal-panel rounded-lg p-4" data-testid="stage-resolved-set-summary">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+          <p className="text-lg font-semibold uppercase tracking-[0.18em] text-ember-300">
             Set {set.setOrder} resolved
           </p>
-          <h2 className="mt-1 text-xl font-black uppercase text-white">{set.displayLabel}</h2>
+          <h2 className="mt-1 text-4xl font-black uppercase text-white">{set.displayLabel}</h2>
         </div>
-        <p className="rounded border border-ember-300/35 bg-ember-900/25 px-3 py-2 text-xs font-black uppercase text-ember-300">
+        <p className="rounded border border-ember-300/35 bg-ember-900/25 px-4 py-2 text-lg font-black uppercase text-ember-300">
           Selected
         </p>
       </div>
@@ -120,7 +120,10 @@ function StageResolvedSetSummary({ set }: { set: ResultSetSnapshot }) {
 function StageResultModeHolding({ roundNumber, status }: { roundNumber: number; status: string }) {
   return (
     <>
-      <StageAutoRefresh intervalMs={STAGE_REVEAL_REFRESH_INTERVAL_MS} />
+      <StageAutoRefresh
+        intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
+        jitterMs={STAGE_LIVE_REFRESH_JITTER_MS}
+      />
       <main className="min-h-screen" data-testid="stage-result-mode-holding">
         <RoundHeader
           title={`Round ${roundNumber} Results Reveal`}
@@ -129,17 +132,17 @@ function StageResultModeHolding({ roundNumber, status }: { roundNumber: number; 
         />
         <section className="grid min-h-[calc(100vh-96px)] place-items-center px-5 py-4 lg:px-8">
           <div className="metal-panel w-full max-w-3xl rounded-lg p-6 text-center">
-            <p className="text-sm font-semibold uppercase text-ember-300">
+            <p className="text-xl font-semibold uppercase text-ember-300">
               Result reveal in progress
             </p>
-            <h1 className="mt-3 text-4xl font-black uppercase text-white">
+            <h1 className="mt-3 text-6xl font-black uppercase text-white">
               Holding Stage Screen
             </h1>
-            <p className="mt-3 text-lg font-bold text-metal-300">
+            <p className="mt-3 text-2xl font-bold text-metal-300">
               The round has moved past voting into results. Waiting for the latest result snapshot
               before showing the next reveal step.
             </p>
-            <p className="mt-4 rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+            <p className="mt-5 rounded border border-metal-700 bg-black/25 px-5 py-3 text-xl font-bold uppercase text-metal-300">
               {status.replaceAll("_", " ")}
             </p>
           </div>
@@ -170,7 +173,10 @@ export default async function StagePage() {
     if (result.revealPhase === "final") {
       return (
         <>
-          <StageAutoRefresh intervalMs={PUBLIC_INSPECTION_REFRESH_INTERVAL_MS} />
+          <StageAutoRefresh
+            intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
+            jitterMs={STAGE_LIVE_REFRESH_JITTER_MS}
+          />
           <StageResultPhaseGuard roundNumber={roundNumber} phase={result.revealPhase}>
             <main className="min-h-screen">
               <RoundHeader
@@ -186,10 +192,10 @@ export default async function StagePage() {
                   {result.sets.map((set) => (
                     <section key={set.roundSetId} className="grid content-stretch gap-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-black uppercase text-ember-300">
-                          Set {set.setOrder} - {set.displayLabel}
+                        <p className="text-2xl font-black uppercase text-ember-300">
+                          Set {set.setOrder}
                         </p>
-                        <p className="text-2xl font-black uppercase leading-none text-ember-300">
+                        <p className="text-5xl font-black uppercase leading-none text-ember-300">
                           {set.selectedChart.displayDifficulty}
                         </p>
                       </div>
@@ -206,7 +212,11 @@ export default async function StagePage() {
 
     return (
       <>
-        <StageAutoRefresh deferDuringTiebreak intervalMs={STAGE_REVEAL_REFRESH_INTERVAL_MS} />
+        <StageAutoRefresh
+          deferDuringTiebreak
+          intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
+          jitterMs={STAGE_LIVE_REFRESH_JITTER_MS}
+        />
         <StageResultPhaseGuard roundNumber={roundNumber} phase={result.revealPhase}>
           <main className="min-h-screen">
             <RoundHeader
@@ -214,26 +224,14 @@ export default async function StagePage() {
               status={revealLabel(result.revealPhase)}
               compact
             />
-            <section className="grid gap-4 px-5 py-4 lg:px-8">
-              <div className="metal-panel rounded-lg p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Reveal Order
-                </p>
-                <ol className="mt-2 flex flex-wrap gap-3 text-sm text-metal-300">
-                  <li>Set 1 counts</li>
-                  <li>Set 1 selected</li>
-                  <li>Set 2 counts</li>
-                  <li>Set 2 selected</li>
-                  <li>Final two charts</li>
-                </ol>
-              </div>
-              <div className="grid gap-5">
+            <section className="grid gap-3 px-5 py-3 lg:px-8">
+              <div className="grid gap-4">
                 {result.revealPhase === "computed" ? (
                   <section className="metal-panel rounded-lg p-5 text-center">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                    <p className="text-xl font-semibold uppercase tracking-[0.18em] text-ember-300">
                       Results computed
                     </p>
-                    <h1 className="mt-2 text-3xl font-black uppercase text-white">
+                    <h1 className="mt-2 text-6xl font-black uppercase text-white">
                       Awaiting Host Reveal
                     </h1>
                   </section>
@@ -267,8 +265,7 @@ export default async function StagePage() {
   return (
     <>
       <StageAutoRefresh
-        deferDuringStageDrawReveal
-        intervalMs={1_000}
+        intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
         jitterMs={0}
         leading
       />

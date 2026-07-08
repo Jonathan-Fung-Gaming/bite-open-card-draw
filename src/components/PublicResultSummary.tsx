@@ -33,22 +33,25 @@ function SelectedChartCard({
       <div className="relative aspect-[16/9] overflow-hidden border-b border-ember-300/15 bg-black/35">
         <ChartArtImage src={imagePath} className="h-full w-full object-contain opacity-95" />
       </div>
-      <div className="flex min-h-36 flex-col justify-between p-4">
+      <div className="flex min-h-48 flex-col justify-between p-5">
         <div className="flex items-start justify-between gap-3 font-black uppercase text-ember-300">
-          <span className="text-xl leading-tight sm:text-2xl" data-testid="selected-chart-difficulty">
+          <span
+            className="text-3xl leading-tight sm:text-5xl"
+            data-testid="selected-chart-difficulty"
+          >
             {chart.displayDifficulty}
           </span>
-          <span className="font-mono text-xs">{String(index).padStart(2, "0")}</span>
+          <span className="font-mono text-lg">{String(index).padStart(2, "0")}</span>
         </div>
         <div>
           <h2
-            className="mt-4 break-words text-xl font-black uppercase leading-tight text-white sm:text-2xl"
+            className="mt-5 break-words text-3xl font-black uppercase leading-tight text-white sm:text-5xl"
             data-testid="selected-chart-title"
           >
             {chart.name}
           </h2>
           <p
-            className="mt-2 break-words text-sm text-metal-300 sm:text-base"
+            className="mt-3 break-words text-xl text-metal-300 sm:text-2xl"
             data-testid="selected-chart-artist"
           >
             {chart.artist}
@@ -75,20 +78,20 @@ export function PublicResultSummary({
           />
         ))}
       </div>
-      <section className="metal-panel rounded-lg p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+      <section className="metal-panel rounded-lg p-5">
+        <p className="text-lg font-semibold uppercase tracking-[0.22em] text-ember-300">
           Full ban counts
         </p>
-        <h2 className="mt-1 text-2xl font-black uppercase text-white">
+        <h2 className="mt-2 text-4xl font-black uppercase text-white">
           Least banned to most banned
         </h2>
         <div className="mt-4 grid gap-3">
           {result.sets.map((set) => (
             <details
               key={set.roundSetId}
-              className="rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300"
+              className="rounded border border-metal-700 bg-black/25 p-4 text-xl text-metal-300"
             >
-              <summary className="cursor-pointer font-bold uppercase text-ember-300">
+              <summary className="cursor-pointer text-2xl font-bold uppercase text-ember-300">
                 {set.displayLabel} ban counts
               </summary>
               <ol className="mt-3 grid gap-2">
@@ -101,19 +104,21 @@ export function PublicResultSummary({
                     )}
                   >
                     <div className="min-w-0">
-                      <p className="text-base font-black uppercase leading-tight text-ember-300">
+                      <p className="text-2xl font-black uppercase leading-tight text-ember-300">
                         {row.chart.displayDifficulty}
                       </p>
-                      <p className="mt-1 break-words font-bold text-white">{row.chart.name}</p>
-                      <p className="break-words text-xs text-metal-300">{row.chart.artist}</p>
+                      <p className="mt-1 break-words text-2xl font-bold text-white">
+                        {row.chart.name}
+                      </p>
+                      <p className="break-words text-lg text-metal-300">{row.chart.artist}</p>
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
-                      <p className="font-mono font-black text-ember-300">
+                      <p className="font-mono text-2xl font-black text-ember-300">
                         {banLabel(row.banCount)}
                       </p>
                       {row.selected ? (
                         <p
-                          className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-white"
+                          className="mt-1 text-lg font-black uppercase tracking-[0.14em] text-white"
                           data-testid="result-selected-label"
                         >
                           Selected

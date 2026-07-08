@@ -85,12 +85,18 @@ select {
   width: min(100%, 12rem);
 }
 
+.rune-wheel-shell-stage {
+  --rune-slot-radius: -11.75rem;
+  --rune-slot-size: 6.7rem;
+  width: min(100%, 34rem, 68vh);
+}
+
 .rune-wheel-circle {
   border: 1px solid rgba(255, 185, 92, 0.22);
   border-radius: 9999px;
   height: 100%;
   position: relative;
-  transition: transform 240ms linear;
+  will-change: transform;
   width: 100%;
 }
 
@@ -118,6 +124,19 @@ select {
   z-index: 3;
 }
 
+.rune-wheel-selector {
+  border: 2px solid rgba(255, 185, 92, 0.95);
+  clip-path: polygon(50% 0%, 100% 18%, 88% 100%, 12% 100%, 0% 18%);
+  filter: drop-shadow(0 0 16px rgba(255, 122, 26, 0.65));
+  height: var(--rune-slot-size);
+  left: calc(50% - (var(--rune-slot-size) / 2));
+  pointer-events: none;
+  position: absolute;
+  top: calc(0px - (var(--rune-slot-size) * 0.18));
+  width: var(--rune-slot-size);
+  z-index: 4;
+}
+
 .rune-wheel-slot {
   height: var(--rune-slot-size);
   left: calc(50% - (var(--rune-slot-size) / 2));
@@ -126,6 +145,34 @@ select {
   transform: rotate(var(--rune-slot-angle)) translateY(var(--rune-slot-radius))
     rotate(var(--rune-slot-counter-angle));
   width: var(--rune-slot-size);
+}
+
+.rune-wheel-slot-frame {
+  background: #11100f;
+  border: 1px solid rgba(255, 185, 92, 0.36);
+  clip-path: polygon(50% 0%, 100% 18%, 88% 100%, 12% 100%, 0% 18%);
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.rune-wheel-slot-frame::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(255, 185, 92, 0.18), transparent 42%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.rune-wheel-slot-selected .rune-wheel-slot-frame {
+  border-color: rgba(255, 185, 92, 0.98);
+  box-shadow:
+    0 0 0 2px rgba(255, 185, 92, 0.55),
+    0 0 24px rgba(255, 122, 26, 0.8);
+  filter: brightness(1.22) saturate(1.18);
 }
 
 .public-chart-grid {

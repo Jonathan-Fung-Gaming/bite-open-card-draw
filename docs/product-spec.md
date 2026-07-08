@@ -22,7 +22,7 @@ For each chart set:
 - Draw 7 charts.
 - Players vote to ban charts.
 - The chart with the fewest bans is selected.
-- If multiple charts tie for fewest bans, use a backend-decided tiebreak and reveal it through a 5-second rune-wheel animation.
+- If multiple charts tie for fewest bans, use a backend-decided tiebreak and reveal it through a 10-second rune-wheel animation.
 
 After voting and reveal, each round produces 2 final charts: 1 selected chart from each set.
 
@@ -196,11 +196,12 @@ Results use ban counts only, not percentages.
 
 For each chart set:
 
-- reveal from least banned to most banned
+- on the stage reveal screen, reveal ban-count rows from most banned down to least banned
+- on final/public detail lists, keep the stable least-banned-to-most-banned ordering for review
 - show ban count badges and/or small bars
 - reveal non-winning ties alphabetically
 - if the least-banned chart is unique, select it
-- if multiple charts tie for fewest bans, run the 5-second rune-wheel tiebreak
+- if multiple charts tie for fewest bans, run the 10-second rune-wheel tiebreak
 
 The backend must choose any tiebreak winner before the animation starts. The animation only reveals the already-decided winner.
 

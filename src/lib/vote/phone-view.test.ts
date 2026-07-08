@@ -3,8 +3,12 @@ import {
   formatBallotSaveFailureMessage,
   PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
   PUBLIC_REFRESH_JITTER_MS,
+  RESULTS_LIVE_REFRESH_INTERVAL_MS,
+  RESULTS_LIVE_REFRESH_JITTER_MS,
   shouldShowFinalPhoneResults,
   shouldShowPhoneResultHoldingState,
+  STAGE_LIVE_REFRESH_INTERVAL_MS,
+  STAGE_LIVE_REFRESH_JITTER_MS,
   STAGE_PUBLIC_REFRESH_INTERVAL_MS,
   STAGE_REVEAL_REFRESH_INTERVAL_MS,
   VOTE_PAGE_REFRESH_INTERVAL_MS,
@@ -60,5 +64,12 @@ describe("phone result display", () => {
     expect(PUBLIC_REFRESH_JITTER_MS).toBeGreaterThanOrEqual(1_000);
     expect(PUBLIC_REFRESH_JITTER_MS).toBeLessThanOrEqual(5_000);
     expect(VOTER_PRESENCE_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(45_000);
+  });
+
+  it("uses fast no-jitter refresh for live stage and results screens", () => {
+    expect(STAGE_LIVE_REFRESH_INTERVAL_MS).toBe(500);
+    expect(STAGE_LIVE_REFRESH_JITTER_MS).toBe(0);
+    expect(RESULTS_LIVE_REFRESH_INTERVAL_MS).toBe(1_000);
+    expect(RESULTS_LIVE_REFRESH_JITTER_MS).toBe(0);
   });
 });

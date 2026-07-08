@@ -459,15 +459,15 @@ async function adminRevealPhaseIsVisible(page: Page, phase: string) {
 
 async function advanceToFinalReveal(page: Page, baseURL: string) {
   await advanceRevealStep(page, baseURL, 2_000);
-  await advanceRevealStep(page, baseURL, 7_000);
+  await advanceRevealStep(page, baseURL, 12_000);
   await advanceRevealStep(page, baseURL, 2_000);
-  await advanceRevealStep(page, baseURL, 7_000);
+  await advanceRevealStep(page, baseURL, 12_000);
   await advanceRevealStep(page, baseURL, 5_000);
 
   await loginAndTakeHost(page, baseURL);
 
   if (!(await adminRevealPhaseIsVisible(page, "final"))) {
-    await advanceRevealStep(page, baseURL, 5_000);
+    await advanceRevealStep(page, baseURL, 12_000);
   }
 
   await expect

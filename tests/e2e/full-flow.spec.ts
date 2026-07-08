@@ -30,6 +30,8 @@ const LOGO_ALT_TEXT = "Pump It Up Open Stage tournament logo";
 const LOGO_ROUTE_BYTE_LIMIT = 400_000;
 const BALLOT_DRAFT_STORAGE_KEY = "bite-open-card-draw:ballot-drafts:v1";
 const STAGE_QR_MIN_SIZE_PX = 176;
+const STAGE_PROJECTOR_VIEWPORT = { height: 1080, width: 1920 } as const;
+const STAGE_VIEWPORT_TOLERANCE_PX = 4;
 
 function sanitizeFilenameSegment(value: string) {
   return (
@@ -125,7 +127,7 @@ async function expectStageRows(page: Page) {
   await expect(rows.nth(1).getByTestId("stage-chart-card")).toHaveCount(7);
 }
 
-async function expectResultRowsSortedLeastToMostBanned(page: Page) {
+async function expectStageResultRowsSortedMostToLeastBanned(page: Page) {
   const rows = page.getByTestId("result-row");
 
   await expect(rows).toHaveCount(7, {
@@ -136,7 +138,42 @@ async function expectResultRowsSortedLeastToMostBanned(page: Page) {
     elements.map((element) => Number(element.getAttribute("data-ban-count"))),
   );
 
-  expect(banCounts).toEqual([...banCounts].sort((left, right) => left - right));
+  expect(banCounts).toEqual([...banCounts].sort((left, right) => right - left));
+}
+
+async function expectStageAcceptedResultPhase(page: Page, phase: string) {
+  await expect(page.getByTestId("stage-result-phase-guard")).toHaveAttribute(
+    "data-accepted-result-phase",
+    phase,
+    { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+  );
+}
+
+async function expectStageResultRowsRevealProgressively(page: Page) {
+  const rows = page.getByTestId("result-row");
+
+  await expect(rows).toHaveCount(7, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
+
+  const initiallyVisible = await rows.evaluateAll(
+    (elements) =>
+      elements.filter((element) => element.getAttribute("data-result-row-visible") === "true")
+        .length,
+  );
+
+  expect(initiallyVisible).toBeGreaterThanOrEqual(1);
+  expect(initiallyVisible).toBeLessThan(7);
+
+  await expect
+    .poll(
+      () =>
+        rows.evaluateAll(
+          (elements) =>
+            elements.filter((element) => element.getAttribute("data-result-row-visible") === "true")
+              .length,
+        ),
+      { timeout: 9_000 },
+    )
+    .toBe(7);
 }
 
 async function expectRenderedImageElement(image: Locator) {
@@ -292,6 +329,174 @@ async function expectNoStageVerticalScroll(page: Page) {
       ),
     )
     .toBeLessThanOrEqual(4);
+}
+
+async function setStageProjectorViewport(page: Page) {
+  await page.setViewportSize(STAGE_PROJECTOR_VIEWPORT);
+}
+
+async function expectStageProjectorTextMetrics(page: Page, label: string) {
+  const checks = [
+    { maxLines: 1.2, minFontPx: 14, selector: "header p" },
+    { maxLines: 1.2, minFontPx: 32, selector: "header h1" },
+    { maxLines: 1.2, minFontPx: 28, selector: '[data-testid="result-row-difficulty"]' },
+    { maxLines: 3.2, minFontPx: 22, selector: '[data-testid="result-row-title"]' },
+    { maxLines: 2.2, minFontPx: 18, selector: '[data-testid="result-row-artist"]' },
+    { maxLines: 1.2, minFontPx: 24, selector: '[data-testid="result-row-ban-count"]' },
+    { maxLines: 1.2, minFontPx: 24, selector: '[data-testid="rune-wheel"] > p:first-child' },
+    { maxLines: 2.2, minFontPx: 30, selector: '[data-testid="rune-wheel-status"]' },
+    {
+      maxLines: 2.2,
+      minFontPx: 44,
+      selector:
+        '[data-testid="stage-final-chart-list"] [data-testid="stage-chart-card"] [data-testid="stage-chart-title"]',
+    },
+    {
+      maxLines: 1.2,
+      minFontPx: 20,
+      selector:
+        '[data-testid="stage-final-chart-list"] [data-testid="stage-chart-card"] [data-testid="stage-chart-artist"]',
+    },
+  ];
+
+  for (const check of checks) {
+    const metrics = await page.locator(check.selector).evaluateAll((elements) =>
+      elements
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = window.getComputedStyle(element);
+          const fontSize = Number.parseFloat(style.fontSize);
+          const parsedLineHeight = Number.parseFloat(style.lineHeight);
+          const lineHeight =
+            Number.isFinite(parsedLineHeight) && parsedLineHeight > 0
+              ? parsedLineHeight
+              : fontSize * 1.2;
+          const range = document.createRange();
+
+          range.selectNodeContents(element);
+
+          const textRect = range.getBoundingClientRect();
+
+          range.detach();
+
+          return {
+            clientWidth: element.clientWidth,
+            fontSize,
+            lineCount: (textRect.height > 0 ? textRect.height : rect.height) / lineHeight,
+            scrollWidth: element.scrollWidth,
+            text: element.textContent?.trim() ?? "",
+            visible: rect.width > 0 && rect.height > 0 && style.visibility !== "hidden",
+          };
+        })
+        .filter((metric) => metric.visible),
+    );
+
+    for (const metric of metrics) {
+      expect(
+        metric.fontSize,
+        `${label} ${check.selector} should use projector-sized type for "${metric.text}"`,
+      ).toBeGreaterThanOrEqual(check.minFontPx);
+      expect(
+        metric.lineCount,
+        `${label} ${check.selector} should avoid unnecessary wrapping for "${metric.text}"`,
+      ).toBeLessThanOrEqual(check.maxLines);
+      expect(
+        metric.scrollWidth,
+        `${label} ${check.selector} should not clip text for "${metric.text}"`,
+      ).toBeLessThanOrEqual(metric.clientWidth + STAGE_VIEWPORT_TOLERANCE_PX);
+    }
+  }
+}
+
+async function expectStageFitsProjectorViewport(page: Page, label: string) {
+  await expect.poll(async () => page.viewportSize()).toEqual(STAGE_PROJECTOR_VIEWPORT);
+  await expectNoHorizontalOverflow(page);
+  await expectNoStageVerticalScroll(page);
+
+  const fit = await page.evaluate((tolerance) => {
+    const viewport = {
+      height: window.innerHeight,
+      width: window.innerWidth,
+    };
+    const visibleContent = Array.from(document.querySelectorAll("main, main *, header, header *"))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+
+        return {
+          bottom: Math.round(rect.bottom * 100) / 100,
+          className: element.getAttribute("class") ?? "",
+          height: Math.round(rect.height * 100) / 100,
+          left: Math.round(rect.left * 100) / 100,
+          right: Math.round(rect.right * 100) / 100,
+          tagName: element.tagName.toLowerCase(),
+          testId: element.getAttribute("data-testid") ?? "",
+          text: element.textContent?.trim().slice(0, 120) ?? "",
+          top: Math.round(rect.top * 100) / 100,
+          visible:
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== "none" &&
+            style.visibility !== "hidden",
+          width: Math.round(rect.width * 100) / 100,
+        };
+      })
+      .filter((entry) => entry.visible);
+    const offenders = visibleContent.filter(
+      (entry) =>
+        entry.left < -tolerance ||
+        entry.top < -tolerance ||
+        entry.right > viewport.width + tolerance ||
+        entry.bottom > viewport.height + tolerance,
+    );
+    const contentBottom = visibleContent.reduce(
+      (bottom, entry) => Math.max(bottom, entry.bottom),
+      0,
+    );
+    const wheel = document.querySelector('[data-testid="rune-wheel"] .rune-wheel-shell');
+    const wheelRect = wheel?.getBoundingClientRect();
+    const finalCards = Array.from(
+      document.querySelectorAll('[data-testid="stage-final-chart-list"] [data-testid="stage-chart-card"]'),
+    ).map((element) => {
+      const rect = element.getBoundingClientRect();
+
+      return {
+        height: rect.height,
+        width: rect.width,
+      };
+    });
+
+    return {
+      contentBottom,
+      finalCards,
+      offenders: offenders.slice(0, 8),
+      viewport,
+      wheel: wheelRect
+        ? {
+            height: wheelRect.height,
+            width: wheelRect.width,
+          }
+        : null,
+    };
+  }, STAGE_VIEWPORT_TOLERANCE_PX);
+
+  expect(fit.offenders, `${label} visible content should stay inside 1080p viewport`).toEqual([]);
+  expect(
+    fit.contentBottom,
+    `${label} should use meaningful vertical space on the projector`,
+  ).toBeGreaterThanOrEqual(fit.viewport.height * 0.55);
+
+  if (fit.wheel) {
+    expect(fit.wheel.width, `${label} rune wheel width`).toBeGreaterThanOrEqual(520);
+    expect(fit.wheel.height, `${label} rune wheel height`).toBeGreaterThanOrEqual(520);
+  }
+
+  for (const card of fit.finalCards) {
+    expect(card.height, `${label} final chart card height`).toBeGreaterThanOrEqual(560);
+    expect(card.width, `${label} final chart card width`).toBeGreaterThanOrEqual(760);
+  }
+
+  await expectStageProjectorTextMetrics(page, label);
 }
 
 function toEvidenceBox(box: NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>): EvidenceBox {
@@ -1154,6 +1359,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await page.setViewportSize({ width: 1280, height: 720 });
 
   const stagePage = await page.context().newPage();
+  await setStageProjectorViewport(stagePage);
   await goto(stagePage, "/stage");
   await expect(stagePage).toHaveTitle("Stage Display | Pump It Up Open Stage");
   await expect(stagePage.locator("header").getByText("Awaiting host draw")).toBeVisible();
@@ -1402,10 +1608,14 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
   await expectStageDoesNotReturnToDrawMode(stagePage, 1);
-  await expectResultRowsSortedLeastToMostBanned(stagePage);
+  await expectStageAcceptedResultPhase(stagePage, "set_1_counts");
+  await expectStageResultRowsRevealProgressively(stagePage);
+  await expectStageResultRowsSortedMostToLeastBanned(stagePage);
+  await expectStageFitsProjectorViewport(stagePage, "set 1 counts");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
   await expectStageDoesNotReturnToDrawMode(stagePage, 1);
+  await expectStageAcceptedResultPhase(stagePage, "set_1_resolved");
   await expect(stagePage.getByTestId("stage-auto-refresh")).toHaveAttribute(
     "data-defer-during-tiebreak",
     "true",
@@ -1415,17 +1625,23 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     Number(
       await stagePage.getByTestId("stage-auto-refresh").getAttribute("data-refresh-interval-ms"),
     ),
-  ).toBeGreaterThan(5_000);
+  ).toBe(500);
   await waitForVisibleTiebreakReveal(stagePage, 1);
+  await expectStageFitsProjectorViewport(stagePage, "set 1 resolved");
   await advanceRevealAndWaitForAdminPhase(page, "set 2 counts");
+  await expectStageAcceptedResultPhase(stagePage, "set_2_counts");
   await expect(stagePage.locator("header").getByText("Set 2 counts")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
-  await expectResultRowsSortedLeastToMostBanned(stagePage);
+  await expectStageResultRowsRevealProgressively(stagePage);
+  await expectStageResultRowsSortedMostToLeastBanned(stagePage);
+  await expectStageFitsProjectorViewport(stagePage, "set 2 counts");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await expectNoStageVerticalScroll(stagePage);
   await advanceRevealAndWaitForAdminPhase(page, "set 2 resolved");
+  await expectStageAcceptedResultPhase(stagePage, "set_2_resolved");
   await waitForVisibleTiebreakReveal(stagePage, 1);
+  await expectStageFitsProjectorViewport(stagePage, "set 2 resolved");
   await expectNoStageVerticalScroll(stagePage);
   await expectPhoneRoutesHoldFinalResults({ chartsPage, resultsPage, votePage: phonePage });
   await captureEvidenceScreenshot(testInfo, "uxr-008-vote-holding-before-final.png", phonePage);
@@ -1435,12 +1651,14 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     resultsPage,
   );
   await advanceRevealAndWaitForAdminPhase(page, "final");
+  await expectStageAcceptedResultPhase(stagePage, "final");
   await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expect(
     stagePage.getByTestId("stage-final-chart-list").getByTestId("stage-chart-card"),
   ).toHaveCount(2);
+  await expectStageFitsProjectorViewport(stagePage, "final charts");
   await expectPhoneRoutesHoldFinalResults({ chartsPage, resultsPage, votePage: phonePage });
   const privateCsvDownloadPromise = page.waitForEvent("download");
   await clickAdminActionAndWait(
@@ -1772,7 +1990,7 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }, te
   await clickAdminActionAndWait(page, hostRunButton(page, "Release"));
 });
 
-test("stage tiebreak wheel hides the winner until the five-second reveal completes", async ({
+test("stage tiebreak wheel hides the winner until the ten-second reveal completes", async ({
   page,
 }) => {
   await loginAndTakeHost(page);
@@ -1787,6 +2005,7 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   await expect(page.getByText("Rehearsal mode", { exact: true }).first()).toBeVisible();
 
   const stagePage = await page.context().newPage();
+  await setStageProjectorViewport(stagePage);
   await goto(stagePage, "/stage");
 
   await hostRunButton(page, "Draw Set").nth(0).click();
@@ -1812,21 +2031,34 @@ test("stage tiebreak wheel hides the winner until the five-second reveal complet
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0, { timeout: 500 });
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
+  await expectStageAcceptedResultPhase(stagePage, "set_1_resolved");
 
   await expect(stagePage.getByTestId("rune-wheel-slot")).toHaveCount(12);
   await expect(stagePage.getByTestId("rune-wheel")).not.toContainText("Sealed rune");
+  await expect(stagePage.getByTestId("rune-wheel-slot").first()).not.toContainText(/\d|S\d/);
+  await expectStageFitsProjectorViewport(stagePage, "focused tiebreak wheel");
 
   await expect(stagePage.getByTestId("rune-wheel")).toHaveAttribute(
     "data-winner-revealed",
     "true",
     {
-      timeout: 8_000,
+      timeout: 13_000,
     },
   );
+  await expect
+    .poll(() =>
+      stagePage
+        .getByTestId("rune-wheel-slot")
+        .evaluateAll(
+          (slots) =>
+            slots.filter((slot) => slot.getAttribute("data-slot-winner") === "true").length,
+        ),
+    )
+    .toBe(1);
   await expect(stagePage.getByTestId("rune-wheel-status")).toContainText(
-    "Backend winner revealed:",
+    "Selected chart:",
   );
-  await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(1);
+  await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Release"));
   await expect(hostRunButton(page, "Release")).toBeDisabled();

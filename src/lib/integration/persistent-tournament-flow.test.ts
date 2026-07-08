@@ -10,6 +10,7 @@ import {
 } from "@/lib/persistence/operational-state";
 import { MemoryOperationalStateRepository } from "@/lib/persistence/repository";
 import { generatePrivateBallotCsv } from "@/lib/results/private-csv";
+import { TIEBREAK_REVEAL_DURATION_MS } from "@/lib/results/reveal-timing";
 import { ResultStore } from "@/lib/results/result-store";
 import { selectedSongBlocksFromResultStoreBeforeRound } from "@/lib/results/selected-song-blocks";
 import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
@@ -140,12 +141,15 @@ function fourRoundRehearsalCharts() {
 
 function revealFinal(stores: AdminStateStores, roundNumber: 1 | 2 | 3 | 4) {
   const baseMs = Date.UTC(2026, 5, 29, roundNumber, 0, 0);
+  const setTwoCountsMs = baseMs + 1_000 + TIEBREAK_REVEAL_DURATION_MS + 1_000;
+  const setTwoResolvedMs = setTwoCountsMs + 1_000;
+  const finalMs = setTwoResolvedMs + TIEBREAK_REVEAL_DURATION_MS + 1_000;
 
   stores.resultStore.advanceReveal(roundNumber, new Date(baseMs).toISOString());
   stores.resultStore.advanceReveal(roundNumber, new Date(baseMs + 1_000).toISOString());
-  stores.resultStore.advanceReveal(roundNumber, new Date(baseMs + 7_000).toISOString());
-  stores.resultStore.advanceReveal(roundNumber, new Date(baseMs + 8_000).toISOString());
-  stores.resultStore.advanceReveal(roundNumber, new Date(baseMs + 14_000).toISOString());
+  stores.resultStore.advanceReveal(roundNumber, new Date(setTwoCountsMs).toISOString());
+  stores.resultStore.advanceReveal(roundNumber, new Date(setTwoResolvedMs).toISOString());
+  stores.resultStore.advanceReveal(roundNumber, new Date(finalMs).toISOString());
 }
 
 describe("repository-backed tournament integration", () => {

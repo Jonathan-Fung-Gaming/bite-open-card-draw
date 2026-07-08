@@ -161,10 +161,10 @@ async function advanceRevealStep(adminPage: AdminPage) {
 async function readRuneSlotLabels(page: Page) {
   return page.getByTestId("rune-wheel-slot").evaluateAll((slots) =>
     slots.map((slot) => {
-      const label = slot.querySelectorAll("p")[1]?.textContent?.trim();
+      const label = slot.getAttribute("aria-label")?.trim();
 
       if (!label) {
-        throw new Error("Rune-wheel slot is missing its chart label.");
+        throw new Error("Rune-wheel slot is missing its accessible chart label.");
       }
 
       return label;
@@ -316,7 +316,7 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
     await expect(wheel).toHaveAttribute("data-winner-revealed", "false", { timeout: 1_500 });
     await expect(stageRawPage.getByTestId("rune-wheel-slot")).toHaveCount(12);
     await expect(stageRawPage.getByTestId("rune-wheel-status")).toHaveText(
-      "Backend winner sealed. Reveal in progress.",
+      "Selector locking onto the sealed chart.",
     );
     await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0, { timeout: 500 });
 
@@ -326,11 +326,18 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
     expect(Object.keys(hiddenSlotCounts)).toHaveLength(2);
     expect(Object.values(hiddenSlotCounts).sort((left, right) => left - right)).toEqual([6, 6]);
 
-    await expect(wheel).toHaveAttribute("data-winner-revealed", "true", { timeout: 8_000 });
+    await expect(wheel).toHaveAttribute("data-winner-revealed", "true", { timeout: 13_000 });
     await expect(stageRawPage.getByTestId("rune-wheel-status")).toContainText(
-      "Backend winner revealed:",
+      "Selected chart:",
     );
-    await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(1);
+    await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0);
+    const revealedSelectedSlotCount = await stageRawPage
+      .getByTestId("rune-wheel-slot")
+      .evaluateAll(
+        (slots) => slots.filter((slot) => slot.getAttribute("data-slot-winner") === "true").length,
+      );
+
+    expect(revealedSelectedSlotCount).toBe(1);
 
     const revealedStatusText =
       (await stageRawPage.getByTestId("rune-wheel-status").textContent())?.trim() ?? "";
@@ -341,7 +348,8 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
       slotCount: hiddenSlotLabels.length,
       slotCountsByChart: hiddenSlotCounts,
       revealedWinnerAttribute: "true",
-      revealedSelectedLabelCount: 1,
+      revealedSelectedLabelCount: 0,
+      revealedSelectedSlotCount,
       revealedStatusText,
     });
   } catch (error) {

@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useJitteredRouterRefresh } from "@/lib/client/use-jittered-router-refresh";
 import {
-  PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
-  PUBLIC_REFRESH_JITTER_MS,
+  RESULTS_LIVE_REFRESH_INTERVAL_MS,
+  RESULTS_LIVE_REFRESH_JITTER_MS,
 } from "@/lib/vote/phone-view";
 
 type ResultsAutoRefreshProps = {
@@ -14,14 +14,14 @@ type ResultsAutoRefreshProps = {
 
 export function ResultsAutoRefresh({
   enabled = true,
-  intervalMs = PUBLIC_INSPECTION_REFRESH_INTERVAL_MS,
+  intervalMs = RESULTS_LIVE_REFRESH_INTERVAL_MS,
 }: ResultsAutoRefreshProps) {
   const router = useRouter();
 
   useJitteredRouterRefresh(router.refresh, {
     enabled,
     intervalMs,
-    jitterMs: PUBLIC_REFRESH_JITTER_MS,
+    jitterMs: RESULTS_LIVE_REFRESH_JITTER_MS,
   });
 
   return (
@@ -29,7 +29,7 @@ export function ResultsAutoRefresh({
       aria-hidden="true"
       data-refresh-enabled={enabled ? "true" : "false"}
       data-refresh-interval-ms={String(intervalMs)}
-      data-refresh-jitter-ms={String(PUBLIC_REFRESH_JITTER_MS)}
+      data-refresh-jitter-ms={String(RESULTS_LIVE_REFRESH_JITTER_MS)}
       data-testid="results-auto-refresh"
       hidden
     />

@@ -705,4 +705,30 @@ describe("admin action production safeguards", () => {
 
     expect(wrapperSource).not.toContain("adminPassword");
   });
+
+  it("routes Supabase close voting through the normalized close RPC", () => {
+    const actionsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
+      "utf8",
+    );
+    const wrapperSource = readFileSync(
+      path.join(process.cwd(), "src/lib/server/normalized-admin-workflows.ts"),
+      "utf8",
+    );
+    const block = getActionBlock(actionsSource, "closeVotingAction");
+    const supabaseBranch = block.indexOf('getTournamentStateBackend() === "supabase"');
+    const hostCheck = block.indexOf("requireActiveHostForNormalizedAction()", supabaseBranch);
+    const wrapperCall = block.indexOf("closeNormalizedVotingWindow({", hostCheck);
+    const revalidate = block.indexOf("revalidateTournamentViews(revalidatePath)", wrapperCall);
+    const branchReturn = block.indexOf("return;", revalidate);
+    const snapshotPath = block.indexOf("withActiveHostVotingAdminState", branchReturn);
+
+    expect(supabaseBranch).toBeGreaterThanOrEqual(0);
+    expect(hostCheck).toBeGreaterThan(supabaseBranch);
+    expect(wrapperCall).toBeGreaterThan(hostCheck);
+    expect(revalidate).toBeGreaterThan(wrapperCall);
+    expect(branchReturn).toBeGreaterThan(revalidate);
+    expect(snapshotPath).toBeGreaterThan(branchReturn);
+    expect(wrapperSource).toContain('executeNormalizedTransactionalMutation("closeVotingWindow"');
+  });
 });

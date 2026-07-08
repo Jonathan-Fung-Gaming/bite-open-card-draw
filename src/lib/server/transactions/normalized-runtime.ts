@@ -89,6 +89,10 @@ const normalizedResetRoundInputSchema = resetRoundInputSchema
     adminSessionId: uuidSchema,
   });
 
+const normalizedCloseVotingWindowInputSchema = closeVotingWindowInputSchema.extend({
+  adminSessionId: uuidSchema,
+});
+
 const adminSessionCreateInputSchema = z.object({
   sessionTokenHash: z.string().trim().min(16),
   expiresAt: isoDateTimeSchema,
@@ -108,6 +112,7 @@ export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   submitBallot: submitBallotInputSchema,
   computeResults: computeResultsInputSchema,
   advanceVotingTimer: advanceVotingTimerInputSchema,
+  closeVotingWindow: normalizedCloseVotingWindowInputSchema,
   manualBallotOverride: normalizedManualBallotOverrideInputSchema,
   reopenVotingWindow: normalizedReopenVotingWindowInputSchema,
   resetRound: normalizedResetRoundInputSchema,
@@ -121,7 +126,6 @@ export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   openVotingWindow: openVotingWindowInputSchema,
   pauseVotingWindow: pauseVotingWindowInputSchema,
   resumeVotingWindow: resumeVotingWindowInputSchema,
-  closeVotingWindow: closeVotingWindowInputSchema,
   drawRoundSet: drawRoundSetInputSchema,
   rerollOneChart: rerollOneChartInputSchema,
   rerollRoundSet: rerollRoundSetInputSchema,
@@ -153,6 +157,7 @@ export const NORMALIZED_RUNTIME_RPC_NAMES = {
   submitBallot: "normalized_submit_ballot",
   computeResults: "normalized_compute_results",
   advanceVotingTimer: "normalized_advance_voting_timer",
+  closeVotingWindow: "normalized_close_voting_window",
   manualBallotOverride: "normalized_manual_ballot_override",
   reopenVotingWindow: "normalized_reopen_voting_window",
   resetRound: "normalized_reset_round",
@@ -166,7 +171,6 @@ export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
   openVotingWindow: "normalized_open_voting_window",
   pauseVotingWindow: "normalized_pause_voting_window",
   resumeVotingWindow: "normalized_resume_voting_window",
-  closeVotingWindow: "normalized_close_voting_window",
   drawRoundSet: "normalized_draw_round_set",
   rerollOneChart: "normalized_reroll_one_chart",
   rerollRoundSet: "normalized_reroll_round_set",

@@ -461,7 +461,8 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 | Result count basis      | Count submitted bans per chart.                                             |
 | Zero-ban charts         | Include charts with zero bans in results.                                   |
 | Public pre-result stats | Show ballots submitted and total ban selections cast, but not chart counts. |
-| Reveal order            | Reveal from least banned to most banned.                                    |
+| Stage reveal order      | Reveal stage ban-count rows from most banned to least banned.               |
+| Final detail order      | Show final/public detail lists from least banned to most banned.            |
 | Winning criterion       | Least-banned chart wins the set.                                            |
 | Ties above minimum      | List sequentially/alphabetically.                                           |
 | Winning tie             | If least-banned charts tie, use tiebreak spinner.                           |
@@ -474,7 +475,8 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 - Confirm no percentages appear in final results.
 - Confirm zero-ban charts are counted and displayed.
-- Confirm results sort least banned to most banned.
+- Confirm stage reveal rows animate most banned to least banned.
+- Confirm final/public detail lists sort least banned to most banned.
 - Confirm least-banned chart wins.
 - Confirm results resolve Set 1 and Set 2 separately.
 - Confirm final round result shows two selected charts together.
@@ -489,7 +491,7 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 | Tiebreak per set   | Tiebreaks run separately for each chart set.                                                         |
 | Tiebreak authority | Backend decides winner before animation.                                                             |
 | Spinner role       | Spinner only reveals the pre-decided winner.                                                         |
-| Spinner duration   | 5 seconds.                                                                                           |
+| Spinner duration   | 10 seconds.                                                                                          |
 | Spinner style      | Circular rune selector.                                                                              |
 | Wheel slots        | 12-slot rune-style wheel.                                                                            |
 | 2-way tie          | Alternate the two chart names around the 12 slots.                                                   |
@@ -502,7 +504,7 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 
 - Confirm tiebreak is only used for minimum-ban ties.
 - Confirm backend commits winner before animation starts.
-- Confirm spinner runs for 5 seconds.
+- Confirm spinner runs for 10 seconds.
 - Confirm 2-, 3-, and 4-way ties populate 12 slots.
 - Confirm 5+ ties do not crash the app.
 - Confirm non-minimum ties do not trigger spinner.

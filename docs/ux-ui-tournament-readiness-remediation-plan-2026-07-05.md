@@ -114,7 +114,7 @@ Tasks:
   state does not already encode that boundary safely.
 - Ensure phones show the required holding copy until stage completion is committed.
 - Keep final public routes fresh enough to respond to corrections, resets, and round advances.
-- Smooth reveal progression so stage polling does not fight with the 5-second tiebreak animation.
+- Smooth reveal progression so stage polling does not fight with the 10-second tiebreak animation.
 - Add browser coverage for already-open `/stage`, `/vote`, `/charts`, and `/results` through final
   reveal and post-final corrections.
 

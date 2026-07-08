@@ -1,4 +1,4 @@
-export const TIEBREAK_REVEAL_DURATION_MS = 5_000;
+export const TIEBREAK_REVEAL_DURATION_MS = 10_000;
 
 export function getTiebreakRevealRemainingMs(startedAt: string | null | undefined, nowMs: number) {
   if (!startedAt) {

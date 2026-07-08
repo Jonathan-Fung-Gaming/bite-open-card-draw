@@ -41,6 +41,7 @@ const implementedMutationNames: NormalizedTransactionalMutationName[] = [
   "submitBallot",
   "computeResults",
   "advanceVotingTimer",
+  "closeVotingWindow",
   "manualBallotOverride",
   "reopenVotingWindow",
   "resetRound",
@@ -54,7 +55,6 @@ const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
   "openVotingWindow",
   "pauseVotingWindow",
   "resumeVotingWindow",
-  "closeVotingWindow",
   "drawRoundSet",
   "rerollOneChart",
   "rerollRoundSet",
@@ -284,6 +284,18 @@ describe("normalized runtime transactional mutations", () => {
     );
 
     await executeNormalizedTransactionalMutation(
+      "closeVotingWindow",
+      {
+        roundNumber: 1,
+        adminSessionId: uuidB,
+      },
+      {
+        eventId: "event-a",
+        supabase: createMockRpcClient(calls),
+      },
+    );
+
+    await executeNormalizedTransactionalMutation(
       "resetRound",
       {
         roundNumber: 1,
@@ -299,12 +311,15 @@ describe("normalized runtime transactional mutations", () => {
     expect(calls.map((call) => call.functionName)).toEqual([
       "normalized_manual_ballot_override",
       "normalized_reopen_voting_window",
+      "normalized_close_voting_window",
       "normalized_reset_round",
     ]);
     for (const call of calls) {
       expect(call.args.p_payload).not.toHaveProperty("adminPassword");
       expect(call.args.p_payload).toHaveProperty("adminSessionId", uuidB);
-      expect(call.args.p_payload).toHaveProperty("reason");
+      if (call.functionName !== "normalized_close_voting_window") {
+        expect(call.args.p_payload).toHaveProperty("reason");
+      }
     }
   });
 
@@ -450,9 +465,10 @@ describe("normalized runtime transactional mutations", () => {
     const migrations = readMigrations();
     const manualFunction = latestRpcDefinition(migrations, "normalized_manual_ballot_override");
     const reopenFunction = latestRpcDefinition(migrations, "normalized_reopen_voting_window");
+    const closeFunction = latestRpcDefinition(migrations, "normalized_close_voting_window");
     const resetFunction = latestRpcDefinition(migrations, "normalized_reset_round");
 
-    for (const definition of [manualFunction, reopenFunction, resetFunction]) {
+    for (const definition of [manualFunction, reopenFunction, closeFunction, resetFunction]) {
       expect(definition).not.toBe("");
       expect(definition).toContain("normalized_database_time");
       expect(definition).toContain("pg_advisory_xact_lock");
@@ -468,6 +484,11 @@ describe("normalized runtime transactional mutations", () => {
     expect(manualFunction).toContain("override_reason");
     expect(reopenFunction).toContain("status = 'voting_open'");
     expect(reopenFunction).toContain("delete from public.result_snapshots");
+    expect(closeFunction).toContain("status = 'voting_closed'");
+    expect(closeFunction).toContain("'close_voting'");
+    expect(closeFunction).toContain("from public.host_locks");
+    expect(closeFunction).toContain("host_lock.lock_name = 'tournament-host'");
+    expect(closeFunction).toContain("Host control is required for this action.");
     expect(resetFunction).toContain("delete from public.ballot_revisions");
     expect(resetFunction).toContain("delete from public.ballots");
     expect(resetFunction).toContain("delete from public.voting_windows");

@@ -23,11 +23,18 @@ export function RoundHeader({
     >
       <TournamentLogo priority className="shrink-0" size={compact ? "compact" : "standard"} />
       <div className="max-w-4xl sm:text-right">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ember-300">{eyebrow}</p>
+        <p
+          className={clsx(
+            "font-semibold uppercase tracking-[0.24em] text-ember-300",
+            compact ? "text-sm" : "text-xs",
+          )}
+        >
+          {eyebrow}
+        </p>
         <h1
           className={clsx(
             "font-black uppercase leading-none text-white",
-            compact ? "mt-0.5 text-2xl sm:text-3xl" : "mt-2 text-4xl sm:text-5xl lg:text-6xl",
+            compact ? "mt-0.5 text-3xl sm:text-4xl" : "mt-2 text-4xl sm:text-5xl lg:text-6xl",
           )}
         >
           {title}
@@ -35,7 +42,7 @@ export function RoundHeader({
         <p
           className={clsx(
             "font-semibold uppercase tracking-[0.16em] text-metal-300",
-            compact ? "mt-0.5 text-xs" : "mt-3 text-base",
+            compact ? "mt-1 text-base" : "mt-3 text-base",
           )}
         >
           {status}
