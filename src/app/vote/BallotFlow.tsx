@@ -54,6 +54,10 @@ const IDENTITY_STORAGE_KEY = "bite-open-card-draw:startgg-identity:v1";
 const DEVICE_STORAGE_KEY = "bite-open-card-draw:device-id:v1";
 const EDIT_TOKEN_STORAGE_KEY = "bite-open-card-draw:ballot-edit-tokens:v1";
 const DRAFT_STORAGE_KEY = "bite-open-card-draw:ballot-drafts:v1";
+const IDENTITY_CONFIRMATION_STORAGE_PREFIX = "bite-open-card-draw:identity-confirmation-seen:v1";
+const BAN_INSTRUCTION_STORAGE_PREFIX = "bite-open-card-draw:ban-instruction-seen:v1";
+const BAN_INSTRUCTION_PAUSE_MS = 2_000;
+const BAN_INSTRUCTION_FADE_MS = 900;
 
 type StoredBallotDraft = {
   roundNumber: 1 | 2 | 3 | 4;
@@ -129,11 +133,7 @@ function getDeviceId() {
   return deviceId;
 }
 
-function voterPresenceClaimKey(
-  roundNumber: 1 | 2 | 3 | 4,
-  playerId: string,
-  deviceId: string,
-) {
+function voterPresenceClaimKey(roundNumber: 1 | 2 | 3 | 4, playerId: string, deviceId: string) {
   return `${roundNumber}:${playerId}:${deviceId}`;
 }
 
@@ -189,6 +189,81 @@ function getBallotEditToken(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
 
 function draftKey(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
   return `${roundNumber}:${playerId}`;
+}
+
+function flowKey(
+  prefix: string,
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  draws: readonly DrawRecord[],
+) {
+  return [prefix, roundNumber, playerId, draws.map((draw) => draw.id).join(",")].join(":");
+}
+
+function identityConfirmationKey(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  draws: readonly DrawRecord[],
+) {
+  return flowKey(IDENTITY_CONFIRMATION_STORAGE_PREFIX, roundNumber, playerId, draws);
+}
+
+function banInstructionKey(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  draws: readonly DrawRecord[],
+) {
+  return flowKey(BAN_INSTRUCTION_STORAGE_PREFIX, roundNumber, playerId, draws);
+}
+
+function hasSeenIdentityConfirmation(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  draws: readonly DrawRecord[],
+) {
+  try {
+    return (
+      window.sessionStorage.getItem(identityConfirmationKey(roundNumber, playerId, draws)) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function markIdentityConfirmationSeen(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  draws: readonly DrawRecord[],
+) {
+  try {
+    window.sessionStorage.setItem(identityConfirmationKey(roundNumber, playerId, draws), "1");
+  } catch {
+    // The checkbox still gates this render even if session storage is unavailable.
+  }
+}
+
+function hasSeenBanInstruction(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  draws: readonly DrawRecord[],
+) {
+  try {
+    return window.sessionStorage.getItem(banInstructionKey(roundNumber, playerId, draws)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markBanInstructionSeen(
+  roundNumber: 1 | 2 | 3 | 4,
+  playerId: string,
+  draws: readonly DrawRecord[],
+) {
+  try {
+    window.sessionStorage.setItem(banInstructionKey(roundNumber, playerId, draws), "1");
+  } catch {
+    // If session storage is unavailable, the instruction still behaves correctly for this render.
+  }
 }
 
 function readStoredDrafts(): Record<string, StoredBallotDraft> {
@@ -341,11 +416,15 @@ export function BallotFlow({
   const router = useRouter();
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
   const [step, setStep] = useState(0);
   const [choices, setChoices] = useState(() => emptyChoices(draws));
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
+  const [banInstructionVisible, setBanInstructionVisible] = useState(false);
+  const [banInstructionFading, setBanInstructionFading] = useState(false);
+  const [banInstructionControlsPaused, setBanInstructionControlsPaused] = useState(false);
   const [presenceWarning, setPresenceWarning] = useState<string | null>(null);
   const [presenceWarningReadyToContinueKey, setPresenceWarningReadyToContinueKey] = useState<
     string | null
@@ -365,6 +444,7 @@ export function BallotFlow({
   const lastPresenceClaimRef = useRef<{ claimedAtMs: number; key: string } | null>(null);
   const lookupRequestRef = useRef(0);
   const refreshRequestedRef = useRef(false);
+  const banInstructionTimersRef = useRef<number[]>([]);
   const confirmedRef = useRef(false);
   const existingBallotRef = useRef<PublicEditableBallot | null>(null);
   const existingBallotLookupExistsRef = useRef(false);
@@ -376,6 +456,7 @@ export function BallotFlow({
     ? "Voting is paused. The host has frozen the timer and ballot changes. Your selections on this phone are still here; leave this page open and continue after voting resumes."
     : "Voting is not accepting ballot changes right now.";
   const editingSavedBallot = confirmed && !savedAt && Boolean(existingBallot);
+  const ballotControlsDisabled = !liveCanSubmit || banInstructionControlsPaused;
   const currentDraw = draws[step];
   const currentChoice = choices[step];
   const canSubmit = choices.every(
@@ -404,11 +485,43 @@ export function BallotFlow({
     savedAtRef.current = savedAt;
   }, [savedAt]);
 
+  useEffect(
+    () => () => {
+      banInstructionTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      banInstructionTimersRef.current = [];
+    },
+    [],
+  );
+
+  const startBanInstructionIfNeeded = useCallback(
+    (playerId: string) => {
+      if (hasSeenBanInstruction(roundNumber, playerId, draws)) {
+        return;
+      }
+
+      banInstructionTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      banInstructionTimersRef.current = [];
+      setBanInstructionVisible(true);
+      setBanInstructionFading(false);
+      setBanInstructionControlsPaused(true);
+
+      const fadeTimer = window.setTimeout(() => {
+        setBanInstructionControlsPaused(false);
+        setBanInstructionFading(true);
+      }, BAN_INSTRUCTION_PAUSE_MS);
+      const hideTimer = window.setTimeout(() => {
+        markBanInstructionSeen(roundNumber, playerId, draws);
+        setBanInstructionVisible(false);
+        setBanInstructionFading(false);
+      }, BAN_INSTRUCTION_PAUSE_MS + BAN_INSTRUCTION_FADE_MS);
+
+      banInstructionTimersRef.current = [fadeTimer, hideTimer];
+    },
+    [draws, roundNumber],
+  );
+
   const loadExistingBallot = useCallback(
-    async (
-      playerId: string,
-      options: { autoConfirmExisting?: boolean; resetWhenMissing?: boolean } = {},
-    ) => {
+    async (playerId: string, options: { resetWhenMissing?: boolean } = {}) => {
       const requestId = ++lookupRequestRef.current;
 
       setLookupPending(true);
@@ -433,10 +546,6 @@ export function BallotFlow({
           setSavedAt(ballot.submittedAt);
           setStep(0);
           setMessage(null);
-
-          if (options.autoConfirmExisting) {
-            setConfirmed(true);
-          }
         } else if (options.resetWhenMissing || lookup.exists) {
           const draft = readBallotDraft(roundNumber, playerId, draws);
 
@@ -446,9 +555,6 @@ export function BallotFlow({
             setMessage(
               "Restored unsaved ballot selections from this device. Review them before submitting.",
             );
-            if (options.autoConfirmExisting) {
-              setConfirmed(true);
-            }
           } else {
             setChoices(emptyChoices(draws));
             setStep(0);
@@ -599,11 +705,14 @@ export function BallotFlow({
 
     initializedIdentityRef.current = true;
     setSelectedPlayerId(rememberedPlayer.id);
+    if (hasSeenIdentityConfirmation(roundNumber, rememberedPlayer.id, draws)) {
+      setIdentityConfirmed(true);
+      setConfirmed(true);
+    }
     void loadExistingBallot(rememberedPlayer.id, {
-      autoConfirmExisting: true,
       resetWhenMissing: true,
     });
-  }, [loadExistingBallot, players]);
+  }, [draws, loadExistingBallot, players, roundNumber]);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true") {
@@ -718,7 +827,14 @@ export function BallotFlow({
   ]);
 
   useEffect(() => {
-    if (!hydrated || !confirmed || !selectedPlayerId || savedAt) {
+    if (
+      !hydrated ||
+      !confirmed ||
+      !selectedPlayerId ||
+      savedAt ||
+      lookupPending ||
+      !existingBallotLookup
+    ) {
       return;
     }
 
@@ -729,7 +845,18 @@ export function BallotFlow({
       choices,
       step,
     });
-  }, [choices, confirmed, draws, hydrated, roundNumber, savedAt, selectedPlayerId, step]);
+  }, [
+    choices,
+    confirmed,
+    draws,
+    existingBallotLookup,
+    hydrated,
+    lookupPending,
+    roundNumber,
+    savedAt,
+    selectedPlayerId,
+    step,
+  ]);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING === "true") {
@@ -842,6 +969,7 @@ export function BallotFlow({
     forgetRememberedIdentity();
     setSelectedPlayerId("");
     setConfirmed(false);
+    setIdentityConfirmed(false);
     setStep(0);
     setChoices(emptyChoices(draws));
     setSavedAt(null);
@@ -862,6 +990,7 @@ export function BallotFlow({
         <button
           className="min-h-9 rounded border border-ember-300/35 px-3 py-2 text-xs font-black uppercase text-ember-300"
           onClick={changeUsernameBeforeSubmit}
+          disabled={banInstructionControlsPaused}
           type="button"
         >
           Change username
@@ -922,6 +1051,7 @@ export function BallotFlow({
             lookupRequestRef.current += 1;
             setSelectedPlayerId(playerId);
             setConfirmed(false);
+            setIdentityConfirmed(false);
             setSavedAt(null);
             setExistingBallot(null);
             setExistingBallotLookup(null);
@@ -950,6 +1080,24 @@ export function BallotFlow({
             Are you sure you are voting as {selectedPlayer.startggUsername}?
           </p>
         ) : null}
+        {selectedPlayer ? (
+          <label
+            className="mt-3 flex min-h-11 items-center gap-3 rounded border border-metal-700 bg-black/25 p-3 text-sm font-bold text-white"
+            data-testid="identity-confirmation-checkbox"
+          >
+            <input
+              className="h-5 w-5 shrink-0 accent-[#ff3b3b]"
+              type="checkbox"
+              checked={identityConfirmed}
+              disabled={!hydrated || lookupPending || presencePending || !liveCanSubmit}
+              onChange={(event) => setIdentityConfirmed(event.target.checked)}
+            />
+            <span className="min-w-0 break-words">
+              I confirm that I am{" "}
+              <span className="text-ember-300">{selectedPlayer.startggUsername}</span>
+            </span>
+          </label>
+        ) : null}
         {warning ? (
           <p
             className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300"
@@ -967,7 +1115,12 @@ export function BallotFlow({
         <button
           className="button-metal mt-5 w-full rounded px-4 py-3 font-black uppercase disabled:opacity-40"
           disabled={
-            !hydrated || !selectedPlayer || lookupPending || presencePending || !liveCanSubmit
+            !hydrated ||
+            !selectedPlayer ||
+            !identityConfirmed ||
+            lookupPending ||
+            presencePending ||
+            !liveCanSubmit
           }
           onClick={async () => {
             if (!selectedPlayer) {
@@ -993,7 +1146,11 @@ export function BallotFlow({
 
             setPresenceWarningReadyToContinueKey(null);
             rememberIdentity(selectedPlayer);
+            markIdentityConfirmationSeen(roundNumber, selectedPlayer.id, draws);
             setConfirmed(true);
+            if (!savedAt && !existingBallot && step < draws.length) {
+              startBanInstructionIfNeeded(selectedPlayer.id);
+            }
           }}
           type="button"
         >
@@ -1003,6 +1160,20 @@ export function BallotFlow({
               ? "Checking saved ballot"
               : "Confirm"}
         </button>
+      </section>
+    );
+  }
+
+  if (lookupPending) {
+    return (
+      <section className="metal-panel rounded-lg p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+          Round {roundNumber} ballot
+        </p>
+        <h1 className="mt-2 text-3xl font-black uppercase text-white">Checking saved ballot</h1>
+        {selectedPlayer ? (
+          <p className="mt-3 text-metal-300">Voting as {selectedPlayer.startggUsername}</p>
+        ) : null}
       </section>
     );
   }
@@ -1073,6 +1244,9 @@ export function BallotFlow({
                       setSavedAt(null);
                       setStep(index);
                       setSelectionMessage(null);
+                      if (selectedPlayer) {
+                        startBanInstructionIfNeeded(selectedPlayer.id);
+                      }
                     }}
                     type="button"
                   >
@@ -1148,6 +1322,9 @@ export function BallotFlow({
                 onClick={() => {
                   setStep(index);
                   setSelectionMessage(null);
+                  if (selectedPlayer) {
+                    startBanInstructionIfNeeded(selectedPlayer.id);
+                  }
                 }}
                 type="button"
               >
@@ -1169,14 +1346,19 @@ export function BallotFlow({
         <div className="mt-5 flex flex-wrap gap-3">
           <button
             className="min-h-11 rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300"
-            onClick={() => setStep(1)}
+            onClick={() => {
+              setStep(1);
+              if (selectedPlayer) {
+                startBanInstructionIfNeeded(selectedPlayer.id);
+              }
+            }}
             type="button"
           >
             Back
           </button>
           <button
             className="button-metal min-h-11 rounded px-4 py-3 font-black uppercase disabled:opacity-40"
-            disabled={!canSubmit || isPending || !liveCanSubmit}
+            disabled={!canSubmit || isPending || !liveCanSubmit || banInstructionControlsPaused}
             onClick={submit}
             type="button"
           >
@@ -1189,6 +1371,26 @@ export function BallotFlow({
 
   return (
     <section className="metal-panel rounded-lg p-2 sm:p-4">
+      {banInstructionVisible ? (
+        <div
+          className={clsx(
+            "fixed inset-0 z-50 grid place-items-center bg-black/65 px-5 transition-opacity duration-700",
+            banInstructionFading ? "pointer-events-none opacity-0" : "opacity-100",
+          )}
+          data-controls-paused={banInstructionControlsPaused ? "true" : "false"}
+          data-testid="ban-instruction-popin"
+          role="status"
+        >
+          <div className="max-w-sm rounded border border-red-400/70 bg-black/90 px-5 py-6 text-center shadow-[0_0_36px_rgba(239,68,68,0.34)]">
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-red-300">
+              Ballot instruction
+            </p>
+            <p className="mt-2 text-3xl font-black uppercase leading-tight text-white">
+              Please ban up to two charts
+            </p>
+          </div>
+        </div>
+      ) : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase text-ember-300">
@@ -1243,7 +1445,7 @@ export function BallotFlow({
               className={clsx(
                 "relative min-h-24 min-w-0 overflow-hidden rounded border bg-furnace-900 text-left disabled:opacity-55 sm:min-h-56",
                 selected
-                  ? "border-ember-300 shadow-ember-tight"
+                  ? "border-red-500 shadow-[0_0_22px_rgba(239,68,68,0.42)]"
                   : "border-metal-700 bg-black/25",
               )}
               data-chart-image-path={imagePath}
@@ -1251,7 +1453,7 @@ export function BallotFlow({
               data-chart-name={chart.name}
               data-testid="ballot-chart-card"
               onClick={() => toggleBan(chart.id)}
-              disabled={!liveCanSubmit}
+              disabled={ballotControlsDisabled}
               type="button"
             >
               <ChartArtImage
@@ -1260,16 +1462,14 @@ export function BallotFlow({
                 testId="ballot-chart-image"
               />
               <span className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/10" />
-              {selected ? (
-                <span className="absolute inset-0 border-2 border-ember-300/80" />
-              ) : null}
+              {selected ? <span className="absolute inset-0 border-2 border-red-500/90" /> : null}
               <span className="relative flex min-h-24 flex-col justify-between p-2 sm:min-h-56 sm:p-3">
                 <span className="flex items-start justify-end gap-1 text-[10px] font-bold uppercase text-ember-300 sm:gap-2 sm:text-xs">
                   <span
                     className={clsx(
                       "rounded border px-1 py-0.5 font-black sm:px-1.5",
                       selected
-                        ? "border-ember-300 bg-ember-900/65 text-white"
+                        ? "border-red-400 bg-red-950/80 text-white"
                         : "border-metal-700 bg-black/55 text-metal-300",
                     )}
                     data-testid="ban-selected-label"
@@ -1302,7 +1502,7 @@ export function BallotFlow({
             className="h-5 w-5 shrink-0 accent-[#ffb95c] sm:h-6 sm:w-6"
             type="checkbox"
             checked={currentChoice?.noBans ?? false}
-            disabled={!liveCanSubmit}
+            disabled={ballotControlsDisabled}
             onChange={(event) => {
               if (!currentChoice) {
                 return;
@@ -1327,7 +1527,7 @@ export function BallotFlow({
       <div className="mt-3 flex flex-wrap gap-2 sm:mt-5 sm:gap-3">
         <button
           className="min-h-11 rounded border border-metal-700 px-3 py-2 text-sm font-bold uppercase text-metal-300 disabled:opacity-40 sm:px-4 sm:py-3 sm:text-base"
-          disabled={step === 0}
+          disabled={step === 0 || banInstructionControlsPaused}
           onClick={() => {
             setSelectionMessage(null);
             setStep((current) => current - 1);
@@ -1340,6 +1540,7 @@ export function BallotFlow({
           className="button-metal min-h-11 rounded px-3 py-2 text-sm font-black uppercase disabled:opacity-40 sm:px-4 sm:py-3 sm:text-base"
           disabled={
             !liveCanSubmit ||
+            banInstructionControlsPaused ||
             !currentChoice ||
             !(
               (currentChoice.noBans && currentChoice.bannedChartIds.length === 0) ||

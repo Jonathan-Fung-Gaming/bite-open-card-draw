@@ -431,6 +431,28 @@ async function captureProjectorEvidence(browser: Browser, baseURL: string, testI
   }
 }
 
+async function expectBanInstructionThenBallotCards(page: Page) {
+  const popin = page.getByTestId("ban-instruction-popin");
+  const cards = page.getByTestId("ballot-chart-card");
+
+  await expect(popin).toContainText("Please ban up to two charts");
+  await expect(popin).toHaveAttribute("data-controls-paused", "true");
+  await expect(cards.first()).toBeDisabled();
+  await expect(popin).toHaveAttribute("data-controls-paused", "false", { timeout: 4_000 });
+  await expect(popin).toBeHidden({ timeout: 5_000 });
+  await expect(cards).toHaveCount(7);
+}
+
+async function confirmVoteIdentity(page: Page, playerName: string) {
+  const confirmButton = page.getByRole("button", { name: "Confirm" });
+
+  await expect(confirmButton).toBeDisabled();
+  await page.getByLabel(`I confirm that I am ${playerName}`).check();
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
+  await expectBanInstructionThenBallotCards(page);
+}
+
 async function captureMobileVoteEvidence(browser: Browser, baseURL: string, testInfo: TestInfo) {
   const context = await browser.newContext({
     baseURL,
@@ -448,8 +470,7 @@ async function captureMobileVoteEvidence(browser: Browser, baseURL: string, test
     await expect(
       votePage.getByText("Are you sure you are voting as Rehearsal Player 01?"),
     ).toBeVisible();
-    await votePage.getByRole("button", { name: "Confirm" }).click();
-    await expect(votePage.getByTestId("ballot-chart-card")).toHaveCount(7);
+    await confirmVoteIdentity(votePage, "Rehearsal Player 01");
 
     const geometry = await collectMobileVoteGeometry(votePage);
     const artifactStem = `pfr-031-mobile-vote-${MOBILE_VOTE_VIEWPORT.name}-ballot`;
@@ -499,7 +520,11 @@ async function captureImageFallbackEvidence(browser: Browser, baseURL: string, t
     await goto(chartsPage, "/charts");
     await expect(chartsPage.getByTestId("view-only-status")).toContainText("Voting open");
     await expectFallbackImageRendered(chartsPage.getByTestId("stage-chart-image").first());
-    await captureEvidenceScreenshot(testInfo, "uxr-002-mobile-charts-image-fallback.png", chartsPage);
+    await captureEvidenceScreenshot(
+      testInfo,
+      "uxr-002-mobile-charts-image-fallback.png",
+      chartsPage,
+    );
 
     const votePage = await phoneContext.newPage();
 
@@ -507,8 +532,7 @@ async function captureImageFallbackEvidence(browser: Browser, baseURL: string, t
     await votePage.getByLabel("Select your start.gg username").selectOption({
       label: "Rehearsal Player 02",
     });
-    await votePage.getByRole("button", { name: "Confirm" }).click();
-    await expect(votePage.getByTestId("ballot-chart-card")).toHaveCount(7);
+    await confirmVoteIdentity(votePage, "Rehearsal Player 02");
     await expectFallbackImageRendered(votePage.getByTestId("ballot-chart-image").first());
     await captureEvidenceScreenshot(testInfo, "uxr-002-mobile-vote-image-fallback.png", votePage);
   } finally {

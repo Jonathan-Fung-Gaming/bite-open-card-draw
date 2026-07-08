@@ -15,6 +15,68 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Vote, Results, And Chart Filtering Follow-Up Phase 1 - Player Identity And Ban Instruction UX - 2026-07-08
+
+Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not
+change tournament rules, result computation, persistence schema, RPCs, or Supabase migrations.
+
+### Scope
+
+- Added an explicit identity checkbox after username selection:
+  `I confirm that I am <username>`.
+- Disabled the username `Confirm` action until the checkbox is checked, and reset that confirmation
+  whenever the selected username changes.
+- Kept remembered identity as a preselect convenience only; the remembered identity can resume a
+  previously confirmed same-round/same-draw browser flow, but it does not bypass the first explicit
+  checkbox confirmation for a new flow.
+- Added a non-skippable centered `Please ban up to two charts` pop-in before chart selection.
+- Disabled ballot controls for 2 seconds while the pop-in is active, then faded it out
+  automatically.
+- Keyed the completed intro state by round, player, and active draw ids so refreshes do not replay
+  the intro unnecessarily while changed draws do.
+- Changed selected ban-card styling from ember/orange to red borders, red selected outline, and red
+  selected badge treatment while preserving `aria-pressed`.
+- Guarded confirmed remembered-identity reloads so local unsaved drafts are not overwritten by the
+  default empty ballot state while the saved-ballot/draft lookup is still resolving.
+
+### Changed Files
+
+- `src/app/vote/BallotFlow.tsx`
+- `tests/e2e/full-flow.spec.ts`
+- `tests/e2e/mobile-routes.spec.ts`
+- `tests/e2e/projector-mobile-evidence.spec.ts`
+- `tests/phase9/pages/vote.page.ts`
+- `tests/phase9/pfr-timer-tiebreak-evidence.spec.ts`
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 57 files / 338 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "unsaved vote draft survives pause and resume reloads"` - passed after fixing the remembered-identity draft reload guard.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+
+### Evidence
+
+- Mobile route e2e verifies the identity checkbox touch target, disabled confirm-before-checkbox
+  state, the non-skippable ban instruction pop-in, disabled chart controls during the pause, and
+  automatic dismissal.
+- Full-flow e2e verifies duplicate-device warning behavior still appears before chart selection
+  after the checkbox is checked.
+- Projector/mobile evidence e2e now captures mobile vote evidence after the required checkbox and
+  ban-instruction sequence.
+- The unsaved-draft pause/resume e2e verifies selected bans still survive paused and resumed reloads.
+
+### Risks And Assumptions
+
+- The two-second instruction pause is intentionally user-visible and therefore adds time to browser
+  tests that drive real ballot confirmations.
+- The intro replay suppression is session-scoped; a fresh browser session sees the instruction
+  again, while a same-session refresh for the same round/player/draw ids does not.
+- Existing saved ballots still open at the saved-ballot review screen first; editing a saved set
+  triggers the ban instruction before chart controls are usable.
+
 ## UX/UI Follow-Up Remediation - Stage Stability, Host Run Controls, Font, And Phone Fit - 2026-07-06
 
 Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not

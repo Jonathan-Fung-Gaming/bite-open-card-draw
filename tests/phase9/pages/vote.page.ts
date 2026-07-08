@@ -1,9 +1,5 @@
 import { expect, type Page, type Route } from "@playwright/test";
-import {
-  HOSTED_REFRESH_TIMEOUT_MS,
-  clickServerAction,
-  goto,
-} from "../fixtures/phase9-env";
+import { HOSTED_REFRESH_TIMEOUT_MS, clickServerAction, goto } from "../fixtures/phase9-env";
 
 export type BallotBanPlan = readonly [readonly number[], readonly number[]];
 
@@ -122,7 +118,7 @@ export class VotePage {
     if (expectDuplicateWarning) {
       await this.expectDuplicateBallotWarning(playerName);
     }
-    await this.confirmSelectedPlayer({ waitForCards: waitForCardsAfterConfirm });
+    await this.confirmSelectedPlayer(playerName, { waitForCards: waitForCardsAfterConfirm });
   }
 
   async finishCurrentBallot(
@@ -141,7 +137,9 @@ export class VotePage {
   async expectDuplicateBallotWarning(playerName: string) {
     await expect(
       this.page.getByText(
-        new RegExp(`A ballot already exists for this start\\.gg username.*${escapeRegExp(playerName)}`),
+        new RegExp(
+          `A ballot already exists for this start\\.gg username.*${escapeRegExp(playerName)}`,
+        ),
       ),
     ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   }
@@ -154,10 +152,7 @@ export class VotePage {
     ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   }
 
-  async expectSavedBallot(options: {
-    expectedTexts?: readonly string[];
-    playerName: string;
-  }) {
+  async expectSavedBallot(options: { expectedTexts?: readonly string[]; playerName: string }) {
     await expect(this.page.getByText("Ballot successfully submitted.")).toBeVisible({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
@@ -169,7 +164,10 @@ export class VotePage {
   }
 
   async editSavedBallotAndForceSubmitFailure(banPlan: BallotBanPlan) {
-    await this.page.getByRole("button", { name: /^Edit / }).first().click();
+    await this.page
+      .getByRole("button", { name: /^Edit / })
+      .first()
+      .click();
     await expect(this.page.getByTestId("ballot-chart-card")).toHaveCount(7, {
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
@@ -209,16 +207,33 @@ export class VotePage {
     });
   }
 
-  private async confirmSelectedPlayer(options: { waitForCards?: boolean } = {}) {
+  private async confirmSelectedPlayer(
+    playerName: string,
+    options: { waitForCards?: boolean } = {},
+  ) {
     const confirmButton = this.page.getByRole("button", { name: "Confirm" });
 
+    await expect(confirmButton).toBeDisabled();
+    await this.page.getByLabel(`I confirm that I am ${playerName}`).check();
     await expect(confirmButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
     await confirmButton.click();
+    await this.expectBanInstruction();
     if (options.waitForCards !== false) {
       await expect(this.page.getByTestId("ballot-chart-card")).toHaveCount(7, {
         timeout: HOSTED_REFRESH_TIMEOUT_MS,
       });
     }
+  }
+
+  private async expectBanInstruction() {
+    const popin = this.page.getByTestId("ban-instruction-popin");
+    const cards = this.page.getByTestId("ballot-chart-card");
+
+    await expect(popin).toContainText("Please ban up to two charts");
+    await expect(popin).toHaveAttribute("data-controls-paused", "true");
+    await expect(cards.first()).toBeDisabled();
+    await expect(popin).toHaveAttribute("data-controls-paused", "false", { timeout: 4_000 });
+    await expect(popin).toBeHidden({ timeout: 5_000 });
   }
 
   private async completeBallotChoices(banPlan: BallotBanPlan) {
@@ -263,11 +278,16 @@ export class VotePage {
   }
 
   private async submitCurrentBallot(expectedMessage: string | RegExp) {
-    await clickServerAction(this.page, this.page.getByRole("button", { name: "Submit Ballot" }), 0, {
-      requireServerActionResponse: true,
-      responseTimeoutMs: 60_000,
-      skipMinimumSettle: true,
-    });
+    await clickServerAction(
+      this.page,
+      this.page.getByRole("button", { name: "Submit Ballot" }),
+      0,
+      {
+        requireServerActionResponse: true,
+        responseTimeoutMs: 60_000,
+        skipMinimumSettle: true,
+      },
+    );
 
     const locator =
       typeof expectedMessage === "string"
@@ -284,7 +304,8 @@ export class VotePage {
       const isServerActionPost =
         request.method() === "POST" &&
         new URL(request.url()).pathname === "/vote" &&
-        (Boolean(request.headers()["next-action"]) || (request.postData() ?? "").includes("$ACTION"));
+        (Boolean(request.headers()["next-action"]) ||
+          (request.postData() ?? "").includes("$ACTION"));
 
       if (!aborted && isServerActionPost) {
         aborted = true;
