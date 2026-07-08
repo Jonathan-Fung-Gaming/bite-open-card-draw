@@ -184,6 +184,11 @@ async function expectStageResultRowsSortedLeastToMostBanned(page: Page) {
 }
 
 async function expectStageAcceptedResultPhase(page: Page, phase: string) {
+  await expect(page.getByTestId("stage-route-freshness-guard")).toHaveAttribute(
+    "data-accepted-result-phase",
+    phase,
+    { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+  );
   await expect(page.getByTestId("stage-result-phase-guard")).toHaveAttribute(
     "data-accepted-result-phase",
     phase,
@@ -1037,10 +1042,13 @@ async function expectAdminRevealPhase(page: Page, phase: string) {
 }
 
 async function advanceRevealAndWaitForAdminPhase(page: Page, phase: string) {
-  await hostRunButton(
+  const advanceButton = hostRunButton(
     page,
     /Advance to Set 1 counts|Reveal Set 1 selected chart|Advance to Set 2 counts|Reveal Set 2 selected chart|Show final charts/,
-  ).click();
+  );
+
+  await expect(advanceButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await clickAdminActionAndWait(page, advanceButton);
   await expectAdminRevealPhase(page, phase);
 }
 
@@ -1132,6 +1140,49 @@ type OpenPublicPages = {
   votePage: Page;
 };
 
+type PublicRouteFreshnessExpectation = {
+  currentRound: string;
+  resultPhase?: string;
+  routeRound: string;
+  routeSource?: string;
+  votingStatus?: string;
+};
+
+async function expectPublicRouteFreshness(
+  page: Page,
+  testId: string,
+  expected: PublicRouteFreshnessExpectation,
+) {
+  const guard = page.getByTestId(testId);
+
+  await expect(guard).toHaveAttribute("data-accepted-current-round", expected.currentRound, {
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect(guard).toHaveAttribute("data-accepted-route-round", expected.routeRound);
+
+  if (expected.routeSource) {
+    await expect(guard).toHaveAttribute("data-accepted-route-source", expected.routeSource);
+  }
+
+  if (expected.resultPhase) {
+    await expect(guard).toHaveAttribute("data-accepted-result-phase", expected.resultPhase);
+  }
+
+  if (expected.votingStatus) {
+    await expect(guard).toHaveAttribute("data-accepted-voting-status", expected.votingStatus);
+  }
+}
+
+async function expectOpenPublicRouteFreshness(
+  pages: OpenPublicPages,
+  expected: PublicRouteFreshnessExpectation,
+) {
+  await expectPublicRouteFreshness(pages.stagePage, "stage-route-freshness-guard", expected);
+  await expectPublicRouteFreshness(pages.chartsPage, "charts-route-freshness-guard", expected);
+  await expectPublicRouteFreshness(pages.resultsPage, "results-route-freshness-guard", expected);
+  await expectPublicRouteFreshness(pages.votePage, "vote-route-freshness-guard", expected);
+}
+
 async function expectPhoneRoutesHoldFinalResults({
   chartsPage,
   resultsPage,
@@ -1176,9 +1227,27 @@ async function expectOpenPublicPagesShowFinal({
   await expect(votePage.getByText("Full ban counts")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
+
+  await expectOpenPublicRouteFreshness(
+    { chartsPage, resultsPage, stagePage, votePage },
+    {
+      currentRound: "1",
+      resultPhase: "final",
+      routeRound: "1",
+      routeSource: "current_round",
+      votingStatus: "results_revealed",
+    },
+  );
 }
 
 async function expectOpenPublicPagesShowChart(pages: OpenPublicPages, chartName: string) {
+  await expectOpenPublicRouteFreshness(pages, {
+    currentRound: "1",
+    resultPhase: "final",
+    routeRound: "1",
+    routeSource: "current_round",
+    votingStatus: "results_revealed",
+  });
   await expect(
     pages.stagePage.getByTestId("stage-final-chart-list").getByText(chartName, { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
@@ -1200,18 +1269,46 @@ async function expectOpenPublicPagesAfterReset({
   votePage,
 }: OpenPublicPages) {
   await stagePage.bringToFront();
+  await expectPublicRouteFreshness(stagePage, "stage-route-freshness-guard", {
+    currentRound: "1",
+    resultPhase: "none",
+    routeRound: "1",
+    routeSource: "current_round",
+    votingStatus: "not_started",
+  });
   await expect(stagePage.getByRole("heading", { name: "Round 1 Draw" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await chartsPage.bringToFront();
+  await expectPublicRouteFreshness(chartsPage, "charts-route-freshness-guard", {
+    currentRound: "1",
+    resultPhase: "none",
+    routeRound: "1",
+    routeSource: "current_round",
+    votingStatus: "not_started",
+  });
   await expect(chartsPage.getByText("Awaiting first chart set").first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await resultsPage.bringToFront();
+  await expectPublicRouteFreshness(resultsPage, "results-route-freshness-guard", {
+    currentRound: "1",
+    resultPhase: "none",
+    routeRound: "1",
+    routeSource: "current_round",
+    votingStatus: "not_started",
+  });
   await expect(resultsPage.getByRole("heading", { name: "Round 1 Results" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await votePage.bringToFront();
+  await expectPublicRouteFreshness(votePage, "vote-route-freshness-guard", {
+    currentRound: "1",
+    resultPhase: "none",
+    routeRound: "1",
+    routeSource: "current_round",
+    votingStatus: "not_started",
+  });
   await expect(votePage.getByText("The host is drawing the two chart sets.")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -1228,18 +1325,46 @@ async function expectOpenPublicPagesAfterRoundAdvance({
   votePage,
 }: OpenPublicPages) {
   await stagePage.bringToFront();
+  await expectPublicRouteFreshness(stagePage, "stage-route-freshness-guard", {
+    currentRound: "2",
+    resultPhase: "none",
+    routeRound: "2",
+    routeSource: "current_round",
+    votingStatus: "not_started",
+  });
   await expect(stagePage.getByRole("heading", { name: "Round 2 Draw" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await chartsPage.bringToFront();
+  await expectPublicRouteFreshness(chartsPage, "charts-route-freshness-guard", {
+    currentRound: "2",
+    resultPhase: "none",
+    routeRound: "2",
+    routeSource: "current_round",
+    votingStatus: "not_started",
+  });
   await expect(chartsPage.getByRole("heading", { name: "Round 2 - S18" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await resultsPage.bringToFront();
+  await expectPublicRouteFreshness(resultsPage, "results-route-freshness-guard", {
+    currentRound: "2",
+    resultPhase: "none",
+    routeRound: "2",
+    routeSource: "current_round",
+    votingStatus: "not_started",
+  });
   await expect(resultsPage.getByRole("heading", { name: "Round 2 Results" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await votePage.bringToFront();
+  await expectPublicRouteFreshness(votePage, "vote-route-freshness-guard", {
+    currentRound: "2",
+    resultPhase: "none",
+    routeRound: "2",
+    routeSource: "current_round",
+    votingStatus: "not_started",
+  });
   await expect(votePage.locator("header").getByText("Round 2")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -1644,7 +1769,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   const resultsPage = await page.context().newPage();
   await goto(resultsPage, "/results");
 
-  await hostRunButton(page, "Close Voting").click();
+  await clickAdminActionAndWait(page, hostRunButton(page, "Close Voting"));
   await expect(
     page.getByTestId("admin-host-run-controls").getByText("voting closed", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
@@ -1852,7 +1977,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   const downloadButton = hostRunButton(page, "Download private ballot CSV");
   await expect(downloadButton).toBeEnabled();
   const manualCsvDownloadPromise = page.waitForEvent("download");
-  await downloadButton.click();
+  await clickAdminActionAndWait(page, downloadButton);
   const manualCsvDownload = await manualCsvDownloadPromise;
   const manualCsvText = await readDownloadText(manualCsvDownload);
   const manualCsvSummary = expectPrivateCsvFinalContent(manualCsvText, csvExpectation);
@@ -1875,6 +2000,13 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await goto(resultsPage, "/results");
   await expect(resultsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expectPublicRouteFreshness(resultsPage, "results-route-freshness-guard", {
+    currentRound: "2",
+    resultPhase: "final",
+    routeRound: "1",
+    routeSource: "previous_round_result",
+    votingStatus: "results_revealed",
   });
   await expect(resultsPage.getByTestId("previous-round-results-notice")).toContainText(
     "Showing Round 1. Round 2 is not final yet.",

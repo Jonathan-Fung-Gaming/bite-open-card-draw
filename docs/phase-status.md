@@ -15,6 +15,85 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Vote, Results, And Chart Filtering Follow-Up Phase 5 - Route Transition Flicker Guard - 2026-07-09
+
+Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not
+change tournament rules, result computation, tiebreak selection, persistence schema, RPCs, or
+Supabase migrations.
+
+### Scope
+
+- Added semantic public-route freshness keys with current/displayed rounds, route source, voting
+  status, voting-window timestamps, active draw versions, result snapshot/phase timestamps, ballot
+  revision timestamp, and tournament-changing audit timestamp.
+- Added a client public-route freshness guard that keeps the last accepted route payload and rejects
+  stale refresh payloads that arrive after a newer state is accepted.
+- Wrapped `/stage`, `/vote`, `/charts`, and `/results` route branches with freshness guards while
+  preserving the existing stage result-phase marker used by browser evidence.
+- Added voting snapshot `updatedAt` so pause, resume, reopen, and recompute transitions can advance
+  route freshness even when the screen moves to a lower-ranked status.
+- Covered legitimate backward transitions for reset, round advance, emergency reopen, final-warning
+  rollback, pause from final-warning/extension states, and unrevealed computed-result invalidation.
+- Hardened e2e admin action clicks used by the full-flow route evidence so refreshes and hydrated
+  button replacement do not create no-op clicks during long browser runs.
+
+### Changed Files
+
+- `docs/phase-status.md`
+- `src/app/charts/page.tsx`
+- `src/app/results/page.tsx`
+- `src/app/stage/StageResultPhaseGuard.tsx`
+- `src/app/stage/page.tsx`
+- `src/app/vote/page.tsx`
+- `src/lib/client/PublicRouteFreshnessGuard.tsx`
+- `src/lib/round/public-route-freshness.ts`
+- `src/lib/round/public-route-freshness.test.ts`
+- `src/lib/server/public-route-freshness.ts`
+- `src/lib/vote/voting-window.ts`
+- `tests/e2e/admin-helpers.ts`
+- `tests/e2e/full-flow.spec.ts`
+
+### Checks Run
+
+- `rtk npx prettier --write tests/e2e/full-flow.spec.ts src/lib/round/public-route-freshness.ts src/lib/round/public-route-freshness.test.ts` - passed.
+- `rtk npx vitest run src/lib/round/public-route-freshness.test.ts src/lib/vote/voting-window.test.ts` - passed, 2 files / 33 tests.
+- `rtk git diff --check` - passed.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 60 files / 362 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e:no-build -- --project=desktop-chromium --grep "full round smoke flow reaches final reveal and downloads private CSV"` - passed after the admin-action click hardening; earlier attempts exposed a Next dev `.next` manifest/chunk race and a stale manual CSV click.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+
+### Evidence
+
+- Pure unit tests verify stale same-result reveal payload rejection, newer correction acceptance,
+  reset acceptance, stale reset rejection, emergency reopen acceptance, pause/resume acceptance,
+  final-warning and extension pause acceptance, final-warning rollback acceptance, computed-result
+  invalidation acceptance, stale invalidation rejection, and round advance/older-round rejection.
+- Full-flow e2e verifies the public route freshness markers on `/stage`, `/vote`, `/charts`, and
+  `/results` through final release, previous-round result fallback, reset, and round advance.
+- Full-flow e2e continues to cover stage final reloads, private CSV download, public result release,
+  pause/resume draft survival, and tiebreak reveal behavior.
+
+### Manual Review
+
+- Reviewed the diff against `docs/product-spec.md` public route, voting-window, ballot, and result
+  visibility requirements.
+- No browser-only tournament mutation paths were added; freshness construction reads server state
+  and all tournament-changing actions remain server-side.
+- No public route now exposes chart-by-chart live counts before results reveal; the guard only emits
+  route state markers used by e2e evidence.
+
+### Risks And Assumptions
+
+- Freshness ordering depends on server-maintained voting-window `updatedAt`, result timestamps,
+  ballot revision timestamps, active draw version data, and tournament-changing audit timestamps.
+- The guard intentionally allows newer payloads to move the UI backward for legitimate admin
+  transitions; stale backward payloads remain covered by unit tests.
+- Browser evidence verifies guard wiring and accepted markers through real route transitions, while
+  the pure comparator tests cover the harder stale-payload ordering cases directly.
+
 ## Vote, Results, And Chart Filtering Follow-Up Phase 4 - Rune Wheel Radial Image Orientation - 2026-07-08
 
 Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not
