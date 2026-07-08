@@ -48,6 +48,16 @@ async function throwIfAdminError(page: Page) {
   }
 }
 
+function isRetryableAdminClickError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.includes("Element is not attached to the DOM") ||
+      error.message.includes("element is not stable") ||
+      error.message.includes("intercepts pointer events") ||
+      error.message.includes("element is outside of the viewport"))
+  );
+}
+
 export async function clickAdminActionAndWait(page: Page, button: Locator) {
   const waitForAdminPost = () =>
     page
@@ -57,34 +67,41 @@ export async function clickAdminActionAndWait(page: Page, button: Locator) {
       )
       .catch(() => null);
 
-  await button.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(50);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await button.scrollIntoViewIfNeeded({ timeout: 8_000 });
+      await page.waitForTimeout(50);
 
-  let adminPostPromise = waitForAdminPost();
+      let adminPostPromise = waitForAdminPost();
 
-  try {
-    await button.click({ timeout: 8_000 });
-  } catch (error) {
-    if (
-      !(error instanceof Error) ||
-      (!error.message.includes("intercepts pointer events") &&
-        !error.message.includes("element is outside of the viewport"))
-    ) {
-      throw error;
+      try {
+        await button.click({ timeout: 8_000 });
+      } catch (error) {
+        if (!isRetryableAdminClickError(error)) {
+          throw error;
+        }
+
+        await button.evaluate((element) => {
+          element.scrollIntoView({ block: "center", inline: "center" });
+        });
+        await page.waitForTimeout(100);
+        adminPostPromise = waitForAdminPost();
+        await button.click({ timeout: 8_000 });
+      }
+
+      await Promise.race([adminPostPromise, page.waitForTimeout(1_000)]);
+      await page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => null);
+      await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => null);
+      await throwIfAdminError(page);
+      return;
+    } catch (error) {
+      if (attempt === 2 || !isRetryableAdminClickError(error)) {
+        throw error;
+      }
+
+      await page.waitForTimeout(250);
     }
-
-    await button.evaluate((element) => {
-      element.scrollIntoView({ block: "center", inline: "center" });
-    });
-    await page.waitForTimeout(100);
-    adminPostPromise = waitForAdminPost();
-    await button.click({ timeout: 8_000 });
   }
-
-  await Promise.race([adminPostPromise, page.waitForTimeout(1_000)]);
-  await page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => null);
-  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => null);
-  await throwIfAdminError(page);
 }
 
 export async function openAdminPanel(page: Page, testId: string) {

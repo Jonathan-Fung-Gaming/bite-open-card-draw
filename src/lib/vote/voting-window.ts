@@ -57,6 +57,7 @@ export type VotingRoundSnapshot = {
   openedAt: string | null;
   closesAt: string | null;
   closedAt: string | null;
+  updatedAt: string | null;
   remainingMs: number;
   extensionUsed: boolean;
   finalWarningStartedAt: string | null;
@@ -447,6 +448,7 @@ export class VotingWindowStore {
       openedAt: null,
       closesAt: null,
       closedAt: null,
+      updatedAt: null,
       remainingMs: status === "ready_to_vote" ? TEN_MINUTES_MS : 0,
       extensionUsed: false,
       finalWarningStartedAt: null,
@@ -574,6 +576,7 @@ export class VotingWindowStore {
       openedAt: record.openedAt,
       closesAt: record.closesAt,
       closedAt: record.closedAt,
+      updatedAt: record.updatedAt,
       remainingMs,
       extensionUsed: record.extensionUsed,
       finalWarningStartedAt: record.finalWarningStartedAt,

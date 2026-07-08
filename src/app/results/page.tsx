@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { PublicResultSummary, RoundHeader } from "@/components";
+import { PublicRouteFreshnessGuard } from "@/lib/client/PublicRouteFreshnessGuard";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydratePublicTournamentState } from "@/lib/server/persistence";
+import { buildPublicRouteFreshness } from "@/lib/server/public-route-freshness";
 import {
   advanceVotingTimerIfDue,
   getRoundDrawRecords,
@@ -117,60 +119,74 @@ export default async function ResultsPage() {
   const bothSetsDrawn = getRoundDrawRecords(roundNumber).length === 2;
   const result = adminState.resultStore.getRoundResult(roundNumber);
   const showFinalResults = shouldShowFinalPhoneResults(snapshot.status, result?.revealPhase);
+  const freshness = buildPublicRouteFreshness({
+    currentRound,
+    result,
+    route: "/results",
+    routeRoundNumber: roundNumber,
+    routeSource: routeState.source,
+    votingSnapshot: snapshot,
+  });
 
   if (!showFinalResults || !result) {
     const pending = pendingResultsCopy(snapshot.status, bothSetsDrawn, snapshot.remainingMs);
 
     return (
-      <main className="min-h-screen">
-        <ResultsAutoRefresh />
-        <RoundHeader title={`Round ${roundNumber} Results`} status={pending.status} />
-        <section className="mx-auto max-w-3xl px-5 py-5">
-          <div
-            className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300"
-            data-testid="current-round-results-pending"
-          >
-            <h1 className="text-2xl font-black uppercase text-white">{pending.title}</h1>
-            <p className="mt-2 text-sm font-semibold uppercase tracking-[0.16em] text-ember-300">
-              Current Round {roundNumber}
-            </p>
-            <div className="mt-3 grid gap-1">
-              {pending.lines.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
+      <PublicRouteFreshnessGuard freshness={freshness} testId="results-route-freshness-guard">
+        <main className="min-h-screen">
+          <ResultsAutoRefresh />
+          <RoundHeader title={`Round ${roundNumber} Results`} status={pending.status} />
+          <section className="mx-auto max-w-3xl px-5 py-5">
+            <div
+              className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300"
+              data-testid="current-round-results-pending"
+            >
+              <h1 className="text-2xl font-black uppercase text-white">{pending.title}</h1>
+              <p className="mt-2 text-sm font-semibold uppercase tracking-[0.16em] text-ember-300">
+                Current Round {roundNumber}
+              </p>
+              <div className="mt-3 grid gap-1">
+                {pending.lines.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
-      </main>
+          </section>
+        </main>
+      </PublicRouteFreshnessGuard>
     );
   }
 
   return (
-    <main className="min-h-screen">
-      <ResultsAutoRefresh />
-      <RoundHeader
-        title={`ROUND ${roundNumber} FINAL CHARTS`}
-        status={routeState.showPreviousRoundResult ? "Previous round results" : "Results revealed"}
-      />
-      <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
-        {routeState.showPreviousRoundResult ? (
-          <div
-            className="metal-panel rounded-lg border border-ember-300/30 p-4 text-center"
-            data-testid="previous-round-results-notice"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              Previous round results
-            </p>
-            <h2 className="mt-1 text-xl font-black uppercase text-white">
-              Showing Round {roundNumber}. Round {currentRound} is not final yet.
-            </h2>
-            <p className="mt-2 text-sm text-metal-300">
-              Current-round final charts will replace this after that stage reveal finishes.
-            </p>
-          </div>
-        ) : null}
-        <PublicResultSummary result={result} />
-      </section>
-    </main>
+    <PublicRouteFreshnessGuard freshness={freshness} testId="results-route-freshness-guard">
+      <main className="min-h-screen">
+        <ResultsAutoRefresh />
+        <RoundHeader
+          title={`ROUND ${roundNumber} FINAL CHARTS`}
+          status={
+            routeState.showPreviousRoundResult ? "Previous round results" : "Results revealed"
+          }
+        />
+        <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
+          {routeState.showPreviousRoundResult ? (
+            <div
+              className="metal-panel rounded-lg border border-ember-300/30 p-4 text-center"
+              data-testid="previous-round-results-notice"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                Previous round results
+              </p>
+              <h2 className="mt-1 text-xl font-black uppercase text-white">
+                Showing Round {roundNumber}. Round {currentRound} is not final yet.
+              </h2>
+              <p className="mt-2 text-sm text-metal-300">
+                Current-round final charts will replace this after that stage reveal finishes.
+              </p>
+            </div>
+          ) : null}
+          <PublicResultSummary result={result} />
+        </section>
+      </main>
+    </PublicRouteFreshnessGuard>
   );
 }

@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import {
-  CountdownTimer,
-  QRPanel,
-  ResultSetPanel,
-  RoundHeader,
-  StageDrawCard,
-} from "@/components";
+import { CountdownTimer, QRPanel, ResultSetPanel, RoundHeader, StageDrawCard } from "@/components";
 import { adminState } from "@/lib/server/admin-state";
 import { hydratePublicTournamentState } from "@/lib/server/persistence";
 import { advanceVotingTimerIfDue, getVotingRoundSnapshot } from "@/lib/server/voting-round";
 import { buildStageRoundView, stageShouldUseResultMode } from "@/lib/stage/stage-view";
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
+import { buildPublicRouteFreshness } from "@/lib/server/public-route-freshness";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import {
   STAGE_LIVE_REFRESH_INTERVAL_MS,
@@ -135,9 +130,7 @@ function StageResultModeHolding({ roundNumber, status }: { roundNumber: number; 
             <p className="text-xl font-semibold uppercase text-ember-300">
               Result reveal in progress
             </p>
-            <h1 className="mt-3 text-6xl font-black uppercase text-white">
-              Holding Stage Screen
-            </h1>
+            <h1 className="mt-3 text-6xl font-black uppercase text-white">Holding Stage Screen</h1>
             <p className="mt-3 text-2xl font-bold text-metal-300">
               The round has moved past voting into results. Waiting for the latest result snapshot
               before showing the next reveal step.
@@ -162,113 +155,117 @@ export default async function StagePage() {
   const snapshot = getVotingRoundSnapshot(roundNumber, serverNowMs);
   const result = adminState.resultStore.getRoundResult(roundNumber);
   const useResultMode = stageShouldUseResultMode(snapshot.status, Boolean(result));
+  const freshness = buildPublicRouteFreshness({
+    currentRound: roundNumber,
+    result,
+    route: "/stage",
+    routeRoundNumber: roundNumber,
+    routeSource: "current_round",
+    votingSnapshot: snapshot,
+  });
 
   if (useResultMode) {
     if (!result) {
-      return <StageResultModeHolding roundNumber={roundNumber} status={snapshot.status} />;
+      return (
+        <StageResultPhaseGuard freshness={freshness}>
+          <StageResultModeHolding roundNumber={roundNumber} status={snapshot.status} />
+        </StageResultPhaseGuard>
+      );
     }
 
     const [setOne, setTwo] = result.sets;
 
     if (result.revealPhase === "final") {
       return (
-        <>
+        <StageResultPhaseGuard freshness={freshness}>
           <StageAutoRefresh
             intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
             jitterMs={STAGE_LIVE_REFRESH_JITTER_MS}
           />
-          <StageResultPhaseGuard roundNumber={roundNumber} phase={result.revealPhase}>
-            <main className="min-h-screen">
-              <RoundHeader
-                title={`ROUND ${roundNumber} FINAL CHARTS`}
-                status="Stable final screen"
-                compact
-              />
-              <section className="px-5 py-5 lg:px-8">
-                <div
-                  className="grid min-h-[calc(100vh-220px)] gap-6 md:grid-cols-2"
-                  data-testid="stage-final-chart-list"
-                >
-                  {result.sets.map((set) => (
-                    <section key={set.roundSetId} className="grid content-stretch gap-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-2xl font-black uppercase text-ember-300">
-                          Set {set.setOrder}
-                        </p>
-                        <p className="text-5xl font-black uppercase leading-none text-ember-300">
-                          {set.selectedChart.displayDifficulty}
-                        </p>
-                      </div>
-                      <StageDrawCard chart={set.selectedChart} variant="featured" />
-                    </section>
-                  ))}
-                </div>
-              </section>
-            </main>
-          </StageResultPhaseGuard>
-        </>
+          <main className="min-h-screen">
+            <RoundHeader
+              title={`ROUND ${roundNumber} FINAL CHARTS`}
+              status="Stable final screen"
+              compact
+            />
+            <section className="px-5 py-5 lg:px-8">
+              <div
+                className="grid min-h-[calc(100vh-220px)] gap-6 md:grid-cols-2"
+                data-testid="stage-final-chart-list"
+              >
+                {result.sets.map((set) => (
+                  <section key={set.roundSetId} className="grid content-stretch gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-2xl font-black uppercase text-ember-300">
+                        Set {set.setOrder}
+                      </p>
+                      <p className="text-5xl font-black uppercase leading-none text-ember-300">
+                        {set.selectedChart.displayDifficulty}
+                      </p>
+                    </div>
+                    <StageDrawCard chart={set.selectedChart} variant="featured" />
+                  </section>
+                ))}
+              </div>
+            </section>
+          </main>
+        </StageResultPhaseGuard>
       );
     }
 
     return (
-      <>
+      <StageResultPhaseGuard freshness={freshness}>
         <StageAutoRefresh
           deferDuringTiebreak
           intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
           jitterMs={STAGE_LIVE_REFRESH_JITTER_MS}
         />
-        <StageResultPhaseGuard roundNumber={roundNumber} phase={result.revealPhase}>
-          <main className="min-h-screen">
-            <RoundHeader
-              title={`Round ${roundNumber} Results Reveal`}
-              status={revealLabel(result.revealPhase)}
-              compact
-            />
-            <section className="grid gap-3 px-5 py-3 lg:px-8">
-              <div className="grid gap-4">
-                {result.revealPhase === "computed" ? (
-                  <section className="metal-panel rounded-lg p-5 text-center">
-                    <p className="text-xl font-semibold uppercase tracking-[0.18em] text-ember-300">
-                      Results computed
-                    </p>
-                    <h1 className="mt-2 text-6xl font-black uppercase text-white">
-                      Awaiting Host Reveal
-                    </h1>
-                  </section>
-                ) : null}
-                {result.revealPhase === "set_1_counts" ? (
-                  <ResultSetPanel set={setOne} serverNowMs={serverNowMs} stageMode />
-                ) : null}
-                {result.revealPhase === "set_1_resolved" ? (
-                  <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} stageMode />
-                ) : null}
-                {result.revealPhase === "set_2_counts" ? (
-                  <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_1fr]">
-                    <StageResolvedSetSummary set={setOne} />
-                    <ResultSetPanel set={setTwo} serverNowMs={serverNowMs} stageMode />
-                  </div>
-                ) : null}
-                {result.revealPhase === "set_2_resolved" ? (
-                  <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_1fr]">
-                    <StageResolvedSetSummary set={setOne} />
-                    <ResultSetPanel set={setTwo} showWinner serverNowMs={serverNowMs} stageMode />
-                  </div>
-                ) : null}
-              </div>
-            </section>
-          </main>
-        </StageResultPhaseGuard>
-      </>
+        <main className="min-h-screen">
+          <RoundHeader
+            title={`Round ${roundNumber} Results Reveal`}
+            status={revealLabel(result.revealPhase)}
+            compact
+          />
+          <section className="grid gap-3 px-5 py-3 lg:px-8">
+            <div className="grid gap-4">
+              {result.revealPhase === "computed" ? (
+                <section className="metal-panel rounded-lg p-5 text-center">
+                  <p className="text-xl font-semibold uppercase tracking-[0.18em] text-ember-300">
+                    Results computed
+                  </p>
+                  <h1 className="mt-2 text-6xl font-black uppercase text-white">
+                    Awaiting Host Reveal
+                  </h1>
+                </section>
+              ) : null}
+              {result.revealPhase === "set_1_counts" ? (
+                <ResultSetPanel set={setOne} serverNowMs={serverNowMs} stageMode />
+              ) : null}
+              {result.revealPhase === "set_1_resolved" ? (
+                <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} stageMode />
+              ) : null}
+              {result.revealPhase === "set_2_counts" ? (
+                <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_1fr]">
+                  <StageResolvedSetSummary set={setOne} />
+                  <ResultSetPanel set={setTwo} serverNowMs={serverNowMs} stageMode />
+                </div>
+              ) : null}
+              {result.revealPhase === "set_2_resolved" ? (
+                <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_1fr]">
+                  <StageResolvedSetSummary set={setOne} />
+                  <ResultSetPanel set={setTwo} showWinner serverNowMs={serverNowMs} stageMode />
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </main>
+      </StageResultPhaseGuard>
     );
   }
 
   return (
-    <>
-      <StageAutoRefresh
-        intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
-        jitterMs={0}
-        leading
-      />
+    <StageResultPhaseGuard freshness={freshness}>
+      <StageAutoRefresh intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS} jitterMs={0} leading />
       <main className="min-h-screen">
         <RoundHeader
           title={`Round ${view.roundNumber} Draw`}
@@ -294,6 +291,6 @@ export default async function StagePage() {
           <StageDrawRows sets={view.sets} serverNowMs={serverNowMs} />
         </section>
       </main>
-    </>
+    </StageResultPhaseGuard>
   );
 }

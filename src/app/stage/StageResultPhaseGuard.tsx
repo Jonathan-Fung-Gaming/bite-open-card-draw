@@ -1,46 +1,22 @@
 "use client";
 
-import { type ReactNode, useRef } from "react";
-import type { ResultRevealPhase } from "@/lib/results/reveal-phase-order";
-import { resultRevealPhaseRank } from "@/lib/results/reveal-phase-order";
+import type { ReactNode } from "react";
+import { PublicRouteFreshnessGuard } from "@/lib/client/PublicRouteFreshnessGuard";
+import type { PublicRouteFreshnessKey } from "@/lib/round/public-route-freshness";
 
 type StageResultPhaseGuardProps = {
   children: ReactNode;
-  phase: ResultRevealPhase;
-  roundNumber: 1 | 2 | 3 | 4;
+  freshness: PublicRouteFreshnessKey;
 };
 
-export function StageResultPhaseGuard({
-  children,
-  phase,
-  roundNumber,
-}: StageResultPhaseGuardProps) {
-  const accepted = useRef({
-    children,
-    phase,
-    rank: resultRevealPhaseRank(phase),
-    roundNumber,
-  });
-  const nextRank = resultRevealPhaseRank(phase);
-
-  if (accepted.current.roundNumber !== roundNumber || nextRank >= accepted.current.rank) {
-    accepted.current = {
-      children,
-      phase,
-      rank: nextRank,
-      roundNumber,
-    };
-  }
-
+export function StageResultPhaseGuard({ children, freshness }: StageResultPhaseGuardProps) {
   return (
-    <>
-      <span
-        aria-hidden="true"
-        data-accepted-result-phase={accepted.current.phase}
-        data-testid="stage-result-phase-guard"
-        hidden
-      />
-      {accepted.current.children}
-    </>
+    <PublicRouteFreshnessGuard
+      freshness={freshness}
+      resultPhaseTestId="stage-result-phase-guard"
+      testId="stage-route-freshness-guard"
+    >
+      {children}
+    </PublicRouteFreshnessGuard>
   );
 }
