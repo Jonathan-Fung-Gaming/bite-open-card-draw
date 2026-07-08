@@ -102,8 +102,7 @@ select {
 
 .rune-wheel-hub {
   background:
-    radial-gradient(circle, rgba(255, 122, 26, 0.24), rgba(17, 16, 15, 0.95) 58%),
-    #11100f;
+    radial-gradient(circle, rgba(255, 122, 26, 0.24), rgba(17, 16, 15, 0.95) 58%), #11100f;
   border: 1px solid rgba(255, 185, 92, 0.28);
   border-radius: 9999px;
   height: 38%;
@@ -142,8 +141,7 @@ select {
   left: calc(50% - (var(--rune-slot-size) / 2));
   position: absolute;
   top: calc(50% - (var(--rune-slot-size) / 2));
-  transform: rotate(var(--rune-slot-angle)) translateY(var(--rune-slot-radius))
-    rotate(var(--rune-slot-counter-angle));
+  transform: rotate(var(--rune-slot-angle)) translateY(var(--rune-slot-radius));
   width: var(--rune-slot-size);
 }
 
