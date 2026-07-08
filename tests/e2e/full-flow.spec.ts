@@ -154,18 +154,33 @@ async function expectStageRows(page: Page) {
   await expect(rows.nth(1).getByTestId("stage-chart-card")).toHaveCount(7);
 }
 
-async function expectStageResultRowsSortedMostToLeastBanned(page: Page) {
+async function expectStageResultRowsSortedLeastToMostBanned(page: Page) {
   const rows = page.getByTestId("result-row");
 
   await expect(rows).toHaveCount(7, {
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
-  const banCounts = await rows.evaluateAll((elements) =>
-    elements.map((element) => Number(element.getAttribute("data-ban-count"))),
+  const rowData = await rows.evaluateAll((elements) =>
+    elements.map((element) => ({
+      banCount: Number(element.getAttribute("data-ban-count")),
+      revealIndex: Number(element.getAttribute("data-stage-reveal-index")),
+      tiedForFewest: element.getAttribute("data-tied-for-fewest") === "true",
+    })),
   );
+  const banCounts = rowData.map((row) => row.banCount);
+  const revealOrderBanCounts = [...rowData]
+    .sort((left, right) => left.revealIndex - right.revealIndex)
+    .map((row) => row.banCount);
+  const leastBanCount = Math.min(...banCounts);
+  const leastBanRows = rowData.filter((row) => row.tiedForFewest);
 
-  expect(banCounts).toEqual([...banCounts].sort((left, right) => right - left));
+  expect(banCounts).toEqual([...banCounts].sort((left, right) => left - right));
+  expect(revealOrderBanCounts).toEqual(
+    [...revealOrderBanCounts].sort((left, right) => right - left),
+  );
+  expect(leastBanRows.length).toBeGreaterThan(0);
+  expect(leastBanRows.every((row) => row.banCount === leastBanCount)).toBe(true);
 }
 
 async function expectStageAcceptedResultPhase(page: Page, phase: string) {
@@ -1638,7 +1653,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expectStageDoesNotReturnToDrawMode(stagePage, 1);
   await expectStageAcceptedResultPhase(stagePage, "set_1_counts");
   await expectStageResultRowsRevealProgressively(stagePage);
-  await expectStageResultRowsSortedMostToLeastBanned(stagePage);
+  await expectStageResultRowsSortedLeastToMostBanned(stagePage);
   await expectStageFitsProjectorViewport(stagePage, "set 1 counts");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
@@ -1662,7 +1677,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expectStageResultRowsRevealProgressively(stagePage);
-  await expectStageResultRowsSortedMostToLeastBanned(stagePage);
+  await expectStageResultRowsSortedLeastToMostBanned(stagePage);
   await expectStageFitsProjectorViewport(stagePage, "set 2 counts");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await expectNoStageVerticalScroll(stagePage);

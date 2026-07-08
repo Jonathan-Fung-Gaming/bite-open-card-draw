@@ -100,8 +100,14 @@ export function PublicResultSummary({
                     key={row.chart.id}
                     className={clsx(
                       "grid gap-2 rounded border bg-black/25 p-3 sm:grid-cols-[1fr_auto]",
-                      row.selected ? "border-ember-300/55" : "border-metal-700",
+                      row.selected
+                        ? "border-ember-200 bg-ember-900/30 shadow-ember-tight ring-2 ring-ember-300/60"
+                        : row.tiedForFewest
+                          ? "border-ember-300/65 bg-ember-900/15"
+                          : "border-metal-700",
                     )}
+                    data-tied-for-fewest={row.tiedForFewest ? "true" : "false"}
+                    data-testid="public-result-row"
                   >
                     <div className="min-w-0">
                       <p className="text-2xl font-black uppercase leading-tight text-ember-300">
@@ -122,6 +128,14 @@ export function PublicResultSummary({
                           data-testid="result-selected-label"
                         >
                           Selected
+                        </p>
+                      ) : null}
+                      {row.tiedForFewest ? (
+                        <p
+                          className="mt-1 text-lg font-black uppercase tracking-[0.14em] text-ember-300"
+                          data-testid="result-least-ban-label"
+                        >
+                          Least bans
                         </p>
                       ) : null}
                     </div>
