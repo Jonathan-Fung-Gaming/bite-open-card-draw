@@ -129,6 +129,12 @@ if (report.skippedRows.length > 0) {
   );
 }
 
+if (report.filteredRows.length > 0) {
+  console.log(
+    `Filtered ${report.filteredRows.length} Short Cut or Full Song source rows; review data/generated/chart-import-report.json before release.`,
+  );
+}
+
 if (report.poolsWithTooFewCharts.length > 0) {
   console.error(
     `Required pools with fewer than 7 eligible charts: ${report.poolsWithTooFewCharts.join(", ")}`,

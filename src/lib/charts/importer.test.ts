@@ -7,6 +7,7 @@ import {
   parseChartCsv,
   parseChartCsvWithReport,
 } from "./importer";
+import { isDisallowedSpecialChartName } from "./normalize";
 import { REQUIRED_CHART_POOLS } from "./types";
 
 describe("chart importer", () => {
@@ -19,7 +20,12 @@ describe("chart importer", () => {
     });
 
     expect(charts.length).toBeGreaterThan(0);
+    expect(report.filteredRows.length).toBeGreaterThan(0);
     expect(report.poolsWithTooFewCharts).toEqual([]);
+    expect(charts.every((chart) => !isDisallowedSpecialChartName(chart.name, chart.nameKr))).toBe(
+      true,
+    );
+    expect(charts.some((chart) => /remix/i.test(`${chart.name} ${chart.nameKr}`))).toBe(true);
 
     for (const pool of REQUIRED_CHART_POOLS) {
       expect(report.poolCounts[pool]).toBeGreaterThanOrEqual(7);
@@ -207,5 +213,56 @@ describe("chart importer", () => {
       { sourceRowNumber: 2, reason: "D16 is outside required tournament pools." },
     ]);
     expect(report.poolCounts.S16).toBe(0);
+  });
+
+  it("filters Short Cut and Full Song rows while preserving Remixes", () => {
+    const rows = [
+      {
+        name: "Euphorianic - SHORT CUT -",
+        name_kr: "Euphorianic - SHORT CUT -",
+        artist: "Artist",
+        label: "s",
+        type: "s",
+        level: "16",
+        bg_img: "https://example.com/short-cut.png",
+      },
+      {
+        name: "Gargoyle - FULL SONG -",
+        name_kr: "Gargoyle - FULL SONG -",
+        artist: "Artist",
+        label: "d",
+        type: "d",
+        level: "23",
+        bg_img: "https://example.com/full-song.png",
+      },
+      {
+        name: "Stardream -Eurobeat Remix-",
+        name_kr: "Stardream -Eurobeat Remix-",
+        artist: "Artist",
+        label: "s",
+        type: "s",
+        level: "16",
+        bg_img: "https://example.com/remix.png",
+      },
+    ];
+    const { charts, report } = importChartRows(rows, {
+      sourcePath: "fixture.csv",
+      generatedAt: "test",
+    });
+
+    expect(charts.map((chart) => chart.name)).toEqual(["Stardream -Eurobeat Remix-"]);
+    expect(report.filteredRows).toEqual([
+      {
+        sourceRowNumber: 2,
+        reason: "name contains disallowed Short Cut marker.",
+      },
+      {
+        sourceRowNumber: 3,
+        reason: "name contains disallowed Full Song marker.",
+      },
+    ]);
+    expect(report.skippedRows).toEqual([]);
+    expect(report.poolCounts.S16).toBe(1);
+    expect(report.poolCounts.D23).toBe(0);
   });
 });

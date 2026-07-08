@@ -5,7 +5,14 @@ import {
   normalizeChartExclusionState,
   upsertChartExclusion,
 } from "./exclusions";
-import { buildChartKey, normalizeChartRow, normalizeKeyPart, parseChartLevel } from "./normalize";
+import {
+  buildChartKey,
+  getDisallowedSpecialChartNameReason,
+  isDisallowedSpecialChartName,
+  normalizeChartRow,
+  normalizeKeyPart,
+  parseChartLevel,
+} from "./normalize";
 
 const rawRow = {
   name: "Murdoch vs Otada",
@@ -72,6 +79,19 @@ describe("chart normalization", () => {
   it("marks only tournament pools as tournament scope", () => {
     expect(normalizeChartRow(rawRow, 2).tournamentScope).toBe(true);
     expect(normalizeChartRow({ ...rawRow, level: "09" }, 3).tournamentScope).toBe(false);
+  });
+
+  it("identifies Short Cut and Full Song markers without filtering remixes", () => {
+    expect(isDisallowedSpecialChartName("Gargoyle - FULL SONG -")).toBe(true);
+    expect(isDisallowedSpecialChartName("Euphorianic - SHORT CUT -")).toBe(true);
+    expect(isDisallowedSpecialChartName("Shortcut Example")).toBe(true);
+    expect(isDisallowedSpecialChartName("Regular", "Paradoxx - SHORT CUT -")).toBe(true);
+    expect(isDisallowedSpecialChartName("Stardream -Eurobeat Remix-")).toBe(false);
+    expect(isDisallowedSpecialChartName("Banya-P Guitar Remix")).toBe(false);
+    expect(isDisallowedSpecialChartName("Short Fuse")).toBe(false);
+    expect(getDisallowedSpecialChartNameReason("Regular", "Gargoyle - FULL SONG -")).toBe(
+      "name_kr contains disallowed Full Song marker.",
+    );
   });
 
   it("supports exclusion and re-inclusion by chart key", () => {

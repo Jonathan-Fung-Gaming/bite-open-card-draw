@@ -3,6 +3,7 @@ import path from "node:path";
 import { localImagePathForRemoteUrl } from "./image-cache";
 import { importChartRows, parseChartCsv } from "./importer";
 import { FALLBACK_CHART_IMAGE_PATH } from "./image-paths";
+import { isDisallowedSpecialChartName } from "./normalize";
 import type { NormalizedChart } from "./types";
 
 export const GENERATED_CHARTS_WITH_IMAGES_PATH = "data/generated/charts-with-images.json";
@@ -40,6 +41,10 @@ export function resolveRuntimeChartImages(charts: readonly NormalizedChart[]): N
   });
 }
 
+export function filterDisallowedRuntimeCharts(charts: readonly NormalizedChart[]) {
+  return charts.filter((chart) => !isDisallowedSpecialChartName(chart.name, chart.nameKr));
+}
+
 function readGeneratedCharts(projectRoot: string) {
   const generatedPath = path.join(projectRoot, GENERATED_CHARTS_WITH_IMAGES_PATH);
 
@@ -54,7 +59,7 @@ export function loadRuntimeCharts(projectRoot = process.cwd()) {
   const generatedCharts = readGeneratedCharts(projectRoot);
 
   if (generatedCharts) {
-    return resolveRuntimeChartImages(generatedCharts);
+    return resolveRuntimeChartImages(filterDisallowedRuntimeCharts(generatedCharts));
   }
 
   const sourcePath = path.join(projectRoot, SOURCE_CHART_CSV_PATH);
@@ -67,5 +72,5 @@ export function loadRuntimeCharts(projectRoot = process.cwd()) {
     sourcePath: SOURCE_CHART_CSV_PATH,
   });
 
-  return resolveRuntimeChartImages(charts);
+  return resolveRuntimeChartImages(filterDisallowedRuntimeCharts(charts));
 }

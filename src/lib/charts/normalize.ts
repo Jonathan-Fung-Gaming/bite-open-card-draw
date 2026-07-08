@@ -53,6 +53,40 @@ export function normalizeKeyPart(value: string): string {
   return `unicode-${createHash("sha256").update(unicodeSource).digest("hex").slice(0, 16)}`;
 }
 
+function normalizeSpecialChartName(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function disallowedSpecialChartReason(value: string, fieldName: "name" | "name_kr") {
+  const normalized = normalizeSpecialChartName(value);
+
+  if (/\b(?:short cut|shortcut)\b/.test(normalized)) {
+    return `${fieldName} contains disallowed Short Cut marker.`;
+  }
+
+  if (/\bfull song\b/.test(normalized)) {
+    return `${fieldName} contains disallowed Full Song marker.`;
+  }
+
+  return null;
+}
+
+export function getDisallowedSpecialChartNameReason(name: string, nameKr = "") {
+  return (
+    disallowedSpecialChartReason(name, "name") ?? disallowedSpecialChartReason(nameKr, "name_kr")
+  );
+}
+
+export function isDisallowedSpecialChartName(name: string, nameKr = "") {
+  return getDisallowedSpecialChartNameReason(name, nameKr) !== null;
+}
+
 export function buildSongKey(name: string, artist: string): string {
   return `${normalizeKeyPart(name)}__${normalizeKeyPart(artist)}`;
 }
