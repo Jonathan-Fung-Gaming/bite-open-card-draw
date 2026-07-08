@@ -780,7 +780,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       </p>
                     </div>
                     <div className="rounded border border-metal-700 bg-black/25 p-3">
-                      <p className="text-xs uppercase text-ember-300">Ban selections</p>
+                      <p className="text-xs uppercase text-ember-300">
+                        Ban selections across both sets
+                      </p>
                       <p className="mt-1 text-3xl font-black text-white">
                         {votingSnapshot.banSelectionsCast}
                       </p>
@@ -1383,7 +1385,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </div>
               <div className="rounded border border-metal-700 bg-black/25 p-3">
                 <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
-                  Ban selections cast
+                  Ban selections cast across both sets
                 </p>
                 <p className="mt-2 text-3xl font-black text-white">
                   {votingSnapshot.banSelectionsCast}

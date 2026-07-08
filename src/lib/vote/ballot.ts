@@ -68,10 +68,14 @@ export type SubmitRoundBallotOptions = {
   editTokenHash?: string | null;
 };
 
+export const MAX_BANS_PER_SET = 2;
+export const SETS_PER_ROUND_BALLOT = 2;
+export const MAX_BANS_PER_ROUND_BALLOT = MAX_BANS_PER_SET * SETS_PER_ROUND_BALLOT;
+
 export function isSetChoiceComplete(choice: BallotSetChoice) {
   return choice.noBans
     ? choice.bannedChartIds.length === 0
-    : choice.bannedChartIds.length >= 1 && choice.bannedChartIds.length <= 2;
+    : choice.bannedChartIds.length >= 1 && choice.bannedChartIds.length <= MAX_BANS_PER_SET;
 }
 
 export function validateRoundBallot(input: SubmitRoundBallotInput, draws: readonly DrawRecord[]) {

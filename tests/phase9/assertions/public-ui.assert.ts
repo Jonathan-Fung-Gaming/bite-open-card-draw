@@ -61,7 +61,7 @@ async function expectNoResultSpoilers(page: Page) {
 async function expectRoomRoutePrivacy(roomPage: RoomPage) {
   await roomPage.reload();
   await roomPage.expectLandingOptions();
-  await expect(roomPage.page.getByText(/Ballots submitted:|Ban selections cast:/)).toHaveCount(0);
+  await expect(roomPage.page.getByText(/Ballots submitted:|Ban selections cast/)).toHaveCount(0);
   await expect(roomPage.page.getByLabel("Select your start.gg username")).toHaveCount(0);
   await expect(roomPage.page.getByRole("button", { name: "Submit Ballot" })).toHaveCount(0);
   await expectNoResultSpoilers(roomPage.page);
@@ -105,7 +105,9 @@ async function expectRehearsalAggregateTotals(
       `Ballots submitted: ${submittedPlayerCount} / ${expectation.activePlayerCount}`,
     ),
   ).toBeVisible();
-  await expect(page.getByText(`Ban selections cast: ${banSelectionCount}`)).toBeVisible();
+  await expect(
+    page.getByText(`Ban selections cast across both sets: ${banSelectionCount}`),
+  ).toBeVisible();
 }
 
 export async function expectPublicDrawState(stagePage: StagePage, chartsPage: ChartsPage) {

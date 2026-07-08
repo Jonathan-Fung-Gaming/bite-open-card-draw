@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import type { DrawnChartSummary } from "@/lib/draw/draw-engine";
-import type { RoundBallot } from "@/lib/vote/ballot";
+import { MAX_BANS_PER_ROUND_BALLOT, MAX_BANS_PER_SET, type RoundBallot } from "@/lib/vote/ballot";
 import { computeRoundResult } from "./result-engine";
 
 function chart(id: string, name: string): DrawnChartSummary {
@@ -218,10 +218,7 @@ describe("result engine", () => {
     const result = computeRoundResult({
       id: "result",
       roundNumber: 1,
-      draws: [
-        draw("draw-1", 1, "S16", setOneCharts),
-        draw("draw-2", 2, "S17", setTwoCharts),
-      ],
+      draws: [draw("draw-1", 1, "S16", setOneCharts), draw("draw-2", 2, "S17", setTwoCharts)],
       ballots: [],
       eligiblePlayers: [],
       priorSelectedSongBlocks: [],
@@ -251,10 +248,7 @@ describe("result engine", () => {
     const result = computeRoundResult({
       id: "result",
       roundNumber: 1,
-      draws: [
-        draw("draw-1", 1, "S16", setOneCharts),
-        draw("draw-2", 2, "S17", setTwoCharts),
-      ],
+      draws: [draw("draw-1", 1, "S16", setOneCharts), draw("draw-2", 2, "S17", setTwoCharts)],
       ballots: [ballot("p1", ["a-6"], ["b-6"])],
       eligiblePlayers: eligiblePlayers("p1"),
       priorSelectedSongBlocks: [],
@@ -291,14 +285,51 @@ describe("result engine", () => {
       randomIndex: () => 0,
     });
 
-    const setOneCounts = new Map(
-      result.sets[0].rows.map((row) => [row.chart.id, row.banCount]),
-    );
+    const setOneCounts = new Map(result.sets[0].rows.map((row) => [row.chart.id, row.banCount]));
 
     expect(setOneCounts.get("a")).toBe(1);
     expect(setOneCounts.get("d")).toBe(1);
     expect(setOneCounts.get("b")).toBe(0);
     expect(setOneCounts.get("c")).toBe(0);
     expect(result.eligiblePlayers).toEqual(eligiblePlayers("p1"));
+  });
+
+  it("keeps result ban counts within valid per-round, per-set, and per-chart maxima", () => {
+    const setOneCharts = sevenCharts("set-one");
+    const setTwoCharts = sevenCharts("set-two");
+    const ballots = [
+      ballot("p1", ["set-one-0", "set-one-1"], ["set-two-0", "set-two-1"]),
+      ballot("p2", ["set-one-0", "set-one-2"], ["set-two-0", "set-two-2"]),
+      ballot("p3", ["set-one-0", "set-one-3"], ["set-two-0", "set-two-3"]),
+      ballot("p4", ["set-one-1", "set-one-2"], ["set-two-1", "set-two-2"]),
+    ];
+    const result = computeRoundResult({
+      id: "result",
+      roundNumber: 1,
+      draws: [draw("draw-1", 1, "S16", setOneCharts), draw("draw-2", 2, "S17", setTwoCharts)],
+      ballots,
+      eligiblePlayers: eligiblePlayers("p1", "p2", "p3", "p4"),
+      priorSelectedSongBlocks: [],
+      computedAt: "now",
+      randomIndex: () => 0,
+    });
+    const countedBallotCount = ballots.length;
+    const totalBanSelections = result.sets.reduce(
+      (roundTotal, set) =>
+        roundTotal + set.rows.reduce((setTotal, row) => setTotal + row.banCount, 0),
+      0,
+    );
+
+    expect(totalBanSelections).toBe(countedBallotCount * MAX_BANS_PER_ROUND_BALLOT);
+    expect(totalBanSelections).toBeLessThanOrEqual(countedBallotCount * MAX_BANS_PER_ROUND_BALLOT);
+
+    for (const set of result.sets) {
+      const setBanSelections = set.rows.reduce((total, row) => total + row.banCount, 0);
+
+      expect(setBanSelections).toBeLessThanOrEqual(countedBallotCount * MAX_BANS_PER_SET);
+      for (const row of set.rows) {
+        expect(row.banCount).toBeLessThanOrEqual(countedBallotCount);
+      }
+    }
   });
 });

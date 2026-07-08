@@ -62,7 +62,7 @@ function stageTimerCaption(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean
   }
 
   const turnout = `Ballots submitted: ${snapshot.submittedCount} / ${snapshot.eligibleCount}`;
-  const bans = `Ban selections cast: ${snapshot.banSelectionsCast}`;
+  const bans = `Ban selections cast across both sets: ${snapshot.banSelectionsCast}`;
 
   if (snapshot.status === "voting_paused") {
     return `${turnout}. ${bans}. Timer paused by host.`;
