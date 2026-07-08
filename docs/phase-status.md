@@ -15,6 +15,58 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Vote, Results, And Chart Filtering Follow-Up Phase 3 - Result Reveal And Least-Ban Presentation - 2026-07-08
+
+Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not
+change result computation, tiebreak selection, persistence schema, RPCs, or Supabase migrations.
+
+### Scope
+
+- Kept result count rows physically ordered least-banned to most-banned so winner candidates stay at
+  the top.
+- Preserved the stage reveal tension by assigning a separate most-banned-to-least-banned reveal rank
+  while rows remain in their final least-first positions.
+- Highlighted every row where `tiedForFewest` is true, and kept the selected winner styling
+  strongest once selection is revealed.
+- Added selected chart art to the unique least-ban reveal panel.
+- Added selected chart art to the 5-or-more fallback tiebreak reveal once the sealed winner is
+  revealed.
+- Added least-ban highlights to public/phone full ban-count rows while keeping final selected chart
+  cards before expandable full counts.
+
+### Changed Files
+
+- `src/components/ResultSetPanel.tsx`
+- `src/components/PublicResultSummary.tsx`
+- `src/components/result-presentation.test.ts`
+- `tests/e2e/full-flow.spec.ts`
+
+### Checks Run
+
+- `rtk npx vitest run src/components/result-presentation.test.ts src/lib/results/result-engine.test.ts src/components/rune-wheel-rotation.test.ts` - passed, 3 files / 14 tests.
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- `rtk npm run test` - passed, 59 files / 345 tests.
+- `rtk npm run build` - passed.
+- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+
+### Evidence
+
+- Component tests verify unique least-ban and fallback reveal panels render selected chart artwork.
+- Component tests verify least-ban rows are flagged and public final selected chart cards render
+  before the full ban counts.
+- Full-flow e2e verifies stage count rows are least-banned to most-banned while reveal ranks still
+  run most-banned to least-banned.
+- Full-flow e2e continues to cover stage layout fit, final chart release, and phone/public final
+  result visibility.
+
+### Risks And Assumptions
+
+- The result engine already supplied least-first rows; this phase removes the stage-only physical
+  resort and uses a separate reveal rank for animation timing.
+- Least-ban tie highlights intentionally appear before the final selected winner is known; the
+  selected winner receives stronger styling after reveal.
+
 ## Vote, Results, And Chart Filtering Follow-Up Phase 2 - Ban Count Clarification And Invariants - 2026-07-08
 
 Status: complete for local source, unit, build, and memory-dev browser evidence. This phase did not

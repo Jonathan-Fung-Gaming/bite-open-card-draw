@@ -36,6 +36,59 @@ function sortStageRevealRows(
   return left.chart.name.localeCompare(right.chart.name);
 }
 
+function RevealChartCard({
+  chart,
+  stageMode,
+}: {
+  chart: ResultSetSnapshot["selectedChart"];
+  stageMode: boolean;
+}) {
+  const imagePath = chart.localImagePath ?? FALLBACK_CHART_IMAGE_PATH;
+
+  return (
+    <article
+      className={clsx(
+        "overflow-hidden rounded border border-ember-300/45 bg-furnace-900 shadow-ember-tight",
+        stageMode ? "w-full max-w-3xl" : "w-full",
+      )}
+      data-chart-id={chart.id}
+      data-chart-image-path={imagePath}
+      data-testid="result-selected-reveal-card"
+    >
+      <div className="relative aspect-[16/9] overflow-hidden border-b border-ember-300/15 bg-black/35">
+        <ChartArtImage
+          src={imagePath}
+          className="h-full w-full object-contain opacity-95"
+          testId="result-selected-reveal-image"
+        />
+      </div>
+      <div className={clsx("p-4", stageMode ? "sm:p-5" : "sm:p-4")}>
+        <p
+          className={clsx(
+            "font-black uppercase leading-none text-ember-300",
+            stageMode ? "text-5xl" : "text-2xl",
+          )}
+        >
+          {chart.displayDifficulty}
+        </p>
+        <h3
+          className={clsx(
+            "mt-3 break-words font-black uppercase leading-tight text-white",
+            stageMode ? "text-4xl" : "text-xl",
+          )}
+        >
+          {chart.name}
+        </h3>
+        <p
+          className={clsx("mt-2 break-words text-metal-300", stageMode ? "text-2xl" : "text-base")}
+        >
+          {chart.artist}
+        </p>
+      </div>
+    </article>
+  );
+}
+
 export function ResultSetPanel({
   set,
   showWinner = false,
@@ -43,9 +96,14 @@ export function ResultSetPanel({
   stageMode = false,
 }: ResultSetPanelProps) {
   const [nowMs, setNowMs] = useState(serverNowMs ?? Date.now());
-  const displayRows = stageMode ? [...set.rows].sort(sortStageRevealRows) : set.rows;
+  const displayRows = set.rows;
+  const stageRevealRows =
+    stageMode && !showWinner ? [...displayRows].sort(sortStageRevealRows) : displayRows;
+  const stageRevealRankByChartId = new Map(
+    stageRevealRows.map((row, index) => [row.chart.id, index]),
+  );
   const initialStageVisibleRowCount =
-    stageMode && !showWinner && displayRows.length > 0 ? 1 : displayRows.length;
+    stageMode && !showWinner && stageRevealRows.length > 0 ? 1 : displayRows.length;
   const [stageVisibleRowCount, setStageVisibleRowCount] = useState(initialStageVisibleRowCount);
   const [stageTiebreakWinnerRevealed, setStageTiebreakWinnerRevealed] = useState(false);
   const serverTiebreakWinnerRevealed =
@@ -92,9 +150,9 @@ export function ResultSetPanel({
               Fallback tiebreak reveal
             </p>
             {tiebreakWinnerRevealed ? (
-              <p className={clsx("mt-2 font-black text-white", stageMode ? "text-3xl" : "text-lg")}>
-                {set.selectedChart.name}
-              </p>
+              <div className="mt-4">
+                <RevealChartCard chart={set.selectedChart} stageMode={stageMode} />
+              </div>
             ) : (
               <p className={clsx("mt-2 font-black text-white", stageMode ? "text-3xl" : "text-lg")}>
                 Selector locked for reveal
@@ -125,6 +183,9 @@ export function ResultSetPanel({
           <p className={clsx("mt-2 font-black text-white", stageMode ? "text-3xl" : "text-lg")}>
             {set.selectedChart.name}
           </p>
+          <div className="mt-4">
+            <RevealChartCard chart={set.selectedChart} stageMode={stageMode} />
+          </div>
         </div>
       )}
     </>
@@ -274,7 +335,9 @@ export function ResultSetPanel({
             stageMode ? "px-4 py-2 text-xl" : "px-3 py-2 text-sm",
           )}
         >
-          {stageMode ? "Most banned to least banned" : "Least banned to most banned"}
+          {stageMode
+            ? "Least banned first - revealing most banned first"
+            : "Least banned to most banned"}
         </p>
       </div>
       <div
@@ -289,7 +352,8 @@ export function ResultSetPanel({
           {displayRows.map((row, index) => {
             const barWidth =
               set.maxBanCount > 0 ? `${(row.banCount / set.maxBanCount) * 100}%` : "0%";
-            const rowRevealed = !stageMode || showWinner || index < stageVisibleRowCount;
+            const stageRevealIndex = stageRevealRankByChartId.get(row.chart.id) ?? index;
+            const rowRevealed = !stageMode || showWinner || stageRevealIndex < stageVisibleRowCount;
 
             return (
               <article
@@ -303,13 +367,16 @@ export function ResultSetPanel({
                     ? "translate-y-0 opacity-100"
                     : "pointer-events-none translate-y-3 opacity-0",
                   shouldShowSelectedState && row.selected
-                    ? "border-ember-300 shadow-ember-tight"
-                    : "border-metal-700",
+                    ? "border-ember-200 bg-ember-900/30 shadow-ember-tight ring-2 ring-ember-300/70"
+                    : row.tiedForFewest
+                      ? "border-ember-300/65 bg-ember-900/15 shadow-[0_0_16px_rgba(255,185,92,0.18)]"
+                      : "border-metal-700",
                 )}
                 data-ban-count={row.banCount}
                 data-result-row-visible={rowRevealed ? "true" : "false"}
-                data-stage-reveal-index={index}
+                data-stage-reveal-index={stageRevealIndex}
                 data-testid="result-row"
+                data-tied-for-fewest={row.tiedForFewest ? "true" : "false"}
               >
                 <div
                   className={clsx(
@@ -387,6 +454,17 @@ export function ResultSetPanel({
                       data-testid="result-selected-label"
                     >
                       Selected
+                    </p>
+                  ) : null}
+                  {row.tiedForFewest ? (
+                    <p
+                      className={clsx(
+                        "mt-2 font-black uppercase tracking-[0.16em] text-ember-300",
+                        stageMode ? "text-lg" : "text-xs",
+                      )}
+                      data-testid="result-least-ban-label"
+                    >
+                      Least bans
                     </p>
                   ) : null}
                 </div>
