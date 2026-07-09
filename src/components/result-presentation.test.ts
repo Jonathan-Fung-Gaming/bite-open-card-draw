@@ -10,6 +10,7 @@ import { TIEBREAK_REVEAL_DURATION_MS } from "@/lib/results/reveal-timing";
 
 const { PublicResultSummary } = await import("./PublicResultSummary");
 const { ResultSetPanel } = await import("./ResultSetPanel");
+const { RuneWheel } = await import("./RuneWheel");
 
 function chart(id: string, name: string): DrawnChartSummary {
   return {
@@ -80,6 +81,32 @@ function roundResult(): RoundResultSnapshot {
   };
 }
 
+function resultRowOpenTags(html: string) {
+  return html.match(/<article\b[^>]*data-testid="result-row"[^>]*>/g) ?? [];
+}
+
+function stageRevealOrderChartIds(html: string) {
+  return resultRowOpenTags(html)
+    .map((row) => {
+      const chartId = row.match(/data-chart-id="([^"]+)"/)?.[1];
+      const revealIndex = Number(row.match(/data-stage-reveal-index="([^"]+)"/)?.[1]);
+
+      if (!chartId || !Number.isFinite(revealIndex)) {
+        throw new Error(`Result row is missing chart id or stage reveal index: ${row}`);
+      }
+
+      return { chartId, revealIndex };
+    })
+    .sort((left, right) => left.revealIndex - right.revealIndex)
+    .map((row) => row.chartId);
+}
+
+function wheelSlots() {
+  const charts = [chart("winner", "Winner"), chart("runner-up", "Runner Up")];
+
+  return Array.from({ length: 12 }, (_, index) => charts[index % charts.length]!);
+}
+
 describe("result presentation", () => {
   it("shows selected chart art in unique least-ban reveal panels", () => {
     const html = renderToStaticMarkup(
@@ -128,5 +155,84 @@ describe("result presentation", () => {
     expect(
       publicHtml.match(/data-testid="result-least-ban-label"/g)?.length,
     ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("reveals tied stage rows backward from their final detail order", () => {
+    const charts = Array.from({ length: 7 }, (_, index) =>
+      chart(`chart-${index + 1}`, `Chart ${index + 1}`),
+    );
+    const html = renderToStaticMarkup(
+      createElement(ResultSetPanel, {
+        set: resultSet({
+          rows: [
+            { chart: charts[0]!, banCount: 0, selected: true, tiedForFewest: true },
+            { chart: charts[1]!, banCount: 0, selected: false, tiedForFewest: true },
+            { chart: charts[2]!, banCount: 0, selected: false, tiedForFewest: true },
+            { chart: charts[3]!, banCount: 3, selected: false, tiedForFewest: false },
+            { chart: charts[4]!, banCount: 3, selected: false, tiedForFewest: false },
+            { chart: charts[5]!, banCount: 3, selected: false, tiedForFewest: false },
+            { chart: charts[6]!, banCount: 5, selected: false, tiedForFewest: false },
+          ],
+          maxBanCount: 5,
+          leastBanCount: 0,
+          selectedChart: charts[0]!,
+          tiebreakUsed: true,
+          tiebreakCandidateIds: [charts[0]!.id, charts[1]!.id, charts[2]!.id],
+          tiebreakWinnerChartId: charts[0]!.id,
+        }),
+        stageMode: true,
+      }),
+    );
+
+    expect(stageRevealOrderChartIds(html)).toEqual([
+      "chart-7",
+      "chart-6",
+      "chart-5",
+      "chart-4",
+      "chart-3",
+      "chart-2",
+      "chart-1",
+    ]);
+  });
+
+  it("centers rune wheel status without the old title", () => {
+    const html = renderToStaticMarkup(
+      createElement(RuneWheel, {
+        slots: wheelSlots(),
+        winnerChartId: "winner",
+        winnerRevealed: true,
+        stageMode: true,
+      }),
+    );
+
+    expect(html).not.toContain("Rune-wheel tiebreak");
+    expect(html).toContain('data-testid="rune-wheel-center"');
+    expect(html).toContain('data-testid="rune-wheel-status"');
+    expect(html).not.toContain("Selected chart:");
+    expect(html).toContain("Winner");
+    expect(html).toMatch(
+      /data-testid="rune-wheel-center"[\s\S]*data-testid="rune-wheel-status"/,
+    );
+    expect(html).toContain("rune-wheel-slot-selected");
+    expect(html).toContain('data-slot-winner="true"');
+  });
+
+  it("removes the stage tiebreak panel rune wheel badge", () => {
+    const html = renderToStaticMarkup(
+      createElement(ResultSetPanel, {
+        set: resultSet({
+          tiebreakUsed: true,
+          tiebreakCandidateIds: ["winner", "least-tie"],
+          tiebreakWinnerChartId: "winner",
+          wheelSupported: true,
+          wheelSlots: wheelSlots(),
+        }),
+        showWinner: true,
+        stageMode: true,
+      }),
+    );
+
+    expect(html).not.toContain(">Rune wheel<");
+    expect(html).toContain("Tiebreak Selector");
   });
 });

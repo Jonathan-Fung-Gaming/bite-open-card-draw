@@ -370,7 +370,12 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
     );
 
     await expect(wheel).toHaveAttribute("data-winner-revealed", "true", { timeout: 13_000 });
-    await expect(stageRawPage.getByTestId("rune-wheel-status")).toContainText("Selected chart:");
+    const revealedStatusText =
+      (await stageRawPage.getByTestId("rune-wheel-status").textContent())?.trim() ?? "";
+
+    expect(revealedStatusText).not.toContain("Selected chart:");
+    expect(revealedStatusText).not.toBe("Selector locking onto the sealed chart.");
+    expect(revealedStatusText.length).toBeGreaterThan(0);
     await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0);
     const revealedSelectedSlotCount = await stageRawPage
       .getByTestId("rune-wheel-slot")
@@ -379,9 +384,6 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
       );
 
     expect(revealedSelectedSlotCount).toBe(1);
-
-    const revealedStatusText =
-      (await stageRawPage.getByTestId("rune-wheel-status").textContent())?.trim() ?? "";
 
     await attachJsonEvidence(testInfo, "pfr-023-browser-tiebreak-evidence.json", {
       hiddenWinnerAttribute: "false",

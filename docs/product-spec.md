@@ -199,7 +199,7 @@ For each chart set:
 - on the stage reveal screen, reveal ban-count rows from most banned down to least banned
 - on final/public detail lists, keep the stable least-banned-to-most-banned ordering for review
 - show ban count badges and/or small bars
-- reveal non-winning ties alphabetically
+- on the stage reveal screen, reveal tied ban-count rows backward from their final detail order
 - if the least-banned chart is unique, select it
 - if multiple charts tie for fewest bans, run the 10-second rune-wheel tiebreak
 
