@@ -28,12 +28,24 @@ function banLabel(count: number) {
 function sortStageRevealRows(
   left: ResultSetSnapshot["rows"][number],
   right: ResultSetSnapshot["rows"][number],
+  displayIndexByChartId: ReadonlyMap<string, number>,
 ) {
   if (left.banCount !== right.banCount) {
     return right.banCount - left.banCount;
   }
 
-  return left.chart.name.localeCompare(right.chart.name);
+  const leftDisplayIndex = displayIndexByChartId.get(left.chart.id);
+  const rightDisplayIndex = displayIndexByChartId.get(right.chart.id);
+
+  if (
+    leftDisplayIndex !== undefined &&
+    rightDisplayIndex !== undefined &&
+    leftDisplayIndex !== rightDisplayIndex
+  ) {
+    return rightDisplayIndex - leftDisplayIndex;
+  }
+
+  return right.chart.name.localeCompare(left.chart.name);
 }
 
 function RevealChartCard({
@@ -97,8 +109,13 @@ export function ResultSetPanel({
 }: ResultSetPanelProps) {
   const [nowMs, setNowMs] = useState(serverNowMs ?? Date.now());
   const displayRows = set.rows;
+  const displayIndexByChartId = new Map(displayRows.map((row, index) => [row.chart.id, index]));
   const stageRevealRows =
-    stageMode && !showWinner ? [...displayRows].sort(sortStageRevealRows) : displayRows;
+    stageMode && !showWinner
+      ? [...displayRows].sort((left, right) =>
+          sortStageRevealRows(left, right, displayIndexByChartId),
+        )
+      : displayRows;
   const stageRevealRankByChartId = new Map(
     stageRevealRows.map((row, index) => [row.chart.id, index]),
   );
@@ -289,7 +306,7 @@ export function ResultSetPanel({
 
   if (stageMode && showWinner) {
     return (
-      <section className="metal-panel rounded-lg p-4">
+      <section className={clsx("metal-panel rounded-lg", set.tiebreakUsed ? "p-4 lg:px-6" : "p-4")}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xl font-semibold uppercase tracking-[0.22em] text-ember-300">
@@ -299,11 +316,15 @@ export function ResultSetPanel({
               {set.tiebreakUsed ? "Tiebreak Selector" : "Selected Chart"}
             </h2>
           </div>
-          <p className="rounded border border-metal-700 bg-black/25 px-4 py-2 text-xl font-bold uppercase text-metal-300">
-            {set.tiebreakUsed ? "Rune wheel" : "Least bans"}
-          </p>
+          {!set.tiebreakUsed ? (
+            <p className="rounded border border-metal-700 bg-black/25 px-4 py-2 text-xl font-bold uppercase text-metal-300">
+              Least bans
+            </p>
+          ) : null}
         </div>
-        <div className="mt-3 grid place-items-center">{revealPanel}</div>
+        <div className={clsx("mt-3 grid place-items-center", set.tiebreakUsed && "overflow-visible")}>
+          {revealPanel}
+        </div>
       </section>
     );
   }
@@ -373,6 +394,7 @@ export function ResultSetPanel({
                       : "border-metal-700",
                 )}
                 data-ban-count={row.banCount}
+                data-chart-id={row.chart.id}
                 data-result-row-visible={rowRevealed ? "true" : "false"}
                 data-stage-reveal-index={stageRevealIndex}
                 data-testid="result-row"

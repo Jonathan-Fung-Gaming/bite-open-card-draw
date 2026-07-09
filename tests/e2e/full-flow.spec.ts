@@ -238,6 +238,23 @@ async function expectRuneWheelSlotsRadiallyOriented(page: Page) {
   expect(slotOrientations.every((slot) => slot.bottomFacesCenter === "true")).toBe(true);
 }
 
+async function expectRuneWheelStageSlotsReadable(page: Page) {
+  const slotSizes = await page.getByTestId("rune-wheel-slot").evaluateAll((slots) =>
+    slots.map((slot) => {
+      const style = window.getComputedStyle(slot);
+
+      return {
+        height: Number.parseFloat(style.height),
+        width: Number.parseFloat(style.width),
+      };
+    }),
+  );
+
+  expect(slotSizes).toHaveLength(12);
+  expect(Math.min(...slotSizes.map((slot) => slot.width))).toBeGreaterThanOrEqual(140);
+  expect(Math.min(...slotSizes.map((slot) => slot.height))).toBeGreaterThanOrEqual(86);
+}
+
 async function expectRenderedImageElement(image: Locator) {
   await expect(image).toBeVisible({ timeout: 7_000 });
   await expect
@@ -405,7 +422,6 @@ async function expectStageProjectorTextMetrics(page: Page, label: string) {
     { maxLines: 3.2, minFontPx: 22, selector: '[data-testid="result-row-title"]' },
     { maxLines: 2.2, minFontPx: 18, selector: '[data-testid="result-row-artist"]' },
     { maxLines: 1.2, minFontPx: 24, selector: '[data-testid="result-row-ban-count"]' },
-    { maxLines: 1.2, minFontPx: 24, selector: '[data-testid="rune-wheel"] > p:first-child' },
     { maxLines: 2.2, minFontPx: 30, selector: '[data-testid="rune-wheel-status"]' },
     {
       maxLines: 2.2,
@@ -2218,6 +2234,7 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
 
   await expect(stagePage.getByTestId("rune-wheel-slot")).toHaveCount(12);
   await expectRuneWheelSlotsRadiallyOriented(stagePage);
+  await expectRuneWheelStageSlotsReadable(stagePage);
   await expect(stagePage.getByTestId("rune-wheel")).not.toContainText("Sealed rune");
   await expect(stagePage.getByTestId("rune-wheel-slot").first()).not.toContainText(/\d|S\d/);
   await expectStageFitsProjectorViewport(stagePage, "focused tiebreak wheel");
@@ -2239,7 +2256,12 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
         ),
     )
     .toBe(1);
-  await expect(stagePage.getByTestId("rune-wheel-status")).toContainText("Selected chart:");
+  const revealedWheelStatus =
+    (await stagePage.getByTestId("rune-wheel-status").textContent())?.trim() ?? "";
+
+  expect(revealedWheelStatus).not.toContain("Selected chart:");
+  expect(revealedWheelStatus).not.toBe("Selector locking onto the sealed chart.");
+  expect(revealedWheelStatus.length).toBeGreaterThan(0);
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Release"));

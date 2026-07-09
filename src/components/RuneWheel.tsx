@@ -71,28 +71,15 @@ export function RuneWheel({
   return (
     <div
       className={clsx(
-        "overflow-hidden rounded border border-ember-300/35 bg-black/30",
-        stageMode && "w-full max-w-[42rem]",
-        stageMode ? "p-4" : compact ? "p-2" : "p-3",
+        "relative overflow-visible bg-transparent",
+        stageMode && "w-full max-w-[54rem]",
+        stageMode ? "px-2 py-3" : compact ? "p-1" : "p-2",
       )}
       data-testid="rune-wheel"
       data-winner-revealed={winnerRevealed ? "true" : "false"}
       data-winner-slot-index={winnerSlotIndex}
     >
-      <p
-        className={clsx(
-          "font-bold uppercase tracking-[0.18em] text-ember-300",
-          stageMode ? "text-2xl" : "text-xs",
-        )}
-      >
-        Rune-wheel tiebreak
-      </p>
-      <div
-        className={clsx(
-          "flex justify-center rounded border border-metal-700 bg-furnace-900",
-          stageMode ? "mt-3 p-3" : compact ? "mt-2 p-2" : "mt-3 p-3",
-        )}
-      >
+      <div className={clsx("flex justify-center", stageMode ? "p-3" : compact ? "p-1" : "p-2")}>
         <div
           className={clsx(
             "rune-wheel-shell",
@@ -103,7 +90,6 @@ export function RuneWheel({
           <div className="rune-wheel-pointer" aria-hidden="true" />
           <div className="rune-wheel-selector" aria-hidden="true" />
           <div className="rune-wheel-circle" style={wheelStyle}>
-            <div className="rune-wheel-hub" aria-hidden="true" />
             {slots.map((slot, index) => {
               const selectedSlot = winnerRevealed && index === winnerSlotIndex;
               const slotRotation = getRuneWheelRadialImageRotation(slots.length, index);
@@ -134,20 +120,29 @@ export function RuneWheel({
               );
             })}
           </div>
+          <div className="rune-wheel-center" data-testid="rune-wheel-center">
+            <p
+              className={clsx(
+                "rune-wheel-status font-bold text-white",
+                stageMode
+                  ? winnerRevealed
+                    ? "text-4xl"
+                    : "text-3xl"
+                  : compact
+                    ? "text-xs"
+                    : "text-sm",
+              )}
+              data-testid="rune-wheel-status"
+            >
+              {winnerRevealed ? (
+                <span className="text-ember-300">{winner?.name ?? winnerChartId}</span>
+              ) : (
+                "Selector locking onto the sealed chart."
+              )}
+            </p>
+          </div>
         </div>
       </div>
-      <p
-        className={clsx("mt-3 font-bold text-white", stageMode ? "text-3xl" : "text-sm")}
-        data-testid="rune-wheel-status"
-      >
-        {winnerRevealed ? (
-          <>
-            Selected chart: <span className="text-ember-300">{winner?.name ?? winnerChartId}</span>
-          </>
-        ) : (
-          "Selector locking onto the sealed chart."
-        )}
-      </p>
     </div>
   );
 }
