@@ -115,13 +115,10 @@ select {
 
 .rune-wheel-center {
   background:
-    radial-gradient(circle, rgba(255, 185, 92, 0.28), rgba(17, 16, 15, 0.94) 58%),
-    linear-gradient(180deg, rgba(255, 185, 92, 0.08), rgba(0, 0, 0, 0.18));
-  border: 1px solid rgba(255, 185, 92, 0.28);
+    radial-gradient(circle, rgba(255, 185, 92, 0.24), rgba(17, 16, 15, 0.76) 44%, transparent 72%),
+    radial-gradient(circle, rgba(255, 122, 26, 0.18), transparent 58%);
+  border: 0;
   border-radius: 9999px;
-  box-shadow:
-    inset 0 0 26px rgba(255, 185, 92, 0.14),
-    0 0 34px rgba(255, 122, 26, 0.18);
   display: grid;
   height: 36%;
   left: 19%;
@@ -143,6 +140,9 @@ select {
 .rune-wheel-status {
   line-height: 1.16;
   max-width: 92%;
+  text-shadow:
+    0 0 18px rgba(255, 185, 92, 0.28),
+    0 2px 6px rgba(0, 0, 0, 0.88);
   text-wrap: balance;
 }
 
@@ -153,8 +153,8 @@ select {
   filter: drop-shadow(0 0 10px rgba(255, 122, 26, 0.45));
   left: calc(50% - 0.75rem);
   position: absolute;
-  top: -0.25rem;
-  z-index: 3;
+  top: calc(50% - (var(--rune-slot-height) / 2) + var(--rune-slot-radius) - 0.75rem);
+  z-index: 5;
 }
 
 .rune-wheel-selector {
@@ -169,7 +169,7 @@ select {
   left: calc(50% - (var(--rune-slot-width) / 2));
   pointer-events: none;
   position: absolute;
-  top: calc(0px - (var(--rune-slot-height) * 0.18));
+  top: calc(50% - (var(--rune-slot-height) / 2) + var(--rune-slot-radius));
   width: var(--rune-slot-width);
   z-index: 4;
 }

@@ -255,6 +255,57 @@ async function expectRuneWheelStageSlotsReadable(page: Page) {
   expect(Math.min(...slotSizes.map((slot) => slot.height))).toBeGreaterThanOrEqual(86);
 }
 
+async function expectRuneWheelSelectorFramesWinner(page: Page) {
+  const geometry = await page.evaluate(() => {
+    const selector = document.querySelector(".rune-wheel-selector");
+    const pointer = document.querySelector(".rune-wheel-pointer");
+    const selectedSlot = document.querySelector(
+      '[data-testid="rune-wheel-slot"][data-slot-winner="true"]',
+    );
+
+    if (!selector || !pointer || !selectedSlot) {
+      return null;
+    }
+
+    const toRect = (element: Element) => {
+      const rect = element.getBoundingClientRect();
+
+      return {
+        bottom: rect.bottom,
+        horizontalCenter: rect.left + rect.width / 2,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+      };
+    };
+
+    return {
+      pointer: toRect(pointer),
+      selectedSlot: toRect(selectedSlot),
+      selector: toRect(selector),
+    };
+  });
+
+  expect(geometry).not.toBeNull();
+
+  if (!geometry) {
+    return;
+  }
+
+  const tolerance = 8;
+
+  expect(geometry.selector.left).toBeLessThanOrEqual(geometry.selectedSlot.left + tolerance);
+  expect(geometry.selector.right).toBeGreaterThanOrEqual(geometry.selectedSlot.right - tolerance);
+  expect(geometry.selector.top).toBeLessThanOrEqual(geometry.selectedSlot.top + tolerance);
+  expect(geometry.selector.bottom).toBeGreaterThanOrEqual(
+    geometry.selectedSlot.bottom - tolerance,
+  );
+  expect(geometry.pointer.bottom).toBeGreaterThan(geometry.selectedSlot.top);
+  expect(geometry.pointer.top).toBeLessThan(geometry.selectedSlot.top + tolerance);
+  expect(geometry.pointer.horizontalCenter).toBeGreaterThan(geometry.selectedSlot.left);
+  expect(geometry.pointer.horizontalCenter).toBeLessThan(geometry.selectedSlot.right);
+}
+
 async function expectRenderedImageElement(image: Locator) {
   await expect(image).toBeVisible({ timeout: 7_000 });
   await expect
@@ -2256,6 +2307,7 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
         ),
     )
     .toBe(1);
+  await expectRuneWheelSelectorFramesWinner(stagePage);
   const revealedWheelStatus =
     (await stagePage.getByTestId("rune-wheel-status").textContent())?.trim() ?? "";
 
