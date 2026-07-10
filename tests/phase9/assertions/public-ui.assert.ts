@@ -42,7 +42,7 @@ async function expectNoFinalStageReveal(page: Page) {
 
 async function expectNoChartByChartResultCounts(page: Page) {
   await expect(page.getByText("Full ban counts", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Least banned to most banned", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Ban counts" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Ban Counts" })).toHaveCount(0);
   await expect(page.getByTestId("rune-wheel")).toHaveCount(0);
   await expect(page.getByTestId("fallback-tiebreak-reveal")).toHaveCount(0);
@@ -101,9 +101,7 @@ async function expectRehearsalAggregateTotals(
   const banSelectionCount = options.banSelectionCount ?? expectation.expectedBanSelectionCount;
 
   await expect(
-    page.getByText(
-      `Ballots submitted: ${submittedPlayerCount} / ${expectation.activePlayerCount}`,
-    ),
+    page.getByText(`Ballots submitted: ${submittedPlayerCount} / ${expectation.activePlayerCount}`),
   ).toBeVisible();
   await expect(
     page.getByText(`Ban selections cast across both sets: ${banSelectionCount}`),
@@ -134,9 +132,7 @@ export async function expectPublicVotingState(
       `Ballots submitted: ${expectation.submittedPlayerCount} / ${expectation.activePlayerCount}`,
     ),
   ).toBeVisible();
-  await expect(publicPages.vote.page.getByRole("button", { name: "Submit Ballot" })).toHaveCount(
-    0,
-  );
+  await expect(publicPages.vote.page.getByRole("button", { name: "Submit Ballot" })).toHaveCount(0);
   await expectNoResultSpoilers(publicPages.vote.page);
 
   await publicPages.charts.reload();
@@ -177,9 +173,7 @@ export async function expectPublicInitialVotingState(
   await expect(
     publicPages.vote.page.getByText(`Ballots submitted: 0 / ${expectation.activePlayerCount}`),
   ).toBeVisible();
-  await expect(publicPages.vote.page.getByRole("button", { name: "Submit Ballot" })).toHaveCount(
-    0,
-  );
+  await expect(publicPages.vote.page.getByRole("button", { name: "Submit Ballot" })).toHaveCount(0);
   await expectNoResultSpoilers(publicPages.vote.page);
 
   await publicPages.charts.reload();
@@ -220,7 +214,7 @@ export async function expectPublicComputedState(
 ) {
   await publicPages.stage.reload();
   await expect(
-    publicPages.stage.page.getByRole("heading", { name: "Awaiting Host Reveal" }),
+    publicPages.stage.page.getByRole("heading", { name: "Reveal Starts Soon" }),
   ).toBeVisible();
   await expectNoResultSpoilers(publicPages.stage.page);
 

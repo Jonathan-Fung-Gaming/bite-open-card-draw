@@ -174,18 +174,14 @@ async function submitHostRequest(page: Page, takeoverReason: string) {
 
   await expect(forceHostDetails).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
 
-  const isOpen = await forceHostDetails.evaluate(
-    (element) => (element as HTMLDetailsElement).open,
-  );
+  const isOpen = await forceHostDetails.evaluate((element) => (element as HTMLDetailsElement).open);
 
   if (!isOpen) {
     await forceHostDetails.locator("summary").first().click();
   }
 
   await expect
-    .poll(async () =>
-      forceHostDetails.evaluate((element) => (element as HTMLDetailsElement).open),
-    )
+    .poll(async () => forceHostDetails.evaluate((element) => (element as HTMLDetailsElement).open))
     .toBe(true);
 
   const forceHostButton = forceHostDetails.getByRole("button", { name: "Force Host Takeover" });
@@ -202,7 +198,7 @@ export async function loginAndTakeHost(page: Page, takeoverReason = "e2e host ta
   await goto(page, ADMIN_PATH);
   await page.getByLabel("Shared admin password").fill(getAdminPassword());
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Log In" }));
-  await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Host Console" })).toBeVisible();
   await throwIfAdminError(page);
 
   if (await waitForActiveHost(page, 1_000)) {

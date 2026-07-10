@@ -196,7 +196,7 @@ async function drawFirstSet(page: Page) {
     page,
     page.getByTestId("admin-host-run-controls").getByRole("button", { name: "Draw Set" }).nth(0),
   );
-  await expect(page.getByText(/Version 1/).first()).toBeVisible({
+  await expect(page.getByText(/Draw 1/).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 }
@@ -207,7 +207,7 @@ async function drawSecondSet(page: Page) {
     page.getByTestId("admin-host-run-controls").getByRole("button", { name: "Draw Set" }).nth(1),
   );
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("ready to vote", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Ready to vote", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 
@@ -219,7 +219,7 @@ async function openVoting(page: Page) {
       .getByRole("button", { name: "Open Voting", exact: true }),
   );
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("voting open", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Voting open", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 
@@ -272,13 +272,13 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
       "One chart set drawn",
     );
     await expect(phase4EvidencePage.getByTestId("view-only-status")).toContainText(
-      "The drawn chart set is visible now",
+      "One chart set is visible. The second set appears after the next draw.",
     );
-    await expect(phase4EvidencePage.getByTestId("view-only-navigation-note")).toContainText(
-      "No votes are recorded here",
+    await expect(phase4EvidencePage.getByTestId("view-only-status")).toContainText(
+      "no votes recorded",
     );
     await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(0)).toContainText(
-      "Draw complete",
+      "Charts ready",
     );
     await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(0)).toBeVisible();
     await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(1)).toBeHidden();
@@ -308,7 +308,7 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
 
   await goto(page, "/room");
   await expect(page).toHaveTitle("Tournament Room | Pump It Up Open Stage");
-  await expect(page.getByTestId("room-current-status")).toContainText("Current tournament state");
+  await expect(page.getByTestId("room-current-status")).toContainText("Current status");
   await expect(page.getByTestId("room-current-status")).toContainText("Round 1 voting open");
   await expect(page.getByRole("link", { name: "I am a player voting" })).toBeVisible();
   await expect(page.getByRole("link", { name: "View charts only" })).toBeVisible();
@@ -322,11 +322,10 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
 
   await goto(page, "/charts");
   await expect(page).toHaveTitle("View Charts | Pump It Up Open Stage");
-  await expect(page.getByTestId("view-only-status")).toContainText("View-only chart browser");
-  await expect(page.getByTestId("view-only-status")).toContainText("Voting open");
-  await expect(page.getByTestId("view-only-navigation-note")).toContainText(
-    "No votes are recorded here",
+  await expect(page.getByTestId("view-only-status")).toContainText(
+    "View charts only - no votes recorded",
   );
+  await expect(page.getByTestId("view-only-status")).toContainText("Voting open");
   await expect(page.getByRole("tab", { name: /View Set 1/ })).toBeVisible();
   await expect(page.getByRole("tab", { name: /View Set 2/ })).toBeVisible();
   await expect(page.getByRole("tab", { name: /View Set 1/ })).toHaveAttribute(

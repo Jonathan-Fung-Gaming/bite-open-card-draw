@@ -116,10 +116,10 @@ describe("result presentation", () => {
     expect(html).toContain('data-testid="result-selected-reveal-card"');
     expect(html).toContain('data-testid="result-selected-reveal-image"');
     expect(html).toContain("/chart-images/winner.png");
-    expect(html).toContain("Unique least-ban chart");
+    expect(html).toContain("Selected chart");
   });
 
-  it("shows selected chart art in fallback tiebreak reveal after the sealed winner is revealed", () => {
+  it("shows selected chart art in fallback tiebreak reveal after the winner is revealed", () => {
     const revealStartedAt = "2026-07-08T00:00:00.000Z";
     const serverNowMs = Date.parse(revealStartedAt) + TIEBREAK_REVEAL_DURATION_MS;
     const html = renderToStaticMarkup(
@@ -140,6 +140,9 @@ describe("result presentation", () => {
     expect(html).toContain('data-winner-revealed="true"');
     expect(html).toContain('data-testid="result-selected-reveal-card"');
     expect(html).toContain("/chart-images/winner.png");
+    expect(html).toContain("Tiebreak reveal");
+    expect(html).not.toContain("Fallback tiebreak reveal");
+    expect(html).not.toContain("Selector locked for reveal");
   });
 
   it("flags every least-ban row while keeping final public selected charts before full counts", () => {
@@ -209,10 +212,9 @@ describe("result presentation", () => {
     expect(html).toContain('data-testid="rune-wheel-center"');
     expect(html).toContain('data-testid="rune-wheel-status"');
     expect(html).not.toContain("Selected chart:");
+    expect(html).not.toContain("sealed chart");
     expect(html).toContain("Winner");
-    expect(html).toMatch(
-      /data-testid="rune-wheel-center"[\s\S]*data-testid="rune-wheel-status"/,
-    );
+    expect(html).toMatch(/data-testid="rune-wheel-center"[\s\S]*data-testid="rune-wheel-status"/);
     expect(html).toContain("rune-wheel-slot-selected");
     expect(html).toContain('data-slot-winner="true"');
   });
@@ -233,6 +235,20 @@ describe("result presentation", () => {
     );
 
     expect(html).not.toContain(">Rune wheel<");
-    expect(html).toContain("Tiebreak Selector");
+    expect(html).toContain("Selected Chart");
+  });
+
+  it("uses audience-safe text while the rune wheel is spinning", () => {
+    const html = renderToStaticMarkup(
+      createElement(RuneWheel, {
+        slots: wheelSlots(),
+        winnerChartId: "winner",
+        winnerRevealed: false,
+        stageMode: true,
+      }),
+    );
+
+    expect(html).toContain("Tiebreak selector is spinning.");
+    expect(html).not.toContain("sealed chart");
   });
 });

@@ -1,10 +1,7 @@
 import type { APIRequestContext } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  expectPrivateCsvExport,
-  expectPrivateCsvFinalContent,
-} from "../fixtures/private-csv";
+import { expectPrivateCsvExport, expectPrivateCsvFinalContent } from "../fixtures/private-csv";
 import {
   expectSupabaseFinalCsvMatchesDatabase,
   expectSupabaseRevealPhase,
@@ -26,7 +23,7 @@ export async function computeAndRevealRoundResults(
   await adminPage.computeResults();
 
   if (!(await expectSupabaseRevealPhase(roundNumber, "computed"))) {
-    await adminPage.expectTextAfterNavigation("results computed");
+    await adminPage.expectTextAfterNavigation("Results ready");
     await adminPage.expectRevealPhaseAfterNavigation("computed");
   }
 

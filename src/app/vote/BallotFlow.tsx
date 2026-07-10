@@ -453,7 +453,7 @@ export function BallotFlow({
   const alreadySubmitted = existingBallotLookup?.exists === true;
   const isPaused = liveStatus === "voting_paused";
   const changesUnavailableCopy = isPaused
-    ? "Voting is paused. The host has frozen the timer and ballot changes. Your selections on this phone are still here; leave this page open and continue after voting resumes."
+    ? "Voting is paused. Your selections are still here; continue after voting resumes."
     : "Voting is not accepting ballot changes right now.";
   const editingSavedBallot = confirmed && !savedAt && Boolean(existingBallot);
   const ballotControlsDisabled = !liveCanSubmit || banInstructionControlsPaused;
@@ -552,15 +552,13 @@ export function BallotFlow({
           if (draft.status === "loaded") {
             setChoices(draft.choices);
             setStep(draft.step);
-            setMessage(
-              "Restored unsaved ballot selections from this device. Review them before submitting.",
-            );
+            setMessage("Restored your unsaved selections. Review them before submitting.");
           } else {
             setChoices(emptyChoices(draws));
             setStep(0);
             setMessage(
               draft.status === "stale"
-                ? "The drawn charts changed, so unsaved selections on this device were cleared. Please vote on the current chart sets."
+                ? "The chart sets changed, so your unsaved selections were cleared."
                 : null,
             );
           }
@@ -595,7 +593,7 @@ export function BallotFlow({
 
         if (presence.hasOtherActiveDevice) {
           setPresenceWarning(
-            `Another active device has already claimed ${player.startggUsername}. You can continue, but the latest valid submitted ballot will count.`,
+            `${player.startggUsername} is already active on another device. You can continue; the latest submitted ballot counts.`,
           );
         } else {
           setPresenceWarning(null);
@@ -640,10 +638,10 @@ export function BallotFlow({
     }
 
     if (existingBallotLookup?.canEdit && existingBallot) {
-      return `A ballot already exists for this start.gg username from ${existingBallot.submittedAt}. Only continue if you are ${selectedPlayer.startggUsername}. A second phone can replace the prior ballot; the latest valid submitted ballot will count.`;
+      return `A ballot already exists for this start.gg username from ${existingBallot.submittedAt}. Only continue if you are ${selectedPlayer.startggUsername}. A newer submitted ballot will replace the prior one.`;
     }
 
-    return `A ballot already exists for this start.gg username. Only continue if you are ${selectedPlayer.startggUsername}. A second phone can replace the prior ballot; the latest valid submitted ballot will count.`;
+    return `A ballot already exists for this start.gg username. Only continue if you are ${selectedPlayer.startggUsername}. A newer submitted ballot will replace the prior one.`;
   }, [alreadySubmitted, existingBallot, existingBallotLookup, selectedPlayer]);
 
   useEffect(() => {
@@ -799,9 +797,7 @@ export function BallotFlow({
         }
       } catch {
         if (!cancelled) {
-          setMessage(
-            "Could not refresh voting status. Server validation still protects submissions.",
-          );
+          setMessage("Could not refresh voting status. Please keep this page open and try again.");
         }
       }
     }
@@ -1277,7 +1273,7 @@ export function BallotFlow({
         ) : (
           <p className="mt-5 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">
             {isPaused
-              ? "Voting is paused. Your saved ballot remains valid; edits resume when the host resumes."
+              ? "Voting is paused. Your saved ballot remains valid; edits resume when voting resumes."
               : "Voting is no longer open for changes."}
           </p>
         )}
@@ -1302,7 +1298,7 @@ export function BallotFlow({
             data-testid="saved-edit-draft-warning"
             role="status"
           >
-            Editing unsaved changes. Your saved ballot stays active until this save succeeds.
+            Editing your saved ballot. The previous submission stays active until you submit again.
           </p>
         ) : null}
         <div className="mt-5 grid gap-3">
@@ -1415,7 +1411,7 @@ export function BallotFlow({
           data-testid="saved-edit-draft-warning"
           role="status"
         >
-          Editing unsaved changes. Your saved ballot stays active until this save succeeds.
+          Editing your saved ballot. The previous submission stays active until you submit again.
         </p>
       ) : null}
       {selectionMessage ? (
@@ -1519,7 +1515,7 @@ export function BallotFlow({
           <span className="min-w-0">
             <span className="block break-words uppercase">No bans for this set</span>
             <span className="mt-1 hidden text-xs font-semibold uppercase text-metal-300 sm:block">
-              Explicit zero-ban choice
+              Select when you want no bans
             </span>
           </span>
         </label>

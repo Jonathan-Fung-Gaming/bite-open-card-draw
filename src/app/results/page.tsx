@@ -30,10 +30,7 @@ function pendingResultsCopy(
     return {
       title: "Awaiting host draw",
       status: "No results yet",
-      lines: [
-        "Both chart sets must be drawn before voting opens.",
-        "Final charts will appear here after the stage reveal finishes.",
-      ],
+      lines: ["Both chart sets must be drawn before voting opens."],
     };
   }
 
@@ -41,10 +38,7 @@ function pendingResultsCopy(
     return {
       title: "Awaiting voting window",
       status: formatVotingStatusLabel(status),
-      lines: [
-        "Both chart sets are drawn. Waiting for the host to open voting.",
-        "Final charts will appear here after the stage reveal finishes.",
-      ],
+      lines: ["Both chart sets are drawn. Waiting for voting to open."],
     };
   }
 
@@ -56,10 +50,7 @@ function pendingResultsCopy(
     return {
       title: "Voting in progress",
       status: formatVotingStatusLabel(status),
-      lines: [
-        `Voting is open. Time remaining: ${formatVotingTime(remainingMs)}.`,
-        "Results will appear after voting closes and the stage reveal finishes.",
-      ],
+      lines: [`Voting is open. Time remaining: ${formatVotingTime(remainingMs)}.`],
     };
   }
 
@@ -67,10 +58,7 @@ function pendingResultsCopy(
     return {
       title: "Voting paused",
       status: formatVotingStatusLabel(status),
-      lines: [
-        "Voting is paused by the host. Ballot changes and the timer are frozen.",
-        "Results will appear after voting resumes, closes, and the stage reveal finishes.",
-      ],
+      lines: ["Voting is paused. Results will appear after voting closes."],
     };
   }
 
@@ -89,7 +77,7 @@ function pendingResultsCopy(
   return {
     title: "Awaiting final reveal",
     status: formatVotingStatusLabel(status),
-    lines: ["Final charts will appear here after the stage reveal finishes."],
+    lines: ["Final charts will appear here after the reveal."],
   };
 }
 
@@ -180,7 +168,7 @@ export default async function ResultsPage() {
                 Showing Round {roundNumber}. Round {currentRound} is not final yet.
               </h2>
               <p className="mt-2 text-sm text-metal-300">
-                Current-round final charts will replace this after that stage reveal finishes.
+                Current-round final charts will replace this after the reveal.
               </p>
             </div>
           ) : null}

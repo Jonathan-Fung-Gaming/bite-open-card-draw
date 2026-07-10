@@ -62,7 +62,10 @@ function cardRevealAnimationActive(
     return false;
   }
 
-  return elapsedMs - activeRevealIndex * STAGE_CHART_REVEAL_INTERVAL_MS <= STAGE_CHART_REVEAL_ANIMATION_GUARD_MS;
+  return (
+    elapsedMs - activeRevealIndex * STAGE_CHART_REVEAL_INTERVAL_MS <=
+    STAGE_CHART_REVEAL_ANIMATION_GUARD_MS
+  );
 }
 
 export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageSetPanelProps) {
@@ -75,10 +78,10 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
   );
   const status = draw
     ? revealStartsAt === null
-      ? "Drawn - waiting for prior row"
+      ? "Queued for reveal"
       : revealedCount >= set.drawCount
-        ? `Version ${draw.version} / Pool ${draw.eligiblePoolCount}`
-        : `Version ${draw.version} / Revealing ${revealedCount} / ${set.drawCount}`
+        ? "Charts ready"
+        : `Revealing ${revealedCount} / ${set.drawCount}`
     : "Awaiting host draw";
 
   useEffect(() => {

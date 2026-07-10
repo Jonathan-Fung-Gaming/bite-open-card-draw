@@ -24,7 +24,7 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
         light: "#ffffff",
       },
     });
-  } catch (error) {
+  } catch {
     return (
       <section
         className="metal-panel rounded-lg border border-ember-300/45 p-4"
@@ -32,13 +32,11 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
       >
         <div className="flex items-center gap-3 text-ember-300">
           <QrCode aria-hidden="true" className="h-6 w-6" />
-          <p className="text-xs font-semibold uppercase tracking-[0.22em]">QR setup error</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em]">Room QR unavailable</p>
         </div>
         <p className="mt-4 text-sm font-bold text-white">
-          Configure NEXT_PUBLIC_SITE_URL to the absolute public event origin before using QR entry.
-        </p>
-        <p className="mt-2 text-xs text-metal-300">
-          {error instanceof Error ? error.message : "Could not generate the public room QR code."}
+          Ask the host to set the public event link, then refresh this display before audience
+          entry.
         </p>
       </section>
     );
@@ -48,7 +46,7 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
 
   return (
     <section
-      className={clsx("metal-panel rounded-lg", compact ? "p-3" : "p-4")}
+      className={clsx("metal-panel rounded-lg", compact ? "p-2" : "p-4")}
       data-testid="room-qr-panel"
     >
       <div className="flex items-center gap-3 text-ember-300">
@@ -60,7 +58,7 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
       <div
         className={clsx(
           "mx-auto flex aspect-square w-full items-center justify-center rounded-md border border-ember-300/25 bg-white text-furnace-950 shadow-ember-tight",
-          compact ? "mt-3 max-w-44 p-2 2xl:max-w-56" : "mt-4 max-w-72 p-3",
+          compact ? "mt-2 max-w-44 p-1.5" : "mt-4 max-w-72 p-3",
         )}
         data-qr-target={roomUrl}
         data-testid="room-qr-link"
@@ -76,7 +74,7 @@ export async function QRPanel({ roomPath = "/room", compact = false }: QRPanelPr
       <p
         className={clsx(
           "break-words text-center font-mono font-black text-white",
-          compact ? "mt-2 text-sm" : "mt-3 text-base",
+          compact ? "mt-1 text-xs" : "mt-3 text-base",
         )}
         data-testid="room-short-url"
       >

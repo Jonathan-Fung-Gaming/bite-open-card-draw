@@ -147,7 +147,7 @@ export class VotePage {
   async expectPresenceWarning(playerName: string) {
     await expect(
       this.page.getByText(
-        new RegExp(`Another active device has already claimed ${escapeRegExp(playerName)}`),
+        new RegExp(`${escapeRegExp(playerName)} is already active on another device`),
       ),
     ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   }

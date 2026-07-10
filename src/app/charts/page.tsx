@@ -27,7 +27,7 @@ function chartsStatus(snapshot: VotingRoundSnapshot, drawnSetCount: number) {
   if (drawnSetCount === 0) {
     return {
       label: "Awaiting first chart set",
-      detail: "Chart sets will appear here as the host draws them. This view cannot submit votes.",
+      detail: "Chart sets will appear here as they are drawn.",
       timerText: null,
     };
   }
@@ -35,8 +35,7 @@ function chartsStatus(snapshot: VotingRoundSnapshot, drawnSetCount: number) {
   if (drawnSetCount === 1) {
     return {
       label: "One chart set drawn",
-      detail:
-        "The drawn chart set is visible now. The second set will appear when the host finishes the draw. This view cannot submit votes.",
+      detail: "One chart set is visible. The second set appears after the next draw.",
       timerText: null,
     };
   }
@@ -48,8 +47,7 @@ function chartsStatus(snapshot: VotingRoundSnapshot, drawnSetCount: number) {
   ) {
     return {
       label: formatVotingStatusLabel(snapshot.status),
-      detail:
-        "View-only mode. Use this page to inspect charts without selecting a username or affecting turnout.",
+      detail: "Use the tabs to inspect either set while voting is open.",
       timerText: formatVotingTime(snapshot.remainingMs),
     };
   }
@@ -57,8 +55,7 @@ function chartsStatus(snapshot: VotingRoundSnapshot, drawnSetCount: number) {
   if (snapshot.status === "ready_to_vote") {
     return {
       label: formatVotingStatusLabel(snapshot.status),
-      detail:
-        "Both chart sets are drawn. Waiting for the host to open voting. This view stays read-only.",
+      detail: "Both chart sets are drawn. Voting has not opened yet.",
       timerText: null,
     };
   }
@@ -70,15 +67,14 @@ function chartsStatus(snapshot: VotingRoundSnapshot, drawnSetCount: number) {
   ) {
     return {
       label: "Results being revealed",
-      detail:
-        "Voting is closed. Results are being revealed on stage before final charts appear here.",
+      detail: "Voting is closed. Results are being revealed on stage.",
       timerText: null,
     };
   }
 
   return {
     label: formatVotingStatusLabel(snapshot.status),
-    detail: "View-only mode. This page never submits votes or changes turnout.",
+    detail: "Use the tabs to inspect the current chart sets.",
     timerText: snapshot.canSubmit ? formatVotingTime(snapshot.remainingMs) : null,
   };
 }
@@ -106,18 +102,16 @@ export default async function ChartsPage() {
       <PublicRouteFreshnessGuard freshness={freshness} testId="charts-route-freshness-guard">
         <main className="min-h-screen">
           <ChartsAutoRefresh />
-          <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="View-only results" />
+          <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Final results" />
           <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
             <div className="metal-panel rounded-lg p-4" data-testid="view-only-status">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                View only
+                View charts only - no votes recorded
               </p>
               <h2 className="mt-1 text-xl font-black uppercase text-white">
                 Final charts revealed
               </h2>
-              <p className="mt-2 text-sm text-metal-300">
-                Selected charts are shown first. This page cannot submit votes or affect turnout.
-              </p>
+              <p className="mt-2 text-sm text-metal-300">Selected charts are shown first.</p>
             </div>
             <PublicResultSummary result={result} />
           </section>
@@ -132,7 +126,7 @@ export default async function ChartsPage() {
     <PublicRouteFreshnessGuard freshness={freshness} testId="charts-route-freshness-guard">
       <main className="min-h-screen">
         <ChartsAutoRefresh />
-        <RoundHeader title="Drawn Charts" status="View-only chart display" />
+        <RoundHeader title="Drawn Charts" status="Chart display" />
         <ChartsSetNavigator
           sets={toPublicChartsSetViews(view.sets)}
           status={chartsStatus(snapshot, snapshot.drawnSetCount)}

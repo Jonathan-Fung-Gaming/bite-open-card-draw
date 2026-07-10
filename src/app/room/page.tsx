@@ -38,37 +38,35 @@ function roomStatus(
   if (shouldShowFinalPhoneResults(snapshot.status, resultPhase)) {
     return {
       label: `${roundLabel} final charts revealed`,
-      detail: "Players and spectators can view the selected charts now.",
+      detail: "Final charts are ready to view.",
     };
   }
 
   if (shouldShowPhoneResultHoldingState(snapshot.status, resultPhase)) {
     return {
       label: `${roundLabel} stage reveal in progress`,
-      detail:
-        "Voting is closed. Final charts will appear on phones after the stage reveal finishes.",
+      detail: "Voting is closed. Results are being revealed on stage.",
     };
   }
 
   if (drawnSetCount === 0) {
     return {
       label: `${roundLabel} awaiting draw`,
-      detail: "The host is preparing the two chart sets. Choose a path and keep the page open.",
+      detail: "Chart sets are being drawn. Choose voting or chart view; this page updates.",
     };
   }
 
   if (drawnSetCount === 1) {
     return {
       label: `${roundLabel} first chart set drawn`,
-      detail:
-        "One chart set is visible. The second set will appear when the host finishes the draw.",
+      detail: "One chart set is visible. The second set appears after the next draw.",
     };
   }
 
   if (snapshot.status === "ready_to_vote") {
     return {
       label: `${roundLabel} charts ready`,
-      detail: "Both chart sets are drawn. Voting starts when the host opens the 10-minute window.",
+      detail: "Both chart sets are drawn. Voting starts when the 10-minute window opens.",
     };
   }
 
@@ -79,17 +77,16 @@ function roomStatus(
   ) {
     return {
       label: `${roundLabel} ${formatVotingStatusLabel(snapshot.status).toLowerCase()}`,
-      detail: `Voting window is live with ${formatVotingTime(
+      detail: `Voting is live with ${formatVotingTime(
         snapshot.remainingMs,
-      )} remaining. Players should vote; spectators can view charts only.`,
+      )} remaining. Players vote; spectators view charts.`,
     };
   }
 
   if (snapshot.status === "voting_paused") {
     return {
       label: `${roundLabel} voting paused`,
-      detail:
-        "The host paused voting. Ballot changes and the timer are frozen until voting resumes.",
+      detail: "Voting is paused. Ballots and the timer resume when voting resumes.",
     };
   }
 
@@ -128,7 +125,7 @@ export default async function RoomPage() {
             data-testid="room-current-status"
           >
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              Current tournament state
+              Current status
             </p>
             <h2 className="mt-1 text-lg font-black uppercase text-white">{status.label}</h2>
             <p className="mt-2 text-sm text-metal-300">{status.detail}</p>

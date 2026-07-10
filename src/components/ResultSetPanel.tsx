@@ -164,7 +164,7 @@ export function ResultSetPanel({
                 stageMode ? "text-2xl" : "text-xs",
               )}
             >
-              Fallback tiebreak reveal
+              Tiebreak reveal
             </p>
             {tiebreakWinnerRevealed ? (
               <div className="mt-4">
@@ -172,7 +172,7 @@ export function ResultSetPanel({
               </div>
             ) : (
               <p className={clsx("mt-2 font-black text-white", stageMode ? "text-3xl" : "text-lg")}>
-                Selector locked for reveal
+                Winner reveal starting
               </p>
             )}
             <p className={clsx("mt-2 text-metal-300", stageMode ? "text-xl" : "text-sm")}>
@@ -195,7 +195,7 @@ export function ResultSetPanel({
               stageMode ? "text-2xl" : "text-xs",
             )}
           >
-            Unique least-ban chart
+            Selected chart
           </p>
           <p className={clsx("mt-2 font-black text-white", stageMode ? "text-3xl" : "text-lg")}>
             {set.selectedChart.name}
@@ -335,7 +335,7 @@ export function ResultSetPanel({
               Set {set.setOrder} - {set.displayLabel}
             </p>
             <h2 className="mt-1 text-5xl font-black uppercase leading-none text-white">
-              {set.tiebreakUsed ? "Tiebreak Selector" : "Selected Chart"}
+              Selected Chart
             </h2>
           </div>
           {!set.tiebreakUsed ? (
@@ -383,9 +383,7 @@ export function ResultSetPanel({
             stageMode ? "px-4 py-2 text-xl" : "px-3 py-2 text-sm",
           )}
         >
-          {stageMode
-            ? "Least banned first - revealing most banned first"
-            : "Least banned to most banned"}
+          {stageMode ? "Ban counts" : "Full ban counts"}
         </p>
       </div>
       <div
