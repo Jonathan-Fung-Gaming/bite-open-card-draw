@@ -549,7 +549,7 @@ describe("admin action production safeguards", () => {
         visibleSummarySnippets: [
           "reset all tournament data",
           "clear the roster, draws, ballots, voting windows, result snapshots, chart exclusions, current round, and rehearsal flag",
-          "Reset Website",
+          "Reset Tournament",
         ],
         guardSnippets: ["resetTournamentOperationalState", "replaceTournamentState"],
       },

@@ -18,7 +18,7 @@ export function AdminLayout({ children, hostStatus = "inactive" }: AdminLayoutPr
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
                 Admin Console
               </p>
-              <h1 className="mt-1 text-3xl font-black uppercase text-white">coolguy69</h1>
+              <h1 className="mt-1 text-3xl font-black uppercase text-white">Host Console</h1>
             </div>
           </div>
           <HostLockBadge status={hostStatus} />

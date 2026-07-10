@@ -16,7 +16,7 @@ export async function openVotingForRound(adminPage: AdminPage, roundNumber: numb
   await adminPage.openVoting();
 
   if (!(await expectSupabaseVotingStatus(roundNumber, "voting_open"))) {
-    await adminPage.expectTextAfterNavigation("voting open");
+    await adminPage.expectTextAfterNavigation("Voting open");
   }
 }
 
@@ -32,12 +32,12 @@ export async function closeVotingForRound(adminPage: AdminPage, roundNumber: num
   }
 
   if (!(await expectSupabaseVotingStatusIn(roundNumber, CLOSEABLE_VOTING_STATUSES))) {
-    await adminPage.expectTextAfterNavigation("voting open");
+    await adminPage.expectTextAfterNavigation("Voting open");
   }
 
   await adminPage.closeVoting();
 
   if (!(await expectSupabaseVotingStatus(roundNumber, "voting_closed"))) {
-    await adminPage.expectTextAfterNavigation("voting closed");
+    await adminPage.expectTextAfterNavigation("Voting closed");
   }
 }

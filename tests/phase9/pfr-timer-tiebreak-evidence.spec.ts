@@ -152,7 +152,7 @@ async function reopenVotingForOneMinute(adminPage: AdminPage) {
     reopenForm.getByRole("button", { name: "Reopen Voting" }),
     0,
   );
-  await adminPage.expectTextAfterNavigation("voting open");
+  await adminPage.expectTextAfterNavigation("Voting open");
 }
 
 async function seedRehearsalTiebreak(adminPage: AdminPage) {
@@ -237,7 +237,7 @@ test("PFR-019 browser timer evidence covers pause, resume, manual close, and reo
     await expectSavedBallotEditsVisible(phonePage);
 
     await clickAdminControl(adminPage, "Pause");
-    await adminPage.expectTextAfterNavigation("voting paused");
+    await adminPage.expectTextAfterNavigation("Voting paused");
     await stagePage.reload();
     await expect(stageRawPage.locator("header").getByText("Voting paused")).toBeVisible({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -255,7 +255,7 @@ test("PFR-019 browser timer evidence covers pause, resume, manual close, and reo
     expect(pausedTimerTextAfterWait).toBe(pausedTimerText);
 
     await clickAdminControl(adminPage, "Resume");
-    await adminPage.expectTextAfterNavigation("voting open");
+    await adminPage.expectTextAfterNavigation("Voting open");
     await stagePage.reload();
     const resumedTimerSeconds = await readStageTimerSeconds(stageRawPage);
 
@@ -351,7 +351,7 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
     );
     expect(slotOrientations.every((slot) => slot.bottomFacesCenter)).toBe(true);
     await expect(stageRawPage.getByTestId("rune-wheel-status")).toHaveText(
-      "Selector locking onto the sealed chart.",
+      "Tiebreak selector is spinning.",
     );
     await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0, {
       timeout: 500,
@@ -374,7 +374,7 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
       (await stageRawPage.getByTestId("rune-wheel-status").textContent())?.trim() ?? "";
 
     expect(revealedStatusText).not.toContain("Selected chart:");
-    expect(revealedStatusText).not.toBe("Selector locking onto the sealed chart.");
+    expect(revealedStatusText).not.toBe("Tiebreak selector is spinning.");
     expect(revealedStatusText.length).toBeGreaterThan(0);
     await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0);
     const revealedSelectedSlotCount = await stageRawPage

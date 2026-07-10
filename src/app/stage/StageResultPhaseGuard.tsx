@@ -55,7 +55,7 @@ function shouldHoldInsteadOfDraw(freshness: PublicRouteFreshnessKey, resultModeL
   );
 }
 
-function StageResultModeStickyHolding({ freshness }: { freshness: PublicRouteFreshnessKey }) {
+function StageResultModeStickyHolding() {
   return (
     <>
       <StageAutoRefresh intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS} jitterMs={0} leading />
@@ -65,12 +65,12 @@ function StageResultModeStickyHolding({ freshness }: { freshness: PublicRouteFre
             <p className="text-xl font-semibold uppercase text-ember-300">
               Result reveal in progress
             </p>
-            <h1 className="mt-3 text-6xl font-black uppercase text-white">Holding Stage Screen</h1>
+            <h1 className="mt-3 text-6xl font-black uppercase text-white">Results Coming Up</h1>
             <p className="mt-3 text-2xl font-bold text-metal-300">
-              Waiting for the latest result snapshot before showing the next reveal step.
+              Waiting for the next official reveal update before showing the next step.
             </p>
             <p className="mt-5 rounded border border-metal-700 bg-black/25 px-5 py-3 text-xl font-bold uppercase text-metal-300">
-              {freshness.votingStatus.replaceAll("_", " ")}
+              Preparing reveal
             </p>
           </div>
         </section>
@@ -87,9 +87,7 @@ function StageResultModeStickyGate({
   freshness: PublicRouteFreshnessKey;
 }) {
   const lockKey = stageResultLockKey(freshness);
-  const [resultModeLocked, setResultModeLocked] = useState(() =>
-    readStageResultModeLock(lockKey),
-  );
+  const [resultModeLocked, setResultModeLocked] = useState(() => readStageResultModeLock(lockKey));
   const resultModeStarted = resultModeHasStarted(freshness);
 
   useEffect(() => {
@@ -103,7 +101,7 @@ function StageResultModeStickyGate({
   }, [freshness.sequence, lockKey, resultModeStarted]);
 
   if (shouldHoldInsteadOfDraw(freshness, resultModeLocked || resultModeStarted)) {
-    return <StageResultModeStickyHolding freshness={freshness} />;
+    return <StageResultModeStickyHolding />;
   }
 
   return children;

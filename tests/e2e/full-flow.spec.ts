@@ -356,9 +356,7 @@ async function expectRuneWheelSelectorFramesWinner(page: Page) {
   expect(geometry.selector.left).toBeLessThanOrEqual(geometry.selectedSlot.left + tolerance);
   expect(geometry.selector.right).toBeGreaterThanOrEqual(geometry.selectedSlot.right - tolerance);
   expect(geometry.selector.top).toBeLessThanOrEqual(geometry.selectedSlot.top + tolerance);
-  expect(geometry.selector.bottom).toBeGreaterThanOrEqual(
-    geometry.selectedSlot.bottom - tolerance,
-  );
+  expect(geometry.selector.bottom).toBeGreaterThanOrEqual(geometry.selectedSlot.bottom - tolerance);
   expect(geometry.pointer.bottom).toBeGreaterThan(geometry.selectedSlot.top);
   expect(geometry.pointer.top).toBeLessThan(geometry.selectedSlot.top + tolerance);
   expect(geometry.pointer.horizontalCenter).toBeGreaterThan(geometry.selectedSlot.left);
@@ -725,6 +723,8 @@ async function expectAdminEventDayFlow(page: Page) {
   const supportPanels = page.getByTestId("admin-support-panels");
   const hostControl = hostRun.getByTestId("admin-host-control-panel");
   const draw = hostRun.getByRole("heading", { name: "Draw Cards" });
+  const stageCheck = hostRun.getByTestId("admin-stage-reveal-check");
+  const stageCheckHeading = stageCheck.getByRole("heading", { name: "Reveal Drawn Charts" });
   const voting = hostRun.getByRole("heading", { name: "Start And Monitor Voting" });
   const results = hostRun.getByRole("heading", { name: "Calculate And Reveal Results" });
 
@@ -752,6 +752,8 @@ async function expectAdminEventDayFlow(page: Page) {
   );
   await expect(hostControl.getByRole("button", { name: "Release" })).toBeVisible();
   await expect(hostRun).toContainText("Draw Cards");
+  await expect(stageCheck).toContainText("Stage Check");
+  await expect(stageCheck.getByRole("link", { name: "Open Stage" })).toBeVisible();
   await expect(hostRun).toContainText("Open Voting");
   await expect(hostRun).toContainText("Compute Results");
   await expect(hostRun).toContainText("Download private ballot CSV");
@@ -761,12 +763,25 @@ async function expectAdminEventDayFlow(page: Page) {
 
   const hostControlTop = await visualTop(hostControl);
   const drawTop = await visualTop(draw);
+  const stageCheckTop = await visualTop(stageCheckHeading);
   const votingTop = await visualTop(voting);
   const resultsTop = await visualTop(results);
+  const secondaryTop = await visualTop(secondaryPanels);
 
   expect(hostControlTop).toBeLessThan(drawTop);
-  expect(drawTop).toBeLessThan(votingTop);
+  expect(drawTop).toBeLessThan(stageCheckTop);
+  expect(stageCheckTop).toBeLessThan(votingTop);
   expect(votingTop).toBeLessThan(resultsTop);
+  expect(resultsTop).toBeLessThan(secondaryTop);
+
+  await openAdminPanel(page, "admin-secondary-panels");
+  await expect(secondaryPanels).toContainText("Setup & Recovery");
+  await expect(secondaryPanels.getByRole("heading", { name: "Draw Recovery" })).toBeVisible();
+  await expect(secondaryPanels.getByRole("button", { name: "Draw Set" })).toHaveCount(0);
+  await expect(
+    secondaryPanels.getByRole("button", { name: "Open Voting", exact: true }),
+  ).toHaveCount(0);
+  await expect(secondaryPanels.getByRole("button", { name: "Compute Results" })).toHaveCount(0);
 }
 
 async function expectAdminPanelOpenStatePersists(page: Page, testId: string) {
@@ -1181,7 +1196,7 @@ async function advanceRevealAndWaitForAdminPhase(page: Page, phase: string) {
 async function expectNoFinalResultSpoilers(page: Page) {
   await expect(page.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toHaveCount(0);
   await expect(page.getByText("Full ban counts")).toHaveCount(0);
-  await expect(page.getByText("Least banned to most banned")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Ban counts" })).toHaveCount(0);
   await expect(page.getByTestId("stage-final-chart-list")).toHaveCount(0);
   await expect(page.getByTestId("phone-final-chart-card")).toHaveCount(0);
   await expect(page.getByTestId("result-selected-label")).toHaveCount(0);
@@ -1223,7 +1238,7 @@ async function expectPublicRoutesHideFinalSpoilersBeforeReveal(page: Page) {
     await expectNoFinalResultSpoilers(publicPage);
 
     await goto(publicPage, "/stage");
-    await expect(publicPage.getByRole("heading", { name: "Awaiting Host Reveal" })).toBeVisible();
+    await expect(publicPage.getByRole("heading", { name: "Reveal Starts Soon" })).toBeVisible();
     await expectNoFinalResultSpoilers(publicPage);
   } finally {
     await publicPage.close();
@@ -1435,7 +1450,7 @@ async function expectOpenPublicPagesAfterReset({
     routeSource: "current_round",
     votingStatus: "not_started",
   });
-  await expect(votePage.getByText("The host is drawing the two chart sets.")).toBeVisible({
+  await expect(votePage.getByText("Chart sets are being drawn.")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
@@ -1580,9 +1595,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   const mobileWaitingPage = await page.context().newPage();
   await mobileWaitingPage.setViewportSize({ width: 390, height: 844 });
   await goto(mobileWaitingPage, "/vote");
-  await expect(
-    mobileWaitingPage.getByText("The host is drawing the two chart sets."),
-  ).toBeVisible();
+  await expect(mobileWaitingPage.getByText("Chart sets are being drawn.")).toBeVisible();
   await captureEvidenceScreenshot(
     testInfo,
     "uxr-013-mobile-vote-waiting-not-drawn.png",
@@ -1592,7 +1605,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await goto(page, "/coolguy69");
   await page.getByLabel("Shared admin password").fill(ADMIN_PASSWORD);
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Log In" }));
-  await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Host Console" })).toBeVisible();
   await expectOxaniumFontLoaded(page);
   await expect(page.getByTestId("admin-host-lock-context")).toContainText("No active host");
   await expect(page.getByTestId("host-heartbeat-confidence")).toContainText("No active heartbeat");
@@ -1614,7 +1627,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     "Read-only admin",
   );
   await expect(readonlyPage.getByTestId("admin-host-lock-context")).toContainText(
-    "Force takeover is gated",
+    "Password required",
   );
   await expect(readonlyPage.getByTestId("host-heartbeat-confidence")).toContainText(
     "Read-only until takeover",
@@ -1677,16 +1690,19 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(chartsPage.getByText("Awaiting first chart set").first()).toBeVisible();
 
   await hostRunButton(page, "Draw Set").nth(0).click();
-  await expect(page.getByText(/Version 1/).first()).toBeVisible();
-  await expect(stagePage.getByText(/Version 1 \/ (Revealing|Pool)/)).toBeVisible({
-    timeout: HOSTED_REFRESH_TIMEOUT_MS,
-  });
-  await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({
+  await expect(page.getByText(/Draw 1/).first()).toBeVisible();
+  await expect(
+    stagePage
+      .getByTestId("stage-set-row")
+      .nth(0)
+      .getByText(/Revealing [0-7] \/ 7|Charts ready/),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect(chartsPage.getByText("Charts ready").first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expect(chartsPage.getByTestId("view-only-status")).toContainText("One chart set drawn");
   await expect(chartsPage.getByTestId("view-only-status")).toContainText(
-    "The drawn chart set is visible now",
+    "One chart set is visible. The second set appears after the next draw.",
   );
 
   const firstChartRerollDetails = page.getByTestId("admin-chart-reroll-panel").first();
@@ -1701,24 +1717,30 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     page,
     firstChartRerollForm.getByRole("button", { name: "Confirm Chart Reroll" }),
   );
-  await expect(page.getByText(/Version 2/).first()).toBeVisible();
-  await expect(stagePage.getByText(/Version 2 \/ (Revealing|Pool)/)).toBeVisible({
-    timeout: HOSTED_REFRESH_TIMEOUT_MS,
-  });
-  await expect(chartsPage.getByText("Draw complete").first()).toBeVisible({
+  await expect(page.getByText(/Draw 2/).first()).toBeVisible();
+  await expect(
+    stagePage
+      .getByTestId("stage-set-row")
+      .nth(0)
+      .getByText(/Revealing [0-7] \/ 7|Charts ready/),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect(chartsPage.getByText("Charts ready").first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
   await hostRunButton(page, "Draw Set").nth(1).click();
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("ready to vote", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Ready to vote", { exact: true }),
   ).toBeVisible();
   await expect(chartsPage.getByTestId("view-only-status")).toContainText("Ready to vote", {
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
-  await expect(stagePage.getByText(/Version 1 \/ (Revealing [0-7] \/ 7|Pool)/)).toBeVisible({
-    timeout: HOSTED_REFRESH_TIMEOUT_MS,
-  });
+  await expect(
+    stagePage
+      .getByTestId("stage-set-row")
+      .nth(1)
+      .getByText(/Revealing [0-7] \/ 7|Charts ready/),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await page
     .getByTestId("admin-draw-chart-name")
     .first()
@@ -1729,7 +1751,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await captureEvidenceScreenshot(testInfo, "uxr-032-admin-draw-controls-long-name.png", page);
   await goto(mobileWaitingPage, "/vote");
   await expect(
-    mobileWaitingPage.getByText("The host has not opened the 10-minute voting window yet."),
+    mobileWaitingPage.getByText("Both chart sets are drawn. Keep this page open;"),
   ).toBeVisible();
   await captureEvidenceScreenshot(
     testInfo,
@@ -1744,7 +1766,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await hostRunButton(page, "Open Voting", { exact: true }).click();
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("voting open", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Voting open", { exact: true }),
   ).toBeVisible();
   await expect(stagePage.locator("header").getByText("Voting open")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -1879,7 +1901,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(duplicatePhonePage.getByRole("button", { name: "Confirm" })).toBeEnabled();
   await duplicatePhonePage.getByRole("button", { name: "Confirm" }).click();
   await expect(
-    duplicatePhonePage.getByText("Another active device has already claimed Alpha"),
+    duplicatePhonePage.getByText(/Alpha is already active on another device/),
   ).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
@@ -1897,7 +1919,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Close Voting"));
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("voting closed", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Voting closed", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await expect(phonePage.getByText("Voting is closed.")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
@@ -1910,7 +1932,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(resultsPage.getByText("Results are being revealed on stage.")).toBeVisible();
   await hostRunButton(page, "Compute Results").click();
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("results computed", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Results ready", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await expectAdminRevealPhase(page, "computed");
   await expectPublicRoutesHideFinalSpoilersBeforeReveal(page);
@@ -2244,11 +2266,11 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }, te
   await clickAdminActionAndWait(page, hostRunButton(page, "Draw Set").nth(0));
   await clickAdminActionAndWait(page, hostRunButton(page, "Draw Set").nth(1));
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("ready to vote", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Ready to vote", { exact: true }),
   ).toBeVisible();
   await clickAdminActionAndWait(page, hostRunButton(page, "Open Voting", { exact: true }));
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("voting open", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Voting open", { exact: true }),
   ).toBeVisible();
 
   const phonePage = await page.context().newPage();
@@ -2274,11 +2296,11 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }, te
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Pause"));
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("voting paused", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Voting paused", { exact: true }),
   ).toBeVisible();
   await phonePage.reload({ waitUntil: "domcontentloaded" });
   await expect(
-    phonePage.getByText("Voting is paused. The host has frozen the timer and ballot changes."),
+    phonePage.getByText("Voting is paused. Your selections are still here;"),
   ).toBeVisible();
   await captureEvidenceScreenshot(testInfo, "uxr-013-mobile-vote-paused.png", phonePage);
   await expect(phonePage.getByTestId("ban-selection-counter")).toHaveText("1/2 bans selected");
@@ -2290,7 +2312,7 @@ test("unsaved vote draft survives pause and resume reloads", async ({ page }, te
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Resume"));
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("voting open", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Voting open", { exact: true }),
   ).toBeVisible();
   await phonePage.reload({ waitUntil: "domcontentloaded" });
   await expect(phonePage.getByText("Voting as Rehearsal Player 01")).toBeVisible();
@@ -2336,11 +2358,11 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
   await page.getByRole("button", { name: "Seed Tiebreak" }).click();
   await hostRunButton(page, "Close Voting").click();
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("voting closed", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Voting closed", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await hostRunButton(page, "Compute Results").click();
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("results computed", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Results ready", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await expectAdminRevealPhase(page, "computed");
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
@@ -2382,7 +2404,7 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
     (await stagePage.getByTestId("rune-wheel-status").textContent())?.trim() ?? "";
 
   expect(revealedWheelStatus).not.toContain("Selected chart:");
-  expect(revealedWheelStatus).not.toBe("Selector locking onto the sealed chart.");
+  expect(revealedWheelStatus).not.toBe("Tiebreak selector is spinning.");
   expect(revealedWheelStatus.length).toBeGreaterThan(0);
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
 

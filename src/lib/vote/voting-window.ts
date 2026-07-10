@@ -148,7 +148,7 @@ export function formatVotingStatusLabel(status: VotingRoundStatus) {
     case "voting_closed":
       return "Voting closed";
     case "results_computed":
-      return "Results computed";
+      return "Results ready";
     case "results_revealing":
       return "Results revealing";
     case "results_revealed":

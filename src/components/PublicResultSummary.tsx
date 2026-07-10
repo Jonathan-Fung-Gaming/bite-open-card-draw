@@ -82,9 +82,7 @@ export function PublicResultSummary({
         <p className="text-lg font-semibold uppercase tracking-[0.22em] text-ember-300">
           Full ban counts
         </p>
-        <h2 className="mt-2 text-4xl font-black uppercase text-white">
-          Least banned to most banned
-        </h2>
+        <h2 className="mt-2 text-4xl font-black uppercase text-white">Ban counts</h2>
         <div className="mt-4 grid gap-3">
           {result.sets.map((set) => (
             <details

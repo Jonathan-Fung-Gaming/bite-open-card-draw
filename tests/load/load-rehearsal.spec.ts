@@ -184,7 +184,7 @@ async function loginAndTakeHost(page: Page, baseURL: string) {
     await clickAdminActionAndWait(page, page.getByRole("button", { name: "Log In" }));
   }
 
-  await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Host Console" })).toBeVisible();
 
   if (await waitForActiveHost(page, 1_000)) {
     return;
@@ -232,7 +232,7 @@ async function drawRoundAndOpenVoting(page: Page, baseURL: string) {
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await submitAdminFormAndWait(page, drawSetForm(page, 0));
-  await expect(page.getByText(/Version 1/).first()).toBeVisible({
+  await expect(page.getByText(/Draw 1/).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
@@ -240,7 +240,7 @@ async function drawRoundAndOpenVoting(page: Page, baseURL: string) {
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await submitAdminFormAndWait(page, drawSetForm(page, 1));
-  await expect(page.getByText("ready to vote")).toBeVisible({
+  await expect(page.getByText("Ready to vote")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
@@ -249,7 +249,7 @@ async function drawRoundAndOpenVoting(page: Page, baseURL: string) {
 
   await expect(openVotingButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await openVotingButton.click();
-  await expect(page.getByText("voting open")).toBeVisible({
+  await expect(page.getByText("Voting open")).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 }
@@ -387,7 +387,7 @@ async function expectAdminTextAfterNavigation(page: Page, baseURL: string, text:
         if ((await passwordInput.count()) > 0) {
           await passwordInput.fill(ADMIN_PASSWORD);
           await page.getByRole("button", { name: "Log In" }).click();
-          await expect(page.getByRole("heading", { name: "coolguy69" })).toBeVisible();
+          await expect(page.getByRole("heading", { name: "Host Console" })).toBeVisible();
         }
 
         return page
@@ -496,22 +496,22 @@ async function setupLoadRound(page: Page, baseURL: string, players: string[]) {
 }
 
 async function closeVotingComputeAndReveal(page: Page, baseURL: string, stagePage: Page) {
-  if (!(await page.getByText("voting closed").isVisible())) {
+  if (!(await page.getByText("Voting closed").isVisible())) {
     await expect(page.getByRole("button", { name: "Close Voting" })).toBeEnabled({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });
     await page.getByRole("button", { name: "Close Voting" }).click();
     await page.waitForTimeout(5_000);
-    await expectAdminTextAfterNavigation(page, baseURL, "voting closed");
+    await expectAdminTextAfterNavigation(page, baseURL, "Voting closed");
   }
 
-  await expectAdminTextAfterNavigation(page, baseURL, "voting closed");
+  await expectAdminTextAfterNavigation(page, baseURL, "Voting closed");
   await expect(page.getByRole("button", { name: "Compute Results" })).toBeEnabled({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await page.getByRole("button", { name: "Compute Results" }).click();
   await page.waitForTimeout(5_000);
-  await expectAdminTextAfterNavigation(page, baseURL, "results computed");
+  await expectAdminTextAfterNavigation(page, baseURL, "Results ready");
 
   await advanceToFinalReveal(page, baseURL);
   await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({

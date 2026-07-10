@@ -137,7 +137,7 @@ export function RuneWheel({
               {winnerRevealed ? (
                 <span className="text-ember-300">{winner?.name ?? winnerChartId}</span>
               ) : (
-                "Selector locking onto the sealed chart."
+                "Tiebreak selector is spinning."
               )}
             </p>
           </div>

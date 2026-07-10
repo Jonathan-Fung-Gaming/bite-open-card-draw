@@ -351,7 +351,7 @@ async function drawBothSetsAndOpenVoting(page: Page) {
     page,
     page.getByTestId("admin-host-run-controls").getByRole("button", { name: "Draw Set" }).nth(0),
   );
-  await expect(page.getByText(/Version 1/).first()).toBeVisible({
+  await expect(page.getByText(/Draw 1/).first()).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await clickAdminActionAndWait(
@@ -359,7 +359,7 @@ async function drawBothSetsAndOpenVoting(page: Page) {
     page.getByTestId("admin-host-run-controls").getByRole("button", { name: "Draw Set" }).nth(1),
   );
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("ready to vote", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Ready to vote", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await clickAdminActionAndWait(
     page,
@@ -368,7 +368,7 @@ async function drawBothSetsAndOpenVoting(page: Page) {
       .getByRole("button", { name: "Open Voting", exact: true }),
   );
   await expect(
-    page.getByTestId("admin-host-run-controls").getByText("voting open", { exact: true }),
+    page.getByTestId("admin-host-run-controls").getByText("Voting open", { exact: true }),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 }
 

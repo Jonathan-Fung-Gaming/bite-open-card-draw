@@ -518,22 +518,17 @@ export class AdminPage {
 
     await expect(drawButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
 
-    await clickServerAction(
-      this.page,
-      drawButton,
-      5_000,
-      {
-        postDataIncludes: [
-          "roundNumber",
-          `\r\n${roundNumber}\r\n`,
-          "setOrder",
-          `\r\n${setOrder}\r\n`,
-        ],
-        requireServerActionResponse: true,
-        responseTimeoutMs: 60_000,
-        submitForm: true,
-      },
-    );
+    await clickServerAction(this.page, drawButton, 5_000, {
+      postDataIncludes: [
+        "roundNumber",
+        `\r\n${roundNumber}\r\n`,
+        "setOrder",
+        `\r\n${setOrder}\r\n`,
+      ],
+      requireServerActionResponse: true,
+      responseTimeoutMs: 60_000,
+      submitForm: true,
+    });
 
     if (await expectSupabaseRoundSetDrawReady(roundNumber, setOrder)) {
       await this.goto();
@@ -551,7 +546,7 @@ export class AdminPage {
             .getByText(`Round ${roundNumber} - Set ${setOrder}`, { exact: true })
             .locator("xpath=ancestor::section[1]");
 
-          return refreshedSetSection.getByText(/Version 1/).isVisible();
+          return refreshedSetSection.getByText(/Draw 1/).isVisible();
         },
         { timeout: HOSTED_REFRESH_TIMEOUT_MS },
       )
@@ -562,7 +557,7 @@ export class AdminPage {
     await this.drawRoundSet(roundNumber, 1);
     await this.drawRoundSet(roundNumber, 2);
     if (!(await expectSupabaseRoundDrawsReady(roundNumber))) {
-      await this.expectTextAfterNavigation("ready to vote");
+      await this.expectTextAfterNavigation("Ready to vote");
     }
   }
 
@@ -762,16 +757,11 @@ export class AdminPage {
     const forceHostButton = forceHostForm.getByRole("button", { name: "Force Host Takeover" });
 
     await expect(forceHostButton).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
-    await clickServerAction(
-      this.page,
-      forceHostButton,
-      5_000,
-      {
-        postDataIncludes: ["forceHostTakeover", reason],
-        requireServerActionResponse: true,
-        responseTimeoutMs: 60_000,
-      },
-    );
+    await clickServerAction(this.page, forceHostButton, 5_000, {
+      postDataIncludes: ["forceHostTakeover", reason],
+      requireServerActionResponse: true,
+      responseTimeoutMs: 60_000,
+    });
     await expect(this.page.getByRole("button", { name: "Release" })).toBeEnabled({
       timeout: HOSTED_REFRESH_TIMEOUT_MS,
     });

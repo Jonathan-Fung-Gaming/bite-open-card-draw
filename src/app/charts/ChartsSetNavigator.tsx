@@ -63,7 +63,7 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              View-only chart browser
+              View charts only - no votes recorded
             </p>
             <h2 className="mt-1 text-xl font-black uppercase text-white">{status.label}</h2>
           </div>
@@ -74,12 +74,6 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
           ) : null}
         </div>
         <p className="mt-2 text-sm text-metal-300">{status.detail}</p>
-        <p
-          className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-metal-400"
-          data-testid="view-only-navigation-note"
-        >
-          Navigation only. No votes are recorded here.
-        </p>
       </div>
 
       <div

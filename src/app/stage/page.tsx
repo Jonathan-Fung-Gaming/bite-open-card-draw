@@ -41,7 +41,7 @@ function stageStatus(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean) {
     case "voting_closed":
       return "Voting closed";
     case "results_computed":
-      return "Results computed";
+      return "Results ready";
     case "results_revealing":
       return "Results revealing";
     case "results_revealed":
@@ -76,6 +76,8 @@ function stageTimerCaption(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean
 
 function revealLabel(phase: string) {
   switch (phase) {
+    case "computed":
+      return "Ready to reveal";
     case "set_1_counts":
       return "Set 1 counts";
     case "set_1_resolved":
@@ -112,7 +114,7 @@ function StageResolvedSetSummary({ set }: { set: ResultSetSnapshot }) {
   );
 }
 
-function StageResultModeHolding({ roundNumber, status }: { roundNumber: number; status: string }) {
+function StageResultModeHolding({ roundNumber }: { roundNumber: number }) {
   return (
     <>
       <StageAutoRefresh
@@ -122,7 +124,7 @@ function StageResultModeHolding({ roundNumber, status }: { roundNumber: number; 
       <main className="min-h-screen" data-testid="stage-result-mode-holding">
         <RoundHeader
           title={`Round ${roundNumber} Results Reveal`}
-          status="Awaiting result state"
+          status="Waiting for reveal"
           compact
         />
         <section className="grid min-h-[calc(100vh-96px)] place-items-center px-5 py-4 lg:px-8">
@@ -130,13 +132,13 @@ function StageResultModeHolding({ roundNumber, status }: { roundNumber: number; 
             <p className="text-xl font-semibold uppercase text-ember-300">
               Result reveal in progress
             </p>
-            <h1 className="mt-3 text-6xl font-black uppercase text-white">Holding Stage Screen</h1>
+            <h1 className="mt-3 text-6xl font-black uppercase text-white">Results Coming Up</h1>
             <p className="mt-3 text-2xl font-bold text-metal-300">
-              The round has moved past voting into results. Waiting for the latest result snapshot
-              before showing the next reveal step.
+              The round has moved past voting into results. Waiting for the next official reveal
+              update before showing the next step.
             </p>
             <p className="mt-5 rounded border border-metal-700 bg-black/25 px-5 py-3 text-xl font-bold uppercase text-metal-300">
-              {status.replaceAll("_", " ")}
+              Preparing reveal
             </p>
           </div>
         </section>
@@ -168,7 +170,7 @@ export default async function StagePage() {
     if (!result) {
       return (
         <StageResultPhaseGuard freshness={freshness}>
-          <StageResultModeHolding roundNumber={roundNumber} status={snapshot.status} />
+          <StageResultModeHolding roundNumber={roundNumber} />
         </StageResultPhaseGuard>
       );
     }
@@ -185,7 +187,7 @@ export default async function StagePage() {
           <main className="min-h-screen">
             <RoundHeader
               title={`ROUND ${roundNumber} FINAL CHARTS`}
-              status="Stable final screen"
+              status="Final charts selected"
               compact
             />
             <section className="px-5 py-5 lg:px-8">
@@ -232,10 +234,10 @@ export default async function StagePage() {
               {result.revealPhase === "computed" ? (
                 <section className="metal-panel rounded-lg p-5 text-center">
                   <p className="text-xl font-semibold uppercase tracking-[0.18em] text-ember-300">
-                    Results computed
+                    Results ready
                   </p>
                   <h1 className="mt-2 text-6xl font-black uppercase text-white">
-                    Awaiting Host Reveal
+                    Reveal Starts Soon
                   </h1>
                 </section>
               ) : null}

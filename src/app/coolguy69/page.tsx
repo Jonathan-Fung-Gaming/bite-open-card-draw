@@ -63,7 +63,7 @@ import { AdminActionButton } from "./_components/AdminActionButton";
 import { HostHeartbeat } from "./_components/HostHeartbeat";
 import { ManualBallotForm } from "./_components/ManualBallotForm";
 import { PrivateCsvDownload } from "./_components/PrivateCsvDownload";
-import { formatVotingTime } from "@/lib/vote/voting-window";
+import { formatVotingStatusLabel, formatVotingTime } from "@/lib/vote/voting-window";
 
 type AdminPageProps = {
   searchParams?: Promise<{
@@ -196,7 +196,7 @@ function hostTakeoverText(hostSnapshot: HostLockSnapshot) {
     case "active":
       return "Heartbeat protected";
     case "readonly":
-      return "Force takeover is gated";
+      return "Password required";
     default:
       return "Takeover available now";
   }
@@ -386,10 +386,12 @@ function DrawControlCard({
   canControl,
   control,
   includeRerollControls,
+  showDrawAction = true,
 }: {
   canControl: boolean;
   control: DrawControlView;
   includeRerollControls: boolean;
+  showDrawAction?: boolean;
 }) {
   const { activeDraw, historyCount, set } = control;
 
@@ -405,23 +407,25 @@ function DrawControlCard({
           </p>
           <h3 className="break-words text-xl font-black text-white">{set.displayLabel}</h3>
         </div>
-        <form action={drawRoundSetAction}>
-          <input type="hidden" name="roundNumber" value={set.roundNumber} />
-          <input type="hidden" name="setOrder" value={set.setOrder} />
-          <button
-            className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-            disabled={!canControl || Boolean(activeDraw)}
-            type="submit"
-          >
-            Draw Set
-          </button>
-        </form>
+        {showDrawAction ? (
+          <form action={drawRoundSetAction}>
+            <input type="hidden" name="roundNumber" value={set.roundNumber} />
+            <input type="hidden" name="setOrder" value={set.setOrder} />
+            <button
+              className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+              disabled={!canControl || Boolean(activeDraw)}
+              type="submit"
+            >
+              Draw Set
+            </button>
+          </form>
+        ) : null}
       </div>
       {activeDraw ? (
         <div className="mt-3 grid gap-2">
           <p className="text-xs uppercase tracking-[0.16em] text-metal-300">
-            Version {activeDraw.version} / Pool {activeDraw.eligiblePoolCount} / History{" "}
-            {historyCount}
+            Draw {activeDraw.version} - {activeDraw.eligiblePoolCount} eligible - {historyCount}{" "}
+            previous
           </p>
           {activeDraw.charts.map((chart, index) => (
             <div
@@ -513,8 +517,8 @@ function HostControlPanel({
             {hostTakeoverText(hostSnapshot)}
           </p>
           <p className="mt-1 break-words text-xs text-metal-300">
-            Use the heartbeat panel for the live expiry window. Forced takeover stays password and
-            audit-reason gated while another heartbeat is live.
+            Use the heartbeat panel for the live expiry window. Taking control from another active
+            host requires the shared password and an audit reason.
           </p>
         </div>
       </div>
@@ -607,7 +611,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
               Admin Console
             </p>
-            <h1 className="mt-2 text-3xl font-black uppercase text-white">coolguy69</h1>
+            <h1 className="mt-2 text-3xl font-black uppercase text-white">Host Console</h1>
             {error ? (
               <p className="mt-4 rounded border border-ember-500/40 bg-ember-900/25 p-3 text-sm text-ember-300">
                 {error}
@@ -716,7 +720,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               defaultOpen
               eyebrow="Event-Day Flow"
               id="host-run-controls"
-              summary={`Round ${currentRoundNumber} - ${votingSnapshot.status.replaceAll("_", " ")}`}
+              summary={`Round ${currentRoundNumber} - ${formatVotingStatusLabel(votingSnapshot.status)}`}
               testId="admin-host-run-controls"
               title="Host Run Controls"
             >
@@ -733,9 +737,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <p className="text-xs font-semibold uppercase text-ember-300">
                         Current Round
                       </p>
-                      <h3 className="mt-1 text-2xl font-black uppercase text-white">
-                        Draw Cards
-                      </h3>
+                      <h3 className="mt-1 text-2xl font-black uppercase text-white">Draw Cards</h3>
                     </div>
                     <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
                       {currentRoundDrawnCount} / 2 drawn
@@ -752,6 +754,52 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     ))}
                   </div>
                 </section>
+                <section
+                  className="rounded border border-metal-700 bg-black/20 p-3"
+                  data-testid="admin-stage-reveal-check"
+                >
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-ember-300">Stage Check</p>
+                      <h3 className="mt-1 text-2xl font-black uppercase text-white">
+                        Reveal Drawn Charts
+                      </h3>
+                    </div>
+                    <a
+                      className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 hover:border-ember-300 hover:text-white"
+                      href="/stage"
+                      target="_blank"
+                    >
+                      Open Stage
+                    </a>
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <div
+                      className={`rounded border p-3 ${readinessToneClass(currentRoundDrawsReady)}`}
+                    >
+                      <p className="text-xs uppercase text-ember-300">Draw status</p>
+                      <p
+                        className={`mt-1 text-2xl font-black uppercase ${readinessTextClass(
+                          currentRoundDrawsReady,
+                        )}`}
+                      >
+                        {currentRoundDrawsReady
+                          ? "Both drawn"
+                          : `${currentRoundDrawnCount} / 2 drawn`}
+                      </p>
+                    </div>
+                    <div className="rounded border border-metal-700 bg-black/25 p-3 md:col-span-2">
+                      <p className="text-sm font-bold text-white">
+                        {currentRoundDrawsReady
+                          ? "Verify the projector has shown both chart rows before opening voting."
+                          : "Draw both current-round sets before opening voting."}
+                      </p>
+                      <p className="mt-2 text-xs text-metal-300">
+                        The stage screen shows the two seven-chart rows for the current round.
+                      </p>
+                    </div>
+                  </div>
+                </section>
                 <section className="rounded border border-metal-700 bg-black/20 p-3">
                   <div className="flex flex-wrap items-end justify-between gap-3">
                     <div>
@@ -763,7 +811,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       </h3>
                     </div>
                     <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
-                      {votingSnapshot.status.replaceAll("_", " ")}
+                      {formatVotingStatusLabel(votingSnapshot.status)}
                     </p>
                   </div>
                   <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -928,1035 +976,847 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <AdminCollapsiblePanel
               eyebrow="Recovery And Setup"
               id="admin-secondary-panels"
-              summary="Roster, chart eligibility, manual corrections, emergency controls, and setup details."
+              summary="Roster, chart eligibility, manual corrections, emergency controls, and recovery tools."
               testId="admin-secondary-panels"
-              title="Secondary Admin Panels"
+              title="Setup & Recovery"
             >
               <div className="grid gap-5">
-          <section className="metal-panel order-2 rounded-lg p-4" data-testid="admin-readiness">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Event-Day Flow
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">
-                  Current Round Readiness
-                </h2>
-              </div>
-              <HostLockBadge status={hostSnapshot.status} />
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <div className={`rounded border p-3 ${readinessToneClass(canControl)}`}>
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Host lock</p>
-                <p
-                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(canControl)}`}
+                <section
+                  className="metal-panel order-2 rounded-lg p-4"
+                  data-testid="admin-readiness"
                 >
-                  {canControl ? "Active" : "Standby"}
-                </p>
-                <p className="mt-1 text-xs text-metal-300">
-                  {canControl
-                    ? "This browser can run tournament controls."
-                    : "Take host control before changing tournament state."}
-                </p>
-              </div>
-              <div className={`rounded border p-3 ${readinessToneClass(currentRoundDrawsReady)}`}>
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
-                  Current round draws
-                </p>
-                <p
-                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(
-                    currentRoundDrawsReady,
-                  )}`}
-                  data-testid="admin-current-round-draw-readiness"
-                >
-                  {currentRoundDrawnCount} / 2
-                </p>
-                <p className="mt-1 text-xs text-metal-300">Draw both sets before opening voting.</p>
-              </div>
-              <div className="rounded border border-metal-700 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Active players</p>
-                <p
-                  className="mt-2 text-2xl font-black uppercase text-white"
-                  data-count={activeCount}
-                  data-testid="admin-readiness-active-player-count"
-                >
-                  {activeCount}
-                </p>
-                <p className="mt-1 text-xs text-metal-300">
-                  Current active roster count before round snapshot.
-                </p>
-              </div>
-              <div className={`rounded border p-3 ${readinessToneClass(requiredPoolsReady)}`}>
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Required pools</p>
-                <p
-                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(requiredPoolsReady)}`}
-                >
-                  {requiredPoolsReady ? "Ready" : "Review"}
-                </p>
-                <p className="mt-1 text-xs text-metal-300">
-                  {chartPoolRows.filter((row) => row.valid).length} / {chartPoolRows.length} pools
-                  have at least 7 eligible charts.
-                </p>
-              </div>
-              <div className={`rounded border p-3 ${readinessToneClass(localImageMetadataReady)}`}>
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
-                  Local image cache
-                </p>
-                <p
-                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(localImageMetadataReady)}`}
-                >
-                  {cachedImageCount} / {tournamentCharts.length}
-                </p>
-                <p className="mt-1 text-xs text-metal-300">
-                  Local metadata signal only; deployed cache-art evidence remains separate.
-                </p>
-              </div>
-              <div className="rounded border border-metal-700 bg-black/25 p-3 md:col-span-2 xl:col-span-5">
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Runbook order</p>
-                <ol className="mt-2 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.12em] text-metal-300">
-                  <li>Host control</li>
-                  <li>Draw current round</li>
-                  <li>Reveal drawn charts</li>
-                  <li>Open voting</li>
-                  <li>Manual corrections</li>
-                  <li>Compute and reveal</li>
-                  <li>Export CSV</li>
-                </ol>
-              </div>
-            </div>
-          </section>
-          <section className="metal-panel order-10 rounded-lg p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Event Mode
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">
-                  Current Round {currentRoundNumber}
-                </h2>
-              </div>
-              <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
-                {roundSnapshot.rehearsalMode ? "Rehearsal mode" : "Tournament mode"}
-              </p>
-            </div>
-            {roundSnapshot.rehearsalMode ? (
-              <p className="mt-4 rounded border border-ember-300/25 bg-ember-900/15 p-3 text-sm text-ember-300">
-                Rehearsal mode is using {deploymentSafety.operationalDataDescription}. Reset
-                rehearsal data before switching back to tournament operation.
-              </p>
-            ) : null}
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              <form action={setCurrentRoundAction} className="flex flex-wrap gap-2">
-                <select
-                  name="roundNumber"
-                  disabled={!canControl}
-                  defaultValue={currentRoundNumber}
-                  className="min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                >
-                  <option value="1">Round 1</option>
-                  <option value="2">Round 2</option>
-                  <option value="3">Round 3</option>
-                  <option value="4">Round 4</option>
-                </select>
-                <button
-                  className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl}
-                  type="submit"
-                >
-                  Set Current Round
-                </button>
-              </form>
-              <form action={advanceCurrentRoundAction}>
-                <button
-                  className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
-                  disabled={!canControl || currentRoundNumber === 4}
-                  type="submit"
-                >
-                  Advance Round
-                </button>
-              </form>
-            </div>
-            {deploymentSafety.rehearsalAdminControlsAllowed ? (
-              <details
-                className="mt-4 rounded border border-metal-700 bg-black/20 p-3"
-                data-testid="admin-rehearsal-controls"
-                open={roundSnapshot.rehearsalMode}
-              >
-                <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
-                  Rehearsal controls
-                </summary>
-                <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                  <form
-                    action={startRehearsalModeAction}
-                    className="rounded border border-metal-700 bg-black/20 p-3"
-                  >
-                    <p className="text-sm font-bold text-white">Start rehearsal mode</p>
-                    <p className="mt-1 text-xs text-metal-300">
-                      This resets {deploymentSafety.operationalDataDescription} and loads a
-                      12-player test roster.
-                    </p>
-                    <p className="mt-2 text-xs font-bold text-ember-300">
-                      Dangerous action: this clears current tournament operation data for this
-                      deployment context.
-                    </p>
-                    <input
-                      name="adminPassword"
-                      type="password"
-                      required
-                      disabled={!canUseRehearsalControls}
-                      placeholder="Admin password"
-                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                    />
-                    <textarea
-                      name="reason"
-                      required
-                      disabled={!canUseRehearsalControls}
-                      rows={2}
-                      placeholder="Audit reason"
-                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                    />
-                    <button
-                      className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                      disabled={!canUseRehearsalControls}
-                      type="submit"
-                    >
-                      Start Rehearsal
-                    </button>
-                  </form>
-                  <form
-                    action={seedRehearsalTiebreakAction}
-                    className="rounded border border-metal-700 bg-black/20 p-3"
-                  >
-                    <p className="text-sm font-bold text-white">Force rehearsal tiebreak</p>
-                    <p className="mt-1 text-xs text-metal-300">
-                      After both current-round sets are drawn, seed ballots that create a two-chart
-                      least-ban tie.
-                    </p>
-                    <p className="mt-2 text-xs font-bold text-ember-300">
-                      Dangerous action: this can open voting and creates manual-admin rehearsal
-                      ballots.
-                    </p>
-                    <input
-                      name="adminPassword"
-                      type="password"
-                      required
-                      disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
-                      placeholder="Admin password"
-                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                    />
-                    <textarea
-                      name="reason"
-                      required
-                      disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
-                      rows={2}
-                      placeholder="Audit reason"
-                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                    />
-                    <button
-                      className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                      disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
-                      type="submit"
-                    >
-                      Seed Tiebreak
-                    </button>
-                  </form>
-                  <form
-                    action={resetRehearsalModeAction}
-                    className="rounded border border-metal-700 bg-black/20 p-3"
-                  >
-                    <p className="text-sm font-bold text-white">Reset rehearsal data</p>
-                    <p className="mt-1 text-xs text-metal-300">
-                      This clears {deploymentSafety.operationalDataDescription} and returns to
-                      tournament mode.
-                    </p>
-                    <p className="mt-2 text-xs font-bold text-ember-300">
-                      Dangerous action: this clears current rehearsal operation data for this
-                      deployment context.
-                    </p>
-                    <input
-                      name="adminPassword"
-                      type="password"
-                      required
-                      disabled={!canUseRehearsalControls}
-                      placeholder="Admin password"
-                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                    />
-                    <textarea
-                      name="reason"
-                      required
-                      disabled={!canUseRehearsalControls}
-                      rows={2}
-                      placeholder="Audit reason"
-                      className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                    />
-                    <button
-                      className="mt-3 w-full rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                      disabled={!canUseRehearsalControls}
-                      type="submit"
-                    >
-                      Reset Rehearsal
-                    </button>
-                  </form>
-                </div>
-              </details>
-            ) : (
-              <div className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
-                <p className="text-sm font-bold text-white">Rehearsal reset controls unavailable</p>
-                <p className="mt-1 text-xs text-metal-300">{rehearsalControlsDisabledReason}</p>
-              </div>
-            )}
-          </section>
-          <section className="metal-panel order-12 rounded-lg p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Tournament Config
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">Round Sets</h2>
-              </div>
-              <HostLockBadge status={hostSnapshot.status} />
-            </div>
-            <div className="mt-4 grid gap-2 md:grid-cols-2">
-              {ROUND_SET_DEFINITIONS.map((set) => (
-                <div
-                  key={`${set.roundNumber}-${set.displayLabel}`}
-                  className="rounded border border-metal-700 bg-black/25 p-3"
-                >
-                  <p className="break-words text-sm font-bold text-white">
-                    Round {set.roundNumber} - {set.displayLabel}
-                  </p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-metal-300">
-                    Draw {set.drawCount} / Max bans {set.maxBans}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-          <section className="metal-panel order-last rounded-lg p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Chart Eligibility
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">Required Pools</h2>
-              </div>
-              <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
-                7 eligible required
-              </p>
-            </div>
-            <div className="mt-4 grid gap-2 md:grid-cols-4">
-              {chartPoolRows.map((row) => (
-                <div
-                  key={row.pool}
-                  className={`rounded border bg-black/25 p-3 ${
-                    row.valid ? "border-metal-700" : "border-ember-300/45"
-                  }`}
-                >
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
-                    {row.pool}
-                  </p>
-                  <p className="mt-2 text-2xl font-black text-white">{row.eligibleCount}</p>
-                  <p className="mt-1 text-xs text-metal-300">
-                    {row.excludedCount} excluded / {row.totalCount} total
-                  </p>
-                </div>
-              ))}
-            </div>
-            {!canControl ? (
-              <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
-                Take host control to change chart eligibility.
-              </p>
-            ) : null}
-            <form className="mt-4 flex flex-wrap gap-2" method="get">
-              <select
-                name="chartPool"
-                defaultValue={selectedChartPool}
-                className="min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-              >
-                {chartPoolRows.map((row) => (
-                  <option key={row.pool} value={row.pool}>
-                    {row.pool} - {row.eligibleCount} eligible
-                  </option>
-                ))}
-              </select>
-              <button
-                className="button-metal rounded px-3 py-2 text-xs font-bold uppercase"
-                type="submit"
-              >
-                Review Pool
-              </button>
-            </form>
-            <details className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
-              <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
-                {selectedChartPoolRow?.pool} - {selectedChartPoolRow?.eligibleCount} eligible
-              </summary>
-              <div className="mt-3 grid gap-2">
-                {selectedChartPoolRow?.charts.map((chart) => (
-                  <form
-                    key={chart.chartKey}
-                    action={updateChartExclusionAction}
-                    className="grid gap-2 rounded border border-metal-700 bg-black/25 p-3 text-sm xl:grid-cols-[minmax(0,1fr)_160px_220px_auto]"
-                    data-testid="admin-chart-exclusion-row"
-                  >
-                    <input type="hidden" name="chartKey" value={chart.chartKey} />
-                    <input
-                      type="hidden"
-                      name="excluded"
-                      value={chart.excluded ? "false" : "true"}
-                    />
-                    <div className="min-w-0">
-                      <p className="break-words font-bold text-white">{chart.name}</p>
-                      <p className="break-words text-xs text-metal-300">{chart.artist}</p>
-                      <p className="mt-1 break-words text-xs uppercase tracking-[0.14em] text-metal-400">
-                        {chart.excluded
-                          ? `Excluded: ${chart.exclusionReason ?? "No reason stored"}`
-                          : "Eligible"}
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                        Event-Day Flow
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                        Current Round Readiness
+                      </h2>
+                    </div>
+                    <HostLockBadge status={hostSnapshot.status} />
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    <div className={`rounded border p-3 ${readinessToneClass(canControl)}`}>
+                      <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                        Host lock
+                      </p>
+                      <p
+                        className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(canControl)}`}
+                      >
+                        {canControl ? "Active" : "Standby"}
+                      </p>
+                      <p className="mt-1 text-xs text-metal-300">
+                        {canControl
+                          ? "This browser can run tournament controls."
+                          : "Take host control before changing tournament state."}
                       </p>
                     </div>
-                    <input
-                      name="adminPassword"
-                      type="password"
-                      required
-                      disabled={!canControl}
-                      placeholder="Admin password"
-                      className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                    />
-                    <input
-                      name="reason"
-                      required
-                      disabled={!canControl}
-                      placeholder={chart.excluded ? "Re-include reason" : "Exclusion reason"}
-                      className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
-                    />
-                    <button
-                      className={`rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40 ${
-                        chart.excluded
-                          ? "button-metal"
-                          : "border border-ember-300/40 text-ember-300"
-                      }`}
-                      disabled={!canControl}
-                      type="submit"
+                    <div
+                      className={`rounded border p-3 ${readinessToneClass(currentRoundDrawsReady)}`}
                     >
-                      {chart.excluded ? "Re-include" : "Exclude"}
-                    </button>
-                  </form>
-                ))}
-              </div>
-            </details>
-          </section>
-          <div className="order-11">
-            <AdminLiveCountsDisclosure
-              roundNumber={currentRoundNumber}
-              action={getAdminLiveCountsAction}
-            />
-          </div>
-          <section className="metal-panel order-5 rounded-lg p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Voting Controls
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">
-                  Round {currentRoundNumber}
-                </h2>
-              </div>
-              <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
-                {votingSnapshot.status.replaceAll("_", " ")}
-              </p>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-4">
-              <div className="rounded border border-metal-700 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Timer</p>
-                <p className="mt-2 font-mono text-3xl font-black tabular-nums text-white">
-                  {formatVotingTime(votingSnapshot.remainingMs)}
-                </p>
-              </div>
-              <div className="rounded border border-metal-700 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
-                  Ballots submitted
-                </p>
-                <p
-                  className="mt-2 text-3xl font-black text-white"
-                  data-count={votingSnapshot.eligibleCount}
-                  data-testid="admin-voting-eligible-count"
-                >
-                  {votingSnapshot.submittedCount} / {votingSnapshot.eligibleCount}
-                </p>
-              </div>
-              <div className="rounded border border-metal-700 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
-                  Ban selections cast across both sets
-                </p>
-                <p className="mt-2 text-3xl font-black text-white">
-                  {votingSnapshot.banSelectionsCast}
-                </p>
-              </div>
-              <div className="rounded border border-metal-700 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Extension</p>
-                <p className="mt-2 text-3xl font-black text-white">
-                  {votingSnapshot.extensionUsed ? "Used" : "Ready"}
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <AdminActionButton
-                action={openVotingAction}
-                className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                disabled={!canControl || !votingSnapshot.canOpen}
-                fields={{ roundNumber: currentRoundNumber }}
-              >
-                Open Voting
-              </AdminActionButton>
-              <AdminActionButton
-                action={pauseVotingAction}
-                className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
-                disabled={!canControl || !votingSnapshot.canPause}
-                fields={{ roundNumber: currentRoundNumber }}
-              >
-                Pause
-              </AdminActionButton>
-              <AdminActionButton
-                action={resumeVotingAction}
-                className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
-                disabled={!canControl || !votingSnapshot.canResume}
-                fields={{ roundNumber: currentRoundNumber }}
-              >
-                Resume
-              </AdminActionButton>
-              <AdminActionButton
-                action={closeVotingAction}
-                className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                disabled={!canControl || !votingSnapshot.canClose}
-                fields={{ roundNumber: currentRoundNumber }}
-              >
-                Close Voting
-              </AdminActionButton>
-            </div>
-          </section>
-          <section className="metal-panel order-8 rounded-lg p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Result Reveal Controls
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">
-                  Round {currentRoundNumber}
-                </h2>
-              </div>
-              <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
-                {result?.revealPhase.replaceAll("_", " ") ?? "not computed"}
-              </p>
-            </div>
-            <p className="mt-4 rounded border border-ember-300/25 bg-black/25 p-3 text-sm text-metal-300">
-              Advancing reveal phases changes what public screens may show. Confirm the stage is
-              ready before each click.
-            </p>
-            <div className="mt-3 grid gap-2 rounded border border-metal-700 bg-black/25 p-3 text-sm md:grid-cols-2">
-              <p className="text-metal-300">
-                Current phase:{" "}
-                <span className="font-bold text-white">
-                  {revealPhaseLabel(result?.revealPhase)}
-                </span>
-              </p>
-              <p className="text-metal-300">
-                Next action:{" "}
-                <span className="font-bold text-ember-300">
-                  {nextRevealActionLabel(result?.revealPhase)}
-                </span>
-              </p>
-              {finalStageShown ? (
-                <p className="text-metal-300 md:col-span-2">
-                  Public release:{" "}
-                  <span className="font-bold text-ember-300">
-                    {finalResultsReleased
-                      ? "Phones and results released"
-                      : "Holding phones until stage completion is confirmed"}
-                  </span>
-                </p>
-              ) : null}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <AdminActionButton
-                action={computeResultsAction}
-                className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
-                disabled={
-                  !canControl || votingSnapshot.status !== "voting_closed" || Boolean(result)
-                }
-                fields={{ roundNumber: currentRoundNumber }}
-              >
-                Compute Results
-              </AdminActionButton>
-              <AdminActionButton
-                action={advanceResultRevealAction}
-                className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                disabled={!canControl || !result || result.revealPhase === "final"}
-                fields={{
-                  expectedRevealPhase: result?.revealPhase ?? "",
-                  roundNumber: currentRoundNumber,
-                }}
-              >
-                {nextRevealActionLabel(result?.revealPhase)}
-              </AdminActionButton>
-              <AdminActionButton
-                action={releaseFinalResultsAction}
-                className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
-                disabled={!canControl || !finalStageAwaitingPublicRelease}
-                fields={{ roundNumber: currentRoundNumber }}
-              >
-                Confirm Stage Reveal Complete
-              </AdminActionButton>
-            </div>
-            <div className="mt-4">
-              <PrivateCsvDownload
-                roundNumber={currentRoundNumber}
-                enabled={canControl && finalResultsReleased}
-                disabledReason={
-                  !canControl
-                    ? "Take host control to download the private ballot CSV."
-                    : "Available after the stage final reveal is confirmed and public results are released."
-                }
-                autoDownloadKey={null}
-                action={downloadPrivateCsvAction}
-              />
-            </div>
-          </section>
-          <div className="order-7">
-            <ManualBallotForm
-              action={manualBallotAction}
-              roundNumber={currentRoundNumber}
-              players={votingSnapshot.eligiblePlayers}
-              draws={currentRoundDraws}
-              existingPlayerIds={submittedPlayerIds}
-              canControl={canControl}
-              canSubmitManualBallot={
-                votingSnapshot.canAcceptManualBallot &&
-                (!result || result.revealPhase === "computed")
-              }
-            />
-          </div>
-          <section className="order-9 grid gap-4 xl:grid-cols-4">
-            <form action={reopenVotingAction}>
-              <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-              <DangerousActionDialog
-                action={`reopen Round ${currentRoundNumber} voting`}
-                consequence="invalidate any computed unrevealed result and allow ballot edits for the chosen duration"
-                disabled={!canReopenVoting}
-                passwordId="reopen-voting-password"
-                summaryItems={[
-                  { label: "Round", fieldName: "roundNumber" },
-                  { label: "Duration", fieldName: "durationMinutes" },
-                ]}
-              >
-                <label
-                  className="mt-4 block text-sm font-semibold text-metal-300"
-                  htmlFor="durationMinutes"
-                >
-                  Reopen duration
-                </label>
-                <select
-                  id="durationMinutes"
-                  name="durationMinutes"
-                  disabled={!canReopenVoting}
-                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                >
-                  <option value="1">1 minute</option>
-                  <option value="2">2 minutes</option>
-                  <option value="3">3 minutes</option>
-                  <option value="5">5 minutes</option>
-                  <option value="10">10 minutes</option>
-                </select>
-                <label
-                  className="mt-4 block text-sm font-semibold text-metal-300"
-                  htmlFor="reopen-reason"
-                >
-                  Audit reason
-                </label>
-                <textarea
-                  id="reopen-reason"
-                  name="reason"
-                  required
-                  disabled={!canReopenVoting}
-                  rows={3}
-                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                />
-                {reopenDisabledReason ? (
-                  <p className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
-                    {reopenDisabledReason}
-                  </p>
-                ) : null}
-                <button
-                  className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                  disabled={!canReopenVoting}
-                  type="submit"
-                >
-                  Reopen Voting
-                </button>
-              </DangerousActionDialog>
-            </form>
-            <form action={resetRoundAction}>
-              <DangerousActionDialog
-                action="reset a round"
-                consequence="clear that round's draws, ballots, voting window, result snapshot, and reveal state"
-                disabled={!canControl}
-                passwordId="reset-round-password"
-                summaryItems={[{ label: "Round", fieldName: "roundNumber" }]}
-              >
-                <label
-                  className="mt-4 block text-sm font-semibold text-metal-300"
-                  htmlFor="reset-round"
-                >
-                  Round
-                </label>
-                <select
-                  id="reset-round"
-                  name="roundNumber"
-                  defaultValue={currentRoundNumber}
-                  disabled={!canControl}
-                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                >
-                  <option value="1">Round 1</option>
-                  <option value="2">Round 2</option>
-                  <option value="3">Round 3</option>
-                  <option value="4">Round 4</option>
-                </select>
-                <label
-                  className="mt-4 block text-sm font-semibold text-metal-300"
-                  htmlFor="reset-round-reason"
-                >
-                  Audit reason
-                </label>
-                <textarea
-                  id="reset-round-reason"
-                  name="reason"
-                  required
-                  disabled={!canControl}
-                  rows={3}
-                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                />
-                <button
-                  className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl}
-                  type="submit"
-                >
-                  Reset Round
-                </button>
-              </DangerousActionDialog>
-            </form>
-            <form action={resetTournamentDataAction}>
-              <DangerousActionDialog
-                action="reset all tournament data"
-                consequence="clear the roster, draws, ballots, voting windows, result snapshots, chart exclusions, current round, and rehearsal flag; your admin session and active host control stay in place"
-                disabled={!canControl}
-                passwordId="reset-tournament-data-password"
-              >
-                <p className="text-sm font-bold text-white">Full website reset</p>
-                <p className="mt-1 text-xs text-metal-300">
-                  Clean Round 1 event state without the rehearsal workflow.
-                </p>
-                <label
-                  className="mt-4 block text-sm font-semibold text-metal-300"
-                  htmlFor="reset-tournament-data-reason"
-                >
-                  Audit reason
-                </label>
-                <textarea
-                  id="reset-tournament-data-reason"
-                  name="reason"
-                  required
-                  disabled={!canControl}
-                  rows={3}
-                  className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                />
-                <button
-                  className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl}
-                  type="submit"
-                >
-                  Reset Website
-                </button>
-              </DangerousActionDialog>
-            </form>
-            <form action={overrideResultAction}>
-              <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-              <DangerousActionDialog
-                action={`override a Round ${currentRoundNumber} selected chart`}
-                consequence="change the committed selected chart used by stage, phones, and private export"
-                disabled={!canControl || !result}
-                passwordId="override-result-password"
-                summaryItems={[
-                  { label: "Round", fieldName: "roundNumber" },
-                  { label: "Chart", fieldName: "resultTarget" },
-                ]}
-              >
-                <label
-                  className="mt-4 block text-sm font-semibold text-metal-300"
-                  htmlFor="resultTarget"
-                >
-                  Corrected selected chart
-                </label>
-                <select
-                  id="resultTarget"
-                  name="resultTarget"
-                  required
-                  disabled={!canControl || !result}
-                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                >
-                  {result?.sets.map((set) => (
-                    <optgroup key={set.roundSetId} label={set.displayLabel}>
-                      {set.rows.map((row) => (
-                        <option key={row.chart.id} value={`${set.setOrder}|${row.chart.id}`}>
-                          {set.displayLabel} - {row.chart.name}
+                      <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                        Current round draws
+                      </p>
+                      <p
+                        className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(
+                          currentRoundDrawsReady,
+                        )}`}
+                        data-testid="admin-current-round-draw-readiness"
+                      >
+                        {currentRoundDrawnCount} / 2
+                      </p>
+                      <p className="mt-1 text-xs text-metal-300">
+                        Draw both sets before opening voting.
+                      </p>
+                    </div>
+                    <div className="rounded border border-metal-700 bg-black/25 p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                        Active players
+                      </p>
+                      <p
+                        className="mt-2 text-2xl font-black uppercase text-white"
+                        data-count={activeCount}
+                        data-testid="admin-readiness-active-player-count"
+                      >
+                        {activeCount}
+                      </p>
+                      <p className="mt-1 text-xs text-metal-300">
+                        Active players for the current round.
+                      </p>
+                    </div>
+                    <div className={`rounded border p-3 ${readinessToneClass(requiredPoolsReady)}`}>
+                      <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                        Required pools
+                      </p>
+                      <p
+                        className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(requiredPoolsReady)}`}
+                      >
+                        {requiredPoolsReady ? "Ready" : "Review"}
+                      </p>
+                      <p className="mt-1 text-xs text-metal-300">
+                        {chartPoolRows.filter((row) => row.valid).length} / {chartPoolRows.length}{" "}
+                        pools have at least 7 eligible charts.
+                      </p>
+                    </div>
+                    <div
+                      className={`rounded border p-3 ${readinessToneClass(localImageMetadataReady)}`}
+                    >
+                      <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                        Local image cache
+                      </p>
+                      <p
+                        className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(localImageMetadataReady)}`}
+                      >
+                        {cachedImageCount} / {tournamentCharts.length}
+                      </p>
+                      <p className="mt-1 text-xs text-metal-300">
+                        Local chart images available for display.
+                      </p>
+                    </div>
+                    <div className="rounded border border-metal-700 bg-black/25 p-3 md:col-span-2 xl:col-span-5">
+                      <p className="text-xs uppercase tracking-[0.16em] text-ember-300">
+                        Event order
+                      </p>
+                      <ol className="mt-2 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.12em] text-metal-300">
+                        <li>Host control</li>
+                        <li>Draw current round</li>
+                        <li>Reveal drawn charts</li>
+                        <li>Open voting</li>
+                        <li>Manual corrections</li>
+                        <li>Compute and reveal</li>
+                        <li>Export CSV</li>
+                      </ol>
+                    </div>
+                  </div>
+                </section>
+                <section className="metal-panel order-10 rounded-lg p-4">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                        Event Mode
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                        Current Round {currentRoundNumber}
+                      </h2>
+                    </div>
+                    <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                      {roundSnapshot.rehearsalMode ? "Rehearsal mode" : "Tournament mode"}
+                    </p>
+                  </div>
+                  {roundSnapshot.rehearsalMode ? (
+                    <p className="mt-4 rounded border border-ember-300/25 bg-ember-900/15 p-3 text-sm text-ember-300">
+                      Rehearsal mode is using {deploymentSafety.operationalDataDescription}. Reset
+                      rehearsal data before switching back to tournament operation.
+                    </p>
+                  ) : null}
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <form action={setCurrentRoundAction} className="flex flex-wrap gap-2">
+                      <select
+                        name="roundNumber"
+                        disabled={!canControl}
+                        defaultValue={currentRoundNumber}
+                        className="min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                      >
+                        <option value="1">Round 1</option>
+                        <option value="2">Round 2</option>
+                        <option value="3">Round 3</option>
+                        <option value="4">Round 4</option>
+                      </select>
+                      <button
+                        className="button-metal rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                        disabled={!canControl}
+                        type="submit"
+                      >
+                        Set Current Round
+                      </button>
+                    </form>
+                    <form action={advanceCurrentRoundAction}>
+                      <button
+                        className="rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 disabled:opacity-40"
+                        disabled={!canControl || currentRoundNumber === 4}
+                        type="submit"
+                      >
+                        Advance Round
+                      </button>
+                    </form>
+                  </div>
+                  {deploymentSafety.rehearsalAdminControlsAllowed ? (
+                    <details
+                      className="mt-4 rounded border border-metal-700 bg-black/20 p-3"
+                      data-testid="admin-rehearsal-controls"
+                      open={roundSnapshot.rehearsalMode}
+                    >
+                      <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
+                        Rehearsal controls
+                      </summary>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                        <form
+                          action={startRehearsalModeAction}
+                          className="rounded border border-metal-700 bg-black/20 p-3"
+                        >
+                          <p className="text-sm font-bold text-white">Start rehearsal mode</p>
+                          <p className="mt-1 text-xs text-metal-300">
+                            This resets {deploymentSafety.operationalDataDescription} and loads a
+                            12-player test roster.
+                          </p>
+                          <p className="mt-2 text-xs font-bold text-ember-300">
+                            Dangerous action: this clears current tournament operation data for this
+                            deployment context.
+                          </p>
+                          <input
+                            name="adminPassword"
+                            type="password"
+                            required
+                            disabled={!canUseRehearsalControls}
+                            placeholder="Admin password"
+                            className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <textarea
+                            name="reason"
+                            required
+                            disabled={!canUseRehearsalControls}
+                            rows={2}
+                            placeholder="Audit reason"
+                            className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <button
+                            className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                            disabled={!canUseRehearsalControls}
+                            type="submit"
+                          >
+                            Start Rehearsal
+                          </button>
+                        </form>
+                        <form
+                          action={seedRehearsalTiebreakAction}
+                          className="rounded border border-metal-700 bg-black/20 p-3"
+                        >
+                          <p className="text-sm font-bold text-white">Force rehearsal tiebreak</p>
+                          <p className="mt-1 text-xs text-metal-300">
+                            After both current-round sets are drawn, seed ballots that create a
+                            two-chart least-ban tie.
+                          </p>
+                          <p className="mt-2 text-xs font-bold text-ember-300">
+                            Dangerous action: this can open voting and creates manual-admin
+                            rehearsal ballots.
+                          </p>
+                          <input
+                            name="adminPassword"
+                            type="password"
+                            required
+                            disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                            placeholder="Admin password"
+                            className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <textarea
+                            name="reason"
+                            required
+                            disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                            rows={2}
+                            placeholder="Audit reason"
+                            className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <button
+                            className="button-metal mt-3 w-full rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
+                            disabled={!canUseRehearsalControls || !roundSnapshot.rehearsalMode}
+                            type="submit"
+                          >
+                            Seed Tiebreak
+                          </button>
+                        </form>
+                        <form
+                          action={resetRehearsalModeAction}
+                          className="rounded border border-metal-700 bg-black/20 p-3"
+                        >
+                          <p className="text-sm font-bold text-white">Reset rehearsal data</p>
+                          <p className="mt-1 text-xs text-metal-300">
+                            This clears {deploymentSafety.operationalDataDescription} and returns to
+                            tournament mode.
+                          </p>
+                          <p className="mt-2 text-xs font-bold text-ember-300">
+                            Dangerous action: this clears current rehearsal operation data for this
+                            deployment context.
+                          </p>
+                          <input
+                            name="adminPassword"
+                            type="password"
+                            required
+                            disabled={!canUseRehearsalControls}
+                            placeholder="Admin password"
+                            className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <textarea
+                            name="reason"
+                            required
+                            disabled={!canUseRehearsalControls}
+                            rows={2}
+                            placeholder="Audit reason"
+                            className="mt-3 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <button
+                            className="mt-3 w-full rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 disabled:opacity-40"
+                            disabled={!canUseRehearsalControls}
+                            type="submit"
+                          >
+                            Reset Rehearsal
+                          </button>
+                        </form>
+                      </div>
+                    </details>
+                  ) : (
+                    <div className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
+                      <p className="text-sm font-bold text-white">
+                        Rehearsal reset controls unavailable
+                      </p>
+                      <p className="mt-1 text-xs text-metal-300">
+                        {rehearsalControlsDisabledReason}
+                      </p>
+                    </div>
+                  )}
+                </section>
+                <section className="metal-panel order-12 rounded-lg p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                        Tournament Config
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black uppercase text-white">Round Sets</h2>
+                    </div>
+                    <HostLockBadge status={hostSnapshot.status} />
+                  </div>
+                  <div className="mt-4 grid gap-2 md:grid-cols-2">
+                    {ROUND_SET_DEFINITIONS.map((set) => (
+                      <div
+                        key={`${set.roundNumber}-${set.displayLabel}`}
+                        className="rounded border border-metal-700 bg-black/25 p-3"
+                      >
+                        <p className="break-words text-sm font-bold text-white">
+                          Round {set.roundNumber} - {set.displayLabel}
+                        </p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-metal-300">
+                          Draw {set.drawCount} / Max bans {set.maxBans}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section className="metal-panel order-last rounded-lg p-4">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                        Chart Eligibility
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                        Required Pools
+                      </h2>
+                    </div>
+                    <p className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                      7 eligible required
+                    </p>
+                  </div>
+                  <div className="mt-4 grid gap-2 md:grid-cols-4">
+                    {chartPoolRows.map((row) => (
+                      <div
+                        key={row.pool}
+                        className={`rounded border bg-black/25 p-3 ${
+                          row.valid ? "border-metal-700" : "border-ember-300/45"
+                        }`}
+                      >
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-ember-300">
+                          {row.pool}
+                        </p>
+                        <p className="mt-2 text-2xl font-black text-white">{row.eligibleCount}</p>
+                        <p className="mt-1 text-xs text-metal-300">
+                          {row.excludedCount} excluded / {row.totalCount} total
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  {!canControl ? (
+                    <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
+                      Take host control to change chart eligibility.
+                    </p>
+                  ) : null}
+                  <form className="mt-4 flex flex-wrap gap-2" method="get">
+                    <select
+                      name="chartPool"
+                      defaultValue={selectedChartPool}
+                      className="min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                    >
+                      {chartPoolRows.map((row) => (
+                        <option key={row.pool} value={row.pool}>
+                          {row.pool} - {row.eligibleCount} eligible
                         </option>
                       ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <label
-                  className="mt-4 block text-sm font-semibold text-metal-300"
-                  htmlFor="override-reason"
-                >
-                  Audit reason
-                </label>
-                <textarea
-                  id="override-reason"
-                  name="reason"
-                  required
-                  disabled={!canControl || !result}
-                  rows={3}
-                  className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                />
-                <button
-                  className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                  disabled={!canControl || !result}
-                  type="submit"
-                >
-                  Override Result
-                </button>
-              </DangerousActionDialog>
-            </form>
-          </section>
-          <section className="metal-panel order-3 rounded-lg p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Draw Controls
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">
-                  Draw Current Round
-                </h2>
-              </div>
-              <RerollFullRoundConfirmation
-                canControl={canControl}
-                currentRoundNumber={currentRoundNumber}
-              />
-            </div>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              {currentRoundDrawControls.map((control) => (
-                <DrawControlCard
-                  key={control.set.displayLabel}
-                  canControl={canControl}
-                  control={control}
-                  includeRerollControls
-                />
-              ))}
-            </div>
-            <details className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
-              <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
-                Secondary all-round draw controls
-              </summary>
-              <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                {secondaryDrawControls.map((control) => (
-                  <DrawControlCard
-                    key={control.set.displayLabel}
-                    canControl={canControl}
-                    control={control}
-                    includeRerollControls
+                    </select>
+                    <button
+                      className="button-metal rounded px-3 py-2 text-xs font-bold uppercase"
+                      type="submit"
+                    >
+                      Review Pool
+                    </button>
+                  </form>
+                  <details className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
+                    <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
+                      {selectedChartPoolRow?.pool} - {selectedChartPoolRow?.eligibleCount} eligible
+                    </summary>
+                    <div className="mt-3 grid gap-2">
+                      {selectedChartPoolRow?.charts.map((chart) => (
+                        <form
+                          key={chart.chartKey}
+                          action={updateChartExclusionAction}
+                          className="grid gap-2 rounded border border-metal-700 bg-black/25 p-3 text-sm xl:grid-cols-[minmax(0,1fr)_160px_220px_auto]"
+                          data-testid="admin-chart-exclusion-row"
+                        >
+                          <input type="hidden" name="chartKey" value={chart.chartKey} />
+                          <input
+                            type="hidden"
+                            name="excluded"
+                            value={chart.excluded ? "false" : "true"}
+                          />
+                          <div className="min-w-0">
+                            <p className="break-words font-bold text-white">{chart.name}</p>
+                            <p className="break-words text-xs text-metal-300">{chart.artist}</p>
+                            <p className="mt-1 break-words text-xs uppercase tracking-[0.14em] text-metal-400">
+                              {chart.excluded
+                                ? `Excluded: ${chart.exclusionReason ?? "No reason stored"}`
+                                : "Eligible"}
+                            </p>
+                          </div>
+                          <input
+                            name="adminPassword"
+                            type="password"
+                            required
+                            disabled={!canControl}
+                            placeholder="Admin password"
+                            className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <input
+                            name="reason"
+                            required
+                            disabled={!canControl}
+                            placeholder={chart.excluded ? "Re-include reason" : "Exclusion reason"}
+                            className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-sm text-white"
+                          />
+                          <button
+                            className={`rounded px-3 py-2 text-xs font-bold uppercase disabled:opacity-40 ${
+                              chart.excluded
+                                ? "button-metal"
+                                : "border border-ember-300/40 text-ember-300"
+                            }`}
+                            disabled={!canControl}
+                            type="submit"
+                          >
+                            {chart.excluded ? "Re-include" : "Exclude"}
+                          </button>
+                        </form>
+                      ))}
+                    </div>
+                  </details>
+                </section>
+                <div className="order-11">
+                  <AdminLiveCountsDisclosure
+                    roundNumber={currentRoundNumber}
+                    action={getAdminLiveCountsAction}
                   />
-                ))}
-              </div>
-              <div className="mt-4">
-                <RerollFullRoundConfirmation
-                  canControl={canControl}
-                  currentRoundNumber={currentRoundNumber}
-                  selectRound
-                />
-              </div>
-            </details>
-          </section>
-          <section
-            className="metal-panel order-4 rounded-lg p-4"
-            data-testid="admin-stage-reveal-check"
-          >
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Stage Reveal Check
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">
-                  Reveal Drawn Charts
-                </h2>
-              </div>
-              <a
-                className="rounded border border-ember-300/40 px-3 py-2 text-xs font-bold uppercase text-ember-300 hover:border-ember-300 hover:text-white"
-                href="/stage"
-                target="_blank"
-              >
-                Open Stage
-              </a>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className={`rounded border p-3 ${readinessToneClass(currentRoundDrawsReady)}`}>
-                <p className="text-xs uppercase tracking-[0.16em] text-ember-300">Draw status</p>
-                <p
-                  className={`mt-2 text-2xl font-black uppercase ${readinessTextClass(currentRoundDrawsReady)}`}
-                >
-                  {currentRoundDrawsReady ? "Both drawn" : `${currentRoundDrawnCount} / 2 drawn`}
-                </p>
-              </div>
-              <div className="rounded border border-metal-700 bg-black/25 p-3 md:col-span-2">
-                <p className="text-sm font-bold text-white">
-                  {currentRoundDrawsReady
-                    ? "Verify the projector has shown both seven-chart rows before opening voting."
-                    : "Draw both current-round sets before the projector can reveal the complete voting slate."}
-                </p>
-                <p className="mt-2 text-xs text-metal-300">
-                  The stage reveal uses the existing `/stage` screen and keeps the required two
-                  horizontal rows of seven charts.
-                </p>
-              </div>
-            </div>
-          </section>
-          <section className="metal-panel order-6 rounded-lg p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                  Roster
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">Players</h2>
-              </div>
-              <p
-                className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm text-metal-300"
-                data-count={activeCount}
-                data-testid="admin-active-player-count"
-              >
-                Active {activeCount}
-              </p>
-            </div>
-            {!canControl ? (
-              <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
-                Take host control to edit the roster.
-              </p>
-            ) : null}
-            <form action={addPlayerAction} className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <input
-                name="startggUsername"
-                required
-                disabled={!canControl}
-                placeholder="start.gg username"
-                className="min-w-0 flex-1 rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-              />
-              <button
-                className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                disabled={!canControl}
-                type="submit"
-              >
-                Add Player
-              </button>
-            </form>
-            <form action={bulkImportPlayersAction} className="mt-4 grid gap-2">
-              <textarea
-                name="startggUsernames"
-                rows={4}
-                disabled={!canControl}
-                placeholder="Bulk import start.gg usernames"
-                className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-              />
-              <button
-                className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                disabled={!canControl}
-                type="submit"
-              >
-                Bulk Import
-              </button>
-            </form>
-            <div className="mt-4 overflow-hidden rounded border border-metal-700 text-sm">
-              <div className="hidden grid-cols-[minmax(0,1fr)_140px_minmax(0,1.4fr)] gap-3 bg-black/40 p-3 text-xs uppercase tracking-[0.16em] text-ember-300 md:grid">
-                <p>Username</p>
-                <p>Status</p>
-                <p>Action</p>
-              </div>
-              <div className="grid gap-px bg-metal-700">
-                {players.map((player) => (
-                  <article
-                    key={player.id}
-                    className="grid gap-3 bg-black/20 p-3 md:grid-cols-[minmax(0,1fr)_140px_minmax(0,1.4fr)]"
-                    data-active={player.active ? "true" : "false"}
-                    data-player-username={player.startggUsername}
-                    data-testid="admin-roster-row"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
-                        Username
-                      </p>
-                      <p className="break-words font-semibold text-white">
-                        {player.startggUsername}
-                      </p>
-                    </div>
-                    <div className="min-w-0 text-metal-300">
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
-                        Status
-                      </p>
-                      <p className="break-words">{player.active ? "Active" : "Inactive"}</p>
-                      {player.hasTournamentHistory ? (
-                        <span className="mt-1 block break-words text-xs text-metal-400">
-                          History locked
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="grid min-w-0 gap-2">
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
-                        Action
-                      </p>
-                      <form
-                        action={editPlayerUsernameAction}
-                        className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                </div>
+                <div className="order-7">
+                  <ManualBallotForm
+                    action={manualBallotAction}
+                    roundNumber={currentRoundNumber}
+                    players={votingSnapshot.eligiblePlayers}
+                    draws={currentRoundDraws}
+                    existingPlayerIds={submittedPlayerIds}
+                    canControl={canControl}
+                    canSubmitManualBallot={
+                      votingSnapshot.canAcceptManualBallot &&
+                      (!result || result.revealPhase === "computed")
+                    }
+                  />
+                </div>
+                <section className="order-9 grid gap-4 xl:grid-cols-4">
+                  <form action={reopenVotingAction}>
+                    <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                    <DangerousActionDialog
+                      action={`reopen Round ${currentRoundNumber} voting`}
+                      consequence="invalidate any computed unrevealed result and allow ballot edits for the chosen duration"
+                      disabled={!canReopenVoting}
+                      passwordId="reopen-voting-password"
+                      summaryItems={[
+                        { label: "Round", fieldName: "roundNumber" },
+                        { label: "Duration", fieldName: "durationMinutes" },
+                      ]}
+                    >
+                      <label
+                        className="mt-4 block text-sm font-semibold text-metal-300"
+                        htmlFor="durationMinutes"
                       >
-                        <input type="hidden" name="playerId" value={player.id} />
-                        <input
-                          name="startggUsername"
-                          defaultValue={player.startggUsername}
-                          disabled={!canControl || player.hasTournamentHistory}
-                          className="min-w-0 rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white disabled:opacity-40"
-                        />
-                        <button
-                          className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
-                          disabled={!canControl || player.hasTournamentHistory}
-                          type="submit"
-                        >
-                          Save Name
-                        </button>
-                      </form>
-                      <form action={setPlayerActiveStatusAction}>
-                        <input type="hidden" name="playerId" value={player.id} />
-                        <input
-                          type="hidden"
-                          name="active"
-                          value={player.active ? "false" : "true"}
-                        />
-                        <button
-                          className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
-                          disabled={!canControl}
-                          type="submit"
-                        >
-                          {player.active ? "Mark Inactive" : "Reactivate"}
-                        </button>
-                      </form>
+                        Reopen duration
+                      </label>
+                      <select
+                        id="durationMinutes"
+                        name="durationMinutes"
+                        disabled={!canReopenVoting}
+                        className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                      >
+                        <option value="1">1 minute</option>
+                        <option value="2">2 minutes</option>
+                        <option value="3">3 minutes</option>
+                        <option value="5">5 minutes</option>
+                        <option value="10">10 minutes</option>
+                      </select>
+                      <label
+                        className="mt-4 block text-sm font-semibold text-metal-300"
+                        htmlFor="reopen-reason"
+                      >
+                        Audit reason
+                      </label>
+                      <textarea
+                        id="reopen-reason"
+                        name="reason"
+                        required
+                        disabled={!canReopenVoting}
+                        rows={3}
+                        className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                      />
+                      {reopenDisabledReason ? (
+                        <p className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
+                          {reopenDisabledReason}
+                        </p>
+                      ) : null}
+                      <button
+                        className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                        disabled={!canReopenVoting}
+                        type="submit"
+                      >
+                        Reopen Voting
+                      </button>
+                    </DangerousActionDialog>
+                  </form>
+                  <form action={resetRoundAction}>
+                    <DangerousActionDialog
+                      action="reset a round"
+                      consequence="clear that round's draws, ballots, voting window, result snapshot, and reveal state"
+                      disabled={!canControl}
+                      passwordId="reset-round-password"
+                      summaryItems={[{ label: "Round", fieldName: "roundNumber" }]}
+                    >
+                      <label
+                        className="mt-4 block text-sm font-semibold text-metal-300"
+                        htmlFor="reset-round"
+                      >
+                        Round
+                      </label>
+                      <select
+                        id="reset-round"
+                        name="roundNumber"
+                        defaultValue={currentRoundNumber}
+                        disabled={!canControl}
+                        className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                      >
+                        <option value="1">Round 1</option>
+                        <option value="2">Round 2</option>
+                        <option value="3">Round 3</option>
+                        <option value="4">Round 4</option>
+                      </select>
+                      <label
+                        className="mt-4 block text-sm font-semibold text-metal-300"
+                        htmlFor="reset-round-reason"
+                      >
+                        Audit reason
+                      </label>
+                      <textarea
+                        id="reset-round-reason"
+                        name="reason"
+                        required
+                        disabled={!canControl}
+                        rows={3}
+                        className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                      />
+                      <button
+                        className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                        disabled={!canControl}
+                        type="submit"
+                      >
+                        Reset Round
+                      </button>
+                    </DangerousActionDialog>
+                  </form>
+                  <form action={resetTournamentDataAction}>
+                    <DangerousActionDialog
+                      action="reset all tournament data"
+                      consequence="clear the roster, draws, ballots, voting windows, result snapshots, chart exclusions, current round, and rehearsal flag; your admin session and active host control stay in place"
+                      disabled={!canControl}
+                      passwordId="reset-tournament-data-password"
+                    >
+                      <p className="text-sm font-bold text-white">Full website reset</p>
+                      <p className="mt-1 text-xs text-metal-300">
+                        Clean Round 1 event state without the rehearsal workflow.
+                      </p>
+                      <label
+                        className="mt-4 block text-sm font-semibold text-metal-300"
+                        htmlFor="reset-tournament-data-reason"
+                      >
+                        Audit reason
+                      </label>
+                      <textarea
+                        id="reset-tournament-data-reason"
+                        name="reason"
+                        required
+                        disabled={!canControl}
+                        rows={3}
+                        className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                      />
+                      <button
+                        className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                        disabled={!canControl}
+                        type="submit"
+                      >
+                        Reset Tournament
+                      </button>
+                    </DangerousActionDialog>
+                  </form>
+                  <form action={overrideResultAction}>
+                    <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                    <DangerousActionDialog
+                      action={`override a Round ${currentRoundNumber} selected chart`}
+                      consequence="change the committed selected chart used by stage, phones, and private export"
+                      disabled={!canControl || !result}
+                      passwordId="override-result-password"
+                      summaryItems={[
+                        { label: "Round", fieldName: "roundNumber" },
+                        { label: "Chart", fieldName: "resultTarget" },
+                      ]}
+                    >
+                      <label
+                        className="mt-4 block text-sm font-semibold text-metal-300"
+                        htmlFor="resultTarget"
+                      >
+                        Corrected selected chart
+                      </label>
+                      <select
+                        id="resultTarget"
+                        name="resultTarget"
+                        required
+                        disabled={!canControl || !result}
+                        className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                      >
+                        {result?.sets.map((set) => (
+                          <optgroup key={set.roundSetId} label={set.displayLabel}>
+                            {set.rows.map((row) => (
+                              <option key={row.chart.id} value={`${set.setOrder}|${row.chart.id}`}>
+                                {set.displayLabel} - {row.chart.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <label
+                        className="mt-4 block text-sm font-semibold text-metal-300"
+                        htmlFor="override-reason"
+                      >
+                        Audit reason
+                      </label>
+                      <textarea
+                        id="override-reason"
+                        name="reason"
+                        required
+                        disabled={!canControl || !result}
+                        rows={3}
+                        className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                      />
+                      <button
+                        className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                        disabled={!canControl || !result}
+                        type="submit"
+                      >
+                        Override Result
+                      </button>
+                    </DangerousActionDialog>
+                  </form>
+                </section>
+                <section className="metal-panel order-3 rounded-lg p-4">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                        Recovery Controls
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black uppercase text-white">
+                        Draw Recovery
+                      </h2>
                     </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </section>
+                    <RerollFullRoundConfirmation
+                      canControl={canControl}
+                      currentRoundNumber={currentRoundNumber}
+                    />
+                  </div>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    {currentRoundDrawControls.map((control) => (
+                      <DrawControlCard
+                        key={control.set.displayLabel}
+                        canControl={canControl}
+                        control={control}
+                        includeRerollControls
+                        showDrawAction={false}
+                      />
+                    ))}
+                  </div>
+                  <details className="mt-4 rounded border border-metal-700 bg-black/20 p-3">
+                    <summary className="cursor-pointer text-sm font-black uppercase text-ember-300">
+                      Other round recovery controls
+                    </summary>
+                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                      {secondaryDrawControls.map((control) => (
+                        <DrawControlCard
+                          key={control.set.displayLabel}
+                          canControl={canControl}
+                          control={control}
+                          includeRerollControls
+                          showDrawAction={false}
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-4">
+                      <RerollFullRoundConfirmation
+                        canControl={canControl}
+                        currentRoundNumber={currentRoundNumber}
+                        selectRound
+                      />
+                    </div>
+                  </details>
+                </section>
+                <section className="metal-panel order-6 rounded-lg p-4">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                        Roster
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black uppercase text-white">Players</h2>
+                    </div>
+                    <p
+                      className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm text-metal-300"
+                      data-count={activeCount}
+                      data-testid="admin-active-player-count"
+                    >
+                      Active {activeCount}
+                    </p>
+                  </div>
+                  {!canControl ? (
+                    <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
+                      Take host control to edit the roster.
+                    </p>
+                  ) : null}
+                  <form action={addPlayerAction} className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      name="startggUsername"
+                      required
+                      disabled={!canControl}
+                      placeholder="start.gg username"
+                      className="min-w-0 flex-1 rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                    />
+                    <button
+                      className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                      disabled={!canControl}
+                      type="submit"
+                    >
+                      Add Player
+                    </button>
+                  </form>
+                  <form action={bulkImportPlayersAction} className="mt-4 grid gap-2">
+                    <textarea
+                      name="startggUsernames"
+                      rows={4}
+                      disabled={!canControl}
+                      placeholder="Bulk import start.gg usernames"
+                      className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                    />
+                    <button
+                      className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                      disabled={!canControl}
+                      type="submit"
+                    >
+                      Bulk Import
+                    </button>
+                  </form>
+                  <div className="mt-4 overflow-hidden rounded border border-metal-700 text-sm">
+                    <div className="hidden grid-cols-[minmax(0,1fr)_140px_minmax(0,1.4fr)] gap-3 bg-black/40 p-3 text-xs uppercase tracking-[0.16em] text-ember-300 md:grid">
+                      <p>Username</p>
+                      <p>Status</p>
+                      <p>Action</p>
+                    </div>
+                    <div className="grid gap-px bg-metal-700">
+                      {players.map((player) => (
+                        <article
+                          key={player.id}
+                          className="grid gap-3 bg-black/20 p-3 md:grid-cols-[minmax(0,1fr)_140px_minmax(0,1.4fr)]"
+                          data-active={player.active ? "true" : "false"}
+                          data-player-username={player.startggUsername}
+                          data-testid="admin-roster-row"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
+                              Username
+                            </p>
+                            <p className="break-words font-semibold text-white">
+                              {player.startggUsername}
+                            </p>
+                          </div>
+                          <div className="min-w-0 text-metal-300">
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
+                              Status
+                            </p>
+                            <p className="break-words">{player.active ? "Active" : "Inactive"}</p>
+                            {player.hasTournamentHistory ? (
+                              <span className="mt-1 block break-words text-xs text-metal-400">
+                                History locked
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="grid min-w-0 gap-2">
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
+                              Action
+                            </p>
+                            <form
+                              action={editPlayerUsernameAction}
+                              className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                            >
+                              <input type="hidden" name="playerId" value={player.id} />
+                              <input
+                                name="startggUsername"
+                                defaultValue={player.startggUsername}
+                                disabled={!canControl || player.hasTournamentHistory}
+                                className="min-w-0 rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white disabled:opacity-40"
+                              />
+                              <button
+                                className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
+                                disabled={!canControl || player.hasTournamentHistory}
+                                type="submit"
+                              >
+                                Save Name
+                              </button>
+                            </form>
+                            <form action={setPlayerActiveStatusAction}>
+                              <input type="hidden" name="playerId" value={player.id} />
+                              <input
+                                type="hidden"
+                                name="active"
+                                value={player.active ? "false" : "true"}
+                              />
+                              <button
+                                className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
+                                disabled={!canControl}
+                                type="submit"
+                              >
+                                {player.active ? "Mark Inactive" : "Reactivate"}
+                              </button>
+                            </form>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                </section>
               </div>
             </AdminCollapsiblePanel>
           </div>
@@ -1970,107 +1830,114 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             title="Support Panels"
           >
             <div className="grid gap-5">
-          <section className="metal-panel rounded-lg p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              Session
-            </p>
-            <h2 className="mt-1 text-2xl font-black uppercase text-white">Admin Access</h2>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <AdminInactivityTimer expiresAt={session.expiresAt} />
-              <form action={adminLogoutAction}>
-                <button className="rounded border border-metal-700 px-3 py-2 text-sm font-bold uppercase text-metal-300">
-                  Log Out
-                </button>
-              </form>
-            </div>
-            <DebugSnapshotDownload action={downloadDebugSnapshotAction} disabled={!canControl} />
-          </section>
-          <section className="metal-panel rounded-lg p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              Audit
-            </p>
-            <h2 className="mt-1 text-2xl font-black uppercase text-white">Recent Actions</h2>
-            <div className="mt-4 grid gap-2">
-              {auditRecords.length === 0 ? (
-                <p className="text-sm text-metal-300">
-                  No admin actions recorded in this server process yet.
+              <section className="metal-panel rounded-lg p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Session
                 </p>
-              ) : (
-                auditRecords.map((record) => (
-                  <article
-                    key={record.id}
-                    className="rounded border border-metal-700 bg-black/25 p-3 text-sm"
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">Admin Access</h2>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <AdminInactivityTimer expiresAt={session.expiresAt} />
+                  <form action={adminLogoutAction}>
+                    <button className="rounded border border-metal-700 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                      Log Out
+                    </button>
+                  </form>
+                </div>
+                <DebugSnapshotDownload
+                  action={downloadDebugSnapshotAction}
+                  disabled={!canControl}
+                />
+              </section>
+              <section className="metal-panel rounded-lg p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+                  Audit
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">Recent Actions</h2>
+                <div className="mt-4 grid gap-2">
+                  {auditRecords.length === 0 ? (
+                    <p className="text-sm text-metal-300">No admin actions recorded yet.</p>
+                  ) : (
+                    auditRecords.map((record) => (
+                      <article
+                        key={record.id}
+                        className="rounded border border-metal-700 bg-black/25 p-3 text-sm"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="break-words font-bold text-white">
+                            {record.action.replaceAll("_", " ")}
+                          </p>
+                          <p className="font-mono text-xs text-metal-300">{record.createdAt}</p>
+                        </div>
+                        <p className="mt-1 break-words text-metal-300">{record.summary}</p>
+                        {record.reason ? (
+                          <p className="mt-1 break-words text-xs text-ember-300">
+                            Reason: {record.reason}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-metal-400">
+                          Session {record.sessionId.slice(0, 8)}
+                        </p>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+              <form action={addInactivePlayerToCurrentRoundAction} className="min-w-0">
+                <input type="hidden" name="roundNumber" value={currentRoundNumber} />
+                <DangerousActionDialog
+                  action="add an inactive player to current round eligibility"
+                  consequence="make that player eligible for the selected current round"
+                  disabled={!canControl}
+                  summaryItems={[
+                    { label: "Player", fieldName: "playerId" },
+                    { label: "Round", fieldName: "roundNumber" },
+                  ]}
+                >
+                  <label
+                    className="mt-4 block text-sm font-semibold text-metal-300"
+                    htmlFor="playerId"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="break-words font-bold text-white">
-                        {record.action.replaceAll("_", " ")}
-                      </p>
-                      <p className="font-mono text-xs text-metal-300">{record.createdAt}</p>
-                    </div>
-                    <p className="mt-1 break-words text-metal-300">{record.summary}</p>
-                    {record.reason ? (
-                      <p className="mt-1 break-words text-xs text-ember-300">
-                        Reason: {record.reason}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-metal-400">
-                      Session {record.sessionId.slice(0, 8)}
-                    </p>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-          <form action={addInactivePlayerToCurrentRoundAction} className="min-w-0">
-            <input type="hidden" name="roundNumber" value={currentRoundNumber} />
-            <DangerousActionDialog
-              action="add an inactive player to current round eligibility"
-              consequence="make that player eligible for the selected current round"
-              disabled={!canControl}
-              summaryItems={[
-                { label: "Player", fieldName: "playerId" },
-                { label: "Round", fieldName: "roundNumber" },
-              ]}
-            >
-              <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="playerId">
-                Inactive player
-              </label>
-              <select
-                id="playerId"
-                name="playerId"
-                required
-                disabled={!canControl}
-                className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-              >
-                {inactivePlayers.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.startggUsername}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-4 rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
-                Round {currentRoundNumber}
-              </p>
-              <label className="mt-4 block text-sm font-semibold text-metal-300" htmlFor="reason">
-                Audit reason
-              </label>
-              <textarea
-                id="reason"
-                name="reason"
-                required
-                disabled={!canControl}
-                rows={3}
-                className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-              />
-              <button
-                className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                disabled={!canControl}
-                type="submit"
-              >
-                Confirm Eligibility Change
-              </button>
-            </DangerousActionDialog>
-          </form>
+                    Inactive player
+                  </label>
+                  <select
+                    id="playerId"
+                    name="playerId"
+                    required
+                    disabled={!canControl}
+                    className="mt-2 w-full min-w-0 max-w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                  >
+                    {inactivePlayers.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.startggUsername}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-4 rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm font-bold uppercase text-metal-300">
+                    Round {currentRoundNumber}
+                  </p>
+                  <label
+                    className="mt-4 block text-sm font-semibold text-metal-300"
+                    htmlFor="reason"
+                  >
+                    Audit reason
+                  </label>
+                  <textarea
+                    id="reason"
+                    name="reason"
+                    required
+                    disabled={!canControl}
+                    rows={3}
+                    className="mt-2 w-full rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
+                  />
+                  <button
+                    className="button-metal mt-4 w-full rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
+                    disabled={!canControl}
+                    type="submit"
+                  >
+                    Confirm Eligibility Change
+                  </button>
+                </DangerousActionDialog>
+              </form>
             </div>
           </AdminCollapsiblePanel>
         </aside>

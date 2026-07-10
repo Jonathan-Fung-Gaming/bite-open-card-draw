@@ -85,7 +85,7 @@ export default async function VotePage() {
           <VoteDenseHeader title="Voting Paused" status={`Round ${roundNumber}`} />
           <section className="mx-auto max-w-2xl px-5 py-5">
             <div className="metal-panel rounded-lg p-5 text-center text-lg font-bold text-metal-300">
-              Voting is paused. The timer and ballot changes are frozen until the host resumes.
+              Voting is paused. Ballot changes resume when voting resumes.
             </div>
           </section>
         </main>
@@ -131,7 +131,7 @@ export default async function VotePage() {
                   <p>Final charts will appear here once the host releases them.</p>
                   {phoneStatus.phase === "revealed" ? (
                     <p className="mt-3 text-sm text-metal-300">
-                      Keep this page open; it will update after the host finishes the stage check.
+                      Keep this page open; it will update after the stage reveal.
                     </p>
                   ) : null}
                 </>
@@ -151,8 +151,8 @@ export default async function VotePage() {
   if (!snapshot.canSubmit && snapshot.status !== "voting_paused") {
     const message =
       snapshot.status === "ready_to_vote"
-        ? "Both chart sets are drawn. The host has not opened the 10-minute voting window yet. Keep this page open; the ballot will appear when voting starts."
-        : "The host is drawing the two chart sets. Voting opens only after both sets are ready.";
+        ? "Both chart sets are drawn. Keep this page open; the ballot appears when voting starts."
+        : "Chart sets are being drawn. Voting opens after both sets are ready.";
 
     return (
       <PublicRouteFreshnessGuard freshness={freshness} testId="vote-route-freshness-guard">

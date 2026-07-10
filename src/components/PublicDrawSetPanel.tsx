@@ -22,7 +22,7 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
             Round {set.roundNumber} - {set.displayLabel}
           </h2>
         </div>
-        <p className="text-sm text-metal-300">{draw ? "Draw complete" : "Awaiting host draw"}</p>
+        <p className="text-sm text-metal-300">{draw ? "Charts ready" : "Awaiting host draw"}</p>
       </div>
       {draw ? (
         <div className="public-chart-grid" data-testid="public-chart-card-row">
