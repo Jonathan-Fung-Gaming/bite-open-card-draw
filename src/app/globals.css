@@ -88,10 +88,10 @@ select {
 }
 
 .rune-wheel-shell-stage {
-  --rune-slot-height: 5.55rem;
-  --rune-slot-radius: -13.85rem;
-  --rune-slot-width: 9rem;
-  width: min(100%, 39rem, 73vh);
+  --rune-slot-height: 5.4rem;
+  --rune-slot-radius: -13.35rem;
+  --rune-slot-width: 8.85rem;
+  width: min(100%, 38rem, 70vh);
 }
 
 .rune-wheel-circle {

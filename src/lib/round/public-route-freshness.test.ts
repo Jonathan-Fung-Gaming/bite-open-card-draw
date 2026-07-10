@@ -433,6 +433,34 @@ describe("public route freshness", () => {
     expect(shouldAcceptPublicRoutePayload(staleInvalidationShape, computed)).toBe(false);
   });
 
+  it("rejects newer non-result payloads once an active stage reveal has started", () => {
+    const activeReveal = freshness({
+      latestTournamentActionAt: "2026-07-08T00:00:40.000Z",
+      resultComputedAt: "2026-07-08T00:00:20.000Z",
+      resultRevealPhase: "set_1_resolved",
+      resultRevealPhaseStartedAt: "2026-07-08T00:00:40.000Z",
+      resultSnapshotId: "active-reveal",
+      votingStatus: "results_revealing",
+      votingWindowClosedAt: "2026-07-08T00:00:10.000Z",
+      votingWindowOpenedAt: "2026-07-08T00:00:03.000Z",
+      votingWindowUpdatedAt: "2026-07-08T00:00:20.000Z",
+    });
+
+    const drawFallbackPayload = freshness({
+      latestTournamentActionAt: "2026-07-08T00:00:50.000Z",
+      resultComputedAt: null,
+      resultRevealPhase: null,
+      resultRevealPhaseStartedAt: null,
+      resultSnapshotId: null,
+      votingStatus: "voting_closed",
+      votingWindowClosedAt: "2026-07-08T00:00:10.000Z",
+      votingWindowOpenedAt: "2026-07-08T00:00:03.000Z",
+      votingWindowUpdatedAt: "2026-07-08T00:00:20.000Z",
+    });
+
+    expect(shouldAcceptPublicRoutePayload(drawFallbackPayload, activeReveal)).toBe(false);
+  });
+
   it("accepts round advance and rejects a later-arriving older-round payload", () => {
     const accepted = freshness({
       latestTournamentActionAt: "2026-07-08T00:00:30.000Z",

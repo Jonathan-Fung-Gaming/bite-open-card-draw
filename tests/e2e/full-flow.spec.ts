@@ -183,6 +183,65 @@ async function expectStageResultRowsSortedLeastToMostBanned(page: Page) {
   expect(leastBanRows.every((row) => row.banCount === leastBanCount)).toBe(true);
 }
 
+async function expectStageResultRowsFillColumnsFirst(page: Page) {
+  const rows = page.getByTestId("result-row");
+
+  await expect(rows).toHaveCount(7, {
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expect
+    .poll(
+      () =>
+        rows.evaluateAll(
+          (elements) =>
+            elements.filter((element) => element.getAttribute("data-result-row-visible") === "true")
+              .length,
+        ),
+      { timeout: 9_000 },
+    )
+    .toBe(7);
+
+  const boxes = await rows.evaluateAll((elements) =>
+    elements.map((element, index) => {
+      const rect = element.getBoundingClientRect();
+
+      return {
+        height: rect.height,
+        index,
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        width: rect.width,
+      };
+    }),
+  );
+  const leftColumn = boxes.slice(0, 4);
+  const rightColumn = boxes.slice(4);
+  const leftX = leftColumn[0]?.left ?? 0;
+  const rightX = rightColumn[0]?.left ?? 0;
+
+  expect(leftColumn).toHaveLength(4);
+  expect(rightColumn).toHaveLength(3);
+  expect(rightX).toBeGreaterThan(leftX + (leftColumn[0]?.width ?? 0) / 2);
+
+  for (const box of leftColumn) {
+    expect(Math.abs(box.left - leftX)).toBeLessThanOrEqual(4);
+  }
+
+  for (const box of rightColumn) {
+    expect(Math.abs(box.left - rightX)).toBeLessThanOrEqual(4);
+  }
+
+  for (let index = 1; index < leftColumn.length; index += 1) {
+    expect(leftColumn[index]!.top).toBeGreaterThan(leftColumn[index - 1]!.top);
+  }
+
+  for (let index = 1; index < rightColumn.length; index += 1) {
+    expect(rightColumn[index]!.top).toBeGreaterThan(rightColumn[index - 1]!.top);
+  }
+
+  expect(Math.abs((rightColumn[0]?.top ?? 0) - (leftColumn[0]?.top ?? 0))).toBeLessThanOrEqual(4);
+}
+
 async function expectStageAcceptedResultPhase(page: Page, phase: string) {
   await expect(page.getByTestId("stage-route-freshness-guard")).toHaveAttribute(
     "data-accepted-result-phase",
@@ -1861,6 +1920,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expectStageAcceptedResultPhase(stagePage, "set_1_counts");
   await expectStageResultRowsRevealProgressively(stagePage);
   await expectStageResultRowsSortedLeastToMostBanned(stagePage);
+  await expectStageResultRowsFillColumnsFirst(stagePage);
   await expectStageFitsProjectorViewport(stagePage, "set 1 counts");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
@@ -1870,6 +1930,10 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     "data-defer-during-tiebreak",
     "true",
     { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+  );
+  await expect(stagePage.getByTestId("stage-auto-refresh")).toHaveAttribute(
+    "data-refresh-on-stage-tiebreak-reveal-complete",
+    "true",
   );
   expect(
     Number(
@@ -1885,6 +1949,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   });
   await expectStageResultRowsRevealProgressively(stagePage);
   await expectStageResultRowsSortedLeastToMostBanned(stagePage);
+  await expectStageResultRowsFillColumnsFirst(stagePage);
   await expectStageFitsProjectorViewport(stagePage, "set 2 counts");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
   await expectNoStageVerticalScroll(stagePage);
@@ -2279,8 +2344,13 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await expectAdminRevealPhase(page, "computed");
   await advanceRevealAndWaitForAdminPhase(page, "set 1 counts");
+  await expectStageDoesNotReturnToDrawMode(stagePage, 1);
+  await expectStageAcceptedResultPhase(stagePage, "set_1_counts");
+  await expectStageResultRowsFillColumnsFirst(stagePage);
+  await expectStageFitsProjectorViewport(stagePage, "focused set 1 counts");
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0, { timeout: 500 });
   await advanceRevealAndWaitForAdminPhase(page, "set 1 resolved");
+  await expectStageDoesNotReturnToDrawMode(stagePage, 1);
   await expectStageAcceptedResultPhase(stagePage, "set_1_resolved");
 
   await expect(stagePage.getByTestId("rune-wheel-slot")).toHaveCount(12);
@@ -2315,6 +2385,28 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
   expect(revealedWheelStatus).not.toBe("Selector locking onto the sealed chart.");
   expect(revealedWheelStatus.length).toBeGreaterThan(0);
   await expect(stagePage.getByTestId("result-selected-label")).toHaveCount(0);
+
+  await advanceRevealAndWaitForAdminPhase(page, "set 2 counts");
+  await expectStageDoesNotReturnToDrawMode(stagePage, 1);
+  await expectStageAcceptedResultPhase(stagePage, "set_2_counts");
+  await expect(stagePage.locator("header").getByText("Set 2 counts")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+  await expectStageResultRowsFillColumnsFirst(stagePage);
+  await expectStageFitsProjectorViewport(stagePage, "focused set 2 counts");
+
+  await advanceRevealAndWaitForAdminPhase(page, "set 2 resolved");
+  await expectStageDoesNotReturnToDrawMode(stagePage, 1);
+  await expectStageAcceptedResultPhase(stagePage, "set_2_resolved");
+  await waitForVisibleTiebreakReveal(stagePage, 1);
+  await expectStageFitsProjectorViewport(stagePage, "focused set 2 resolved");
+
+  await advanceRevealAndWaitForAdminPhase(page, "final");
+  await expectStageDoesNotReturnToDrawMode(stagePage, 1);
+  await expectStageAcceptedResultPhase(stagePage, "final");
+  await expect(stagePage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Release"));
   await expect(hostRunButton(page, "Release")).toBeDisabled();

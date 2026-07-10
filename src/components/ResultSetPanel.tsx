@@ -304,6 +304,28 @@ export function ResultSetPanel({
     stageMode,
   ]);
 
+  useEffect(() => {
+    if (!stageMode || !showWinner || !set.tiebreakUsed || !stageTiebreakWinnerRevealed) {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("stage-tiebreak-reveal-complete", {
+        detail: {
+          drawId: set.drawId,
+          selectedChartId: set.selectedChart.id,
+        },
+      }),
+    );
+  }, [
+    set.drawId,
+    set.selectedChart.id,
+    set.tiebreakUsed,
+    showWinner,
+    stageMode,
+    stageTiebreakWinnerRevealed,
+  ]);
+
   if (stageMode && showWinner) {
     return (
       <section className={clsx("metal-panel rounded-lg", set.tiebreakUsed ? "p-4 lg:px-6" : "p-4")}>
@@ -322,7 +344,12 @@ export function ResultSetPanel({
             </p>
           ) : null}
         </div>
-        <div className={clsx("mt-3 grid place-items-center", set.tiebreakUsed && "overflow-visible")}>
+        <div
+          className={clsx(
+            "grid place-items-center",
+            set.tiebreakUsed ? "mt-1 overflow-visible" : "mt-3",
+          )}
+        >
           {revealPanel}
         </div>
       </section>
@@ -369,7 +396,12 @@ export function ResultSetPanel({
             : "mt-4",
         )}
       >
-        <div className={clsx("grid", stageMode ? "gap-3 md:grid-cols-2" : "gap-3")}>
+        <div
+          className={clsx(
+            "grid",
+            stageMode ? "gap-3 md:grid-flow-col md:grid-cols-2 md:grid-rows-4" : "gap-3",
+          )}
+        >
           {displayRows.map((row, index) => {
             const barWidth =
               set.maxBanCount > 0 ? `${(row.banCount / set.maxBanCount) * 100}%` : "0%";
