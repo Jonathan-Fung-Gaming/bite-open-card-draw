@@ -219,8 +219,9 @@ export default async function StagePage() {
           deferDuringTiebreak
           intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
           jitterMs={STAGE_LIVE_REFRESH_JITTER_MS}
+          refreshOnStageTiebreakRevealComplete
         />
-        <main className="min-h-screen">
+        <main className="h-screen overflow-hidden">
           <RoundHeader
             title={`Round ${roundNumber} Results Reveal`}
             status={revealLabel(result.revealPhase)}

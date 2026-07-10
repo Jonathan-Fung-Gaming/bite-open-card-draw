@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useJitteredRouterRefresh } from "@/lib/client/use-jittered-router-refresh";
 import { STAGE_LIVE_REFRESH_INTERVAL_MS } from "@/lib/vote/phone-view";
@@ -11,6 +12,7 @@ type StageAutoRefreshProps = {
   intervalMs?: number;
   jitterMs?: number;
   leading?: boolean;
+  refreshOnStageTiebreakRevealComplete?: boolean;
 };
 
 function activeTiebreakRevealIsRunning() {
@@ -37,6 +39,7 @@ export function StageAutoRefresh({
   intervalMs = STAGE_LIVE_REFRESH_INTERVAL_MS,
   jitterMs = 0,
   leading = false,
+  refreshOnStageTiebreakRevealComplete = false,
 }: StageAutoRefreshProps) {
   const router = useRouter();
 
@@ -53,6 +56,19 @@ export function StageAutoRefresh({
         : undefined,
   });
 
+  useEffect(() => {
+    if (!enabled || !refreshOnStageTiebreakRevealComplete) {
+      return undefined;
+    }
+
+    const refreshAfterStageTiebreak = () => router.refresh();
+
+    window.addEventListener("stage-tiebreak-reveal-complete", refreshAfterStageTiebreak);
+
+    return () =>
+      window.removeEventListener("stage-tiebreak-reveal-complete", refreshAfterStageTiebreak);
+  }, [enabled, refreshOnStageTiebreakRevealComplete, router]);
+
   return (
     <span
       aria-hidden="true"
@@ -61,6 +77,9 @@ export function StageAutoRefresh({
       data-refresh-enabled={enabled ? "true" : "false"}
       data-refresh-interval-ms={String(intervalMs)}
       data-refresh-jitter-ms={String(jitterMs)}
+      data-refresh-on-stage-tiebreak-reveal-complete={
+        refreshOnStageTiebreakRevealComplete ? "true" : "false"
+      }
       data-testid="stage-auto-refresh"
       hidden
     />
