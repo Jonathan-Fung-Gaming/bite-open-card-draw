@@ -95,12 +95,14 @@ function readRememberedIdentity() {
     const parsed = JSON.parse(raw) as {
       playerId?: unknown;
       startggUsername?: unknown;
+      locked?: unknown;
     };
 
     return typeof parsed.playerId === "string" && typeof parsed.startggUsername === "string"
       ? {
           playerId: parsed.playerId,
           startggUsername: parsed.startggUsername,
+          locked: parsed.locked === true,
         }
       : null;
   } catch {
@@ -108,12 +110,21 @@ function readRememberedIdentity() {
   }
 }
 
-function rememberIdentity(player: EligiblePlayerSnapshot) {
+function rememberIdentity(player: EligiblePlayerSnapshot, locked = false) {
+  const existing = readRememberedIdentity();
+
   window.localStorage.setItem(
     IDENTITY_STORAGE_KEY,
     JSON.stringify({
       playerId: player.id,
       startggUsername: player.startggUsername,
+      locked:
+        locked ||
+        Boolean(
+          existing?.locked &&
+            (existing.playerId === player.id ||
+              existing.startggUsername === player.startggUsername),
+        ),
     }),
   );
 }
@@ -434,6 +445,11 @@ export function BallotFlow({
   const [existingBallotLookup, setExistingBallotLookup] = useState<PublicBallotLookup | null>(null);
   const [lookupPending, setLookupPending] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [deviceIdentityLocked, setDeviceIdentityLocked] = useState(false);
+  const [unavailableLockedIdentity, setUnavailableLockedIdentity] = useState<{
+    playerId: string;
+    startggUsername: string;
+  } | null>(null);
   const [liveCanSubmit, setLiveCanSubmit] = useState(initialCanSubmit);
   const [liveStatusLabel, setLiveStatusLabel] = useState(statusLabel);
   const [liveStatus, setLiveStatus] = useState<VotingRoundStatus>(status);
@@ -542,6 +558,12 @@ export function BallotFlow({
         setExistingBallot(ballot);
 
         if (ballot) {
+          const ballotPlayer = players.find((player) => player.id === playerId);
+
+          if (ballotPlayer) {
+            rememberIdentity(ballotPlayer, true);
+            setDeviceIdentityLocked(true);
+          }
           setChoices(choicesFromBallot(draws, ballot));
           setSavedAt(ballot.submittedAt);
           setStep(0);
@@ -574,7 +596,7 @@ export function BallotFlow({
         }
       }
     },
-    [draws, roundNumber],
+    [draws, players, roundNumber],
   );
 
   const claimPresence = useCallback(
@@ -693,15 +715,25 @@ export function BallotFlow({
       return;
     }
 
+    setDeviceIdentityLocked(remembered.locked);
+
     const rememberedPlayer =
       players.find((player) => player.id === remembered.playerId) ??
       players.find((player) => player.startggUsername === remembered.startggUsername);
 
     if (!rememberedPlayer) {
+      initializedIdentityRef.current = true;
+      if (remembered.locked) {
+        setUnavailableLockedIdentity({
+          playerId: remembered.playerId,
+          startggUsername: remembered.startggUsername,
+        });
+      }
       return;
     }
 
     initializedIdentityRef.current = true;
+    setUnavailableLockedIdentity(null);
     setSelectedPlayerId(rememberedPlayer.id);
     if (hasSeenIdentityConfirmation(roundNumber, rememberedPlayer.id, draws)) {
       setIdentityConfirmed(true);
@@ -927,7 +959,8 @@ export function BallotFlow({
           choices,
         });
 
-        rememberIdentity(selectedPlayer);
+        rememberIdentity(selectedPlayer, true);
+        setDeviceIdentityLocked(true);
         clearBallotDraft(roundNumber, selectedPlayer.id);
         setExistingBallot(ballot);
         setExistingBallotLookup({
@@ -958,6 +991,10 @@ export function BallotFlow({
   }
 
   function changeUsernameBeforeSubmit() {
+    if (deviceIdentityLocked) {
+      return;
+    }
+
     if (selectedPlayerId) {
       clearBallotDraft(roundNumber, selectedPlayerId);
     }
@@ -973,12 +1010,17 @@ export function BallotFlow({
     setExistingBallotLookup(null);
     setPresenceWarning(null);
     setPresenceWarningReadyToContinueKey(null);
+    setUnavailableLockedIdentity(null);
     setMessage("Choose the correct start.gg username before submitting.");
     setSelectionMessage(null);
   }
 
   const identityCorrection =
-    selectedPlayer && !savedAt && !alreadySubmitted && !existingBallot ? (
+    selectedPlayer &&
+    !deviceIdentityLocked &&
+    !savedAt &&
+    !alreadySubmitted &&
+    !existingBallot ? (
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded border border-metal-700 bg-black/25 p-2">
         <p className="text-xs font-bold text-metal-300 sm:text-sm">
           Voting as <span className="text-white">{selectedPlayer.startggUsername}</span>
@@ -1013,6 +1055,24 @@ export function BallotFlow({
     );
   }
 
+  if (hydrated && unavailableLockedIdentity) {
+    return (
+      <section className="metal-panel rounded-lg p-5" data-testid="device-identity-locked">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
+          Device identity locked
+        </p>
+        <h1 className="mt-2 text-3xl font-black uppercase text-white">
+          Voting as {unavailableLockedIdentity.startggUsername}
+        </h1>
+        <p className="mt-3 rounded border border-red-500/35 bg-red-950/25 p-3 text-sm font-bold text-red-300">
+          This device has already submitted a ballot as this start.gg username. That player is not
+          eligible for the current round, so this device cannot vote as someone else. Ask an admin
+          for help if this is unexpected.
+        </p>
+      </section>
+    );
+  }
+
   if (!confirmed) {
     return (
       <section className="metal-panel rounded-lg p-5">
@@ -1039,7 +1099,7 @@ export function BallotFlow({
         <select
           id="startgg-username"
           className="mt-3 w-full rounded border border-metal-700 bg-black/35 px-3 py-3 text-white"
-          disabled={!hydrated}
+          disabled={!hydrated || deviceIdentityLocked}
           value={selectedPlayerId}
           onChange={(event) => {
             const playerId = event.target.value;
@@ -1071,6 +1131,15 @@ export function BallotFlow({
             </option>
           ))}
         </select>
+        {deviceIdentityLocked && selectedPlayer ? (
+          <p
+            className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm font-bold text-metal-300"
+            data-testid="device-identity-locked"
+          >
+            This device is locked to {selectedPlayer.startggUsername} after its first submitted
+            ballot.
+          </p>
+        ) : null}
         {selectedPlayer ? (
           <p className="mt-4 rounded border border-ember-300/20 bg-black/25 p-3 text-sm font-semibold text-ember-300">
             Are you sure you are voting as {selectedPlayer.startggUsername}?
@@ -1298,7 +1367,7 @@ export function BallotFlow({
             data-testid="saved-edit-draft-warning"
             role="status"
           >
-            Editing your saved ballot. The previous submission stays active until you submit again.
+            Editing your saved ballot. Your saved ballot stays active until you submit again.
           </p>
         ) : null}
         <div className="mt-5 grid gap-3">
@@ -1411,7 +1480,7 @@ export function BallotFlow({
           data-testid="saved-edit-draft-warning"
           role="status"
         >
-          Editing your saved ballot. The previous submission stays active until you submit again.
+          Editing your saved ballot. Your saved ballot stays active until you submit again.
         </p>
       ) : null}
       {selectionMessage ? (

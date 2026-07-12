@@ -201,6 +201,9 @@ async function expectStageResultRowsFillColumnsFirst(page: Page) {
     )
     .toBe(7);
 
+  // Visibility changes before the 500ms row translation finishes; measure only settled geometry.
+  await page.waitForTimeout(600);
+
   const boxes = await rows.evaluateAll((elements) =>
     elements.map((element, index) => {
       const rect = element.getBoundingClientRect();
@@ -766,13 +769,11 @@ async function expectAdminEventDayFlow(page: Page) {
   const stageCheckTop = await visualTop(stageCheckHeading);
   const votingTop = await visualTop(voting);
   const resultsTop = await visualTop(results);
-  const secondaryTop = await visualTop(secondaryPanels);
 
   expect(hostControlTop).toBeLessThan(drawTop);
   expect(drawTop).toBeLessThan(stageCheckTop);
   expect(stageCheckTop).toBeLessThan(votingTop);
   expect(votingTop).toBeLessThan(resultsTop);
-  expect(resultsTop).toBeLessThan(secondaryTop);
 
   await openAdminPanel(page, "admin-secondary-panels");
   await expect(secondaryPanels).toContainText("Setup & Recovery");
@@ -1613,6 +1614,16 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(hostRunButton(page, "Release")).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await expect(page).toHaveTitle("Host Console | Pump It Up Open Stage");
   await expectAdminEventDayFlow(page);
+  const rosterPanel = page.getByTestId("admin-roster-panel");
+  const supportPanels = page.getByTestId("admin-support-panels");
+
+  await expect(rosterPanel).toBeVisible();
+  await expect(rosterPanel.getByText("Status", { exact: true })).toHaveCount(0);
+  await expect(rosterPanel.getByText("Active", { exact: true })).toBeVisible();
+  expect(await visualTop(rosterPanel)).toBeLessThan(await visualTop(supportPanels));
+  await expect(page.getByTestId("admin-secondary-panels").getByTestId("admin-roster-panel")).toHaveCount(
+    0,
+  );
   await expectAdminPanelOpenStatePersists(page, "admin-secondary-panels");
   const readonlyContext = await browser.newContext({
     acceptDownloads: true,
@@ -1648,6 +1659,12 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Bulk Import" }));
   await expect(page.getByTestId("admin-roster-row").filter({ hasText: "Alpha" })).toBeVisible();
   await expect(
+    page
+      .getByTestId("admin-roster-row")
+      .filter({ hasText: "Alpha" })
+      .getByTestId("admin-roster-username"),
+  ).toHaveClass(/text-green-400/);
+  await expect(
     page.getByTestId("admin-roster-row").filter({ hasText: PHASE5_LONG_USERNAME }),
   ).toBeVisible();
   await clickAdminActionAndWait(
@@ -1660,6 +1677,12 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(
     page.getByTestId("admin-roster-row").filter({ hasText: PHASE5_LONG_USERNAME }),
   ).toHaveAttribute("data-active", "false");
+  await expect(
+    page
+      .getByTestId("admin-roster-row")
+      .filter({ hasText: PHASE5_LONG_USERNAME })
+      .getByTestId("admin-roster-username"),
+  ).toHaveClass(/text-red-400/);
 
   const chartEligibility = page
     .getByText("Chart Eligibility", { exact: true })
@@ -1884,6 +1907,39 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
+  await phonePage.evaluate(() => window.sessionStorage.clear());
+  await phonePage.reload({ waitUntil: "domcontentloaded" });
+  await expect(phonePage.getByTestId("device-identity-locked")).toContainText(
+    "This device is locked to Alpha",
+    { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+  );
+  await expect(phonePage.getByLabel("Select your start.gg username")).toBeDisabled();
+  await phonePage.getByLabel("I confirm that I am Alpha").check();
+  await phonePage.getByRole("button", { name: "Confirm" }).click();
+  await expect(phonePage.getByText("Ballot successfully submitted.")).toBeVisible({
+    timeout: HOSTED_REFRESH_TIMEOUT_MS,
+  });
+
+  const sameDeviceOverridePage = await page.context().newPage();
+  await sameDeviceOverridePage.goto(new URL("/vote", page.url()).toString(), {
+    waitUntil: "domcontentloaded",
+  });
+  await sameDeviceOverridePage.evaluate(() => {
+    window.localStorage.removeItem("bite-open-card-draw:startgg-identity:v1");
+    window.sessionStorage.clear();
+  });
+  await sameDeviceOverridePage.reload({ waitUntil: "domcontentloaded" });
+  await sameDeviceOverridePage
+    .getByLabel("Select your start.gg username")
+    .selectOption({ label: "Bravo" });
+  await sameDeviceOverridePage.getByLabel("I confirm that I am Bravo").check();
+  await sameDeviceOverridePage.getByRole("button", { name: "Confirm" }).click();
+  await expect(
+    sameDeviceOverridePage.getByText(/already registered to a different start\.gg username/i),
+  ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
+  await expect(sameDeviceOverridePage.getByTestId("ballot-chart-card")).toHaveCount(0);
+  await sameDeviceOverridePage.close();
+
   const duplicatePhonePage = await browser.newPage();
   await duplicatePhonePage.goto(new URL("/vote", page.url()).toString(), {
     waitUntil: "domcontentloaded",
@@ -1930,6 +1986,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expect(resultsPage.getByText("Results are being revealed on stage.")).toBeVisible();
+  await expectStageDoesNotReturnToDrawMode(stagePage, 1);
   await hostRunButton(page, "Compute Results").click();
   await expect(
     page.getByTestId("admin-host-run-controls").getByText("Results ready", { exact: true }),

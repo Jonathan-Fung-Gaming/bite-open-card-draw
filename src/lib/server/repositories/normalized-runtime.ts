@@ -77,6 +77,7 @@ const BALLOT_TABLES = [
   "ballot_choices",
   "ballot_revisions",
   "ballot_invalidations",
+  "voter_device_bindings",
 ] as const;
 const RESULT_TABLES = ["result_snapshots", "result_rows", "tiebreaks"] as const;
 const ADMIN_SESSION_TABLES = ["admin_sessions"] as const;

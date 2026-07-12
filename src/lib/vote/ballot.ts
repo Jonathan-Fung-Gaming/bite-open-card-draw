@@ -61,6 +61,7 @@ export type SubmitRoundBallotInput = {
 };
 
 export type SubmitRoundBallotOptions = {
+  deviceId?: string;
   source?: RoundBallot["source"];
   manualReason?: string;
   manualOverride?: boolean;

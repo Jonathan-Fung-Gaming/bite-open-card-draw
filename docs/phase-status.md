@@ -4731,3 +4731,79 @@ Status: complete for local memory-dev validation and Playwright evidence.
   full reset action are available on the live site.
 - No Supabase migration is applicable for this remediation; changes are application code, UI, docs,
   and tests.
+
+## Focused Reveal, Device Identity, And Admin Roster Remediation - 2026-07-13
+
+Status: complete for local memory validation, production build, and full Playwright evidence.
+
+### Scope
+
+- Closed voting is now a stage result-mode boundary. `/stage` renders the result holding screen from
+  `voting_closed` onward and cannot flash the voting timer/drawn-card view while the first result
+  snapshot is being committed or hydrated.
+- A successful player ballot now binds the app-issued device id to one player for the event. Memory
+  state persists the binding, and the Supabase migration checks the binding during presence claims
+  and commits it atomically with normalized ballot submission.
+- The browser remembers when its identity is locked, disables the username selector after refresh,
+  and blocks an ineligible remembered player from switching to another username.
+- The player roster moved out of `Setup & Recovery` into the first right-sidebar panel. Usernames use
+  a 15-character-wide desktop column, active names are green, inactive names are red, and the middle
+  column now contains `Mark Inactive` / `Reactivate` instead of redundant status text.
+
+### Changed Files
+
+- Added `docs/focused-reveal-device-roster-remediation-plan-2026-07-13.md` and this completion entry.
+- Updated stage result-mode selection and regression coverage in `src/lib/stage/stage-view.ts` and
+  `src/lib/stage/stage-view.test.ts`.
+- Updated player identity UX and ballot submission in `src/app/vote/BallotFlow.tsx`,
+  `src/app/vote/actions.ts`, `src/lib/vote/ballot.ts`, and `src/lib/vote/ballot-store.ts`.
+- Added device-binding contracts, normalized persistence, database types, repository ownership, and
+  tests under `src/lib/server`, `src/lib/db`, and `src/lib/persistence`.
+- Added `supabase/migrations/20260713010000_event_scoped_voter_device_binding.sql`.
+- Added `src/app/coolguy69/_components/AdminRosterPanel.tsx` and updated
+  `src/app/coolguy69/page.tsx`.
+- Updated `tests/e2e/full-flow.spec.ts` with closed-stage, refreshed-device, server-bypass, roster
+  position/color, and settled result-row geometry evidence.
+- Updated the synthetic Supabase ballot helper in `src/app/api/e2e/load-ballot/route.ts`.
+
+### Checks Run
+
+- `rtk npm run lint` - passed.
+- `rtk npm run typecheck` - passed.
+- Focused stage, ballot, mutation, normalized RPC, schema, persistence, and merge tests - passed,
+  85 tests across 8 files.
+- `rtk npm run test` - passed, 60 files / 372 tests.
+- `rtk npm run build` - passed.
+- `rtk git diff --check` - passed before the final documentation entry and rerun in final review.
+- `rtk npm run test:e2e:no-build -- tests/e2e/full-flow.spec.ts --grep "full round smoke"` -
+  passed, including the exact reveal and same-device regression path.
+- `rtk npm run test:e2e` - passed, all 6 Playwright tests in desktop Chromium, mobile Chromium,
+  mobile WebKit, and visual-evidence Chromium.
+
+### Manual Review
+
+- The review compared the implementation against `docs/product-spec.md` player identity, voting
+  window, final reveal, admin, and roster requirements.
+- Voting duration, turnout extension, result selection, reveal cadence, tiebreak authority, active
+  roster snapshots, and same-player second-device behavior were not changed.
+- The stage change only removes the invalid closed-to-draw fallback; explicit newer reopen, reset,
+  and round-advance transitions remain accepted by the existing freshness guard.
+- Device bindings contain only an opaque app-issued device id, event id, player id, and timestamps.
+  They stay in server/database state and expose no service keys, edit-token hashes, or browser
+  secrets.
+- The Supabase wrapper inserts/checks the binding and invokes the existing normalized ballot function
+  in one database transaction, so failed ballots roll back new bindings and concurrent conflicting
+  identities cannot both commit.
+- Roster mutations still use the existing server actions and active-host gating; current-round
+  emergency eligibility remains separately password/reason gated.
+
+### Risks And Assumptions
+
+- A web app cannot prove physical hardware identity. Enforcement applies to the stable app-issued
+  device id in browser storage; clearing or forging that id creates a logically new device. The
+  server remains authoritative for every stable device id it has seen.
+- Existing ballots submitted before this migration cannot be retroactively associated with a device
+  id. Event-day enforcement is complete for ballots submitted after deployment.
+- The new Supabase migration must be applied before relying on device binding in a hosted Supabase
+  event namespace. Local automated coverage validates the SQL contract and memory behavior; no
+  destructive Supabase-dev run was authorized or required for this focused remediation.

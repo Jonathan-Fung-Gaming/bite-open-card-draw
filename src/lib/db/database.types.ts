@@ -333,6 +333,21 @@ export type Database = {
           user_agent?: string | null;
         }
       >;
+      voter_device_bindings: TableDefinition<
+        {
+          event_id: string;
+          device_id: string;
+          player_id: Uuid;
+          bound_at: Timestamp;
+          last_used_at: Timestamp;
+        },
+        EventScopedInsert & {
+          device_id: string;
+          player_id: Uuid;
+          bound_at?: Timestamp;
+          last_used_at?: Timestamp;
+        }
+      >;
       rate_limit_buckets: TableDefinition<
         {
           event_id: string;

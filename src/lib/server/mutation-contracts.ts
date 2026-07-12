@@ -144,6 +144,7 @@ export const reopenVotingWindowInputSchema = z.object({
 export const submitBallotInputSchema = z.object({
   roundNumber: roundNumberInputSchema,
   playerId: uuidSchema,
+  deviceId: z.string().trim().min(8).max(200),
   editTokenHash: z.string().trim().min(1).optional(),
   choices: z
     .array(
@@ -157,11 +158,13 @@ export const submitBallotInputSchema = z.object({
     .length(2),
 });
 
-export const manualBallotOverrideInputSchema = submitBallotInputSchema.extend({
-  adminPassword: passwordSchema,
-  reason: reasonSchema,
-  replaceExistingBallot: z.boolean(),
-});
+export const manualBallotOverrideInputSchema = submitBallotInputSchema
+  .omit({ deviceId: true })
+  .extend({
+    adminPassword: passwordSchema,
+    reason: reasonSchema,
+    replaceExistingBallot: z.boolean(),
+  });
 
 export const closeVotingWindowInputSchema = z.object({
   roundNumber: roundNumberInputSchema,

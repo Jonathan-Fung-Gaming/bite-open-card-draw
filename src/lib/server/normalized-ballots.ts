@@ -18,12 +18,14 @@ export type NormalizedSubmitBallotResult = z.infer<typeof normalizedSubmitBallot
 export async function submitNormalizedPlayerBallot(input: {
   roundNumber: 1 | 2 | 3 | 4;
   playerId: string;
+  deviceId: string;
   choices: BallotSetChoice[];
   editTokenHash?: string | null;
 }): Promise<NormalizedSubmitBallotResult> {
   const result = await executeNormalizedTransactionalMutation("submitBallot", {
     roundNumber: input.roundNumber,
     playerId: input.playerId,
+    deviceId: input.deviceId,
     editTokenHash: input.editTokenHash ?? undefined,
     choices: input.choices.map((choice) => ({
       drawId: choice.drawId,

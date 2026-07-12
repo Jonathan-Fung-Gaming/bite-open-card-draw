@@ -22,6 +22,13 @@ export type PlayerPresenceClaim = {
   expiresAt: string;
 };
 
+export type DevicePlayerBinding = {
+  deviceId: string;
+  playerId: string;
+  boundAt: string;
+  lastUsedAt: string;
+};
+
 export type BallotInvalidationRecord = {
   id: string;
   roundNumber: 1 | 2 | 3 | 4;
@@ -35,6 +42,7 @@ export type BallotInvalidationRecord = {
 export type BallotStoreSnapshot = {
   ballots: RoundBallot[];
   ballotInvalidations?: BallotInvalidationRecord[];
+  deviceBindings?: DevicePlayerBinding[];
   phoneStatus: Array<{
     roundNumber: 1 | 2 | 3 | 4;
     status: PhoneRoundStatus;
@@ -44,6 +52,7 @@ export type BallotStoreSnapshot = {
 
 export class BallotStore {
   private ballots = new Map<string, RoundBallot>();
+  private deviceBindings = new Map<string, DevicePlayerBinding>();
   private phoneStatus = new Map<1 | 2 | 3 | 4, PhoneRoundStatus>();
   private presenceClaims = new Map<string, PlayerPresenceClaim>();
   private ballotInvalidations: BallotInvalidationRecord[] = [];
@@ -55,6 +64,10 @@ export class BallotStore {
     options: SubmitRoundBallotOptions = {},
   ) {
     validateRoundBallot(input, draws);
+
+    if ((options.source ?? "player") === "player" && options.deviceId) {
+      this.bindDeviceToPlayer(options.deviceId, input.playerId, now);
+    }
 
     const key = ballotKey(input.roundNumber, input.playerId);
     const existing = this.ballots.get(key);
@@ -99,6 +112,7 @@ export class BallotStore {
     const claimedAt = new Date(nowMs).toISOString();
     const expiresAt = new Date(nowMs + VOTER_PRESENCE_TTL_MS).toISOString();
 
+    this.assertDeviceMayVoteFor(input.deviceId, input.playerId);
     this.pruneExpiredPresence(nowMs);
     this.presenceClaims.set(
       `${input.roundNumber}:${input.playerId}:${input.deviceId}`,
@@ -122,6 +136,18 @@ export class BallotStore {
       otherActiveDeviceCount,
       hasOtherActiveDevice: otherActiveDeviceCount > 0,
     };
+  }
+
+  assertDeviceMayVoteFor(deviceId: string, playerId: string) {
+    const binding = this.deviceBindings.get(deviceId);
+
+    if (binding && binding.playerId !== playerId) {
+      throw new Error(
+        "This device is already registered to a different start.gg username. Ask an admin for help.",
+      );
+    }
+
+    return binding;
   }
 
   invalidateRound(input: {
@@ -184,6 +210,7 @@ export class BallotStore {
         ballotIds: [...record.ballotIds],
         ballots: record.ballots.map(cloneBallot),
       })),
+      deviceBindings: [...this.deviceBindings.values()].map((binding) => ({ ...binding })),
       phoneStatus: [...this.phoneStatus.entries()].map(([roundNumber, status]) => ({
         roundNumber,
         status:
@@ -211,6 +238,9 @@ export class BallotStore {
         ballotIds: [...record.ballotIds],
         ballots: record.ballots.map(cloneBallot),
       })) ?? [];
+    this.deviceBindings = new Map(
+      (snapshot.deviceBindings ?? []).map((binding) => [binding.deviceId, { ...binding }]),
+    );
     this.phoneStatus = new Map(
       snapshot.phoneStatus.map((entry) => [
         entry.roundNumber,
@@ -236,6 +266,17 @@ export class BallotStore {
         this.presenceClaims.delete(key);
       }
     }
+  }
+
+  private bindDeviceToPlayer(deviceId: string, playerId: string, boundAt: string) {
+    const existing = this.assertDeviceMayVoteFor(deviceId, playerId);
+
+    this.deviceBindings.set(deviceId, {
+      deviceId,
+      playerId,
+      boundAt: existing?.boundAt ?? boundAt,
+      lastUsedAt: boundAt,
+    });
   }
 }
 

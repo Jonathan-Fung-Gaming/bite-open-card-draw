@@ -18,6 +18,7 @@ export const STAGE_CHART_REVEAL_INTERVAL_MS = 1800;
 export const STAGE_SET_REVEAL_GAP_MS = 900;
 
 const STAGE_RESULT_STATUSES = new Set<VotingRoundStatus>([
+  "voting_closed",
   "results_computed",
   "results_revealing",
   "results_revealed",

@@ -19,19 +19,16 @@ import {
 import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
 import {
   addInactivePlayerToCurrentRoundAction,
-  addPlayerAction,
   advanceCurrentRoundAction,
   adminLoginAction,
   adminLogoutAction,
   advanceResultRevealAction,
-  bulkImportPlayersAction,
   closeVotingAction,
   computeResultsAction,
   downloadDebugSnapshotAction,
   getAdminLiveCountsAction,
   downloadPrivateCsvAction,
   drawRoundSetAction,
-  editPlayerUsernameAction,
   releaseHostControlAction,
   releaseFinalResultsAction,
   manualBallotAction,
@@ -47,13 +44,13 @@ import {
   resetRehearsalModeAction,
   resetTournamentDataAction,
   seedRehearsalTiebreakAction,
-  setPlayerActiveStatusAction,
   setCurrentRoundAction,
   startRehearsalModeAction,
   takeHostControlAction,
   updateChartExclusionAction,
 } from "./actions";
 import { AdminInactivityTimer } from "./_components/AdminInactivityTimer";
+import { AdminRosterPanel } from "./_components/AdminRosterPanel";
 import { AdminCollapsiblePanel } from "./_components/AdminCollapsiblePanel";
 import { AdminLiveRefresh } from "./_components/AdminLiveRefresh";
 import { AdminLiveCountsDisclosure } from "./_components/AdminLiveCountsDisclosure";
@@ -976,7 +973,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <AdminCollapsiblePanel
               eyebrow="Recovery And Setup"
               id="admin-secondary-panels"
-              summary="Roster, chart eligibility, manual corrections, emergency controls, and recovery tools."
+              summary="Chart eligibility, manual corrections, emergency controls, and recovery tools."
               testId="admin-secondary-panels"
               title="Setup & Recovery"
             >
@@ -1686,142 +1683,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </div>
                   </details>
                 </section>
-                <section className="metal-panel order-6 rounded-lg p-4">
-                  <div className="flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                        Roster
-                      </p>
-                      <h2 className="mt-1 text-2xl font-black uppercase text-white">Players</h2>
-                    </div>
-                    <p
-                      className="rounded border border-metal-700 bg-black/25 px-3 py-2 text-sm text-metal-300"
-                      data-count={activeCount}
-                      data-testid="admin-active-player-count"
-                    >
-                      Active {activeCount}
-                    </p>
-                  </div>
-                  {!canControl ? (
-                    <p className="mt-4 rounded border border-metal-700 bg-black/25 p-3 text-sm text-metal-300">
-                      Take host control to edit the roster.
-                    </p>
-                  ) : null}
-                  <form action={addPlayerAction} className="mt-4 flex flex-col gap-2 sm:flex-row">
-                    <input
-                      name="startggUsername"
-                      required
-                      disabled={!canControl}
-                      placeholder="start.gg username"
-                      className="min-w-0 flex-1 rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                    />
-                    <button
-                      className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                      disabled={!canControl}
-                      type="submit"
-                    >
-                      Add Player
-                    </button>
-                  </form>
-                  <form action={bulkImportPlayersAction} className="mt-4 grid gap-2">
-                    <textarea
-                      name="startggUsernames"
-                      rows={4}
-                      disabled={!canControl}
-                      placeholder="Bulk import start.gg usernames"
-                      className="rounded border border-metal-700 bg-black/30 px-3 py-2 text-white"
-                    />
-                    <button
-                      className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-                      disabled={!canControl}
-                      type="submit"
-                    >
-                      Bulk Import
-                    </button>
-                  </form>
-                  <div className="mt-4 overflow-hidden rounded border border-metal-700 text-sm">
-                    <div className="hidden grid-cols-[minmax(0,1fr)_140px_minmax(0,1.4fr)] gap-3 bg-black/40 p-3 text-xs uppercase tracking-[0.16em] text-ember-300 md:grid">
-                      <p>Username</p>
-                      <p>Status</p>
-                      <p>Action</p>
-                    </div>
-                    <div className="grid gap-px bg-metal-700">
-                      {players.map((player) => (
-                        <article
-                          key={player.id}
-                          className="grid gap-3 bg-black/20 p-3 md:grid-cols-[minmax(0,1fr)_140px_minmax(0,1.4fr)]"
-                          data-active={player.active ? "true" : "false"}
-                          data-player-username={player.startggUsername}
-                          data-testid="admin-roster-row"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
-                              Username
-                            </p>
-                            <p className="break-words font-semibold text-white">
-                              {player.startggUsername}
-                            </p>
-                          </div>
-                          <div className="min-w-0 text-metal-300">
-                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
-                              Status
-                            </p>
-                            <p className="break-words">{player.active ? "Active" : "Inactive"}</p>
-                            {player.hasTournamentHistory ? (
-                              <span className="mt-1 block break-words text-xs text-metal-400">
-                                History locked
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className="grid min-w-0 gap-2">
-                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-ember-300 md:hidden">
-                              Action
-                            </p>
-                            <form
-                              action={editPlayerUsernameAction}
-                              className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-                            >
-                              <input type="hidden" name="playerId" value={player.id} />
-                              <input
-                                name="startggUsername"
-                                defaultValue={player.startggUsername}
-                                disabled={!canControl || player.hasTournamentHistory}
-                                className="min-w-0 rounded border border-metal-700 bg-black/30 px-2 py-1 text-xs text-white disabled:opacity-40"
-                              />
-                              <button
-                                className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
-                                disabled={!canControl || player.hasTournamentHistory}
-                                type="submit"
-                              >
-                                Save Name
-                              </button>
-                            </form>
-                            <form action={setPlayerActiveStatusAction}>
-                              <input type="hidden" name="playerId" value={player.id} />
-                              <input
-                                type="hidden"
-                                name="active"
-                                value={player.active ? "false" : "true"}
-                              />
-                              <button
-                                className="rounded border border-metal-700 px-3 py-1 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:opacity-40"
-                                disabled={!canControl}
-                                type="submit"
-                              >
-                                {player.active ? "Mark Inactive" : "Reactivate"}
-                              </button>
-                            </form>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-                </section>
               </div>
             </AdminCollapsiblePanel>
           </div>
         </div>
         <aside className="grid min-w-0 content-start gap-5">
+          <AdminRosterPanel
+            activeCount={activeCount}
+            canControl={canControl}
+            players={players}
+          />
           <AdminCollapsiblePanel
             eyebrow="Operator Support"
             id="admin-support-panels"

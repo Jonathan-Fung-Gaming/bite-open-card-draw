@@ -93,6 +93,7 @@ describe("Phase 2 mutation contracts", () => {
     const drawAwareShape = MUTATION_CONTRACTS.submitBallot.safeParse({
       roundNumber: 1,
       playerId: "00000000-0000-4000-8000-000000000001",
+      deviceId: "device-contract-test",
       choices: [
         {
           drawId: "00000000-0000-4000-8000-000000000201",
