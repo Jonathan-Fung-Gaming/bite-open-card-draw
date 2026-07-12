@@ -186,6 +186,7 @@ describe("normalized runtime transactional mutations", () => {
       {
         roundNumber: 1,
         playerId: uuidA,
+        deviceId: "device-event-a",
         choices: [
           { drawId: uuidB, roundSetId: uuidA, noBans: false, bannedChartIds: [uuidC] },
           { drawId: uuidC, roundSetId: uuidB, noBans: true, bannedChartIds: [] },
@@ -206,6 +207,7 @@ describe("normalized runtime transactional mutations", () => {
           p_payload: {
             roundNumber: 1,
             playerId: uuidA,
+            deviceId: "device-event-a",
             choices: [
               { drawId: uuidB, roundSetId: uuidA, noBans: false, bannedChartIds: [uuidC] },
               { drawId: uuidC, roundSetId: uuidB, noBans: true, bannedChartIds: [] },
@@ -346,6 +348,7 @@ describe("normalized runtime transactional mutations", () => {
         {
           roundNumber: 1,
           playerId: "not-a-uuid",
+          deviceId: "device-event-a",
           choices: [],
         },
         {
@@ -381,6 +384,7 @@ describe("normalized runtime transactional mutations", () => {
         {
           roundNumber: 1,
           playerId: uuidA,
+          deviceId: "device-event-a",
           choices: [
             { drawId: uuidB, roundSetId: uuidA, noBans: false, bannedChartIds: [uuidC] },
             { drawId: uuidC, roundSetId: uuidB, noBans: true, bannedChartIds: [] },
@@ -419,6 +423,13 @@ describe("normalized runtime transactional mutations", () => {
     expect(submitFunction).toContain("pg_advisory_xact_lock");
     expect(submitFunction).toContain("v_now + interval '30 seconds'");
     expect(submitFunction).not.toContain("least(coalesce(closes_at");
+    expect(migrations).toContain("voter_device_bindings");
+    expect(migrations).toContain(
+      "normalized_submit_ballot_without_device_binding_20260713",
+    );
+    expect(migrations).toContain(
+      "already registered to a different start.gg username",
+    );
     expect(submitFunction?.indexOf("normalized_apply_voting_deadline_locked")).toBeLessThan(
       submitFunction?.indexOf("Voting is not open for ballot changes.") ?? 0,
     );
@@ -439,10 +450,15 @@ describe("normalized runtime transactional mutations", () => {
     const claimFunction = latestRpcDefinition(migrations, "normalized_claim_voter_presence");
 
     expect(claimFunction).not.toBe("");
-    expect(claimFunction).toContain("normalized_database_time");
-    expect(claimFunction).toContain("round_player_eligibility");
-    expect(claimFunction).toContain("active_voter_presence");
-    expect(claimFunction).toContain("on conflict (event_id, round_number, player_id, device_id)");
+    expect(claimFunction).toContain("normalized_assert_voter_device_available");
+    expect(claimFunction).toContain(
+      "normalized_claim_voter_presence_without_device_binding_20260713",
+    );
+    expect(migrations).toContain("round_player_eligibility");
+    expect(migrations).toContain("active_voter_presence");
+    expect(migrations).toContain(
+      "on conflict (event_id, round_number, player_id, device_id)",
+    );
     expect(claimFunction).not.toContain("normalized_runtime_transaction_disabled");
     expect(claimFunction).not.toContain("normalized_runtime_transaction_ack");
   });

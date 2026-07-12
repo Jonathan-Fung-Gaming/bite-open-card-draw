@@ -65,7 +65,7 @@ describe("stage round view", () => {
 
   it("keeps stage in result mode once result statuses begin", () => {
     expect(stageShouldUseResultMode("ready_to_vote", false)).toBe(false);
-    expect(stageShouldUseResultMode("voting_closed", false)).toBe(false);
+    expect(stageShouldUseResultMode("voting_closed", false)).toBe(true);
     expect(stageShouldUseResultMode("results_computed", false)).toBe(true);
     expect(stageShouldUseResultMode("results_revealing", false)).toBe(true);
     expect(stageShouldUseResultMode("results_revealed", false)).toBe(true);

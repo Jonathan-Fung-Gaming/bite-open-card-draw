@@ -288,6 +288,12 @@ export function mergeOperationalStateSnapshots({
     latest.ballot.presenceClaims ?? [],
     (claim) => `${claim.roundNumber}:${claim.playerId}:${claim.deviceId}`,
   ).sort((left, right) => left.claimedAt.localeCompare(right.claimedAt));
+  merged.ballot.deviceBindings = reconcileByKey(
+    baseline.ballot.deviceBindings ?? [],
+    current.ballot.deviceBindings ?? [],
+    latest.ballot.deviceBindings ?? [],
+    (binding) => binding.deviceId,
+  ).sort((left, right) => left.boundAt.localeCompare(right.boundAt));
 
   merged.result.results = sortByRound(
     reconcileByKey(

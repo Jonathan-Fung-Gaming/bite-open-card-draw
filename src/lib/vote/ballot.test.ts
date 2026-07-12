@@ -325,6 +325,73 @@ describe("ballot validation and store", () => {
     expect(afterExpiry.hasOtherActiveDevice).toBe(false);
   });
 
+  it("binds a device after its first successful ballot and rejects a different player", () => {
+    const store = new BallotStore();
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    store.claimVoterPresence({
+      roundNumber: 1,
+      playerId: input.playerId,
+      deviceId: "shared-device",
+      nowMs: 1_000,
+    });
+    store.submit(input, draws, "2026-07-13T00:00:00.000Z", {
+      deviceId: "shared-device",
+      editTokenHash: "first-token",
+    });
+
+    expect(() =>
+      store.claimVoterPresence({
+        roundNumber: 1,
+        playerId: "different-player",
+        deviceId: "shared-device",
+        nowMs: 2_000,
+      }),
+    ).toThrow(/already registered to a different start\.gg username/i);
+    expect(() =>
+      store.submit(
+        {
+          ...input,
+          playerId: "different-player",
+          playerStartggUsername: "Different Player",
+        },
+        draws,
+        "2026-07-13T00:00:01.000Z",
+        { deviceId: "shared-device", editTokenHash: "second-token" },
+      ),
+    ).toThrow(/already registered to a different start\.gg username/i);
+    expect(store.listForRound(1)).toHaveLength(1);
+  });
+
+  it("allows multiple devices for one player and persists device bindings", () => {
+    const store = new BallotStore();
+    const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];
+    const input = validBallotInput(draws);
+
+    store.submit(input, draws, "2026-07-13T00:00:00.000Z", {
+      deviceId: "same-player-device-a",
+      editTokenHash: "device-a-token",
+    });
+    store.submit(input, draws, "2026-07-13T00:00:01.000Z", {
+      deviceId: "same-player-device-b",
+      editTokenHash: "device-b-token",
+    });
+
+    const restored = new BallotStore();
+    restored.importSnapshot(store.exportSnapshot());
+
+    expect(
+      restored.assertDeviceMayVoteFor("same-player-device-a", input.playerId),
+    ).toMatchObject({ playerId: input.playerId });
+    expect(
+      restored.assertDeviceMayVoteFor("same-player-device-b", input.playerId),
+    ).toMatchObject({ playerId: input.playerId });
+    expect(() =>
+      restored.assertDeviceMayVoteFor("same-player-device-a", "different-player"),
+    ).toThrow(/already registered to a different start\.gg username/i);
+  });
+
   it("warns a second active device and keeps only the latest valid same-player ballot", () => {
     const store = new BallotStore();
     const draws = [draw("draw-1", "S16", "16"), draw("draw-2", "S17", "17")];

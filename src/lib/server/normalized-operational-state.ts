@@ -103,6 +103,7 @@ type NormalizedOperationalStateRepositoryDependencies = {
 const EVENT_TABLE_DELETE_BATCHES: readonly (readonly TableName[])[] = [
   [
     "active_voter_presence",
+    "voter_device_bindings",
     "tiebreaks",
     "result_rows",
     "ballot_invalidations",
@@ -121,6 +122,7 @@ const EVENT_LOCK_TIMEOUT_MS = 35_000;
 const EVENT_LOCK_RETRY_MS = 100;
 const EVENT_SELECT_COLUMNS: Partial<Record<TableName, string>> = {
   active_voter_presence: "round_number,player_id,device_id,claimed_at,expires_at",
+  voter_device_bindings: "device_id,player_id,bound_at,last_used_at",
   admin_actions:
     "id,admin_session_id,action_type,action_summary,reason,requires_password_reentry,metadata,created_at",
   ballot_choices: "ballot_id,draw_id,round_set_id,no_bans,banned_chart_ids",
@@ -441,6 +443,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       votingWindows,
       roundEligibility,
       activeVoterPresence,
+      voterDeviceBindings,
       ballots,
       ballotChoices,
       ballotRevisions,
@@ -461,6 +464,9 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       includeBallotTables
         ? this.selectEventRows("active_voter_presence")
         : emptyRows("active_voter_presence"),
+      includeBallotTables
+        ? this.selectEventRows("voter_device_bindings")
+        : emptyRows("voter_device_bindings"),
       includeBallotTables ? this.selectEventRows("ballots") : emptyRows("ballots"),
       includeBallotTables ? this.selectEventRows("ballot_choices") : emptyRows("ballot_choices"),
       includeBallotTables
@@ -581,6 +587,12 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
           claimedAt: row.claimed_at,
           expiresAt: row.expires_at,
         })),
+        deviceBindings: voterDeviceBindings.map((row) => ({
+          deviceId: row.device_id,
+          playerId: row.player_id,
+          boundAt: row.bound_at,
+          lastUsedAt: row.last_used_at,
+        })),
       },
       votingWindow: {
         windows: votingWindows.map((row) => ({
@@ -631,6 +643,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.saveResults(snapshot),
       this.saveBallotInvalidations(snapshot),
       this.savePresence(snapshot),
+      this.saveDeviceBindings(snapshot),
       this.saveHostLock(snapshot),
     ]);
   }
@@ -1252,6 +1265,20 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         last_seen_at: claim.claimedAt,
         expires_at: claim.expiresAt,
       })),
+    );
+  }
+
+  private async saveDeviceBindings(snapshot: OperationalStateSnapshot) {
+    await this.upsertMany(
+      "voter_device_bindings",
+      (snapshot.ballot.deviceBindings ?? []).map((binding) => ({
+        event_id: this.eventId,
+        device_id: binding.deviceId,
+        player_id: binding.playerId,
+        bound_at: binding.boundAt,
+        last_used_at: binding.lastUsedAt,
+      })),
+      { onConflict: "event_id,device_id" },
     );
   }
 

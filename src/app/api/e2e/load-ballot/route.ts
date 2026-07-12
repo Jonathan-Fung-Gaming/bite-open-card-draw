@@ -189,6 +189,7 @@ async function submitSupabaseLoadBallot(input: {
   return submitNormalizedPlayerBallot({
     roundNumber: input.roundNumber,
     playerId: loadPlayer.id,
+    deviceId: `e2e-load:${loadPlayer.id}`,
     choices: validatedChoices,
     editTokenHash: hashBallotEditToken(`e2e-load:${input.roundNumber}:${loadPlayer.id}`),
   });

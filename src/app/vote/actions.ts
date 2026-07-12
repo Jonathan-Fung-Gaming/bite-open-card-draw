@@ -158,6 +158,7 @@ export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInpu
     const ballot = await submitNormalizedPlayerBallot({
       roundNumber: input.roundNumber,
       playerId: input.playerId,
+      deviceId: input.deviceId,
       choices: input.choices,
       editTokenHash,
     });
@@ -218,7 +219,7 @@ export async function submitRoundBallotAction(input: PublicSubmitRoundBallotInpu
       },
       draws,
       snapshot.serverNow,
-      { source: "player", editTokenHash },
+      { source: "player", deviceId: input.deviceId, editTokenHash },
     );
     adminState.rosterStore.markTournamentHistory(player.id, snapshot.serverNow);
 
