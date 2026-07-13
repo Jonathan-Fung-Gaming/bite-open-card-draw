@@ -19,11 +19,12 @@ status text when there is a conflict.
 
 ## Production Readiness Remediation Phase 3 - Non-Expiring Host - 2026-07-14
 
-Status: implementation and pre-merge evidence complete. Every Phase 3 acceptance row and the
-implementation, test, security-review, and evidence gate rows are checked. The phase PR and
-post-merge production migration deployment remain intentionally unchecked until the required PR
-merge, application deployment, migration push, parity verification, and linked database lint are
-complete.
+Status: complete. Phase 3 implementation and evidence merged in
+[PR #105](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/105) as `a261203` after
+the required Quality Gates check passed with no review or inline comments. Synchronized `main`
+passed its Quality Gates, deployed successfully to production, and received the Phase 3 migration.
+Production migration parity, database lint, permission probes, route health, and a fresh
+post-merge disposable-preview rehearsal all passed.
 
 ### Scope And Changed Files
 
@@ -73,7 +74,7 @@ complete.
   non-production attestation, configured-event collision, and missing real-soak opt-in; positive
   hosted listing found both intended tests.
 - `npm run supabase:migration:list` - linked production is in parity through `20260713020000`; only
-  the Phase 3 migration is pending locally as required before merge.
+  the Phase 3 migration was pending locally as required before merge.
 - `npx supabase db lint --linked --level error --fail-on error` - passed with no schema errors.
 - `npx supabase db push --linked --dry-run` - passed and would apply only
   `20260714010000_phase3_non_expiring_host_recovery.sql`; no production write occurred.
@@ -134,20 +135,44 @@ complete.
 ### Migration And Rollout State
 
 - The configured linked project name was verified exactly as `bite-open-card-draw`; identifiers and
-  credentials were not printed. Linked production has not received the Phase 3 migration before
-  merge.
+  credentials were not printed. After the application deployment was Ready, migration
+  `20260714010000_phase3_non_expiring_host_recovery.sql` was applied successfully to that target.
 - Every hosted run used a uniquely named non-persistent Supabase preview with production data
   disabled. Failed attempts stopped safely, each preview was deleted, and an independent final
   relist confirmed zero matching Phase 3 previews remain.
 - The application is backward-compatible/fail-closed before migration: compatibility expiry keeps
   old close behavior safe, while unavailable lifecycle RPCs return a visible migration-required
   error rather than falling back to split writes.
-- After PR merge and successful application deployment, verify the same linked target, push only
-  migration `20260714010000`, verify exact local/remote parity and linked lint, run permission/
-  capability probes, record evidence, and only then check the final two Phase 3 gate rows.
+- Post-merge verification found exact local/remote parity at 24/24 through `20260714010000`, no
+  linked database-lint errors, anonymous denial for all four probed host/close RPCs, and service-role
+  reachability that failed safely before mutation for nonexistent admin sessions.
 - Rollback after migration is forward-only because the corrected close payload requires
   `hostTokenHash`; keep the migration and deploy a forward patch rather than restoring automatic
   expiry or deleting authoritative ownership/audit data.
+
+### Post-Merge Verification
+
+- PR #105 was squash-merged as `a261203e9bbbdf82415c83e4e17d512dd9483bc7`. Its Quality Gates
+  passed in 1 minute 23 seconds, there was no review or inline feedback, and the synchronized
+  `main` Quality Gates run passed in 1 minute 17 seconds.
+- Clean synchronized `main` deployed successfully to Vercel production and reached Ready state at
+  `https://bite-open-card-draw.vercel.app`. `/stage`, `/room`, `/vote`, `/charts`, `/results`, and
+  `/coolguy69` each returned HTTP 200.
+- `npm run supabase:db:push -- --yes` applied only Phase 3 migration `20260714010000`. The command
+  exited successfully; Docker Desktop being unavailable affected only the optional local pg-delta
+  cache and did not prevent the linked migration.
+- `npm run supabase:migration:list` reported exact 24/24 local/remote parity through
+  `20260714010000`, and `npx supabase db lint --linked --level error --fail-on error` reported no
+  schema errors.
+- Non-mutating production permission probes confirmed anonymous denial and service-role-only
+  reachability for Take, heartbeat, Release, and close-voting RPCs without creating production
+  event data.
+- A fresh disposable post-merge preview from synchronized `main` passed migration push in 15.2
+  seconds, 24/24 parity, database lint in 4.6 seconds, and hosted lifecycle plus concurrent Restore
+  2/2 in 56.1 seconds. The preview was deleted and an independent relist found zero matching
+  previews.
+- Local `main` and `origin/main` were synchronized to the merged implementation before deployment,
+  migration, and the post-merge preview verification.
 
 ### Risks And Assumptions
 
@@ -157,7 +182,8 @@ complete.
   remaining continuous. Shared-password Force remains the audited recovery path for a different
   authenticated device.
 - The only unavailable local check is Docker-backed Supabase status. Final disposable hosted
-  migration/lint/e2e passed, and post-merge linked production push/parity/lint remain mandatory.
+  migration/lint/e2e and post-merge linked production push/parity/lint all passed, so this optional
+  local infrastructure limitation does not leave the Phase 3 gate open.
 - Phase 3 changes no tournament round, chart-set, draw, ballot, result-selection, tiebreak, player
   identity, or timing rule.
 
