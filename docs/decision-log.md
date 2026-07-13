@@ -34,5 +34,10 @@
 - Selected songs are blocked from later rounds.
 - Same song should not be drawn in both sets of the same round.
 - Normal tiebreak wheel handles 2, 3, or 4 tied charts.
+- The tiebreak reveal lasts 10 seconds.
 - 5+ chart least-ban tie uses simple fallback reveal, including zero-ballot seven-way ties.
+- Active host ownership never expires automatically. Heartbeat is a health signal only.
+- Host ownership ends only through explicit release or a password-confirmed, audited forced takeover.
+- Missing heartbeat keeps explicit forced takeover available from another authenticated device but
+  never transfers ownership automatically.
 - No reduced-motion UI toggle.

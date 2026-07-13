@@ -1,7 +1,9 @@
 # Phase 9 Hosted Supabase Manual Guide
 
 This guide is for completing Phase 9 of
-`docs/comprehensive-review-remediation-plan-2026-06-30.md` with a hosted Supabase project. It
+`docs/archive/comprehensive-review-remediation-plan-2026-06-30.md` with a hosted Supabase project.
+That plan is retained as historical context; current release requirements come from
+`docs/production-readiness-remediation-plan-2026-07-13.md`. This guide
 assumes you have not done this workflow before.
 
 Prefer a non-production Supabase project. If no spare project is available, production may be used
@@ -375,7 +377,7 @@ For each round:
 At least once during the rehearsal:
 
 - Use `Seed Tiebreak` before computing results to force a rune-wheel tiebreak.
-- Verify the wheel runs for about 5 seconds and reveals the backend-committed winner.
+- Verify the wheel runs for about 10 seconds and reveals the backend-committed winner.
 - Use two admin browser windows to test host lock read-only and takeover behavior.
 - Restart the app and confirm state survives:
   1. Stop `rtk npm run dev` with `Ctrl+C`.
@@ -451,7 +453,7 @@ rtk git status --short
    - `docs/phase-status.md`
    - `docs/deployment-readiness.md`
    - `docs/release-checklist.md`
-   - `docs/comprehensive-review-checklist-2026-06-30.md`
+   - `docs/archive/comprehensive-review-checklist-2026-06-30.md` (historical evidence only)
 
 5. Mark `CR-001`, `CR-003`, and `CR-008` complete only if the hosted evidence actually passed.
 

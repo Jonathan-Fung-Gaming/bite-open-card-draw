@@ -4,9 +4,9 @@ Use this checklist on the event machine before players arrive and before every r
 
 ## Remediation Gate
 
-- Review `docs/production-flow-risk-remediation-plan-2026-07-02.md` and
-  `docs/production-flow-risk-checklist-2026-07-02.md` before release prep.
-- Do not treat the app as event-ready until every production-flow risk item is closed with dated
+- Review `docs/production-readiness-remediation-plan-2026-07-13.md` and
+  `docs/production-readiness-remediation-checklist-2026-07-13.md` before release prep.
+- Do not treat the app as event-ready until every production-readiness item is closed with dated
   evidence or explicitly accepted as event-day risk by the tournament owner.
 - When docs disagree, follow `docs/product-spec.md` and
   `docs/pump_open_stage_repo_validation_checklist.md` over stale execution-plan text.
@@ -29,8 +29,9 @@ Use this checklist on the event machine before players arrive and before every r
 - Confirm each round's active count, turnout denominator, eligibility snapshot, submitted ballot
   count, and private CSV row count match the expected 48, 36, 24, or 12 count.
 - Confirm production environment variables are set in Vercel and not committed to Git.
-- Confirm Supabase migrations are applied through `20260704010000_normalized_voter_presence_rpc.sql`
-  with `rtk npm run supabase:migration:list`.
+- Confirm Supabase migrations are applied through
+  `20260713010000_event_scoped_voter_device_binding.sql` with
+  `rtk npm run supabase:migration:list`.
 - Confirm `TOURNAMENT_STATE_BACKEND=supabase` and a stable `TOURNAMENT_EVENT_ID` are configured for
   deployed or event use.
 - Run `rtk npm run import:charts` and confirm the output prints `Imported ... charts` plus required
@@ -112,8 +113,12 @@ Use this checklist on the event machine before players arrive and before every r
 
 - Confirm only the intended host has active control.
 - Confirm other admin browsers are read-only.
-- Keep the host browser open so heartbeat continues.
-- If the host laptop fails, wait for lock expiry or deliberately take over from the backup admin laptop.
+- Keep the host browser open so heartbeat health remains visible.
+- Host ownership does not expire automatically if heartbeat stops.
+- If the host laptop fails, perform the password-confirmed, audited forced takeover from the backup
+  admin laptop.
+- Do not wait for a host timeout; missing heartbeat is the signal to evaluate explicit takeover,
+  not an ownership transfer.
 
 ## Host Setup
 

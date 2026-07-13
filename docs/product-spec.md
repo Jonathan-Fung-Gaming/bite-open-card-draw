@@ -255,7 +255,7 @@ Store only a password hash, not plaintext.
 Include:
 
 - host lock
-- admin inactivity timer
+- inactivity timer for non-host and standby admin sessions
 - roster management
 - chart exclusions
 - draw controls
@@ -289,9 +289,14 @@ Host lock behavior:
 - Admin logs in.
 - Admin clicks `Take Host Control`.
 - That browser becomes active host.
-- It sends a heartbeat.
-- Other admin browsers are read-only unless they take over.
-- If heartbeat expires, another admin can take over.
+- It sends a heartbeat as a health signal.
+- Active host ownership never expires automatically because of inactivity or a missing heartbeat.
+- Other admin browsers are read-only unless they perform an explicit forced takeover.
+- A missing heartbeat is a health warning that keeps forced takeover available to an authenticated
+  admin on another device; it never transfers or releases ownership automatically.
+- Forced takeover requires the shared admin password, a clear warning, and an audit reason.
+- The original host may recover control on the same secured tournament laptop after reauthentication.
+- Host ownership ends only through explicit release or a successful forced takeover.
 
 ## Roster behavior
 

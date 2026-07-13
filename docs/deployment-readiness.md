@@ -4,7 +4,7 @@
 
 - Vercel project linked to this repository.
 - Supabase project with migrations applied through
-  `20260704010000_normalized_voter_presence_rpc.sql`.
+  `20260713010000_event_scoped_voter_device_binding.sql`.
 - Production environment variables configured in Vercel project settings only.
 
 Do not commit `.env`, `.env.local`, Supabase service-role keys, Vercel tokens, session secrets, or plaintext admin passwords.
@@ -67,7 +67,8 @@ Do not use the release for tournament operation until:
   rehearsal id, including `phase9-e2e-2026-06-30-prod-23`,
   `phase9-load-2026-06-30-prod-07`, or `phase9-fourround-2026-06-30-prod-05`, for the real
   tournament.
-- Supabase migrations are applied through `20260704010000_normalized_voter_presence_rpc.sql`.
+- Supabase migrations are applied through
+  `20260713010000_event_scoped_voter_device_binding.sql`.
 - `TOURNAMENT_TEST_ROUTE_TOKEN` is absent from production environment variables.
 - `rtk npm run cache:chart-images` produces at least one non-fallback cached artwork file and
   `public/chart-images/cache` or the chosen controlled storage has real files.
@@ -80,8 +81,8 @@ Do not use the release for tournament operation until:
   Rounds 2, 3, and 4 use 36, 24, and 12 active voting players.
 - The same rehearsal has verified the per-round active count, turnout denominator, eligibility
   snapshot, submitted ballot count, and private CSV row count.
-- `docs/remediation-issue-checklist.md` has every row checked with evidence and its final closure
-  gate passes.
+- `docs/production-readiness-remediation-checklist-2026-07-13.md` has every row checked with dated
+  evidence and its final closure gate passes.
 
 ## Phase 9 Hosted Evidence
 
@@ -91,7 +92,7 @@ Hosted Supabase rehearsal is no longer an unresolved release blocker as of 2026-
   risk is that global migrations were applied to the existing production project.
 - `rtk npx supabase db lint --linked` passed with no schema errors.
 - Historical `rtk npx supabase migration list --linked` showed remote migration `20260630041000`.
-  Current Phase 11 readiness requires `20260704010000_normalized_voter_presence_rpc.sql`.
+  Current readiness requires `20260713010000_event_scoped_voter_device_binding.sql`.
 - Hosted `rtk npm run test:e2e` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
   `phase9-e2e-2026-06-30-prod-23`.
 - Hosted `rtk npm run test:load` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
