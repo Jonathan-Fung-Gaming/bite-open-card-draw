@@ -106,8 +106,8 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 - [x] All Phase 1 tiebreak/transition tests rerun successfully.
 - [x] Code/diff review completed with findings resolved.
 - [x] Checklist/phase-status evidence recorded.
-- [ ] Phase PR merged.
-- [ ] Post-merge migration step marked not applicable or completed and verified.
+- [x] Phase PR merged.
+- [x] Post-merge migration step marked not applicable or completed and verified.
 
 ## Phase 3 - Non-Expiring Host
 
