@@ -19,11 +19,13 @@ status text when there is a conflict.
 
 ## Production Readiness Remediation Phase 1 - Atomic State And Freshness - 2026-07-13
 
-Status: implementation plus local and disposable-hosted verification complete; phase closure
-remains open only for PR merge and the post-merge production migration. A non-persistent Supabase
-preview branch was created under the linked `bite-open-card-draw` project without production data,
-used only with generated `e2e-` event namespaces, and deleted after the hosted gates passed. No
-destructive evidence or pre-merge migration was run against the production database.
+Status: complete. Phase 1 implementation and evidence merged in
+[PR #101](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/101) as `85c68fd`.
+Local `main` was synchronized after merge. Migration `20260713020000` was then applied to the
+explicitly linked `bite-open-card-draw` production project and verified through local/remote
+migration parity, linked remote database lint, and read-only capability/permission probes. A
+non-persistent Supabase preview branch without production data was used only for the pre-merge
+hosted gates and deleted after they passed.
 
 ### Scope And Changed Files
 
@@ -109,16 +111,27 @@ destructive evidence or pre-merge migration was run against the production datab
 - Final database, client, and test re-reviews reported no remaining actionable findings in their
   assigned scope.
 
-### Risks, Rollout, And Blockers
+### Post-Merge Production Verification
 
-- The migration is verified locally and on the deleted disposable preview branch. New application
-  mutations perform a read-only capability preflight and fail closed until the migration exists.
-  Production migration push, parity, permission verification, and database lint occur only after
-  the phase PR is merged and the intended linked target is reconfirmed.
-- PR #101 remains the merge gate. Production migration verification and final checklist closure
-  remain intentionally unchecked until that merge completes.
-- No production namespace, production schema, secret file, tournament rule, or browser randomness
-  changed during pre-merge evidence.
+- The linked target was confirmed as project `bite-open-card-draw` with ref
+  `gsiyqhkcgegjrvqcqioc`; the repository had exactly one pending migration before the push.
+- The dry run listed only `20260713020000_phase1_atomic_reroll_reveal_public_state.sql`, and the
+  subsequent production push applied it successfully.
+- `npx supabase migration list` showed exact local/remote parity through `20260713020000`.
+- `npx supabase db lint --linked --level warning --fail-on error` passed with no schema errors.
+- A read-only production probe confirmed service-role access to
+  `normalized_read_public_generation_key` with HTTP 200. Anonymous calls to the two coherent-read
+  RPCs plus one-chart/set/full reroll, reveal advancement, and final release were all denied with
+  HTTP 401 / PostgreSQL code `42501` before mutation logic could run.
+
+### Risks And Assumptions
+
+- The Supabase CLI emitted a non-fatal pg-delta catalog-cache warning after both successful
+  migration pushes because its isolated catalog worker could not find a temporary CA file. Direct
+  migration parity and linked remote lint verified the committed schema independently.
+- No production event namespace data was reset or used for destructive evidence. The production
+  post-merge probes were read-only or privilege-denied.
+- No secret file, tournament rule, or browser randomness changed during Phase 1 closure.
 
 ## Obsolete Command Wrapper Reference Removal - 2026-07-13
 

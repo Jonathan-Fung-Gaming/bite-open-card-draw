@@ -70,8 +70,8 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 - [x] Lint, typecheck, unit, build, relevant e2e, and hosted Supabase checks pass.
 - [x] Code/diff review completed with findings resolved.
 - [x] Checklist/phase-status evidence recorded.
-- [ ] Phase PR merged.
-- [ ] Supabase migrations pushed after merge and parity/database lint verified.
+- [x] Phase PR merged.
+- [x] Supabase migrations pushed after merge and parity/database lint verified.
 
 ## Phase 2 - Stage Reveal And Countdown
 
