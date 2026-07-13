@@ -156,7 +156,6 @@ export default async function StagePage() {
   const view = buildStageRoundView(adminState.drawStateStore, roundNumber);
   const snapshot = getVotingRoundSnapshot(roundNumber, serverNowMs);
   const result = adminState.resultStore.getRoundResult(roundNumber);
-  const useResultMode = stageShouldUseResultMode(snapshot.status, Boolean(result));
   const freshness = buildPublicRouteFreshness({
     currentRound: roundNumber,
     result,
@@ -165,6 +164,8 @@ export default async function StagePage() {
     routeSource: "current_round",
     votingSnapshot: snapshot,
   });
+  const useResultMode =
+    freshness.publicStateResultMode || stageShouldUseResultMode(snapshot.status, Boolean(result));
 
   if (useResultMode) {
     if (!result) {
@@ -242,7 +243,12 @@ export default async function StagePage() {
                 </section>
               ) : null}
               {result.revealPhase === "set_1_counts" ? (
-                <ResultSetPanel set={setOne} serverNowMs={serverNowMs} stageMode />
+                <ResultSetPanel
+                  set={setOne}
+                  serverNowMs={serverNowMs}
+                  revealStartedAt={result.revealPhaseStartedAt}
+                  stageMode
+                />
               ) : null}
               {result.revealPhase === "set_1_resolved" ? (
                 <ResultSetPanel set={setOne} showWinner serverNowMs={serverNowMs} stageMode />
@@ -250,7 +256,12 @@ export default async function StagePage() {
               {result.revealPhase === "set_2_counts" ? (
                 <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_1fr]">
                   <StageResolvedSetSummary set={setOne} />
-                  <ResultSetPanel set={setTwo} serverNowMs={serverNowMs} stageMode />
+                  <ResultSetPanel
+                    set={setTwo}
+                    serverNowMs={serverNowMs}
+                    revealStartedAt={result.revealPhaseStartedAt}
+                    stageMode
+                  />
                 </div>
               ) : null}
               {result.revealPhase === "set_2_resolved" ? (

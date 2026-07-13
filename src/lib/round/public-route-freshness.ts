@@ -27,11 +27,20 @@ export type PublicRouteFreshnessInput = {
   votingWindowClosedAt: string | null;
   votingWindowOpenedAt: string | null;
   votingWindowUpdatedAt: string | null;
+  publicStateGeneration?: number;
+  publicStateResultMode?: boolean;
+  publicStateTransitionKind?: string;
 };
 
-export type PublicRouteFreshnessKey = PublicRouteFreshnessInput & {
+export type PublicRouteFreshnessKey = Omit<
+  PublicRouteFreshnessInput,
+  "publicStateGeneration" | "publicStateResultMode" | "publicStateTransitionKind"
+> & {
   activeDrawKey: string;
   epochMs: number;
+  publicStateGeneration: number;
+  publicStateResultMode: boolean;
+  publicStateTransitionKind: string;
   sequence: string;
 };
 
@@ -269,6 +278,11 @@ function shouldAcceptRouteChange(next: PublicRouteFreshnessKey, accepted: Public
 export function createPublicRouteFreshnessKey(
   input: PublicRouteFreshnessInput,
 ): PublicRouteFreshnessKey {
+  const publicStateGeneration = Math.max(0, input.publicStateGeneration ?? 0);
+  const publicStateResultMode =
+    input.publicStateResultMode ??
+    (input.resultSnapshotId !== null || input.resultRevealPhase !== null);
+  const publicStateTransitionKind = input.publicStateTransitionKind ?? "legacy";
   const activeDrawKey = drawKey(input.activeDrawVersions);
   const epoch = latestEpochMs([
     input.latestTournamentActionAt,
@@ -294,6 +308,9 @@ export function createPublicRouteFreshnessKey(
     input.latestBallotRevisionAt ?? "",
     input.latestTournamentActionAt ?? "",
     input.latestTournamentActionSequence,
+    publicStateGeneration,
+    publicStateResultMode ? "result" : "draw",
+    publicStateTransitionKind,
     activeDrawKey,
   ].join(";");
 
@@ -301,6 +318,9 @@ export function createPublicRouteFreshnessKey(
     ...input,
     activeDrawKey,
     epochMs: epoch,
+    publicStateGeneration,
+    publicStateResultMode,
+    publicStateTransitionKind,
     sequence,
   };
 }
@@ -309,6 +329,15 @@ export function comparePublicRouteFreshness(
   next: PublicRouteFreshnessKey,
   accepted: PublicRouteFreshnessKey,
 ) {
+  const generationComparison = compareNumbers(
+    next.publicStateGeneration,
+    accepted.publicStateGeneration,
+  );
+
+  if (generationComparison !== 0) {
+    return generationComparison;
+  }
+
   const epochComparison = compareNumbers(next.epochMs, accepted.epochMs);
 
   if (epochComparison !== 0) {
@@ -356,8 +385,14 @@ export function shouldAcceptPublicRoutePayload(
     return true;
   }
 
+  // Generations are monotonic within a round, not across rounds. Route/round
+  // changes must therefore be ordered by the global action/time evidence first.
   if (isRoundOrRouteSourceChange(next, accepted)) {
     return shouldAcceptRouteChange(next, accepted);
+  }
+
+  if (next.publicStateGeneration !== accepted.publicStateGeneration) {
+    return next.publicStateGeneration > accepted.publicStateGeneration;
   }
 
   if (

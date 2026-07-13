@@ -17,6 +17,7 @@ export type PersistMergedStateInput = {
 
 export type OperationalStateRepository = {
   load(): Promise<OperationalStateSnapshot | null>;
+  readPublicGenerationKey?(): Promise<string>;
   loadVotingAdminState?(): Promise<OperationalStateSnapshot | null>;
   loadResultAdminState?(): Promise<OperationalStateSnapshot | null>;
   save(snapshot: OperationalStateSnapshot): Promise<void>;

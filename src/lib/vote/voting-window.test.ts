@@ -55,6 +55,35 @@ describe("voting window store", () => {
     expect(view.eligibleCount).toBe(4);
   });
 
+  it("rejects opening a completed round until its prior window is explicitly reset", () => {
+    const store = new VotingWindowStore();
+
+    store.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: players,
+      nowMs: 1_000,
+    });
+    const completedSnapshot = store.exportSnapshot();
+    const completedWindow = completedSnapshot.windows[0];
+
+    if (!completedWindow) {
+      throw new Error("Expected the voting window fixture to exist.");
+    }
+
+    completedWindow.status = "round_complete";
+    store.importSnapshot(completedSnapshot);
+
+    expect(() =>
+      store.openVoting({
+        roundNumber: 1,
+        drawsReady: true,
+        eligiblePlayers: players,
+        nowMs: 2_000,
+      }),
+    ).toThrow("Voting has already opened for this round.");
+  });
+
   it("extends once by one minute when turnout is below 75 percent at normal expiration", () => {
     const store = new VotingWindowStore();
 

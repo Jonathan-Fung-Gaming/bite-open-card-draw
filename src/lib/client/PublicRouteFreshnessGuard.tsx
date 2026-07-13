@@ -42,8 +42,12 @@ export function PublicRouteFreshnessGuard({
     <>
       <span
         aria-hidden="true"
+        data-accepted-active-draw-key={acceptedFreshness.activeDrawKey}
         data-accepted-current-round={acceptedFreshness.currentRound}
         data-accepted-public-route-epoch-ms={acceptedFreshness.epochMs}
+        data-accepted-public-state-generation={acceptedFreshness.publicStateGeneration}
+        data-accepted-public-transition={acceptedFreshness.publicStateTransitionKind}
+        data-accepted-result-mode={acceptedFreshness.publicStateResultMode ? "true" : "false"}
         data-accepted-result-phase={acceptedResultPhase}
         data-accepted-result-snapshot={acceptedFreshness.resultSnapshotId ?? "none"}
         data-accepted-route={acceptedFreshness.route}

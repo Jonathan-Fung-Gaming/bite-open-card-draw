@@ -5,9 +5,8 @@ import { useEffect, useState } from "react";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { ResultSetSnapshot } from "@/lib/results/result-engine";
 import {
-  TIEBREAK_REVEAL_DURATION_MS,
-  getTiebreakRevealRemainingMs,
-  isTiebreakRevealComplete,
+  getStageResultCountRevealProgress,
+  getTiebreakRevealProgress,
 } from "@/lib/results/reveal-timing";
 import { ChartArtImage } from "./ChartArtImage";
 import { RuneWheel } from "./RuneWheel";
@@ -15,11 +14,10 @@ import { RuneWheel } from "./RuneWheel";
 type ResultSetPanelProps = {
   set: ResultSetSnapshot;
   showWinner?: boolean;
+  revealStartedAt?: string | null;
   serverNowMs?: number;
   stageMode?: boolean;
 };
-
-const STAGE_RESULT_ROW_REVEAL_INTERVAL_MS = 1_100;
 
 function banLabel(count: number) {
   return `${count} ${count === 1 ? "ban" : "bans"}`;
@@ -104,6 +102,7 @@ function RevealChartCard({
 export function ResultSetPanel({
   set,
   showWinner = false,
+  revealStartedAt,
   serverNowMs,
   stageMode = false,
 }: ResultSetPanelProps) {
@@ -119,25 +118,18 @@ export function ResultSetPanel({
   const stageRevealRankByChartId = new Map(
     stageRevealRows.map((row, index) => [row.chart.id, index]),
   );
-  const initialStageVisibleRowCount =
-    stageMode && !showWinner && stageRevealRows.length > 0 ? 1 : displayRows.length;
-  const [stageVisibleRowCount, setStageVisibleRowCount] = useState(initialStageVisibleRowCount);
-  const [stageTiebreakWinnerRevealed, setStageTiebreakWinnerRevealed] = useState(false);
-  const serverTiebreakWinnerRevealed =
-    showWinner && set.tiebreakUsed && isTiebreakRevealComplete(set.winnerRevealStartedAt, nowMs);
-  const tiebreakWinnerRevealed =
-    stageMode && showWinner && set.tiebreakUsed
-      ? stageTiebreakWinnerRevealed
-      : serverTiebreakWinnerRevealed;
+  const countRevealProgress = getStageResultCountRevealProgress(
+    revealStartedAt,
+    nowMs,
+    displayRows.length,
+  );
+  const stageVisibleRowCount =
+    stageMode && !showWinner ? countRevealProgress.visibleRowCount : displayRows.length;
+  const tiebreakRevealProgress = getTiebreakRevealProgress(set.winnerRevealStartedAt, nowMs);
+  const tiebreakWinnerRevealed = showWinner && set.tiebreakUsed && tiebreakRevealProgress.complete;
   const shouldShowSelectedState = showWinner && (!set.tiebreakUsed || tiebreakWinnerRevealed);
   const tiebreakRemainingMs =
-    showWinner && set.tiebreakUsed
-      ? stageMode
-        ? stageTiebreakWinnerRevealed
-          ? 0
-          : TIEBREAK_REVEAL_DURATION_MS
-        : getTiebreakRevealRemainingMs(set.winnerRevealStartedAt, nowMs)
-      : 0;
+    showWinner && set.tiebreakUsed ? tiebreakRevealProgress.remainingMs : 0;
   const tiebreakRemainingSeconds = Math.ceil(tiebreakRemainingMs / 1000);
   const revealPanel = showWinner ? (
     <>
@@ -148,6 +140,8 @@ export function ResultSetPanel({
             slots={set.wheelSlots}
             winnerChartId={set.selectedChart.id}
             winnerRevealed={tiebreakWinnerRevealed}
+            revealStartedAt={set.winnerRevealStartedAt}
+            serverNowMs={serverNowMs}
           />
         ) : (
           <div
@@ -155,6 +149,7 @@ export function ResultSetPanel({
               "rounded border border-ember-300/35 bg-black/25",
               stageMode ? "p-5" : "p-3",
             )}
+            data-reveal-timing-valid={tiebreakRevealProgress.hasValidStart ? "true" : "false"}
             data-testid="fallback-tiebreak-reveal"
             data-winner-revealed={tiebreakWinnerRevealed ? "true" : "false"}
           >
@@ -172,13 +167,17 @@ export function ResultSetPanel({
               </div>
             ) : (
               <p className={clsx("mt-2 font-black text-white", stageMode ? "text-3xl" : "text-lg")}>
-                Winner reveal starting
+                {tiebreakRevealProgress.hasValidStart
+                  ? "Winner reveal starting"
+                  : "Waiting for reveal timing"}
               </p>
             )}
             <p className={clsx("mt-2 text-metal-300", stageMode ? "text-xl" : "text-sm")}>
               {tiebreakWinnerRevealed
                 ? "5 or more charts tied for fewest bans."
-                : `Revealing in ${tiebreakRemainingSeconds} seconds.`}
+                : tiebreakRevealProgress.hasValidStart
+                  ? `Revealing in ${tiebreakRemainingSeconds} seconds.`
+                  : "Waiting for the authoritative reveal start time."}
             </p>
           </div>
         )
@@ -213,99 +212,49 @@ export function ResultSetPanel({
 
     setNowMs(baseNowMs);
 
-    if (!showWinner || !set.tiebreakUsed) {
+    const initialProgress = showWinner
+      ? getTiebreakRevealProgress(set.winnerRevealStartedAt, baseNowMs)
+      : getStageResultCountRevealProgress(revealStartedAt, baseNowMs, displayRows.length);
+    const shouldTrackCountReveal = stageMode && !showWinner;
+    const shouldTrackTiebreakReveal = showWinner && set.tiebreakUsed;
+
+    if (
+      (!shouldTrackCountReveal && !shouldTrackTiebreakReveal) ||
+      !initialProgress.hasValidStart ||
+      initialProgress.complete
+    ) {
       return undefined;
     }
 
     const basePerformanceMs = window.performance.now();
     const intervalId = window.setInterval(() => {
-      setNowMs(baseNowMs + window.performance.now() - basePerformanceMs);
-    }, 250);
+      const nextNowMs = baseNowMs + window.performance.now() - basePerformanceMs;
+      const nextProgress = shouldTrackTiebreakReveal
+        ? getTiebreakRevealProgress(set.winnerRevealStartedAt, nextNowMs)
+        : getStageResultCountRevealProgress(revealStartedAt, nextNowMs, displayRows.length);
+
+      setNowMs(nextNowMs);
+
+      if (nextProgress.complete) {
+        window.clearInterval(intervalId);
+      }
+    }, 100);
 
     return () => window.clearInterval(intervalId);
-  }, [serverNowMs, set.tiebreakUsed, set.winnerRevealStartedAt, showWinner]);
-
-  useEffect(() => {
-    if (!stageMode || showWinner) {
-      setStageVisibleRowCount(displayRows.length);
-      return undefined;
-    }
-
-    setStageVisibleRowCount(displayRows.length > 0 ? 1 : 0);
-
-    const intervalId = window.setInterval(() => {
-      setStageVisibleRowCount((count) => {
-        if (count >= displayRows.length) {
-          window.clearInterval(intervalId);
-          return count;
-        }
-
-        return count + 1;
-      });
-    }, STAGE_RESULT_ROW_REVEAL_INTERVAL_MS);
-
-    return () => window.clearInterval(intervalId);
-  }, [displayRows.length, set.drawId, set.drawVersion, showWinner, stageMode]);
-
-  useEffect(() => {
-    if (!stageMode || !showWinner || !set.tiebreakUsed) {
-      setStageTiebreakWinnerRevealed(false);
-      return undefined;
-    }
-
-    const storageKey = [
-      "stage-tiebreak",
-      set.drawId,
-      set.selectedChart.id,
-      set.winnerRevealStartedAt ?? "no-start",
-    ].join(":");
-    const startedAtMs = set.winnerRevealStartedAt ? Date.parse(set.winnerRevealStartedAt) : NaN;
-    const initialServerNowMs = serverNowMs ?? Date.now();
-    const serverRevealAlreadyComplete =
-      Number.isFinite(startedAtMs) &&
-      initialServerNowMs - startedAtMs >= TIEBREAK_REVEAL_DURATION_MS;
-    let storedRevealComplete = false;
-
-    try {
-      storedRevealComplete = window.sessionStorage.getItem(storageKey) === "complete";
-
-      if (serverRevealAlreadyComplete) {
-        window.sessionStorage.setItem(storageKey, "complete");
-      }
-    } catch {
-      // Session storage can be unavailable in hardened browser contexts.
-    }
-
-    if (serverRevealAlreadyComplete || storedRevealComplete) {
-      setStageTiebreakWinnerRevealed(true);
-      return undefined;
-    }
-
-    setStageTiebreakWinnerRevealed(false);
-
-    const timeoutId = window.setTimeout(() => {
-      try {
-        window.sessionStorage.setItem(storageKey, "complete");
-      } catch {
-        // The visual state can still complete even if storage is unavailable.
-      }
-
-      setStageTiebreakWinnerRevealed(true);
-    }, TIEBREAK_REVEAL_DURATION_MS);
-
-    return () => window.clearTimeout(timeoutId);
   }, [
+    displayRows.length,
+    revealStartedAt,
+    serverNowMs,
     set.drawId,
-    set.selectedChart.id,
+    set.drawVersion,
     set.tiebreakUsed,
     set.winnerRevealStartedAt,
-    serverNowMs,
     showWinner,
     stageMode,
   ]);
 
   useEffect(() => {
-    if (!stageMode || !showWinner || !set.tiebreakUsed || !stageTiebreakWinnerRevealed) {
+    if (!stageMode || !showWinner || !set.tiebreakUsed || !tiebreakWinnerRevealed) {
       return;
     }
 
@@ -323,7 +272,7 @@ export function ResultSetPanel({
     set.tiebreakUsed,
     showWinner,
     stageMode,
-    stageTiebreakWinnerRevealed,
+    tiebreakWinnerRevealed,
   ]);
 
   if (stageMode && showWinner) {
@@ -429,6 +378,7 @@ export function ResultSetPanel({
                 data-stage-reveal-index={stageRevealIndex}
                 data-testid="result-row"
                 data-tied-for-fewest={row.tiedForFewest ? "true" : "false"}
+                aria-hidden={!rowRevealed}
               >
                 <div
                   className={clsx(

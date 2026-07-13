@@ -37,39 +37,39 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 
 ### PRR-008 - Reroll And Voting Restart
 
-- [ ] One-chart, set, and full-round post-vote rerolls use atomic server-side transactions.
-- [ ] Draw history is preserved.
-- [ ] Round ballots are invalidated according to the existing one-ballot/two-set rule.
-- [ ] Already-open desktop `/vote` receives replacement charts automatically.
-- [ ] Already-open participant phones receive replacement charts automatically.
-- [ ] Replaced chart and stale choices disappear without manual refresh.
-- [ ] Player identity remains selected.
-- [ ] Old-generation submissions are rejected server-side.
-- [ ] Out-of-order polling cannot restore old charts.
-- [ ] No RSC error, page error, 5xx response, or error overlay occurs.
+- [X] One-chart, set, and full-round post-vote rerolls use atomic server-side transactions.
+- [X] Draw history is preserved.
+- [X] Round ballots are invalidated according to the existing one-ballot/two-set rule.
+- [X] Already-open desktop `/vote` receives replacement charts automatically.
+- [X] Already-open participant phones receive replacement charts automatically.
+- [X] Replaced chart and stale choices disappear without manual refresh.
+- [X] Player identity remains selected.
+- [X] Old-generation submissions are rejected server-side.
+- [X] Out-of-order polling cannot restore old charts.
+- [X] No RSC error, page error, 5xx response, or error overlay occurs.
 
 ### PRR-012 - Tiebreak/Final State Transitions
 
-- [ ] Reveal and public-release changes commit atomically.
-- [ ] Normalized reroll/reveal/release RPCs are real implementations, not placeholders.
-- [ ] RPC execution is service-role-only and verifies the active host.
-- [ ] Migration rollout and rollback are documented.
-- [ ] Public projection cannot expose a mixed draw/window/result generation.
-- [ ] Stage never shows timer/card draw before Set 1 tiebreak.
-- [ ] Stage never shows timer/card draw before Set 2 tiebreak.
-- [ ] Stage never shows timer/card draw after `Confirm Stage Reveal Complete`.
-- [ ] Stage cannot remain stuck and requires no manual refresh.
-- [ ] Mid-spinner reload resumes authoritative remaining time.
-- [ ] Post-duration reload shows the committed winner immediately.
-- [ ] Browser randomness never decides the winner.
+- [X] Reveal and public-release changes commit atomically.
+- [X] Normalized reroll/reveal/release RPCs are real implementations, not placeholders.
+- [X] RPC execution is service-role-only and verifies the active host.
+- [X] Migration rollout and rollback are documented.
+- [X] Public projection cannot expose a mixed draw/window/result generation.
+- [X] Stage never shows timer/card draw before Set 1 tiebreak.
+- [X] Stage never shows timer/card draw before Set 2 tiebreak.
+- [X] Stage never shows timer/card draw after `Confirm Stage Reveal Complete`.
+- [X] Stage cannot remain stuck and requires no manual refresh.
+- [X] Mid-spinner reload resumes authoritative remaining time.
+- [X] Post-duration reload shows the committed winner immediately.
+- [X] Browser randomness never decides the winner.
 - [ ] Cache TTL zero/max and hosted concurrent-reader tests pass.
 
 ### Phase Gate
 
-- [ ] Phase plan self-reviewed and amended.
+- [X] Phase plan self-reviewed and amended.
 - [ ] Lint, typecheck, unit, build, relevant e2e, and hosted Supabase checks pass.
-- [ ] Code/diff review completed with findings resolved.
-- [ ] Checklist/phase-status evidence recorded.
+- [X] Code/diff review completed with findings resolved.
+- [X] Checklist/phase-status evidence recorded.
 - [ ] Phase PR merged.
 - [ ] Supabase migrations pushed after merge and parity/database lint verified.
 

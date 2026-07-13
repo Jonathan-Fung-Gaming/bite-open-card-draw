@@ -239,16 +239,51 @@ describe("result presentation", () => {
   });
 
   it("uses audience-safe text while the rune wheel is spinning", () => {
+    const revealStartedAt = "2026-07-08T00:00:00.000Z";
     const html = renderToStaticMarkup(
       createElement(RuneWheel, {
         slots: wheelSlots(),
         winnerChartId: "winner",
         winnerRevealed: false,
+        revealStartedAt,
+        serverNowMs: Date.parse(revealStartedAt) + 1_000,
         stageMode: true,
       }),
     );
 
     expect(html).toContain("Tiebreak selector is spinning.");
     expect(html).not.toContain("sealed chart");
+  });
+
+  it("shows an authoritative waiting state when tiebreak timing is unavailable", () => {
+    const wheelHtml = renderToStaticMarkup(
+      createElement(RuneWheel, {
+        slots: wheelSlots(),
+        winnerChartId: "winner",
+        winnerRevealed: false,
+        revealStartedAt: null,
+        serverNowMs: Date.parse("2026-07-08T00:00:01.000Z"),
+        stageMode: true,
+      }),
+    );
+    const fallbackHtml = renderToStaticMarkup(
+      createElement(ResultSetPanel, {
+        set: resultSet({
+          tiebreakUsed: true,
+          tiebreakCandidateIds: ["winner", "least-tie", "middle", "most", "fifth"],
+          tiebreakWinnerChartId: "winner",
+          wheelSupported: false,
+          winnerRevealStartedAt: null,
+        }),
+        showWinner: true,
+        serverNowMs: Date.parse("2026-07-08T00:00:01.000Z"),
+      }),
+    );
+
+    expect(wheelHtml).toContain("Waiting for authoritative reveal timing.");
+    expect(wheelHtml).not.toContain("Tiebreak selector is spinning.");
+    expect(fallbackHtml).toContain("Waiting for reveal timing");
+    expect(fallbackHtml).toContain("Waiting for the authoritative reveal start time.");
+    expect(fallbackHtml).not.toContain("Revealing in 10 seconds.");
   });
 });

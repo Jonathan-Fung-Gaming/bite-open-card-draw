@@ -14,6 +14,15 @@ import {
 } from "@/lib/vote/phone-view";
 import type { EligiblePlayerSnapshot, VotingRoundStatus } from "@/lib/vote/voting-window";
 import {
+  activeDrawGenerationFromDraws,
+  classifyVoteLiveProjectionChange,
+  compareVoteLiveGeneration,
+  isStaleBallotStateError,
+  reconcileChoicesForActiveDraws,
+  shouldAcceptVoteLivePoll,
+  shouldRequestVoteRouteRefresh,
+} from "@/lib/vote/live-generation";
+import {
   claimVoterPresenceAction,
   getExistingBallotAction,
   getVoteLiveStateAction,
@@ -26,6 +35,7 @@ export type BallotFlowProps = {
   remainingMs: number;
   roundNumber: 1 | 2 | 3 | 4;
   players: EligiblePlayerSnapshot[];
+  publicStateGeneration: number;
   draws: DrawRecord[];
   serverNowMs: number;
   statusLabel: string;
@@ -58,6 +68,22 @@ const IDENTITY_CONFIRMATION_STORAGE_PREFIX = "bite-open-card-draw:identity-confi
 const BAN_INSTRUCTION_STORAGE_PREFIX = "bite-open-card-draw:ban-instruction-seen:v1";
 const BAN_INSTRUCTION_PAUSE_MS = 2_000;
 const BAN_INSTRUCTION_FADE_MS = 900;
+const STALE_BALLOT_REFRESH_MESSAGE =
+  "Voting state changed before your ballot could save. Your selections remain here while the latest chart state loads.";
+const REROLL_BALLOT_MESSAGE =
+  "The chart draw changed. Your identity is preserved; review the current chart sets and submit a new ballot.";
+const INVALIDATED_BALLOT_MESSAGE =
+  "The chart draw changed after your ballot was saved. Your previous ballot was invalidated; please review the current chart sets and submit again.";
+
+function preserveConfirmedBallotGuidance(current: string | null, fallback: string) {
+  return current === REROLL_BALLOT_MESSAGE || current === INVALIDATED_BALLOT_MESSAGE
+    ? current
+    : fallback;
+}
+
+function staleBallotRefreshMessage(current: string | null) {
+  return preserveConfirmedBallotGuidance(current, STALE_BALLOT_REFRESH_MESSAGE);
+}
 
 type StoredBallotDraft = {
   roundNumber: 1 | 2 | 3 | 4;
@@ -122,8 +148,7 @@ function rememberIdentity(player: EligiblePlayerSnapshot, locked = false) {
         locked ||
         Boolean(
           existing?.locked &&
-            (existing.playerId === player.id ||
-              existing.startggUsername === player.startggUsername),
+          (existing.playerId === player.id || existing.startggUsername === player.startggUsername),
         ),
     }),
   );
@@ -211,12 +236,8 @@ function flowKey(
   return [prefix, roundNumber, playerId, draws.map((draw) => draw.id).join(",")].join(":");
 }
 
-function identityConfirmationKey(
-  roundNumber: 1 | 2 | 3 | 4,
-  playerId: string,
-  draws: readonly DrawRecord[],
-) {
-  return flowKey(IDENTITY_CONFIRMATION_STORAGE_PREFIX, roundNumber, playerId, draws);
+function identityConfirmationKey(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
+  return [IDENTITY_CONFIRMATION_STORAGE_PREFIX, roundNumber, playerId].join(":");
 }
 
 function banInstructionKey(
@@ -227,27 +248,17 @@ function banInstructionKey(
   return flowKey(BAN_INSTRUCTION_STORAGE_PREFIX, roundNumber, playerId, draws);
 }
 
-function hasSeenIdentityConfirmation(
-  roundNumber: 1 | 2 | 3 | 4,
-  playerId: string,
-  draws: readonly DrawRecord[],
-) {
+function hasSeenIdentityConfirmation(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
   try {
-    return (
-      window.sessionStorage.getItem(identityConfirmationKey(roundNumber, playerId, draws)) === "1"
-    );
+    return window.sessionStorage.getItem(identityConfirmationKey(roundNumber, playerId)) === "1";
   } catch {
     return false;
   }
 }
 
-function markIdentityConfirmationSeen(
-  roundNumber: 1 | 2 | 3 | 4,
-  playerId: string,
-  draws: readonly DrawRecord[],
-) {
+function markIdentityConfirmationSeen(roundNumber: 1 | 2 | 3 | 4, playerId: string) {
   try {
-    window.sessionStorage.setItem(identityConfirmationKey(roundNumber, playerId, draws), "1");
+    window.sessionStorage.setItem(identityConfirmationKey(roundNumber, playerId), "1");
   } catch {
     // The checkbox still gates this render even if session storage is unavailable.
   }
@@ -413,6 +424,7 @@ export function BallotFlow({
   eligibleCount,
   roundNumber,
   players,
+  publicStateGeneration,
   draws,
   serverNowMs,
   statusLabel,
@@ -451,6 +463,7 @@ export function BallotFlow({
     startggUsername: string;
   } | null>(null);
   const [liveCanSubmit, setLiveCanSubmit] = useState(initialCanSubmit);
+  const [liveProjectionRefreshing, setLiveProjectionRefreshing] = useState(false);
   const [liveStatusLabel, setLiveStatusLabel] = useState(statusLabel);
   const [liveStatus, setLiveStatus] = useState<VotingRoundStatus>(status);
   const [liveTimerText, setLiveTimerText] = useState(timerText);
@@ -459,7 +472,19 @@ export function BallotFlow({
   const initializedIdentityRef = useRef(false);
   const lastPresenceClaimRef = useRef<{ claimedAtMs: number; key: string } | null>(null);
   const lookupRequestRef = useRef(0);
+  const pollRequestSequenceRef = useRef(0);
+  const acceptedPollRef = useRef({
+    generation: {
+      generation: publicStateGeneration,
+      activeDraws: activeDrawGenerationFromDraws(draws),
+    },
+    requestSequence: 0,
+  });
   const refreshRequestedRef = useRef(false);
+  const routeRefreshAttemptRef = useRef<{
+    attemptedAtMs: number;
+    targetGeneration: number;
+  } | null>(null);
   const banInstructionTimersRef = useRef<number[]>([]);
   const confirmedRef = useRef(false);
   const existingBallotRef = useRef<PublicEditableBallot | null>(null);
@@ -468,9 +493,11 @@ export function BallotFlow({
   const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null;
   const alreadySubmitted = existingBallotLookup?.exists === true;
   const isPaused = liveStatus === "voting_paused";
-  const changesUnavailableCopy = isPaused
-    ? "Voting is paused. Your selections are still here; continue after voting resumes."
-    : "Voting is not accepting ballot changes right now.";
+  const changesUnavailableCopy = liveProjectionRefreshing
+    ? "Voting state is updating. Your selections and saved ballot remain unchanged."
+    : isPaused
+      ? "Voting is paused. Your selections are still here; continue after voting resumes."
+      : "Voting is not accepting ballot changes right now.";
   const editingSavedBallot = confirmed && !savedAt && Boolean(existingBallot);
   const ballotControlsDisabled = !liveCanSubmit || banInstructionControlsPaused;
   const currentDraw = draws[step];
@@ -479,6 +506,27 @@ export function BallotFlow({
     (choice) =>
       (choice.noBans && choice.bannedChartIds.length === 0) ||
       (!choice.noBans && choice.bannedChartIds.length >= 1 && choice.bannedChartIds.length <= 2),
+  );
+  const requestRouteRefresh = useCallback(
+    (targetGeneration: number) => {
+      const nowMs = Date.now();
+
+      refreshRequestedRef.current = true;
+      if (
+        !shouldRequestVoteRouteRefresh({
+          lastAttempt: routeRefreshAttemptRef.current,
+          nowMs,
+          retryAfterMs: VOTE_LIVE_POLL_INTERVAL_MS,
+          targetGeneration,
+        })
+      ) {
+        return;
+      }
+
+      routeRefreshAttemptRef.current = { attemptedAtMs: nowMs, targetGeneration };
+      router.refresh();
+    },
+    [router],
   );
 
   useEffect(() => {
@@ -704,6 +752,35 @@ export function BallotFlow({
   }, [draws]);
 
   useEffect(() => {
+    const renderedGeneration = {
+      generation: publicStateGeneration,
+      activeDraws: activeDrawGenerationFromDraws(draws),
+    };
+
+    if (compareVoteLiveGeneration(renderedGeneration, acceptedPollRef.current.generation) >= 0) {
+      const catchUpChange = classifyVoteLiveProjectionChange(
+        acceptedPollRef.current.generation,
+        renderedGeneration,
+      );
+
+      acceptedPollRef.current = {
+        generation: renderedGeneration,
+        requestSequence: acceptedPollRef.current.requestSequence,
+      };
+      refreshRequestedRef.current = false;
+      routeRefreshAttemptRef.current = null;
+      setLiveProjectionRefreshing(false);
+      setMessage((current) => {
+        if (current !== STALE_BALLOT_REFRESH_MESSAGE) {
+          return current;
+        }
+
+        return catchUpChange === "draws" ? REROLL_BALLOT_MESSAGE : null;
+      });
+    }
+  }, [draws, publicStateGeneration]);
+
+  useEffect(() => {
     if (initializedIdentityRef.current) {
       return;
     }
@@ -735,7 +812,7 @@ export function BallotFlow({
     initializedIdentityRef.current = true;
     setUnavailableLockedIdentity(null);
     setSelectedPlayerId(rememberedPlayer.id);
-    if (hasSeenIdentityConfirmation(roundNumber, rememberedPlayer.id, draws)) {
+    if (hasSeenIdentityConfirmation(roundNumber, rememberedPlayer.id)) {
       setIdentityConfirmed(true);
       setConfirmed(true);
     }
@@ -752,6 +829,8 @@ export function BallotFlow({
     let cancelled = false;
 
     async function poll() {
+      const requestSequence = ++pollRequestSequenceRef.current;
+
       try {
         const state = await getVoteLiveStateAction(
           roundNumber,
@@ -765,7 +844,54 @@ export function BallotFlow({
           return;
         }
 
-        setLiveCanSubmit(state.canSubmit);
+        const nextGeneration = {
+          generation: state.generation,
+          activeDraws: state.activeDraws,
+        };
+
+        if (
+          !shouldAcceptVoteLivePoll({
+            acceptedGeneration: acceptedPollRef.current.generation,
+            acceptedRequestSequence: acceptedPollRef.current.requestSequence,
+            nextGeneration,
+            nextRequestSequence: requestSequence,
+          })
+        ) {
+          return;
+        }
+
+        acceptedPollRef.current = {
+          generation: nextGeneration,
+          requestSequence,
+        };
+
+        const renderedGeneration = {
+          generation: publicStateGeneration,
+          activeDraws: activeDrawGenerationFromDraws(draws),
+        };
+        const projectionChange = classifyVoteLiveProjectionChange(
+          renderedGeneration,
+          nextGeneration,
+        );
+
+        if (projectionChange === "draws") {
+          setChoices((current) => reconcileChoicesForActiveDraws(current, state.activeDraws));
+          setExistingBallot(null);
+          setExistingBallotLookup(null);
+          setSavedAt(null);
+          setLiveCanSubmit(false);
+          setLiveProjectionRefreshing(true);
+          setMessage(REROLL_BALLOT_MESSAGE);
+          requestRouteRefresh(state.generation);
+          return;
+        }
+
+        if (projectionChange === "generation") {
+          setLiveProjectionRefreshing(true);
+          requestRouteRefresh(state.generation);
+        }
+
+        setLiveCanSubmit(state.canSubmit && projectionChange === "none");
         setLiveStatus(state.status);
         setLiveStatusLabel(state.statusLabel);
         setLiveTimerText(state.timerText);
@@ -783,7 +909,7 @@ export function BallotFlow({
           turnoutText: state.turnoutText,
         });
 
-        if (state.canSubmit) {
+        if (state.canSubmit && projectionChange === "none") {
           refreshRequestedRef.current = false;
         }
 
@@ -808,27 +934,28 @@ export function BallotFlow({
             setSavedAt(null);
             setChoices(emptyChoices(draws));
             clearBallotDraft(roundNumber, selectedPlayerId);
-            setMessage(
-              "The chart draw changed after your ballot was saved. Your previous ballot was invalidated; please review the current chart sets and submit again.",
-            );
+            setMessage(INVALIDATED_BALLOT_MESSAGE);
             router.refresh();
           }
         }
 
         if (!state.canSubmit && state.status === "voting_paused") {
-          setMessage(changesUnavailableCopy);
+          setMessage((current) => preserveConfirmedBallotGuidance(current, changesUnavailableCopy));
           return;
         }
 
         if (!state.canSubmit && !refreshRequestedRef.current) {
           refreshRequestedRef.current = true;
-          setMessage(
-            "Voting state changed. Ballot changes are disabled while this phone refreshes.",
+          setMessage((current) =>
+            preserveConfirmedBallotGuidance(
+              current,
+              "Voting state changed. Ballot changes are disabled while this phone refreshes.",
+            ),
           );
           router.refresh();
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && requestSequence >= acceptedPollRef.current.requestSequence) {
           setMessage("Could not refresh voting status. Please keep this page open and try again.");
         }
       }
@@ -849,6 +976,8 @@ export function BallotFlow({
     draws,
     onLiveStateChange,
     players.length,
+    publicStateGeneration,
+    requestRouteRefresh,
     roundNumber,
     router,
     selectedPlayerId,
@@ -950,14 +1079,25 @@ export function BallotFlow({
 
     startTransition(async () => {
       try {
-        const ballot = await submitRoundBallotAction({
+        const result = await submitRoundBallotAction({
           roundNumber,
           playerId: selectedPlayer.id,
           playerStartggUsername: selectedPlayer.startggUsername,
           deviceId: getDeviceId(),
           editToken: getBallotEditToken(roundNumber, selectedPlayer.id),
+          expectedGeneration: publicStateGeneration,
           choices,
         });
+
+        if (result.status === "stale") {
+          setLiveCanSubmit(false);
+          setLiveProjectionRefreshing(true);
+          setMessage(staleBallotRefreshMessage);
+          requestRouteRefresh(acceptedPollRef.current.generation.generation);
+          return;
+        }
+
+        const ballot = result.ballot;
 
         rememberIdentity(selectedPlayer, true);
         setDeviceIdentityLocked(true);
@@ -973,6 +1113,16 @@ export function BallotFlow({
         setSavedAt(ballot.submittedAt);
         setMessage(null);
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Save failed.";
+
+        if (isStaleBallotStateError(errorMessage)) {
+          setLiveCanSubmit(false);
+          setLiveProjectionRefreshing(true);
+          setMessage(staleBallotRefreshMessage);
+          requestRouteRefresh(acceptedPollRef.current.generation.generation);
+          return;
+        }
+
         const hadServerConfirmedBallot =
           Boolean(existingBallot) || Boolean(savedAt) || existingBallotLookup?.exists === true;
 
@@ -981,11 +1131,7 @@ export function BallotFlow({
           setSavedAt(existingBallot.submittedAt);
         }
 
-        setMessage(
-          error instanceof Error
-            ? formatBallotSaveFailureMessage(error.message, hadServerConfirmedBallot)
-            : formatBallotSaveFailureMessage("Save failed.", hadServerConfirmedBallot),
-        );
+        setMessage(formatBallotSaveFailureMessage(errorMessage, hadServerConfirmedBallot));
       }
     });
   }
@@ -1016,11 +1162,7 @@ export function BallotFlow({
   }
 
   const identityCorrection =
-    selectedPlayer &&
-    !deviceIdentityLocked &&
-    !savedAt &&
-    !alreadySubmitted &&
-    !existingBallot ? (
+    selectedPlayer && !deviceIdentityLocked && !savedAt && !alreadySubmitted && !existingBallot ? (
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded border border-metal-700 bg-black/25 p-2">
         <p className="text-xs font-bold text-metal-300 sm:text-sm">
           Voting as <span className="text-white">{selectedPlayer.startggUsername}</span>
@@ -1211,7 +1353,7 @@ export function BallotFlow({
 
             setPresenceWarningReadyToContinueKey(null);
             rememberIdentity(selectedPlayer);
-            markIdentityConfirmationSeen(roundNumber, selectedPlayer.id, draws);
+            markIdentityConfirmationSeen(roundNumber, selectedPlayer.id);
             setConfirmed(true);
             if (!savedAt && !existingBallot && step < draws.length) {
               startBanInstructionIfNeeded(selectedPlayer.id);
@@ -1341,9 +1483,11 @@ export function BallotFlow({
           </button>
         ) : (
           <p className="mt-5 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">
-            {isPaused
-              ? "Voting is paused. Your saved ballot remains valid; edits resume when voting resumes."
-              : "Voting is no longer open for changes."}
+            {liveProjectionRefreshing
+              ? "Voting state is updating. Your saved ballot remains valid; edits will resume automatically."
+              : isPaused
+                ? "Voting is paused. Your saved ballot remains valid; edits resume when voting resumes."
+                : "Voting is no longer open for changes."}
           </p>
         )}
       </section>

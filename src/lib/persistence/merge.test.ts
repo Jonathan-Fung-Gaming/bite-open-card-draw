@@ -97,15 +97,40 @@ function snapshotWithResult(result: RoundResultSnapshot, savedAt: string) {
   return snapshot;
 }
 
+function snapshotWithPublicGeneration(
+  generations: Partial<Record<1 | 2 | 3 | 4, number>>,
+  updatedAt: string,
+) {
+  const snapshot = createOperationalStateSnapshot(createAdminStateStores(), updatedAt);
+
+  for (const record of snapshot.publicStateGeneration?.rounds ?? []) {
+    const generation = generations[record.roundNumber];
+
+    if (generation === undefined) {
+      continue;
+    }
+
+    record.generation = generation;
+    record.transitionKind = `generation_${generation}`;
+    record.updatedAt = updatedAt;
+    record.activeDraws = [
+      {
+        drawId: `round-${record.roundNumber}-generation-${generation}`,
+        roundSetId: `round-${record.roundNumber}-set-1`,
+        version: Math.max(1, generation),
+      },
+    ];
+  }
+
+  return snapshot;
+}
+
 describe("operational state merge", () => {
   it("unions audit rows instead of treating missing rows as deletions", () => {
     const baselineStores = createAdminStateStores();
     const latestStores = createAdminStateStores();
     const currentStores = createAdminStateStores();
-    const baseline = createOperationalStateSnapshot(
-      baselineStores,
-      "2026-07-03T00:00:00.000Z",
-    );
+    const baseline = createOperationalStateSnapshot(baselineStores, "2026-07-03T00:00:00.000Z");
     const latestAudit = latestStores.auditStore.record({
       sessionId: "session-a",
       action: "pause_voting",
@@ -189,5 +214,44 @@ describe("operational state merge", () => {
     expect(merged.result.results[0]?.sets[1].winnerRevealStartedAt).toBe(
       "2026-07-03T00:00:03.000Z",
     );
+  });
+
+  it("keeps the highest public-state generation independently for each round", () => {
+    const baseline = snapshotWithPublicGeneration({ 1: 1, 2: 1 }, "2026-07-13T00:00:01.000Z");
+    const current = snapshotWithPublicGeneration({ 1: 3, 2: 2 }, "2026-07-13T00:00:03.000Z");
+    const latest = snapshotWithPublicGeneration({ 1: 2, 2: 4 }, "2026-07-13T00:00:04.000Z");
+
+    const merged = mergeOperationalStateSnapshots({ baseline, current, latest });
+    const rounds = new Map(
+      merged.publicStateGeneration?.rounds.map((record) => [record.roundNumber, record]),
+    );
+
+    expect(rounds.get(1)).toMatchObject({
+      generation: 3,
+      transitionKind: "generation_3",
+    });
+    expect(rounds.get(2)).toMatchObject({
+      generation: 4,
+      transitionKind: "generation_4",
+    });
+  });
+
+  it("does not regress a public generation when the baseline or latest snapshot is legacy", () => {
+    const baseline = snapshotWithPublicGeneration({ 1: 2 }, "2026-07-13T00:00:02.000Z");
+    const current = snapshotWithPublicGeneration({ 1: 5 }, "2026-07-13T00:00:05.000Z");
+    const legacyLatest = createOperationalStateSnapshot(
+      createAdminStateStores(),
+      "2026-07-13T00:00:06.000Z",
+    );
+
+    delete legacyLatest.publicStateGeneration;
+
+    const merged = mergeOperationalStateSnapshots({ baseline, current, latest: legacyLatest });
+
+    expect(merged.publicStateGeneration?.rounds[0]).toMatchObject({
+      roundNumber: 1,
+      generation: 5,
+      transitionKind: "generation_5",
+    });
   });
 });

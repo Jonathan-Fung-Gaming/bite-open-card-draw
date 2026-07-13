@@ -19,8 +19,8 @@ function activeTiebreakRevealIsRunning() {
   return Boolean(
     document.querySelector(
       [
-        '[data-testid="rune-wheel"][data-winner-revealed="false"]',
-        '[data-testid="fallback-tiebreak-reveal"][data-winner-revealed="false"]',
+        '[data-testid="rune-wheel"][data-reveal-timing-valid="true"][data-winner-revealed="false"]',
+        '[data-testid="fallback-tiebreak-reveal"][data-reveal-timing-valid="true"][data-winner-revealed="false"]',
       ].join(","),
     ),
   );

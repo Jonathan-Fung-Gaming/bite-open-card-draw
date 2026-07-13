@@ -1,8 +1,9 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createHostToken, type HostLockReleaseOutcome } from "@/lib/admin/host-lock";
+import { createHostToken, hashHostToken, type HostLockReleaseOutcome } from "@/lib/admin/host-lock";
 import { buildAdminLiveCountRows } from "@/lib/admin/live-counts";
 import type { AdminSessionPayload } from "@/lib/admin/session";
 import {
@@ -44,6 +45,7 @@ import {
   persistResultAdminState,
   persistTournamentState,
   withPersistedHostLockState,
+  withPersistedTournamentState,
   withPersistedVotingAdminState,
 } from "@/lib/server/persistence";
 import { getTournamentEventId } from "@/lib/server/env";
@@ -54,6 +56,19 @@ import {
   submitNormalizedManualBallotOverride,
 } from "@/lib/server/normalized-admin-workflows";
 import { computeNormalizedResults } from "@/lib/server/normalized-results";
+import {
+  advanceNormalizedResultReveal,
+  openNormalizedVotingWindow,
+  pauseNormalizedVotingWindow,
+  releaseNormalizedFinalResults,
+  rerollNormalizedFullRound,
+  rerollNormalizedOneChart,
+  rerollNormalizedRoundSet,
+  resumeNormalizedVotingWindow,
+  type NormalizedAdminTransitionContext,
+  type NormalizedRerollDraw,
+} from "@/lib/server/normalized-round-transitions";
+import { advancePublicStateGeneration } from "@/lib/server/public-state-projection";
 import { isCurrentRoundEligibilityChangeAllowed } from "@/lib/vote/voting-window";
 import {
   getRoundDrawRecords,
@@ -252,6 +267,7 @@ function resetRoundState(roundNumber: 1 | 2 | 3 | 4) {
   syncSelectedSongBlocks();
   adminState.ballotStore.resetRound(roundNumber);
   adminState.votingWindowStore.resetRound(roundNumber);
+  adminState.rosterStore.clearRoundEligibility(roundNumber);
   adminState.drawStateStore.resetRound(roundNumber);
 }
 
@@ -554,6 +570,64 @@ async function withActiveHostResultAdminState<T>(
   });
 }
 
+async function withActiveHostTournamentState<T>(
+  session: AdminSessionPayload,
+  hostToken: string | null,
+  callback: (nowMs: number) => T | Promise<T>,
+) {
+  return withPersistedTournamentState(async () => {
+    const nowMs = await getAuthoritativeNowMs();
+
+    if (!hostToken || !adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs)) {
+      throw new Error("Host control is required for this action.");
+    }
+
+    return callback(nowMs);
+  });
+}
+
+async function requireNormalizedTransitionContext(
+  roundNumber: 1 | 2 | 3 | 4,
+): Promise<NormalizedAdminTransitionContext> {
+  const session = await requireActiveHostForNormalizedAction();
+  const hostToken = await getHostTokenCookie();
+
+  if (!hostToken) {
+    throw new Error("Host control is required for this action.");
+  }
+
+  return {
+    requestId: randomUUID(),
+    roundNumber,
+    adminSessionId: session.sessionId,
+    hostTokenHash: hashHostToken(hostToken),
+    expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+  };
+}
+
+function prepareNormalizedRerollDraws<T>(callback: () => T) {
+  const rollback = createOperationalStateSnapshot(adminState);
+
+  try {
+    syncSelectedSongBlocks();
+
+    return callback();
+  } finally {
+    restoreOperationalStateSnapshot(adminState, rollback);
+  }
+}
+
+function normalizedRerollDraw(
+  expected: NonNullable<ReturnType<typeof adminState.drawStateStore.getActiveDraw>>,
+  nextDraw: NonNullable<ReturnType<typeof adminState.drawStateStore.getActiveDraw>>,
+): NormalizedRerollDraw {
+  return {
+    expectedDrawId: expected.id,
+    expectedDrawVersion: expected.version,
+    nextDraw,
+  };
+}
+
 export async function addPlayerAction(formData: FormData) {
   const session = await requireActiveHost();
 
@@ -774,124 +848,228 @@ export async function drawRoundSetAction(formData: FormData) {
 }
 
 export async function rerollOneChartAction(formData: FormData) {
-  const session = await requireActiveHost();
+  const session = await requireAdminSession();
+  const hostToken = await getHostTokenCookie();
 
   try {
-    syncSelectedSongBlocks();
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const chartId = getString(formData, "chartId");
     const roundNumber = getRoundNumber(formData);
-    const nowMs = await getAuthoritativeNowMs();
-    const postVoteInvalidation = invalidateRoundVotingForReroll(
-      roundNumber,
-      reason,
-      session,
-      nowMs,
-    );
-    const draw = adminState.drawStateStore.rerollOneChart({
-      roundNumber,
-      setOrder: getSetOrder(formData),
-      chartId,
-      reason,
-    });
-    audit(session, {
-      action: "reroll_one_chart",
-      summary: `Rerolled one chart in Round ${draw.roundNumber} - ${draw.displayLabel}.`,
-      reason,
-      dangerous: true,
-      affectedRecords: [
-        { type: "draw", id: draw.id },
-        { type: "chart", id: chartId },
-      ],
-      metadata: {
-        roundNumber: draw.roundNumber,
-        setOrder: draw.setOrder,
-        version: draw.version,
-        postVoteInvalidation,
-      },
+    const setOrder = getSetOrder(formData);
+
+    if (getTournamentStateBackend() === "supabase") {
+      const context = await requireNormalizedTransitionContext(roundNumber);
+      const draw = prepareNormalizedRerollDraws(() => {
+        const expected = adminState.drawStateStore.getActiveDraw(roundNumber, setOrder);
+
+        if (!expected) {
+          throw new Error("Cannot reroll one chart before the set is drawn.");
+        }
+
+        const nextDraw = adminState.drawStateStore.rerollOneChart({
+          roundNumber,
+          setOrder,
+          chartId,
+          reason,
+        });
+
+        return normalizedRerollDraw(expected, nextDraw);
+      });
+
+      await rerollNormalizedOneChart({
+        ...context,
+        reason,
+        targetChartId: chartId,
+        draw,
+      });
+      await hydrateTournamentState();
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
+    await withActiveHostTournamentState(session, hostToken, async (nowMs) => {
+      syncSelectedSongBlocks();
+      const postVoteInvalidation = invalidateRoundVotingForReroll(
+        roundNumber,
+        reason,
+        session,
+        nowMs,
+      );
+      const draw = adminState.drawStateStore.rerollOneChart({
+        roundNumber,
+        setOrder,
+        chartId,
+        reason,
+      });
+      audit(session, {
+        action: "reroll_one_chart",
+        summary: `Rerolled one chart in Round ${draw.roundNumber} - ${draw.displayLabel}.`,
+        reason,
+        dangerous: true,
+        affectedRecords: [
+          { type: "draw", id: draw.id },
+          { type: "chart", id: chartId },
+        ],
+        metadata: {
+          roundNumber: draw.roundNumber,
+          setOrder: draw.setOrder,
+          version: draw.version,
+          postVoteInvalidation,
+        },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "reroll_one_chart",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll chart.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
 export async function rerollRoundSetAction(formData: FormData) {
-  const session = await requireActiveHost();
+  const session = await requireAdminSession();
+  const hostToken = await getHostTokenCookie();
 
   try {
-    syncSelectedSongBlocks();
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const roundNumber = getRoundNumber(formData);
-    const nowMs = await getAuthoritativeNowMs();
-    const postVoteInvalidation = invalidateRoundVotingForReroll(
-      roundNumber,
-      reason,
-      session,
-      nowMs,
-    );
-    const draw = adminState.drawStateStore.rerollRoundSet({
-      roundNumber,
-      setOrder: getSetOrder(formData),
-      reason,
-    });
-    audit(session, {
-      action: "reroll_round_set",
-      summary: `Rerolled Round ${draw.roundNumber} - ${draw.displayLabel}.`,
-      reason,
-      dangerous: true,
-      affectedRecords: [{ type: "draw", id: draw.id }],
-      metadata: {
-        roundNumber: draw.roundNumber,
-        setOrder: draw.setOrder,
-        version: draw.version,
-        postVoteInvalidation,
-      },
+    const setOrder = getSetOrder(formData);
+
+    if (getTournamentStateBackend() === "supabase") {
+      const context = await requireNormalizedTransitionContext(roundNumber);
+      const draw = prepareNormalizedRerollDraws(() => {
+        const expected = adminState.drawStateStore.getActiveDraw(roundNumber, setOrder);
+
+        if (!expected) {
+          throw new Error("Cannot reroll a chart set before it is drawn.");
+        }
+
+        return normalizedRerollDraw(
+          expected,
+          adminState.drawStateStore.rerollRoundSet({ roundNumber, setOrder, reason }),
+        );
+      });
+
+      await rerollNormalizedRoundSet({ ...context, reason, draw });
+      await hydrateTournamentState();
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
+    await withActiveHostTournamentState(session, hostToken, async (nowMs) => {
+      syncSelectedSongBlocks();
+      const postVoteInvalidation = invalidateRoundVotingForReroll(
+        roundNumber,
+        reason,
+        session,
+        nowMs,
+      );
+      const draw = adminState.drawStateStore.rerollRoundSet({
+        roundNumber,
+        setOrder,
+        reason,
+      });
+      audit(session, {
+        action: "reroll_round_set",
+        summary: `Rerolled Round ${draw.roundNumber} - ${draw.displayLabel}.`,
+        reason,
+        dangerous: true,
+        affectedRecords: [{ type: "draw", id: draw.id }],
+        metadata: {
+          roundNumber: draw.roundNumber,
+          setOrder: draw.setOrder,
+          version: draw.version,
+          postVoteInvalidation,
+        },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "reroll_round_set",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll round set.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
 export async function rerollFullRoundAction(formData: FormData) {
-  const session = await requireActiveHost();
+  const session = await requireAdminSession();
+  const hostToken = await getHostTokenCookie();
 
   try {
-    syncSelectedSongBlocks();
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const roundNumber = getRoundNumber(formData);
-    const nowMs = await getAuthoritativeNowMs();
-    const postVoteInvalidation = invalidateRoundVotingForReroll(
-      roundNumber,
-      reason,
-      session,
-      nowMs,
-    );
-    const draws = adminState.drawStateStore.rerollFullRound({
-      roundNumber,
-      reason,
-    });
-    audit(session, {
-      action: "reroll_full_round",
-      summary: `Rerolled both chart sets for Round ${roundNumber}.`,
-      reason,
-      dangerous: true,
-      affectedRecords: draws.map((draw) => ({ type: "draw", id: draw.id })),
-      metadata: { roundNumber, postVoteInvalidation },
+
+    if (getTournamentStateBackend() === "supabase") {
+      const context = await requireNormalizedTransitionContext(roundNumber);
+      const draws = prepareNormalizedRerollDraws(() => {
+        const expectedOne = adminState.drawStateStore.getActiveDraw(roundNumber, 1);
+        const expectedTwo = adminState.drawStateStore.getActiveDraw(roundNumber, 2);
+
+        if (!expectedOne || !expectedTwo) {
+          throw new Error("Cannot reroll a full round before both sets are drawn.");
+        }
+
+        const [nextOne, nextTwo] = adminState.drawStateStore.rerollFullRound({
+          roundNumber,
+          reason,
+        });
+
+        return [
+          normalizedRerollDraw(expectedOne, nextOne),
+          normalizedRerollDraw(expectedTwo, nextTwo),
+        ] as [NormalizedRerollDraw, NormalizedRerollDraw];
+      });
+
+      await rerollNormalizedFullRound({ ...context, reason, draws });
+      await hydrateTournamentState();
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
+    await withActiveHostTournamentState(session, hostToken, async (nowMs) => {
+      syncSelectedSongBlocks();
+      const postVoteInvalidation = invalidateRoundVotingForReroll(
+        roundNumber,
+        reason,
+        session,
+        nowMs,
+      );
+      const draws = adminState.drawStateStore.rerollFullRound({
+        roundNumber,
+        reason,
+      });
+      audit(session, {
+        action: "reroll_full_round",
+        summary: `Rerolled both chart sets for Round ${roundNumber}.`,
+        reason,
+        dangerous: true,
+        affectedRecords: draws.map((draw) => ({ type: "draw", id: draw.id })),
+        metadata: { roundNumber, postVoteInvalidation },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "reroll_full_round",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reroll full round.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -899,9 +1077,26 @@ export async function openVotingAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
 
-    await withActiveHostVotingAdminState((session, nowMs) => {
+    if (getTournamentStateBackend() === "supabase") {
+      const context = await requireNormalizedTransitionContext(roundNumber);
+
+      await openNormalizedVotingWindow(context);
+      await hydrateTournamentState();
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
+    const session = await requireAdminSession();
+    const hostToken = await getHostTokenCookie();
+
+    await withActiveHostTournamentState(session, hostToken, (nowMs) => {
       const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
       const drawReadiness = getRoundDrawReadiness(roundNumber);
+      const result = adminState.resultStore.getRoundResult(roundNumber);
+
+      if (result) {
+        throw new Error("Round results must be reset before voting can open again.");
+      }
 
       if (!drawReadiness.isReady) {
         const selectedSongProblem = drawReadiness.problems.find(
@@ -921,6 +1116,11 @@ export async function openVotingAction(formData: FormData) {
         eligiblePlayers: snapshot.eligiblePlayers,
         nowMs,
       });
+      adminState.rosterStore.snapshotRoundEligibility({
+        roundNumber,
+        playerIds: snapshot.eligiblePlayers.map((player) => player.id),
+        now: new Date(nowMs).toISOString(),
+      });
       audit(session, {
         action: "open_voting",
         summary: `Opened voting for Round ${roundNumber}.`,
@@ -928,6 +1128,12 @@ export async function openVotingAction(formData: FormData) {
           roundNumber,
           eligibleCount: snapshot.eligibleCount,
         },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "voting_opened",
+        updatedAt: new Date(nowMs).toISOString(),
       });
     });
   } catch (error) {
@@ -941,6 +1147,15 @@ export async function pauseVotingAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
 
+    if (getTournamentStateBackend() === "supabase") {
+      const context = await requireNormalizedTransitionContext(roundNumber);
+
+      await pauseNormalizedVotingWindow(context);
+      await hydrateTournamentState();
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
     await withActiveHostVotingAdminState((session, nowMs) => {
       advanceVotingDeadline(roundNumber, nowMs);
       adminState.votingWindowStore.pauseVoting(roundNumber, nowMs);
@@ -948,6 +1163,12 @@ export async function pauseVotingAction(formData: FormData) {
         action: "pause_voting",
         summary: `Paused voting for Round ${roundNumber}.`,
         metadata: { roundNumber },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "voting_paused",
+        updatedAt: new Date(nowMs).toISOString(),
       });
     });
   } catch (error) {
@@ -961,12 +1182,27 @@ export async function resumeVotingAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
 
+    if (getTournamentStateBackend() === "supabase") {
+      const context = await requireNormalizedTransitionContext(roundNumber);
+
+      await resumeNormalizedVotingWindow(context);
+      await hydrateTournamentState();
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
     await withActiveHostVotingAdminState((session, nowMs) => {
       adminState.votingWindowStore.resumeVoting(roundNumber, nowMs);
       audit(session, {
         action: "resume_voting",
         summary: `Resumed voting for Round ${roundNumber}.`,
         metadata: { roundNumber },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "voting_resumed",
+        updatedAt: new Date(nowMs).toISOString(),
       });
     });
   } catch (error) {
@@ -998,6 +1234,12 @@ export async function closeVotingAction(formData: FormData) {
         action: "close_voting",
         summary: `Closed voting for Round ${roundNumber}.`,
         metadata: { roundNumber },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "voting_closed",
+        updatedAt: new Date(nowMs).toISOString(),
       });
     });
   } catch (error) {
@@ -1147,6 +1389,12 @@ export async function manualBallotAction(formData: FormData) {
       adminState.resultStore.clearRoundResult(roundNumber);
       syncSelectedSongBlocks();
       adminState.votingWindowStore.returnToClosedForRecompute(roundNumber, nowMs);
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "manual_ballot_override",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     }
 
     audit(session, {
@@ -1179,44 +1427,52 @@ export async function computeResultsAction(formData: FormData) {
     const roundNumber = getRoundNumber(formData);
 
     if (getTournamentStateBackend() === "supabase") {
-      const session = await requireActiveHostForNormalizedAction();
+      const context = await requireNormalizedTransitionContext(roundNumber);
 
-      await computeNormalizedResults({ roundNumber, adminSessionId: session.sessionId });
+      await computeNormalizedResults(context);
       revalidateTournamentViews(revalidatePath);
       return;
     }
 
-    const session = await requireActiveHost();
-    const nowMs = await getAuthoritativeNowMs();
-    advanceVotingDeadline(roundNumber, nowMs);
-    const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
+    const session = await requireAdminSession();
+    const hostToken = await getHostTokenCookie();
 
-    if (snapshot.status !== "voting_closed") {
-      throw new Error("Voting must be closed before results are computed.");
-    }
+    await withActiveHostTournamentState(session, hostToken, (nowMs) => {
+      advanceVotingDeadline(roundNumber, nowMs);
+      const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
 
-    const result = adminState.resultStore.computeRound({
-      roundNumber,
-      draws: getRoundDrawRecords(roundNumber),
-      ballots: adminState.ballotStore.listForRound(roundNumber),
-      eligiblePlayers: snapshot.eligiblePlayers,
-      priorSelectedSongBlocks: priorSelectedSongBlocksForRound(roundNumber),
-      now: snapshot.serverNow,
-    });
-    syncSelectedSongBlocks();
-    adminState.votingWindowStore.setResultsPhase(roundNumber, "results_computed");
-    adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
-    audit(session, {
-      action: "compute_results",
-      summary: `Computed results for Round ${roundNumber}.`,
-      affectedRecords: [{ type: "result", id: result.id }],
-      metadata: { roundNumber },
+      if (snapshot.status !== "voting_closed") {
+        throw new Error("Voting must be closed before results are computed.");
+      }
+
+      const result = adminState.resultStore.computeRound({
+        roundNumber,
+        draws: getRoundDrawRecords(roundNumber),
+        ballots: adminState.ballotStore.listForRound(roundNumber),
+        eligiblePlayers: snapshot.eligiblePlayers,
+        priorSelectedSongBlocks: priorSelectedSongBlocksForRound(roundNumber),
+        now: snapshot.serverNow,
+      });
+      syncSelectedSongBlocks();
+      adminState.votingWindowStore.setResultsPhase(roundNumber, "results_computed");
+      adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "closed_revealing" });
+      audit(session, {
+        action: "compute_results",
+        summary: `Computed results for Round ${roundNumber}.`,
+        affectedRecords: [{ type: "result", id: result.id }],
+        metadata: { roundNumber },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "results_computed",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not compute results.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -1224,6 +1480,32 @@ export async function advanceResultRevealAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
     const expectedRevealPhase = getExpectedRevealPhase(formData);
+
+    if (getTournamentStateBackend() === "supabase") {
+      const context = await requireNormalizedTransitionContext(roundNumber);
+      const result = adminState.resultStore.getRoundResult(roundNumber);
+
+      if (!result) {
+        throw new Error(`Round ${roundNumber} results have not been computed.`);
+      }
+
+      if (!expectedRevealPhase) {
+        throw new Error("Expected reveal phase is required.");
+      }
+
+      if (expectedRevealPhase === "final") {
+        throw new Error("Final results cannot advance to another reveal phase.");
+      }
+
+      await advanceNormalizedResultReveal({
+        ...context,
+        expectedResultId: result.id,
+        expectedRevealPhase,
+      });
+      await hydrateTournamentState();
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
 
     await withActiveHostResultAdminState((session, nowMs) => {
       const result = adminState.resultStore.advanceReveal(
@@ -1245,12 +1527,17 @@ export async function advanceResultRevealAction(formData: FormData) {
         affectedRecords: [{ type: "result", id: result.id }],
         metadata: { roundNumber, revealPhase: result.revealPhase },
       });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "result_reveal_advanced",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not advance result reveal.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -1258,7 +1545,25 @@ export async function releaseFinalResultsAction(formData: FormData) {
   try {
     const roundNumber = getRoundNumber(formData);
 
-    await withActiveHostResultAdminState((session) => {
+    if (getTournamentStateBackend() === "supabase") {
+      const context = await requireNormalizedTransitionContext(roundNumber);
+      const result = adminState.resultStore.getRoundResult(roundNumber);
+
+      if (!result || result.revealPhase !== "final") {
+        throw new Error("Final charts must be shown on stage before public results are released.");
+      }
+
+      await releaseNormalizedFinalResults({
+        ...context,
+        expectedResultId: result.id,
+        expectedRevealPhase: "final",
+      });
+      await hydrateTournamentState();
+      revalidateTournamentViews(revalidatePath);
+      return;
+    }
+
+    await withActiveHostResultAdminState((session, nowMs) => {
       const result = adminState.resultStore.getRoundResult(roundNumber);
 
       if (!result || result.revealPhase !== "final") {
@@ -1273,12 +1578,17 @@ export async function releaseFinalResultsAction(formData: FormData) {
         affectedRecords: [{ type: "result", id: result.id }],
         metadata: { roundNumber, revealPhase: result.revealPhase },
       });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "results_released",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not release final results.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -1450,7 +1760,11 @@ export async function startRehearsalModeAction(formData: FormData) {
     await requireRehearsalControlsForAction(session, "start rehearsal mode");
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
-    resetTournamentOperationalState();
+    const nowMs = await getAuthoritativeNowMs();
+    resetTournamentOperationalState({
+      publicTransitionKind: "start_rehearsal_mode",
+      publicUpdatedAtMs: nowMs,
+    });
     adminState.roundStateStore.setCurrentRound(1);
     adminState.roundStateStore.setRehearsalMode(true);
 
@@ -1471,7 +1785,7 @@ export async function startRehearsalModeAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not start rehearsal mode.");
   }
 
-  await persistTournamentState();
+  await replaceTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -1482,7 +1796,11 @@ export async function resetRehearsalModeAction(formData: FormData) {
     await requireRehearsalControlsForAction(session, "reset rehearsal mode");
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
-    resetTournamentOperationalState();
+    const nowMs = await getAuthoritativeNowMs();
+    resetTournamentOperationalState({
+      publicTransitionKind: "reset_rehearsal_mode",
+      publicUpdatedAtMs: nowMs,
+    });
     adminState.roundStateStore.setCurrentRound(1);
     adminState.roundStateStore.setRehearsalMode(false);
     audit(session, {
@@ -1495,7 +1813,7 @@ export async function resetRehearsalModeAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Could not reset rehearsal data.");
   }
 
-  await persistTournamentState();
+  await replaceTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -1505,8 +1823,12 @@ export async function resetTournamentDataAction(formData: FormData) {
   try {
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
+    const nowMs = await getAuthoritativeNowMs();
 
-    resetTournamentOperationalState();
+    resetTournamentOperationalState({
+      publicTransitionKind: "reset_tournament_data",
+      publicUpdatedAtMs: nowMs,
+    });
     adminState.roundStateStore.setCurrentRound(1);
     adminState.roundStateStore.setRehearsalMode(false);
     audit(session, {
@@ -1631,7 +1953,7 @@ export async function reopenVotingAction(formData: FormData) {
     const roundNumber = getRoundNumber(formData);
 
     if (getTournamentStateBackend() === "supabase") {
-      const session = await requireActiveHostForNormalizedAction();
+      const context = await requireNormalizedTransitionContext(roundNumber);
 
       await verifyDangerousActionPassword(getAdminPassword(formData));
 
@@ -1646,58 +1968,63 @@ export async function reopenVotingAction(formData: FormData) {
       }
 
       await reopenNormalizedVotingWindow({
-        roundNumber,
+        ...context,
         durationMinutes,
         reason,
-        adminSessionId: session.sessionId,
       });
       revalidateTournamentViews(revalidatePath);
       return;
     }
 
-    assertSupabaseTransactionalMutationImplemented("reopenVotingWindow");
-    const session = await requireActiveHost();
+    const session = await requireAdminSession();
+    const hostToken = await getHostTokenCookie();
 
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
     const durationMinutes = getDurationMinutes(formData);
-    const nowMs = await getAuthoritativeNowMs();
-    const result = adminState.resultStore.getRoundResult(roundNumber);
+    await withActiveHostTournamentState(session, hostToken, (nowMs) => {
+      const result = adminState.resultStore.getRoundResult(roundNumber);
 
-    if (result && result.revealPhase !== "computed") {
-      throw new Error(
-        "Emergency reopen is allowed only before result reveal starts. Use result correction after reveal begins.",
-      );
-    }
+      if (result && result.revealPhase !== "computed") {
+        throw new Error(
+          "Emergency reopen is allowed only before result reveal starts. Use result correction after reveal begins.",
+        );
+      }
 
-    if (result?.revealPhase === "computed") {
-      adminState.resultStore.clearRoundResult(roundNumber);
-      syncSelectedSongBlocks();
-      adminState.votingWindowStore.returnToClosedForRecompute(roundNumber, nowMs);
-    }
+      if (result?.revealPhase === "computed") {
+        adminState.resultStore.clearRoundResult(roundNumber);
+        syncSelectedSongBlocks();
+        adminState.votingWindowStore.returnToClosedForRecompute(roundNumber, nowMs);
+      }
 
-    adminState.votingWindowStore.reopenVoting({
-      roundNumber,
-      durationMinutes,
-      nowMs,
-    });
-    adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "voting_open" });
-    audit(session, {
-      action: "emergency_reopen_voting",
-      summary: `Reopened Round ${roundNumber} voting for ${durationMinutes} minute(s).`,
-      reason,
-      dangerous: true,
-      metadata: {
+      adminState.votingWindowStore.reopenVoting({
         roundNumber,
         durationMinutes,
-        invalidatedComputedResult: result?.revealPhase === "computed",
-      },
+        nowMs,
+      });
+      adminState.ballotStore.setPhoneStatus(roundNumber, { phase: "voting_open" });
+      audit(session, {
+        action: "emergency_reopen_voting",
+        summary: `Reopened Round ${roundNumber} voting for ${durationMinutes} minute(s).`,
+        reason,
+        dangerous: true,
+        metadata: {
+          roundNumber,
+          durationMinutes,
+          invalidatedComputedResult: result?.revealPhase === "computed",
+        },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "voting_restarted",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reopen voting.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 
@@ -1706,40 +2033,46 @@ export async function resetRoundAction(formData: FormData) {
     const roundNumber = getRoundNumber(formData);
 
     if (getTournamentStateBackend() === "supabase") {
-      const session = await requireActiveHostForNormalizedAction();
+      const context = await requireNormalizedTransitionContext(roundNumber);
 
       await verifyDangerousActionPassword(getAdminPassword(formData));
 
       const reason = getRequiredReason(formData);
 
       await resetNormalizedRound({
-        roundNumber,
+        ...context,
         reason,
-        adminSessionId: session.sessionId,
       });
       revalidateTournamentViews(revalidatePath);
       return;
     }
 
-    assertSupabaseTransactionalMutationImplemented("resetRound");
-    const session = await requireActiveHost();
+    const session = await requireAdminSession();
+    const hostToken = await getHostTokenCookie();
 
     await verifyDangerousActionPassword(getAdminPassword(formData));
     const reason = getRequiredReason(formData);
 
-    resetRoundState(roundNumber);
-    audit(session, {
-      action: "reset_round",
-      summary: `Reset Round ${roundNumber} operational state.`,
-      reason,
-      dangerous: true,
-      metadata: { roundNumber },
+    await withActiveHostTournamentState(session, hostToken, (nowMs) => {
+      resetRoundState(roundNumber);
+      audit(session, {
+        action: "reset_round",
+        summary: `Reset Round ${roundNumber} operational state.`,
+        reason,
+        dangerous: true,
+        metadata: { roundNumber },
+      });
+      advancePublicStateGeneration({
+        expectedGeneration: adminState.publicStateGenerationStore.getRound(roundNumber).generation,
+        roundNumber,
+        transitionKind: "round_reset",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
     });
   } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not reset round.");
   }
 
-  await persistTournamentState();
   revalidateTournamentViews(revalidatePath);
 }
 

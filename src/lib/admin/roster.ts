@@ -15,6 +15,7 @@ export type CurrentRoundEligibilityEntry = {
   roundNumber: 1 | 2 | 3 | 4;
   reason: string;
   addedAt: string;
+  activeAtRoundStart?: boolean;
 };
 
 export type RosterStoreSnapshot = {
@@ -42,14 +43,20 @@ export class RosterStore {
 
   listEligiblePlayersForRound(roundNumber: 1 | 2 | 3 | 4) {
     const eligible = new Map<string, RosterPlayer>();
+    const roundEntries = this.currentRoundEligibility.filter(
+      (candidate) => candidate.roundNumber === roundNumber,
+    );
+    const hasVotingSnapshot = roundEntries.some((entry) => entry.activeAtRoundStart === true);
 
-    for (const player of this.listPlayers()) {
-      if (player.active) {
-        eligible.set(player.id, player);
+    if (!hasVotingSnapshot) {
+      for (const player of this.listPlayers()) {
+        if (player.active) {
+          eligible.set(player.id, player);
+        }
       }
     }
 
-    for (const entry of this.currentRoundEligibility.filter((candidate) => candidate.roundNumber === roundNumber)) {
+    for (const entry of roundEntries) {
       const player = this.players.get(entry.playerId);
 
       if (player) {
@@ -57,7 +64,9 @@ export class RosterStore {
       }
     }
 
-    return [...eligible.values()].sort((left, right) => left.startggUsername.localeCompare(right.startggUsername));
+    return [...eligible.values()].sort((left, right) =>
+      left.startggUsername.localeCompare(right.startggUsername),
+    );
   }
 
   getPlayer(playerId: string) {
@@ -81,7 +90,10 @@ export class RosterStore {
     const active = input.active ?? existing?.active ?? true;
     const duplicateActive = this.listPlayers().find(
       (player) =>
-        player.id !== input.playerId && player.active && active && player.normalizedUsername === normalizedUsername,
+        player.id !== input.playerId &&
+        player.active &&
+        active &&
+        player.normalizedUsername === normalizedUsername,
     );
 
     if (duplicateActive) {
@@ -217,11 +229,57 @@ export class RosterStore {
       roundNumber: input.roundNumber,
       reason: input.reason.trim(),
       addedAt: input.now ?? new Date().toISOString(),
+      activeAtRoundStart: false,
     };
 
     this.currentRoundEligibility.push(entry);
 
     return entry;
+  }
+
+  snapshotRoundEligibility(input: {
+    roundNumber: 1 | 2 | 3 | 4;
+    playerIds: string[];
+    now?: string;
+  }) {
+    const now = input.now ?? new Date().toISOString();
+    const existingKeys = new Set(
+      this.currentRoundEligibility.map((entry) => `${entry.roundNumber}:${entry.playerId}`),
+    );
+
+    for (const playerId of input.playerIds) {
+      if (!this.players.has(playerId)) {
+        throw new Error("Eligible player was not found in the roster.");
+      }
+
+      const key = `${input.roundNumber}:${playerId}`;
+
+      if (existingKeys.has(key)) {
+        const existing = this.currentRoundEligibility.find(
+          (entry) => entry.roundNumber === input.roundNumber && entry.playerId === playerId,
+        );
+
+        if (existing) {
+          existing.activeAtRoundStart = true;
+        }
+        continue;
+      }
+
+      this.currentRoundEligibility.push({
+        playerId,
+        roundNumber: input.roundNumber,
+        reason: "Voting eligibility snapshot.",
+        addedAt: now,
+        activeAtRoundStart: true,
+      });
+      existingKeys.add(key);
+    }
+  }
+
+  clearRoundEligibility(roundNumber: 1 | 2 | 3 | 4) {
+    this.currentRoundEligibility = this.currentRoundEligibility.filter(
+      (entry) => entry.roundNumber !== roundNumber,
+    );
   }
 
   listCurrentRoundEligibility() {
@@ -237,6 +295,9 @@ export class RosterStore {
 
   importSnapshot(snapshot: RosterStoreSnapshot) {
     this.players = new Map(snapshot.players.map((player) => [player.id, { ...player }]));
-    this.currentRoundEligibility = snapshot.currentRoundEligibility.map((entry) => ({ ...entry }));
+    this.currentRoundEligibility = snapshot.currentRoundEligibility.map((entry) => ({
+      ...entry,
+      activeAtRoundStart: entry.activeAtRoundStart ?? false,
+    }));
   }
 }

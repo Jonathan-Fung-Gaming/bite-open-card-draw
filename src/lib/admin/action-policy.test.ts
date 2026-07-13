@@ -1,10 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  ADMIN_ACTION_POLICIES,
-  ADMIN_ACTION_POLICY_CLASSIFICATIONS,
-} from "./action-policy";
+import { ADMIN_ACTION_POLICIES, ADMIN_ACTION_POLICY_CLASSIFICATIONS } from "./action-policy";
 
 const actionsSource = readFileSync(
   path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
@@ -58,9 +55,7 @@ describe("admin action policy matrix", () => {
       expect(block, policy.serverAction).toContain("verifyDangerousActionPassword");
       expect(block, policy.serverAction).toContain("getRequiredReason");
       expect(block, policy.serverAction).toContain("dangerous: true");
-      expect(policy.classification, policy.serverAction).toBe(
-        "password-required dangerous action",
-      );
+      expect(policy.classification, policy.serverAction).toBe("password-required dangerous action");
       expect(policy.requiresAuditReason, policy.serverAction).toBe(true);
       expect(policy.dangerousAudit, policy.serverAction).toBe(true);
     }
@@ -71,6 +66,7 @@ describe("admin action policy matrix", () => {
       "requireActiveHost",
       "withActiveHostVotingAdminState",
       "withActiveHostResultAdminState",
+      "withActiveHostTournamentState",
       "requireActiveHostForNormalizedAction",
       "adminState.hostLockStore.refresh",
     ] as const;

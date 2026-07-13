@@ -4,7 +4,10 @@ import clsx from "clsx";
 import { useEffect, useState, type CSSProperties } from "react";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawnChartSummary } from "@/lib/draw/draw-engine";
-import { TIEBREAK_REVEAL_DURATION_MS } from "@/lib/results/reveal-timing";
+import {
+  TIEBREAK_REVEAL_DURATION_MS,
+  getTiebreakRevealProgress,
+} from "@/lib/results/reveal-timing";
 import { ChartArtImage } from "./ChartArtImage";
 import { getRuneWheelFinalRotation, getRuneWheelRadialImageRotation } from "./rune-wheel-rotation";
 
@@ -13,6 +16,8 @@ type RuneWheelProps = {
   winnerChartId: string;
   winnerRevealed: boolean;
   compact?: boolean;
+  revealStartedAt?: string | null;
+  serverNowMs?: number;
   stageMode?: boolean;
 };
 
@@ -29,12 +34,22 @@ export function RuneWheel({
   winnerChartId,
   winnerRevealed,
   compact = false,
+  revealStartedAt,
+  serverNowMs,
   stageMode = false,
 }: RuneWheelProps) {
   const winner = slots.find((slot) => slot.id === winnerChartId);
   const winnerSlotIndex = slots.findIndex((slot) => slot.id === winnerChartId);
   const finalRotation = getRuneWheelFinalRotation(slots.length, winnerSlotIndex);
-  const [animationProgress, setAnimationProgress] = useState(winnerRevealed ? 1 : 0);
+  const revealTimingValid = getTiebreakRevealProgress(
+    revealStartedAt,
+    serverNowMs ?? Date.now(),
+  ).hasValidStart;
+  const [animationProgress, setAnimationProgress] = useState(() =>
+    winnerRevealed
+      ? 1
+      : getTiebreakRevealProgress(revealStartedAt, serverNowMs ?? Date.now()).progress,
+  );
   const progress = winnerRevealed ? 1 : easeOutCubic(animationProgress);
   const wheelStyle = {
     transform: `rotate(${progress * finalRotation}deg)`,
@@ -47,18 +62,25 @@ export function RuneWheel({
       return undefined;
     }
 
-    let animationFrame = 0;
-    const startedAt = window.performance.now();
+    const baseNowMs = serverNowMs ?? Date.now();
+    const initialProgress = getTiebreakRevealProgress(revealStartedAt, baseNowMs);
 
-    setAnimationProgress(0);
+    setAnimationProgress(initialProgress.progress);
+
+    if (!initialProgress.hasValidStart || initialProgress.complete) {
+      return undefined;
+    }
+
+    let animationFrame = 0;
+    const basePerformanceMs = window.performance.now();
 
     const tick = () => {
-      const elapsedMs = window.performance.now() - startedAt;
-      const nextProgress = clamp(elapsedMs / TIEBREAK_REVEAL_DURATION_MS, 0, 1);
+      const nextNowMs = baseNowMs + window.performance.now() - basePerformanceMs;
+      const nextProgress = getTiebreakRevealProgress(revealStartedAt, nextNowMs);
 
-      setAnimationProgress(nextProgress);
+      setAnimationProgress(nextProgress.progress);
 
-      if (nextProgress < 1) {
+      if (!nextProgress.complete) {
         animationFrame = window.requestAnimationFrame(tick);
       }
     };
@@ -66,7 +88,7 @@ export function RuneWheel({
     animationFrame = window.requestAnimationFrame(tick);
 
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [slots.length, winnerChartId, winnerRevealed]);
+  }, [revealStartedAt, serverNowMs, slots.length, winnerChartId, winnerRevealed]);
 
   return (
     <div
@@ -75,6 +97,8 @@ export function RuneWheel({
         stageMode && "w-full max-w-[54rem]",
         stageMode ? "px-2 py-3" : compact ? "p-1" : "p-2",
       )}
+      data-authoritative-reveal-progress={clamp(animationProgress, 0, 1).toFixed(4)}
+      data-reveal-timing-valid={revealTimingValid ? "true" : "false"}
       data-testid="rune-wheel"
       data-winner-revealed={winnerRevealed ? "true" : "false"}
       data-winner-slot-index={winnerSlotIndex}
@@ -136,6 +160,8 @@ export function RuneWheel({
             >
               {winnerRevealed ? (
                 <span className="text-ember-300">{winner?.name ?? winnerChartId}</span>
+              ) : !revealTimingValid ? (
+                "Waiting for authoritative reveal timing."
               ) : (
                 "Tiebreak selector is spinning."
               )}

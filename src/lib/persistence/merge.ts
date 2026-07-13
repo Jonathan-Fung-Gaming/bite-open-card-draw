@@ -4,6 +4,11 @@ import {
 } from "@/lib/persistence/operational-state";
 import type { RoundResultSnapshot } from "@/lib/results/result-engine";
 import { resultRevealPhaseRank } from "@/lib/results/reveal-phase-order";
+import {
+  createDefaultPublicStateGenerationSnapshot,
+  type PublicStateGenerationRecord,
+  type PublicStateGenerationStoreSnapshot,
+} from "@/lib/round/public-state-generation";
 import type { RoundBallot } from "@/lib/vote/ballot";
 
 type MergeInput = {
@@ -101,6 +106,43 @@ function resultTime(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function publicStateGenerationTime(record: PublicStateGenerationRecord) {
+  const parsed = record.updatedAt ? Date.parse(record.updatedAt) : NaN;
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mergePublicStateGenerations(
+  ...snapshots: Array<PublicStateGenerationStoreSnapshot | null | undefined>
+): PublicStateGenerationStoreSnapshot {
+  const merged = new Map<number, PublicStateGenerationRecord>();
+
+  for (const snapshot of snapshots) {
+    const rounds = snapshot?.rounds ?? createDefaultPublicStateGenerationSnapshot().rounds;
+
+    for (const record of rounds) {
+      const existing = merged.get(record.roundNumber);
+      const shouldReplace =
+        !existing ||
+        record.generation > existing.generation ||
+        (record.generation === existing.generation &&
+          publicStateGenerationTime(record) >= publicStateGenerationTime(existing));
+
+      if (shouldReplace) {
+        merged.set(record.roundNumber, {
+          ...record,
+          activeDraws: record.activeDraws.map((draw) => ({ ...draw })),
+          tiebreakStarts: record.tiebreakStarts.map((start) => ({ ...start })),
+        });
+      }
+    }
+  }
+
+  return {
+    rounds: [...merged.values()].sort((left, right) => left.roundNumber - right.roundNumber),
+  };
+}
+
 function monotonicResult(
   current: RoundResultSnapshot,
   latest: RoundResultSnapshot | undefined,
@@ -152,7 +194,9 @@ function sortByRound<T extends { roundNumber: number }>(items: T[]) {
   return items.sort((left, right) => left.roundNumber - right.roundNumber);
 }
 
-function sortDraws<T extends { roundNumber: number; setOrder: number; version: number }>(items: T[]) {
+function sortDraws<T extends { roundNumber: number; setOrder: number; version: number }>(
+  items: T[],
+) {
   return items.sort(
     (left, right) =>
       left.roundNumber - right.roundNumber ||
@@ -195,13 +239,26 @@ export function mergeOperationalStateSnapshots({
   latest,
 }: MergeInput): OperationalStateSnapshot {
   if (!latest || !baseline) {
-    return cloneOperationalStateSnapshot(current);
+    const merged = cloneOperationalStateSnapshot(current);
+
+    merged.publicStateGeneration = mergePublicStateGenerations(
+      baseline?.publicStateGeneration,
+      current.publicStateGeneration,
+      latest?.publicStateGeneration,
+    );
+
+    return merged;
   }
 
   const merged = cloneOperationalStateSnapshot(latest);
 
   merged.schemaVersion = current.schemaVersion;
   merged.savedAt = current.savedAt;
+  merged.publicStateGeneration = mergePublicStateGenerations(
+    baseline.publicStateGeneration,
+    current.publicStateGeneration,
+    latest.publicStateGeneration,
+  );
 
   merged.audit.records = sortByCreatedAtDesc(
     unionByKey(

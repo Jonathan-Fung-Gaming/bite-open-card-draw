@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { BallotSetChoice } from "@/lib/vote/ballot";
 import { withNormalizedEventPersistenceLock } from "@/lib/server/normalized-operational-state";
+import type { NormalizedAdminTransitionContext } from "@/lib/server/normalized-round-transitions";
 import { executeNormalizedTransactionalMutation } from "@/lib/server/transactions/normalized-runtime";
 
 const normalizedManualBallotOverrideResultSchema = z.object({
@@ -21,12 +22,18 @@ const normalizedReopenVotingWindowResultSchema = z.object({
   durationMinutes: z.number().int().min(1).max(10),
   invalidatedComputedResult: z.boolean(),
   adminActionId: z.string().uuid(),
+  requestId: z.string().uuid(),
+  generation: z.number().int().nonnegative(),
+  transitionKind: z.literal("voting_restarted"),
 });
 
 const normalizedResetRoundResultSchema = z.object({
   roundNumber: z.number().int().min(1).max(4),
   rowsChanged: z.number().int().nonnegative(),
   adminActionId: z.string().uuid(),
+  requestId: z.string().uuid(),
+  generation: z.number().int().nonnegative(),
+  transitionKind: z.literal("round_reset"),
 });
 
 const normalizedCloseVotingWindowResultSchema = z.object({
@@ -75,34 +82,29 @@ export async function submitNormalizedManualBallotOverride(input: {
   return normalizedManualBallotOverrideResultSchema.parse(result);
 }
 
-export async function reopenNormalizedVotingWindow(input: {
-  roundNumber: 1 | 2 | 3 | 4;
-  durationMinutes: number;
-  reason: string;
-  adminSessionId: string;
-}): Promise<NormalizedReopenVotingWindowResult> {
+export async function reopenNormalizedVotingWindow(
+  input: NormalizedAdminTransitionContext & {
+    durationMinutes: number;
+    reason: string;
+  },
+): Promise<NormalizedReopenVotingWindowResult> {
   const result = await withNormalizedEventPersistenceLock(() =>
     executeNormalizedTransactionalMutation("reopenVotingWindow", {
-      roundNumber: input.roundNumber,
-      durationMinutes: input.durationMinutes,
-      reason: input.reason,
-      adminSessionId: input.adminSessionId,
+      ...input,
     }),
   );
 
   return normalizedReopenVotingWindowResultSchema.parse(result);
 }
 
-export async function resetNormalizedRound(input: {
-  roundNumber: 1 | 2 | 3 | 4;
-  reason: string;
-  adminSessionId: string;
-}): Promise<NormalizedResetRoundResult> {
+export async function resetNormalizedRound(
+  input: NormalizedAdminTransitionContext & {
+    reason: string;
+  },
+): Promise<NormalizedResetRoundResult> {
   const result = await withNormalizedEventPersistenceLock(() =>
     executeNormalizedTransactionalMutation("resetRound", {
-      roundNumber: input.roundNumber,
-      reason: input.reason,
-      adminSessionId: input.adminSessionId,
+      ...input,
     }),
   );
 

@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { normalizeChartRow } from "@/lib/charts/normalize";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import {
+  cloneOperationalStateSnapshot,
   createAdminStateStores,
   createOperationalStateSnapshot,
+  type AdminStateStores,
+  type OperationalStateSnapshot,
 } from "@/lib/persistence/operational-state";
 import { MemoryOperationalStateRepository } from "@/lib/persistence/repository";
 import type { OperationalStateRepository } from "@/lib/persistence/repository";
@@ -12,7 +15,9 @@ import {
   getTournamentStateBackend,
   hydrateTournamentState,
   persistTournamentState,
+  withPersistedResultAdminState,
   withPersistedTournamentState,
+  withPersistedVotingAdminState,
 } from "./persistence";
 
 vi.mock("server-only", () => ({}));
@@ -74,6 +79,97 @@ async function seedOpenVotingRound(repository: MemoryOperationalStateRepository)
   return {
     players,
     draws: [firstDraw, secondDraw] as const,
+  };
+}
+
+function seedAtomicTransitionState() {
+  const stores = createAdminStateStores();
+
+  stores.drawStateStore.setChartsForTest([
+    ...chartsFor("16", 10, "Atomic S16"),
+    ...chartsFor("17", 30, "Atomic S17"),
+  ]);
+
+  const player = stores.rosterStore.createOrUpdatePlayer({
+    startggUsername: "Atomic Player",
+    active: true,
+    now: "2026-07-13T00:00:00.000Z",
+  });
+  const firstDraw = stores.drawStateStore.drawRoundSet({ roundNumber: 1, setOrder: 1 });
+  const secondDraw = stores.drawStateStore.drawRoundSet({ roundNumber: 1, setOrder: 2 });
+
+  stores.votingWindowStore.openVoting({
+    roundNumber: 1,
+    drawsReady: true,
+    eligiblePlayers: [{ id: player.id, startggUsername: player.startggUsername }],
+    nowMs: Date.parse("2026-07-13T00:00:00.000Z"),
+  });
+  stores.votingWindowStore.closeVoting(1, Date.parse("2026-07-13T00:10:00.000Z"));
+  stores.resultStore.computeRound({
+    roundNumber: 1,
+    draws: [firstDraw, secondDraw],
+    ballots: [],
+    eligiblePlayers: [{ id: player.id, startggUsername: player.startggUsername }],
+    priorSelectedSongBlocks: [],
+    now: "2026-07-13T00:10:01.000Z",
+  });
+  stores.votingWindowStore.setResultsPhase(1, "results_computed");
+  stores.ballotStore.setPhoneStatus(1, { phase: "closed_revealing" });
+
+  return stores;
+}
+
+function advanceTestPublicStateGeneration(
+  stores: AdminStateStores,
+  transitionKind: string,
+  updatedAt: string,
+) {
+  const { generation: expectedGeneration, ...previous } =
+    stores.publicStateGenerationStore.getRound(1);
+  const result = stores.resultStore.getRoundResult(1);
+  const votingWindow = stores.votingWindowStore
+    .exportSnapshot()
+    .windows.find((window) => window.roundNumber === 1);
+  const phoneReleased = stores.ballotStore.getPhoneStatus(1).phase === "revealed";
+
+  return stores.publicStateGenerationStore.advance({
+    ...previous,
+    expectedGeneration,
+    transitionKind,
+    resultMode: Boolean(result),
+    updatedAt,
+    activeDraws: stores.drawStateStore
+      .getRoundDraws(1)
+      .filter((draw): draw is NonNullable<typeof draw> => draw !== null)
+      .map((draw) => ({
+        drawId: draw.id,
+        roundSetId: draw.roundSetId,
+        version: draw.version,
+      })),
+    votingStatus: votingWindow?.status ?? "ready_to_vote",
+    votingDeadline: votingWindow?.closesAt ?? null,
+    resultId: result?.id ?? null,
+    resultPhase: result?.revealPhase ?? null,
+    resultPhaseStartedAt: result?.revealPhaseStartedAt ?? null,
+    tiebreakStarts:
+      result?.sets.flatMap((set) =>
+        set.winnerRevealStartedAt
+          ? [{ setOrder: set.setOrder, startedAt: set.winnerRevealStartedAt }]
+          : [],
+      ) ?? [],
+    phoneReleaseStatus: phoneReleased ? "released" : "held",
+    phoneReleasedAt: phoneReleased ? updatedAt : null,
+  });
+}
+
+function failingSaveRepository(snapshot: OperationalStateSnapshot): OperationalStateRepository {
+  return {
+    async load() {
+      return cloneOperationalStateSnapshot(snapshot);
+    },
+    async save() {
+      throw new Error("atomic save failed");
+    },
   };
 }
 
@@ -157,6 +253,103 @@ describe("server persistence safety", () => {
     ]);
   });
 
+  it("rolls back a reroll and its generation when the atomic memory save fails", async () => {
+    const stores = seedAtomicTransitionState();
+    const baseline = createOperationalStateSnapshot(stores, "2026-07-13T00:10:01.000Z");
+    const originalDraw = stores.drawStateStore.getActiveDraw(1, 1);
+    const originalHistoryCount = stores.drawStateStore.getRoundDraws(1).filter(Boolean).length;
+
+    await expect(
+      withPersistedVotingAdminState(
+        () => {
+          stores.drawStateStore.rerollOneChart({
+            roundNumber: 1,
+            setOrder: 1,
+            chartId: originalDraw?.charts[0]?.id ?? "",
+            reason: "atomic rollback test",
+          });
+          stores.resultStore.clearRoundResult(1);
+          stores.votingWindowStore.resetRound(1);
+          stores.ballotStore.setPhoneStatus(1, { phase: "voting_open" });
+          advanceTestPublicStateGeneration(stores, "reroll_one_chart", "2026-07-13T00:10:02.000Z");
+        },
+        stores,
+        failingSaveRepository(baseline),
+      ),
+    ).rejects.toThrow("atomic save failed");
+
+    expect(stores.drawStateStore.getActiveDraw(1, 1)?.id).toBe(originalDraw?.id);
+    expect(stores.drawStateStore.getRoundDraws(1).filter(Boolean)).toHaveLength(
+      originalHistoryCount,
+    );
+    expect(stores.resultStore.getRoundResult(1)?.revealPhase).toBe("computed");
+    expect(stores.ballotStore.getPhoneStatus(1)).toEqual({ phase: "closed_revealing" });
+    expect(stores.publicStateGenerationStore.getRound(1).generation).toBe(0);
+  });
+
+  it("rolls back reveal progress and generation when the atomic memory save fails", async () => {
+    const stores = seedAtomicTransitionState();
+    const baseline = createOperationalStateSnapshot(stores, "2026-07-13T00:10:01.000Z");
+
+    await expect(
+      withPersistedResultAdminState(
+        () => {
+          stores.resultStore.advanceReveal(1, "2026-07-13T00:10:02.000Z", "computed");
+          stores.votingWindowStore.setResultsPhase(1, "results_revealing");
+          advanceTestPublicStateGeneration(
+            stores,
+            "result_reveal_advanced",
+            "2026-07-13T00:10:02.000Z",
+          );
+        },
+        stores,
+        failingSaveRepository(baseline),
+      ),
+    ).rejects.toThrow("atomic save failed");
+
+    expect(stores.resultStore.getRoundResult(1)?.revealPhase).toBe("computed");
+    expect(stores.votingWindowStore.exportSnapshot().windows[0]?.status).toBe("results_computed");
+    expect(stores.ballotStore.getPhoneStatus(1)).toEqual({ phase: "closed_revealing" });
+    expect(stores.publicStateGenerationStore.getRound(1).generation).toBe(0);
+  });
+
+  it("rolls back phone release and generation when the atomic memory save fails", async () => {
+    const stores = seedAtomicTransitionState();
+
+    stores.resultStore.setRevealPhase(1, "final", "2026-07-13T00:10:02.000Z");
+    stores.votingWindowStore.setResultsPhase(1, "results_revealing");
+
+    const baseline = createOperationalStateSnapshot(stores, "2026-07-13T00:10:02.000Z");
+    const result = stores.resultStore.getRoundResult(1);
+
+    await expect(
+      withPersistedResultAdminState(
+        () => {
+          stores.votingWindowStore.setResultsPhase(1, "results_revealed");
+          stores.ballotStore.setPhoneStatus(1, {
+            phase: "revealed",
+            selectedCharts:
+              result?.sets.map((set) => ({
+                id: set.selectedChart.id,
+                name: set.selectedChart.name,
+                artist: set.selectedChart.artist,
+                displayDifficulty: set.selectedChart.displayDifficulty,
+                localImagePath: set.selectedChart.localImagePath,
+              })) ?? [],
+          });
+          advanceTestPublicStateGeneration(stores, "results_released", "2026-07-13T00:10:03.000Z");
+        },
+        stores,
+        failingSaveRepository(baseline),
+      ),
+    ).rejects.toThrow("atomic save failed");
+
+    expect(stores.resultStore.getRoundResult(1)?.revealPhase).toBe("final");
+    expect(stores.votingWindowStore.exportSnapshot().windows[0]?.status).toBe("results_revealing");
+    expect(stores.ballotStore.getPhoneStatus(1)).toEqual({ phase: "closed_revealing" });
+    expect(stores.publicStateGenerationStore.getRound(1).generation).toBe(0);
+  });
+
   it("merges concurrent different-player ballot submissions instead of overwriting stale snapshots", async () => {
     const repository = new MemoryOperationalStateRepository();
     const { players } = await seedOpenVotingRound(repository);
@@ -206,9 +399,12 @@ describe("server persistence safety", () => {
 
     await hydrateTournamentState(restored, repository);
 
-    expect(restored.ballotStore.listForRound(1).map((ballot) => ballot.playerId).sort()).toEqual(
-      players.map((player) => player.id).sort(),
-    );
+    expect(
+      restored.ballotStore
+        .listForRound(1)
+        .map((ballot) => ballot.playerId)
+        .sort(),
+    ).toEqual(players.map((player) => player.id).sort());
   });
 
   it("preserves the latest valid same-player ballot edit during concurrent saves", async () => {
@@ -365,12 +561,12 @@ describe("server persistence safety", () => {
     expect(staleHeartbeatWriter.hostLockStore.refresh("session-a", "host-token-a", 1_000)).toBe(
       true,
     );
-    expect(staleReleaseWriter.hostLockStore.release("session-a", "host-token-a", 1_100)).toMatchObject(
-      {
-        released: true,
-        outcome: "released",
-      },
-    );
+    expect(
+      staleReleaseWriter.hostLockStore.release("session-a", "host-token-a", 1_100),
+    ).toMatchObject({
+      released: true,
+      outcome: "released",
+    });
     takeoverWriter.hostLockStore.acquire("session-b", "host-token-b", 1_200, { force: true });
 
     await persistTournamentState(takeoverWriter, repository);

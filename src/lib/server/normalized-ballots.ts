@@ -21,12 +21,14 @@ export async function submitNormalizedPlayerBallot(input: {
   deviceId: string;
   choices: BallotSetChoice[];
   editTokenHash?: string | null;
+  expectedGeneration: number;
 }): Promise<NormalizedSubmitBallotResult> {
   const result = await executeNormalizedTransactionalMutation("submitBallot", {
     roundNumber: input.roundNumber,
     playerId: input.playerId,
     deviceId: input.deviceId,
     editTokenHash: input.editTokenHash ?? undefined,
+    expectedGeneration: input.expectedGeneration,
     choices: input.choices.map((choice) => ({
       drawId: choice.drawId,
       roundSetId: choice.roundSetId,
