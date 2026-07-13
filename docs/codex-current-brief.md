@@ -5,14 +5,19 @@ task work, then follow the routing rules below instead of loading every long pla
 
 ## Current Active Workstream
 
-The active remediation workstream is:
+The active production-readiness remediation workstream is:
 
-- Plan: `docs/ux-ui-tournament-readiness-remediation-plan-2026-07-05.md`
-- Checklist: `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md`
+- Plan: `docs/production-readiness-remediation-plan-2026-07-13.md`
+- Checklist: `docs/production-readiness-remediation-checklist-2026-07-13.md`
 
-Use the active plan one phase at a time. Use the checklist to decide which `UXR-*` issues can be
-closed. Do not use older remediation plans, older UX/UI audits, or historical phase plans as current
-instructions unless the user explicitly references them.
+Use the active plan one phase at a time. Use its `PRR-*` checklist rows for closure. Before every
+implementation phase, create and self-review the required detailed phase plan under
+`docs/phase-plans/`. Do not use documents under `docs/archive/` as current instructions unless the
+user explicitly references them.
+
+For a future code-change request outside this workstream, create a scoped plan and checklist first,
+then apply the same plan-review, implementation, diff-review, PR merge, and post-merge migration
+workflow required by `AGENTS.md`.
 
 ## Source Of Truth Order
 
@@ -20,9 +25,9 @@ instructions unless the user explicitly references them.
    requirements.
 2. `docs/pump_open_stage_repo_validation_checklist.md` - final behavior validation and release
    blocking evidence requirements.
-3. `docs/ux-ui-tournament-readiness-remediation-plan-2026-07-05.md` - current active UX/UI
-   remediation phase plan.
-4. `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md` - current active UX/UI issue closure
+3. `docs/production-readiness-remediation-plan-2026-07-13.md` - current active remediation phases
+   and mandatory delivery workflow.
+4. `docs/production-readiness-remediation-checklist-2026-07-13.md` - current issue and phase closure
    checklist.
 5. `docs/phase-gates.md` - phase completion gates and required checks.
 6. `docs/security-notes.md` - secrets, Supabase, admin, host lock, dangerous actions, and mutation
@@ -35,10 +40,11 @@ If documents conflict, follow `docs/product-spec.md` and
 
 Always read this file first.
 
-For UX/UI remediation phase work, read:
+For production-readiness remediation phase work, read:
 
-- the relevant phase section in `docs/ux-ui-tournament-readiness-remediation-plan-2026-07-05.md`,
-- the matching checklist rows in `docs/ux-ui-tournament-readiness-checklist-2026-07-05.md`,
+- the relevant phase in `docs/production-readiness-remediation-plan-2026-07-13.md`,
+- the matching rows in `docs/production-readiness-remediation-checklist-2026-07-13.md`,
+- the phase-specific plan created under `docs/phase-plans/`,
 - `docs/phase-gates.md` before closing the phase.
 
 Read `docs/product-spec.md` when changing or reviewing:
@@ -70,15 +76,8 @@ Read `docs/phase-status.md` only when:
 - checking what evidence was already recorded,
 - investigating historical context after current docs are insufficient.
 
-Do not read these by default:
-
-- `docs/codex-execution-plan.md`,
-- older `docs/phase-*-plan-*.md` files outside the active UX/UI remediation plan,
-- older production-readiness or comprehensive-remediation plans,
-- older UX/UI audit plans and checklists.
-
-Those files are historical unless the user explicitly asks for them or the current active plan routes
-to them.
+Do not read `docs/archive/` by default. It contains superseded execution plans, phase plans,
+remediation checklists, reviews, audits, and handovers retained only for historical evidence.
 
 ## Phase Working Rules
 
@@ -90,3 +89,6 @@ to them.
   relevant.
 - Record changed files, checks, evidence, risks, and assumptions in `docs/phase-status.md`.
 - Do not change tournament rules unless explicitly asked.
+- Self-review every phase plan before implementation and every complete diff before delivery.
+- After a phase passes, commit, push, open/update a PR, merge automatically after required checks,
+  and apply/verify any merged Supabase migrations against the unambiguous configured project.

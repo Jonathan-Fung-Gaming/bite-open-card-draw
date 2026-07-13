@@ -37,7 +37,7 @@ enabled, and `adminActionsOnly=enabled` before any item can be treated as releas
 | Negative ballots             | Incomplete set, third ban, wrong draw id, stale chart id, no-bans-plus-bans, voting before both sets drawn                                              | PFR-020          |
 | Identity and revisions       | Duplicate active username, active second-device warning, latest valid ballot wins, failed edit preserves prior ballot, pre-submit username change       | PFR-021          |
 | Anti-spoiler and live counts | `/stage`, `/room`, `/vote`, `/charts`, `/results`, and `/coolguy69` across voting, closed, computed, revealing, revealed, and complete states           | PFR-022          |
-| Tiebreaks                    | 2-, 3-, 4-, and 5-plus-way least-ban ties, zero-ballot ties, non-minimum ties, alphabetized reveal, 5-second committed-winner reveal                    | PFR-023          |
+| Tiebreaks                    | 2-, 3-, 4-, and 5-plus-way least-ban ties, zero-ballot ties, non-minimum ties, alphabetized reveal, 10-second committed-winner reveal                   | PFR-023          |
 | Admin workflows              | Roster active/inactive/reactivate, emergency add, manual overwrite, reset, reroll, reopen, result override, password re-entry, summaries, audit rows    | PFR-024          |
 | Load and polling             | 100 eligible players, multiple edits, real `/room` to `/vote` player route behavior, spectators/view-only traffic, route polling, request-rate artifact | PFR-005, PFR-030 |
 
@@ -147,9 +147,13 @@ practice rehearsal or one-round 100-player synthetic load test does not satisfy 
 
 - `/coolguy69` shows only the password login form without a valid admin session.
 - Admin sessions use an HTTP-only signed cookie.
-- Admin sessions expire after inactivity.
+- Non-host and standby admin sessions expire after inactivity.
 - Host lock allows one active host.
-- Host heartbeat expires and allows takeover.
+- Active host ownership never expires automatically.
+- Heartbeat loss does not release host ownership.
+- Heartbeat loss keeps explicit forced takeover available from another authenticated device.
+- Forced takeover requires password confirmation, warning, and an audit reason.
+- The original secured host can recover after reauthentication.
 - Other admin browsers are read-only without host control.
 - Roster import and active/inactive player controls work.
 - Duplicate active start.gg usernames are blocked.

@@ -4,7 +4,7 @@ Tournament voting and stage visualization app for Pump It Up Open Stage.
 
 ## Current status
 
-Phase 12 final polish, runbook verification, and release checklist is complete.
+The 2026-07-13 production-readiness remediation plan is the active workstream.
 
 ## Source files
 
@@ -23,7 +23,9 @@ public/brand/tournament-logo.png
 ## Important docs
 
 - `docs/product-spec.md`
-- `docs/codex-execution-plan.md`
+- `docs/codex-current-brief.md`
+- `docs/production-readiness-remediation-plan-2026-07-13.md`
+- `docs/production-readiness-remediation-checklist-2026-07-13.md`
 - `docs/decision-log.md`
 - `docs/phase-gates.md`
 - `docs/security-notes.md`
@@ -43,7 +45,7 @@ npm run import:charts
 npm run cache:chart-images
 ```
 
-End-to-end tests are a placeholder until Playwright is introduced.
+Playwright end-to-end and production-flow suites are available through the scripts above.
 
 For a local fallback-only image manifest:
 

@@ -32,7 +32,14 @@ The admin route is `/coolguy69`, but the path is not security.
 
 The admin route must require the shared admin password.
 
-Admin sessions should expire after inactivity.
+Non-host and standby admin sessions should expire after inactivity.
+
+The active tournament host must not expire or lose ownership because of inactivity or a missing
+heartbeat. Host ownership persists until explicit release or a password-confirmed, audited forced
+takeover. Heartbeat is health information, not an ownership-expiration mechanism. The same secured
+host laptop must have a recovery path after reauthentication.
+When heartbeat is missing, another authenticated admin device may use the explicit forced-takeover
+flow; the missing heartbeat alone grants no host authority.
 
 Dangerous actions require password re-entry.
 

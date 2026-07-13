@@ -2,15 +2,17 @@
 
 ## Current Remediation Status
 
-Status: Production readiness remediation code is complete. The active Codex workstream is now
-`docs/ux-ui-tournament-readiness-remediation-plan-2026-07-05.md`, with
-`docs/ux-ui-tournament-readiness-checklist-2026-07-05.md` as its closure checklist. Start future
-work from `docs/codex-current-brief.md` and treat older remediation plans/checklists as historical
-unless the user explicitly references them.
+Status: A new production-readiness remediation workstream was planned on 2026-07-13. Its active
+execution plan is `docs/production-readiness-remediation-plan-2026-07-13.md`, with
+`docs/production-readiness-remediation-checklist-2026-07-13.md` as its closure checklist. Start
+future work from `docs/codex-current-brief.md`. The dated entries below are an evidence ledger, not
+current behavioral requirements; archived plans and checklists are historical unless the user
+explicitly references them.
 
-Final tournament readiness still depends on merging/deploying the latest code, confirming Supabase
-migrations remain applied, completing the active UX/UI checklist closure evidence, selecting or
-resetting the production event namespace, and any event-day data/operator checks. The authoritative
+Final tournament readiness still depends on completing and merging every phase in the current plan,
+applying and verifying any required Supabase migrations after each merge, deploying the latest code,
+selecting or resetting the production event namespace, and completing event-day data/operator
+checks. The authoritative
 behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.

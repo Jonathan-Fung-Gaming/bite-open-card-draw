@@ -523,20 +523,28 @@ Do not use 4+3 on the stage preview. The 4+3-style decision was superseded by th
 | Hidden route              | Secret/unlinked route plus password.                                 |
 | Admin session             | Use an admin session after password entry.                           |
 | Password storage          | Store password hash, not plaintext password.                         |
-| Admin inactivity          | Include inactivity timer.                                            |
-| Inactivity duration       | 30 minutes is the recommended default.                               |
+| Admin inactivity          | Include inactivity for non-host and standby admin sessions.          |
+| Inactivity duration       | 30 minutes is the recommended non-host default.                      |
 | Host lock                 | Include host lock.                                                   |
-| Host takeover             | Allow takeover if heartbeat expires or with warning.                 |
+| Active host expiry        | Never expire or release the active host automatically.               |
+| Host heartbeat            | Health signal only; it does not expire ownership.                    |
+| Host takeover             | Explicit forced takeover with password, warning, and audit reason.   |
+| Missing-heartbeat recovery | Forced takeover remains available from another authenticated device. |
 | Multiple admin screens    | Only active host can operate controls; others are read-only/standby. |
-| Active host determination | `Take Host Control` button plus heartbeat.                           |
+| Active host determination | Persistent verified host ownership until release or forced takeover. |
 
 ## Validation checks
 
 - Confirm `/coolguy69` exists and is password-protected.
 - Confirm password hash is used instead of plaintext in source.
 - Confirm no admin secrets are exposed client-side.
-- Confirm inactivity timeout exists.
+- Confirm non-host and standby inactivity timeout exists.
 - Confirm host lock exists.
+- Confirm the active host does not expire after inactivity or heartbeat loss.
+- Confirm missing heartbeat permits explicit forced takeover from another authenticated device
+  without automatically transferring ownership.
+- Confirm takeover requires password confirmation, warning, and an audit reason.
+- Confirm the original secured host can recover after reauthentication.
 - Confirm non-host admin screens cannot trigger host controls.
 
 ---

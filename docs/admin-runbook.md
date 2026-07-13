@@ -6,8 +6,8 @@ Implemented now:
 
 - shared password login
 - HTTP-only signed admin session cookie
-- 30-minute session max age
-- host lock with heartbeat
+- 30-minute inactivity timeout for non-host and standby sessions
+- non-expiring active host ownership with heartbeat health reporting
 - roster add, bulk import, active/inactive toggle, and restore
 - duplicate active start.gg username blocking
 - emergency current-round eligibility form with password re-entry and audit reason
@@ -28,7 +28,12 @@ Implemented now:
 - Store only `ADMIN_PASSWORD_HASH`, never a plaintext password.
 - Use the supported local hash format `scrypt:v1:<salt_hex>:<hash_hex>`.
 - Set HTTP-only admin session cookies after login.
-- Expire sessions after inactivity.
+- Expire non-host and standby sessions after inactivity.
+- Never expire the active host automatically because of inactivity or heartbeat loss.
+- End host ownership only through explicit release or password-confirmed, audited forced takeover.
+- If heartbeat is missing, use explicit forced takeover from another authenticated device; do not
+  wait for ownership to expire because it will not expire automatically.
+- Allow the original secured host laptop to recover after reauthentication.
 - Require password re-entry for dangerous actions.
 - Show a clear action summary before a dangerous action password prompt.
 - Keep tournament-changing actions server-side.

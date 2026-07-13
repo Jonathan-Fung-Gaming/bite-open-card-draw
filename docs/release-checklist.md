@@ -9,7 +9,7 @@ automatable release metadata gaps for the source branch, but they do not replace
 deployment, real roster, production environment, or venue-distance manual evidence.
 
 - Phase 12 plan and self-review:
-  `docs/phase-12-release-metadata-closure-plan-2026-07-04.md`.
+  `docs/archive/phase-12-release-metadata-closure-plan-2026-07-04.md`.
 - Phase 12 operator/reviewer for source closure: `Codex`.
 - Phase 12 branch before PR merge: `codex/phase-12-release-metadata-closure`.
 - Pre-Phase-12 base commit: `a67f4f1e1f5bfbe2c46869586a45a3932bb2f6f2`.
@@ -82,13 +82,12 @@ workflow.
 
 ## Remediation Gate
 
-- [ ] `docs/remediation-plan-2026-06-28.md` has been reviewed for the current release.
-- [ ] Every item in `docs/remediation-issue-checklist.md` is closed with evidence.
-- [ ] The final closure gate in `docs/remediation-issue-checklist.md` passes.
-- [ ] `docs/production-readiness-remediation-2026-07-01.md` has been reviewed and its required
-      release evidence is complete.
-- [ ] `docs/production-flow-risk-remediation-plan-2026-07-02.md` has been reviewed and Phase 5
-      release artifact gates are complete.
+- [ ] `docs/production-readiness-remediation-plan-2026-07-13.md` has been reviewed for the current
+      release.
+- [ ] Every item in `docs/production-readiness-remediation-checklist-2026-07-13.md` is closed with
+      dated evidence.
+- [ ] The final closure gate in
+      `docs/production-readiness-remediation-checklist-2026-07-13.md` passes.
 - [ ] `docs/product-spec.md` and `docs/pump_open_stage_repo_validation_checklist.md` have been used
       as the final behavior source of truth for release review.
 
@@ -106,7 +105,8 @@ workflow.
       id.
 - [ ] `TOURNAMENT_TEST_ROUTE_TOKEN` is not set in production.
 - [ ] No `.env` or `.env.local` file is committed.
-- [ ] Supabase migrations are applied through `20260704010000_normalized_voter_presence_rpc.sql`.
+- [ ] Supabase migrations are applied through
+      `20260713010000_event_scoped_voter_device_binding.sql`.
 - [ ] `rtk npm run supabase:migration:list` confirms local and remote migrations are in sync.
 
 ## Data
