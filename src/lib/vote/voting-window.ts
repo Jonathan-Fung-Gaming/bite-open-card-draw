@@ -140,7 +140,7 @@ export function formatVotingStatusLabel(status: VotingRoundStatus) {
     case "final_30_seconds":
       return "Final 30 seconds";
     case "extension_1_minute":
-      return "One-minute extension";
+      return "Official one-minute extension";
     case "voting_open":
       return "Voting open";
     case "voting_paused":

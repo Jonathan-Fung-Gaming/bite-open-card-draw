@@ -24,11 +24,12 @@
     ]
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    ".next-phase0/types/**/*.ts",
     ".next/types/**/*.ts",
-    ".next-phase0/types/**/*.ts"
+    "next-env.d.ts",
+    ".next-phase2/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

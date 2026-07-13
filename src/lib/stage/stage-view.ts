@@ -17,6 +17,13 @@ export type StageRoundView = {
 export const STAGE_CHART_REVEAL_INTERVAL_MS = 1800;
 export const STAGE_SET_REVEAL_GAP_MS = 900;
 
+const STAGE_IMMEDIATE_DRAW_STATUSES = new Set<VotingRoundStatus>([
+  "voting_open",
+  "voting_paused",
+  "final_30_seconds",
+  "extension_1_minute",
+]);
+
 const STAGE_RESULT_STATUSES = new Set<VotingRoundStatus>([
   "voting_closed",
   "results_computed",
@@ -27,6 +34,65 @@ const STAGE_RESULT_STATUSES = new Set<VotingRoundStatus>([
 
 export function stageShouldUseResultMode(status: VotingRoundStatus, hasResult: boolean) {
   return hasResult || STAGE_RESULT_STATUSES.has(status);
+}
+
+export function stageShouldShowAllDrawCards(status: VotingRoundStatus) {
+  return STAGE_IMMEDIATE_DRAW_STATUSES.has(status);
+}
+
+export function getStageVisibleCardCount(
+  chartCount: number,
+  revealStartsAt: string | null | undefined,
+  nowMs: number,
+) {
+  const safeChartCount = Math.max(0, Math.trunc(chartCount));
+
+  if (safeChartCount === 0) {
+    return 0;
+  }
+
+  if (revealStartsAt === undefined) {
+    return safeChartCount;
+  }
+
+  if (revealStartsAt === null) {
+    return 0;
+  }
+
+  const revealStartsAtMs = Date.parse(revealStartsAt);
+
+  if (!Number.isFinite(revealStartsAtMs) || !Number.isFinite(nowMs)) {
+    return 0;
+  }
+
+  const elapsedMs = nowMs - revealStartsAtMs;
+
+  if (elapsedMs < 0) {
+    return 0;
+  }
+
+  return Math.min(safeChartCount, Math.floor(elapsedMs / STAGE_CHART_REVEAL_INTERVAL_MS) + 1);
+}
+
+export function buildStageRevealClockKey(
+  sets: readonly StageSetView[],
+  status: VotingRoundStatus,
+  publicStateGeneration: number,
+) {
+  return [
+    sets[0]?.set.roundNumber ?? "missing-round",
+    publicStateGeneration,
+    status,
+    stageShouldShowAllDrawCards(status) ? "immediate" : "canonical",
+    ...sets.map((setView) =>
+      [
+        setView.set.setOrder,
+        setView.draw?.id ?? "missing",
+        setView.draw?.version ?? 0,
+        setView.revealStartsAt ?? "blocked",
+      ].join(":"),
+    ),
+  ].join("|");
 }
 
 export function buildStageRoundView(
