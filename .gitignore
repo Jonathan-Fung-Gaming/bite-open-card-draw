@@ -3,6 +3,8 @@ node_modules/
 
 # Next.js
 .next/
+.next-phase0/
+phase0-test-results/
 out/
 dist/
 build/

@@ -84,7 +84,7 @@ const REHEARSAL_PLAYER_NAMES = Array.from(
   (_, index) => `Rehearsal Player ${String(index + 1).padStart(2, "0")}`,
 );
 
-const DISPOSABLE_EVENT_ID_PATTERN = /^(e2e|phase9|load|rehearsal)-[a-z0-9-]+$/i;
+const DISPOSABLE_EVENT_ID_PATTERN = /^(e2e|phase0|phase9|load|rehearsal)-[a-z0-9-]+$/i;
 const SUPABASE_E2E_HOST_LOCK_TTL_MS = 30 * 60_000;
 const SUPABASE_READ_RETRY_DELAYS_MS = [750, 2_000, 5_000] as const;
 const SUPABASE_READ_RETRY_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504, 522, 524]);
@@ -132,7 +132,7 @@ export function getSupabaseE2eConfig(): SupabaseE2eConfig | null {
 function assertDisposableSupabaseE2eEvent(eventId: string) {
   if (!DISPOSABLE_EVENT_ID_PATTERN.test(eventId)) {
     throw new Error(
-      "Supabase e2e reset requires an event id starting with e2e-, phase9-, load-, or rehearsal-.",
+      "Supabase e2e reset requires an event id starting with e2e-, phase0-, phase9-, load-, or rehearsal-.",
     );
   }
 
@@ -158,18 +158,13 @@ function isSupabaseReadRetryEligible(
 
   return (
     attempt < SUPABASE_READ_RETRY_DELAYS_MS.length &&
-    (SUPABASE_SAFE_READ_METHODS.has(method) ||
-      (method === "POST" && isSafeSupabaseReadRpc(input)))
+    (SUPABASE_SAFE_READ_METHODS.has(method) || (method === "POST" && isSafeSupabaseReadRpc(input)))
   );
 }
 
 function isSafeSupabaseReadRpc(input: RequestInfo | URL) {
   const url =
-    typeof input === "string"
-      ? new URL(input)
-      : input instanceof URL
-        ? input
-        : new URL(input.url);
+    typeof input === "string" ? new URL(input) : input instanceof URL ? input : new URL(input.url);
 
   return SUPABASE_SAFE_READ_RPC_PATHS.has(url.pathname);
 }
@@ -396,7 +391,10 @@ export async function expectSupabaseHostLockOwnedBy(sessionId: string) {
           throw new Error(`Could not load e2e host lock owner: ${error.message}`);
         }
 
-        const row = data as { owner_session_id?: string | null; released_at?: string | null } | null;
+        const row = data as {
+          owner_session_id?: string | null;
+          released_at?: string | null;
+        } | null;
 
         return `${row?.owner_session_id ?? "none"}|${row?.released_at ? "released" : "active"}`;
       },
@@ -515,7 +513,9 @@ export async function expectSupabaseFinalCsvMatchesDatabase(input: {
     .in("id", playerIds);
 
   if (playersError) {
-    throw new Error(`Could not load e2e player rows for CSV reconciliation: ${playersError.message}`);
+    throw new Error(
+      `Could not load e2e player rows for CSV reconciliation: ${playersError.message}`,
+    );
   }
 
   const playerNameById = new Map(
@@ -713,7 +713,9 @@ export async function expectSupabaseRoundSetDrawReady(roundNumber: number, setOr
           .eq("draw_id", drawId);
 
         if (drawnChartsError) {
-          throw new Error(`Could not count e2e round set drawn charts: ${drawnChartsError.message}`);
+          throw new Error(
+            `Could not count e2e round set drawn charts: ${drawnChartsError.message}`,
+          );
         }
 
         return count ?? 0;
@@ -915,10 +917,9 @@ export async function expectSupabaseRehearsalBallots(
                   (index) => chartIds?.[index] ?? `missing-chart-index-${index}`,
                 );
 
-                return [
-                  bannedIndexes.length === 0 ? "none" : "ban",
-                  bannedChartIds.join(","),
-                ].join(":");
+                return [bannedIndexes.length === 0 ? "none" : "ban", bannedChartIds.join(",")].join(
+                  ":",
+                );
               }),
             ].join("|");
           })
@@ -1243,10 +1244,7 @@ export async function expectSupabaseFinalRevealComplete(roundNumber: number) {
   return true;
 }
 
-export async function waitForSupabaseTiebreakRevealIfNeeded(
-  roundNumber: number,
-  phase: string,
-) {
+export async function waitForSupabaseTiebreakRevealIfNeeded(roundNumber: number, phase: string) {
   const config = getSupabaseE2eConfig();
 
   if (!config || (phase !== "set_1_resolved" && phase !== "set_2_resolved")) {
