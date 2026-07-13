@@ -56,12 +56,12 @@ Do not run this against a real event namespace or production data.
 ### 4. Final Release Gate
 
 - [ ] Run all available checks after Phase 8 changes:
-  - `rtk npm run lint`
-  - `rtk npm run typecheck`
-  - `rtk npm run test`
-  - `rtk npm run build`
-  - `rtk npm run test:e2e`
-  - `rtk npm run test:load`
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+  - `npm run build`
+  - `npm run test:e2e`
+  - `npm run test:load`
 - [ ] Confirm no secrets, service-role keys, password hashes, session secrets, Vercel tokens, or
   plaintext admin passwords are committed.
 - [ ] Confirm the repository is clean and `main` is current after the final PR merge.

@@ -164,13 +164,15 @@ describe("operational state persistence", () => {
     expect(recreated.rosterStore.listPlayers()).toHaveLength(1);
     expect(recreated.hostLockStore.getSnapshot("session-a", 1_000).status).toBe("active");
     expect(recreated.drawStateStore.getActiveDraw(1, 1)?.charts).toHaveLength(7);
-    expect(recreated.votingWindowStore.getSnapshot({
-      roundNumber: 1,
-      drawnSetCount: 2,
-      eligiblePlayers: [{ id: player.id, startggUsername: player.startggUsername }],
-      submittedPlayerIds: [player.id],
-      nowMs: 1_000,
-    }).status).toBe("final_30_seconds");
+    expect(
+      recreated.votingWindowStore.getSnapshot({
+        roundNumber: 1,
+        drawnSetCount: 2,
+        eligiblePlayers: [{ id: player.id, startggUsername: player.startggUsername }],
+        submittedPlayerIds: [player.id],
+        nowMs: 1_000,
+      }).status,
+    ).toBe("final_30_seconds");
     expect(recreated.ballotStore.get(1, player.id)?.submittedAt).toBe("submitted");
   });
 
@@ -233,5 +235,35 @@ describe("operational state persistence", () => {
         reason: "event rule exclusion",
       }),
     ]);
+  });
+
+  it("restores legacy snapshots without public generations at generation zero", () => {
+    const original = createAdminStateStores();
+    const legacySnapshot = createOperationalStateSnapshot(original, "legacy");
+
+    delete legacySnapshot.publicStateGeneration;
+
+    const restored = createAdminStateStores();
+    restored.publicStateGenerationStore.advance({
+      roundNumber: 1,
+      expectedGeneration: 0,
+      transitionKind: "result_reveal",
+      resultMode: true,
+      updatedAt: "2026-07-13T00:00:01.000Z",
+      activeDraws: [],
+      votingStatus: "results_revealing",
+      votingDeadline: null,
+      resultId: "result-1",
+      resultPhase: "set_1_counts",
+      resultPhaseStartedAt: "2026-07-13T00:00:01.000Z",
+      tiebreakStarts: [],
+      phoneReleaseStatus: "held",
+      phoneReleasedAt: null,
+    });
+
+    restoreOperationalStateSnapshot(restored, legacySnapshot);
+
+    expect(restored.publicStateGenerationStore.getRound(1).generation).toBe(0);
+    expect(restored.publicStateGenerationStore.exportSnapshot().rounds).toHaveLength(4);
   });
 });

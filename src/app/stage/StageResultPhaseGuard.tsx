@@ -43,15 +43,46 @@ function writeStageResultModeLock(key: string) {
   }
 }
 
-function resultModeHasStarted(freshness: PublicRouteFreshnessKey) {
-  return freshness.resultSnapshotId !== null || freshness.resultRevealPhase !== null;
+export function resultModeHasStarted(freshness: PublicRouteFreshnessKey) {
+  return (
+    freshness.publicStateResultMode ||
+    freshness.resultSnapshotId !== null ||
+    freshness.resultRevealPhase !== null
+  );
 }
 
-function shouldHoldInsteadOfDraw(freshness: PublicRouteFreshnessKey, resultModeLocked: boolean) {
+const RESULT_MODE_EXIT_TRANSITIONS = new Set([
+  "reroll_one_chart",
+  "reroll_round_set",
+  "reroll_full_round",
+  "reset_round",
+  "round_reset",
+  "reset_tournament",
+  "reset_tournament_data",
+  "start_rehearsal_mode",
+  "reset_rehearsal_mode",
+  "voting_restarted",
+  "voting_opened",
+  "set_current_round",
+  "advance_current_round",
+]);
+
+export function explicitNewGenerationAllowsDrawMode(freshness: PublicRouteFreshnessKey) {
+  return (
+    !freshness.publicStateResultMode &&
+    RESULT_MODE_EXIT_TRANSITIONS.has(freshness.publicStateTransitionKind)
+  );
+}
+
+export function shouldHoldInsteadOfDraw(
+  freshness: PublicRouteFreshnessKey,
+  resultModeLocked: boolean,
+) {
   return (
     resultModeLocked &&
+    !explicitNewGenerationAllowsDrawMode(freshness) &&
     !resultModeHasStarted(freshness) &&
-    STAGE_RESULT_LOCK_STATUSES.has(freshness.votingStatus)
+    (STAGE_RESULT_LOCK_STATUSES.has(freshness.votingStatus) || freshness.publicStateGeneration > 0)
   );
 }
 
@@ -61,7 +92,12 @@ function StageResultModeStickyHolding() {
       <StageAutoRefresh intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS} jitterMs={0} leading />
       <main className="min-h-screen" data-testid="stage-result-mode-sticky-holding">
         <section className="grid min-h-screen place-items-center px-5 py-4 lg:px-8">
-          <div className="metal-panel w-full max-w-3xl rounded-lg p-6 text-center">
+          <div
+            className="metal-panel w-full max-w-3xl rounded-lg p-6 text-center"
+            role="status"
+            aria-busy="true"
+            aria-live="polite"
+          >
             <p className="text-xl font-semibold uppercase text-ember-300">
               Result reveal in progress
             </p>
@@ -91,6 +127,16 @@ function StageResultModeStickyGate({
   const resultModeStarted = resultModeHasStarted(freshness);
 
   useEffect(() => {
+    if (explicitNewGenerationAllowsDrawMode(freshness)) {
+      try {
+        window.sessionStorage.removeItem(lockKey);
+      } catch {
+        // The accepted generation still authorizes the render without storage.
+      }
+      setResultModeLocked(false);
+      return;
+    }
+
     if (resultModeStarted) {
       writeStageResultModeLock(lockKey);
       setResultModeLocked(true);
@@ -98,7 +144,7 @@ function StageResultModeStickyGate({
     }
 
     setResultModeLocked(readStageResultModeLock(lockKey));
-  }, [freshness.sequence, lockKey, resultModeStarted]);
+  }, [freshness, lockKey, resultModeStarted]);
 
   if (shouldHoldInsteadOfDraw(freshness, resultModeLocked || resultModeStarted)) {
     return <StageResultModeStickyHolding />;

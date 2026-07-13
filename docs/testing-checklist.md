@@ -6,18 +6,18 @@ source of truth when older phase labels are stale.
 
 ## Static Checks
 
-- `rtk npm run lint`
-- `rtk npm run typecheck`
-- `rtk npm run test`
-- `rtk npm run import:charts`
-- `rtk npm run cache:chart-images -- --fallback-only`
-- `rtk npm audit --omit=dev`
-- `rtk git diff --check`
-- `rtk npm run build`
-- `rtk npm run test:e2e:memory-dev-smoke`
-- `rtk npm run test:e2e:production-flow:validate`
-- `rtk npm run test:e2e:production-flow` during the grouped Phase 11 browser evidence window only.
-- `rtk npm run test:load:api-injection` for the focused synthetic load tool.
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run import:charts`
+- `npm run cache:chart-images -- --fallback-only`
+- `npm audit --omit=dev`
+- `git diff --check`
+- `npm run build`
+- `npm run test:e2e:memory-dev-smoke`
+- `npm run test:e2e:production-flow:validate`
+- `npm run test:e2e:production-flow` during the grouped Phase 11 browser evidence window only.
+- `npm run test:load:api-injection` for the focused synthetic load tool.
 - E2E command names must make the backend/server profile clear. Memory/dev smoke is not production
   release evidence.
 
@@ -30,7 +30,7 @@ enabled, and `adminActionsOnly=enabled` before any item can be treated as releas
 
 | Area                         | Required browser evidence                                                                                                                               | Issue IDs        |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| Production rehearsal command | `rtk npm run test:e2e:production-flow:validate` output plus the grouped browser command output and artifacts                                            | PFR-003, PFR-004 |
+| Production rehearsal command | `npm run test:e2e:production-flow:validate` output plus the grouped browser command output and artifacts                                            | PFR-003, PFR-004 |
 | Full four-round flow         | Draw both sets, open voting, submit/edit ballots, close, compute, reveal, final two charts, private CSV download, and verify 48 -> 36 -> 24 -> 12 active voting-player attrition | PFR-003, PFR-019 |
 | Deployed visual/image evidence | Phase 11 evidence artifact with projector screenshots, QR geometry, mobile `/vote` screenshot, image request/resource entries, and no live third-party chart-art URLs | PRC-020, PRC-035 |
 | Timer transitions            | 10-minute window, below-75 extension, at/above-75 close, all-submitted final warning with edit, pause/resume, manual close, emergency reopen            | PFR-019          |

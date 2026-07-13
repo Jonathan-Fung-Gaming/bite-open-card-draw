@@ -13,10 +13,10 @@ if ($Help) {
   Write-Host "Writes local environment values to .env.local."
   Write-Host ""
   Write-Host "Usage:"
-  Write-Host "  rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1"
+  Write-Host "  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1"
   Write-Host ""
   Write-Host "Optional prefilled browser-safe values:"
-  Write-Host "  rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1 -SupabaseUrl <url> -PublishableKey <key>"
+  Write-Host "  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1 -SupabaseUrl <url> -PublishableKey <key>"
   Write-Host ""
   Write-Host "Use -Overwrite to replace an existing .env.local."
   exit 0

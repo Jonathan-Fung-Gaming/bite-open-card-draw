@@ -53,16 +53,16 @@ by this pass:
 Run before considering this pass complete:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run import:charts
-rtk npm run cache:chart-images
-rtk npm run verify:real-chart-images
-rtk npm audit --omit=dev
-rtk git diff --check
-rtk npm run build
-rtk npm run test:e2e
+npm run lint
+npm run typecheck
+npm run test
+npm run import:charts
+npm run cache:chart-images
+npm run verify:real-chart-images
+npm audit --omit=dev
+git diff --check
+npm run build
+npm run test:e2e
 ```
 
 If `test:e2e` cannot run in the current environment, keep the remaining risk explicit in the

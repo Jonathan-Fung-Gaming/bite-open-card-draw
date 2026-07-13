@@ -53,8 +53,8 @@ For a local fallback-only image manifest:
 npm run cache:chart-images -- --fallback-only
 ```
 
-Use the project command wrapper:
+Run project commands directly:
 
 ```bash
-rtk npm run build
+npm run build
 ```

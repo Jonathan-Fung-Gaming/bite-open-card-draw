@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import net from "node:net";
 import nextEnv from "@next/env";
@@ -26,27 +26,61 @@ async function findOpenPort() {
   });
 }
 
+function terminateChildProcessTree(child) {
+  if (!child.pid) {
+    return;
+  }
+
+  if (process.platform === "win32") {
+    spawnSync("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
+    return;
+  }
+
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch {
+    child.kill("SIGTERM");
+  }
+}
+
 function run(command, args, env) {
-  const executable = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : command;
-  const finalArgs = process.platform === "win32" ? ["/d", "/s", "/c", command, ...args] : args;
-  const result = spawnSync(executable, finalArgs, {
-    env,
-    stdio: "inherit",
+  return new Promise((resolve, reject) => {
+    const executable = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : command;
+    const finalArgs = process.platform === "win32" ? ["/d", "/s", "/c", command, ...args] : args;
+    const child = spawn(executable, finalArgs, {
+      detached: process.platform !== "win32",
+      env,
+      stdio: "inherit",
+    });
+    const forwardSignal = () => terminateChildProcessTree(child);
+    const cleanup = () => {
+      process.off("SIGINT", forwardSignal);
+      process.off("SIGTERM", forwardSignal);
+    };
+
+    process.once("SIGINT", forwardSignal);
+    process.once("SIGTERM", forwardSignal);
+    child.once("error", (error) => {
+      cleanup();
+      reject(error);
+    });
+    child.once("exit", (status, signal) => {
+      cleanup();
+
+      if (signal) {
+        console.error(`[playwright-runner] ${command} exited from signal ${signal}.`);
+      }
+
+      if (status !== 0) {
+        const error = new Error(`${command} exited with status ${status ?? 1}.`);
+        error.exitStatus = status ?? 1;
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
   });
-
-  if (result.error) {
-    throw result.error;
-  }
-
-  if (result.signal) {
-    console.error(`[playwright-runner] ${command} exited from signal ${result.signal}.`);
-  }
-
-  if (result.status !== 0) {
-    const error = new Error(`${command} exited with status ${result.status ?? 1}.`);
-    error.exitStatus = result.status ?? 1;
-    throw error;
-  }
 }
 
 async function isPortListening(port) {
@@ -72,6 +106,10 @@ function sanitizeEnv(env) {
 const PROFILES = new Set([
   "legacy",
   "memory-dev-smoke",
+  "phase1-memory",
+  "phase1-supabase",
+  "phase1-supabase-cache-zero",
+  "phase1-supabase-cache-max",
   "supabase-dev-rehearsal",
   "production-flow",
 ]);
@@ -95,6 +133,42 @@ function isLocalUrl(value) {
 }
 
 function profileDefaults(profile, context) {
+  if (profile === "phase1-memory") {
+    return {
+      backend: "memory",
+      serverMode: "dev",
+      disableAdminSessionHeartbeat: "true",
+      disableHostHeartbeat: "true",
+      disableVoteLivePolling: "false",
+      disablePublicRefresh: "false",
+      allowE2eRoutes: "true",
+      allowMemoryBackend: "true",
+      phase9BallotMode: undefined,
+      publicReadCacheMs: "1000",
+      useAdminActionsOnly: "false",
+    };
+  }
+
+  if (profile.startsWith("phase1-supabase")) {
+    return {
+      backend: "supabase",
+      serverMode: "dev",
+      disableAdminSessionHeartbeat: "true",
+      disableHostHeartbeat: "true",
+      disableVoteLivePolling: "false",
+      disablePublicRefresh: "false",
+      allowE2eRoutes: "true",
+      allowMemoryBackend: "false",
+      phase9BallotMode: "ui",
+      publicReadCacheMs: profile.endsWith("cache-zero")
+        ? "0"
+        : profile.endsWith("cache-max")
+          ? "5000"
+          : "1000",
+      useAdminActionsOnly: "false",
+    };
+  }
+
   if (profile === "memory-dev-smoke") {
     return {
       backend: "memory",
@@ -197,6 +271,39 @@ function collectSupabaseValidationErrors(config) {
   }
 
   return errors;
+}
+
+function collectPhase1SupabaseValidationErrors(config) {
+  const errors = [];
+
+  if (config.backend !== "supabase") {
+    errors.push(`backend must be supabase, got ${config.backend}.`);
+  }
+
+  if (!config.explicitE2eTournamentEventId) {
+    errors.push(
+      "Phase 1 Supabase profiles require an explicit E2E_TOURNAMENT_EVENT_ID; TOURNAMENT_EVENT_ID fallback is not allowed.",
+    );
+  } else if (
+    config.configuredTournamentEventId &&
+    config.explicitE2eTournamentEventId === config.configuredTournamentEventId
+  ) {
+    errors.push(
+      "Phase 1 Supabase profiles require E2E_TOURNAMENT_EVENT_ID to differ from the configured TOURNAMENT_EVENT_ID.",
+    );
+  }
+
+  if (
+    config.supabaseUrl &&
+    !isLocalUrl(config.supabaseUrl) &&
+    process.env.E2E_CONFIRMED_NON_PRODUCTION_SUPABASE_PROJECT !== "true"
+  ) {
+    errors.push(
+      "E2E_CONFIRMED_NON_PRODUCTION_SUPABASE_PROJECT=true is required for a non-local Phase 1 Supabase target.",
+    );
+  }
+
+  return [...errors, ...collectSupabaseValidationErrors(config)];
 }
 
 function collectProductionFlowValidationErrors(config) {
@@ -305,6 +412,7 @@ function printEnvironmentSummary(config) {
       `hostHeartbeat=${enabledLabel(config.disableHostHeartbeat)}`,
       `voteLivePolling=${enabledLabel(config.disableVoteLivePolling)}`,
       `publicRouteRefresh=${enabledLabel(config.disablePublicRefresh)}`,
+      `publicReadCacheMs=${config.publicReadCacheMs}`,
       `phase9BallotMode=${config.phase9BallotMode ?? "(default)"}`,
       `loadProfile=${config.loadProfile ?? "(none)"}`,
       `adminActionsOnly=${config.useAdminActionsOnly === "true" ? "enabled" : "disabled"}`,
@@ -330,6 +438,8 @@ const requestedArgs = rawArgs.filter(
   (arg) => arg !== "--skip-build" && arg !== "--validate-env-only" && !arg.startsWith("--profile="),
 );
 loadEnvConfig(process.cwd());
+const explicitE2eTournamentEventId = process.env.E2E_TOURNAMENT_EVENT_ID?.trim() || undefined;
+const configuredTournamentEventId = process.env.TOURNAMENT_EVENT_ID?.trim() || undefined;
 const usesLoadConfig = requestedArgs.some((arg) => arg.includes("playwright.load.config"));
 const usesPhase9Config = requestedArgs.some((arg) => arg.includes("playwright.phase9.config"));
 const usesPhase0Config = requestedArgs.some((arg) => arg.includes("playwright.phase0.config"));
@@ -361,7 +471,21 @@ const defaults = profileDefaults(requestedProfile, {
   usesHarnessConfig: usesLoadConfig || usesPhase9Config,
   usesPhase9Full,
 });
-const e2eTournamentStateBackend = process.env.E2E_TOURNAMENT_STATE_BACKEND ?? defaults.backend;
+const requestedBackendOverride = process.env.E2E_TOURNAMENT_STATE_BACKEND?.trim();
+
+if (
+  requestedProfile === "phase1-memory" &&
+  requestedBackendOverride &&
+  requestedBackendOverride !== "memory"
+) {
+  console.error(
+    "[playwright-runner] phase1-memory is locked to the memory backend; remove E2E_TOURNAMENT_STATE_BACKEND.",
+  );
+  process.exit(1);
+}
+
+const e2eTournamentStateBackend =
+  requestedProfile === "phase1-memory" ? "memory" : (requestedBackendOverride ?? defaults.backend);
 const e2ePort = process.env.E2E_PORT || (await findOpenPort());
 const e2eBaseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
 const e2eTestRouteToken =
@@ -378,7 +502,9 @@ const skipBuild =
   e2eServerMode === "external";
 const explicitTournamentEventId =
   e2eTournamentStateBackend === "supabase"
-    ? process.env.E2E_TOURNAMENT_EVENT_ID || process.env.TOURNAMENT_EVENT_ID
+    ? requestedProfile.startsWith("phase1-supabase")
+      ? explicitE2eTournamentEventId
+      : explicitE2eTournamentEventId || configuredTournamentEventId
     : undefined;
 const e2eTournamentEventId =
   explicitTournamentEventId ||
@@ -392,6 +518,26 @@ const e2eDisableVoteLivePolling =
   process.env.NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING ?? defaults.disableVoteLivePolling;
 const e2eDisablePublicRefresh =
   process.env.NEXT_PUBLIC_E2E_DISABLE_PUBLIC_REFRESH ?? defaults.disablePublicRefresh;
+const phase1CacheProfileMs = requestedProfile.endsWith("cache-zero")
+  ? "0"
+  : requestedProfile.endsWith("cache-max")
+    ? "5000"
+    : undefined;
+const requestedPublicReadCacheMs = process.env.TOURNAMENT_PUBLIC_READ_CACHE_MS?.trim();
+
+if (
+  phase1CacheProfileMs !== undefined &&
+  requestedPublicReadCacheMs !== undefined &&
+  requestedPublicReadCacheMs !== phase1CacheProfileMs
+) {
+  console.error(
+    `[playwright-runner] ${requestedProfile} is locked to TOURNAMENT_PUBLIC_READ_CACHE_MS=${phase1CacheProfileMs}.`,
+  );
+  process.exit(1);
+}
+
+const e2ePublicReadCacheMs =
+  phase1CacheProfileMs ?? requestedPublicReadCacheMs ?? defaults.publicReadCacheMs ?? "1000";
 const e2ePhase9BallotMode = process.env.E2E_PHASE9_BALLOT_MODE || defaults.phase9BallotMode;
 const e2eAllowE2eRoutes = process.env.TOURNAMENT_TEST_ALLOW_E2E_ROUTES ?? defaults.allowE2eRoutes;
 const e2eAllowMemoryBackend =
@@ -407,7 +553,8 @@ const e2eAllowRehearsalAdminControls =
   process.env.TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS ??
   (usesPhase0Config ||
   requestedProfile === "production-flow" ||
-  requestedProfile === "supabase-dev-rehearsal"
+  requestedProfile === "supabase-dev-rehearsal" ||
+  requestedProfile.startsWith("phase1-")
     ? "true"
     : "false");
 const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
@@ -434,12 +581,15 @@ const runConfig = {
   baseURL: e2eBaseURL,
   publicSiteUrl: e2ePublicSiteUrl,
   eventId: e2eTournamentEventId,
+  explicitE2eTournamentEventId,
+  configuredTournamentEventId,
   phase0EventIdDiffersFromConfigured,
   skipBuild,
   disableAdminSessionHeartbeat: e2eDisableAdminSessionHeartbeat,
   disableHostHeartbeat: e2eDisableHostHeartbeat,
   disableVoteLivePolling: e2eDisableVoteLivePolling,
   disablePublicRefresh: e2eDisablePublicRefresh,
+  publicReadCacheMs: e2ePublicReadCacheMs,
   phase9BallotMode: e2ePhase9BallotMode,
   loadProfile: e2eLoadProfile,
   useAdminActionsOnly: e2eUseAdminActionsOnly,
@@ -457,6 +607,8 @@ printEnvironmentSummary(runConfig);
 
 if (requestedProfile === "production-flow") {
   failValidation(requestedProfile, collectProductionFlowValidationErrors(runConfig));
+} else if (requestedProfile.startsWith("phase1-supabase")) {
+  failValidation(requestedProfile, collectPhase1SupabaseValidationErrors(runConfig));
 } else if (e2eTournamentStateBackend === "supabase") {
   failValidation(requestedProfile, collectSupabaseValidationErrors(runConfig));
 }
@@ -486,6 +638,7 @@ const env = sanitizeEnv({
   NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING: e2eDisableVoteLivePolling,
   NEXT_PUBLIC_E2E_DISABLE_PUBLIC_REFRESH: e2eDisablePublicRefresh,
   TOURNAMENT_STATE_BACKEND: e2eTournamentStateBackend,
+  TOURNAMENT_PUBLIC_READ_CACHE_MS: e2ePublicReadCacheMs,
   TOURNAMENT_EVENT_ID: e2eTournamentEventId,
   NEXT_PUBLIC_SITE_URL: e2ePublicSiteUrl,
   NEXT_PUBLIC_SUPABASE_URL: hostedSupabaseUrl || "http://127.0.0.1:54321",
@@ -506,9 +659,9 @@ let exitStatus = 0;
 
 try {
   if (!skipBuild) {
-    run(npmCommand, ["run", "build"], env);
+    await run(npmCommand, ["run", "build"], env);
   }
-  run(npxCommand, ["playwright", ...requestedArgs], env);
+  await run(npxCommand, ["playwright", ...requestedArgs], env);
 } catch (error) {
   exitStatus = typeof error?.exitStatus === "number" ? error.exitStatus : 1;
   if (exitStatus === 1 && error instanceof Error) {

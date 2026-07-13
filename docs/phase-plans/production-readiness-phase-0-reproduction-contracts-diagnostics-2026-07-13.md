@@ -120,10 +120,10 @@ later-phase remediation item complete.
   layout-shift, and 320/360/390 route geometry baselines are recorded.
 - RSC/public-route diagnostics contain no usernames, cookies, passwords, tokens, hashes, secrets,
   headers, bodies, or full HTML.
-- Formatting/checks: `rtk npx prettier --check` for changed supported files,
-  `rtk npm run lint`, `rtk npm run typecheck`, `rtk npm run test`, `rtk npm run build`, targeted
+- Formatting/checks: `npx prettier --check` for changed supported files,
+  `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`, targeted
   memory diagnostics, targeted hosted diagnostics, and the relevant default e2e suite.
-- Run `rtk git diff --check` and scan changed files/artifacts for secret-like strings.
+- Run `git diff --check` and scan changed files/artifacts for secret-like strings.
 - Review the complete diff against `docs/product-spec.md`, security notes, responsive/accessibility
   requirements, stale-state risks, and data-loss risks.
 

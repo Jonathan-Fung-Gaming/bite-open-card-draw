@@ -15,12 +15,12 @@ short note with the reason and date. Issue IDs are stable so the team can pick o
 
 ## Checks To Run After Selected Fixes
 
-- [x] `rtk npm run lint`
-- [x] `rtk npm run typecheck`
-- [x] `rtk npm run test`
-- [x] `rtk npm run build`
-- [x] `rtk npm run test:e2e`
-- [x] `rtk git diff --check`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run test`
+- [x] `npm run build`
+- [x] `npm run test:e2e`
+- [x] `git diff --check`
 - [ ] If visual changes are included, capture mobile and projector screenshots.
 
 ## Positive Behaviors To Preserve

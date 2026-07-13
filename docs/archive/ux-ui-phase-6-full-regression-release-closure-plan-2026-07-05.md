@@ -36,7 +36,7 @@ finds a real release-blocking defect.
 
 ### Browser evidence
 
-- Run local memory-backend UX regression evidence with `rtk npm run test:e2e`.
+- Run local memory-backend UX regression evidence with `npm run test:e2e`.
 - Record that this evidence covers:
   - desktop/projector `/stage`,
   - desktop `/coolguy69`,
@@ -57,8 +57,8 @@ finds a real release-blocking defect.
 
 ### Full production-flow rehearsal
 
-- Run `rtk npm run test:e2e:production-flow:validate` before the full production-flow browser run.
-- Run `rtk npm run test:e2e:production-flow` with a disposable Supabase event id from the local
+- Run `npm run test:e2e:production-flow:validate` before the full production-flow browser run.
+- Run `npm run test:e2e:production-flow` with a disposable Supabase event id from the local
   environment.
 - Confirm the production-flow evidence still verifies:
   - Round 1 starts with 48 active voting players,
@@ -73,7 +73,7 @@ finds a real release-blocking defect.
 
 ### Image and release data verification
 
-- Run `rtk npm run verify:real-chart-images` and `rtk npm run verify:release-data`.
+- Run `npm run verify:real-chart-images` and `npm run verify:release-data`.
 - Confirm local runtime chart image paths point at non-fallback cached assets under
   `public/chart-images/cache`.
 - Probe the production URL for a tracked cache PNG before and after merge/deployment. The pre-merge
@@ -103,8 +103,8 @@ finds a real release-blocking defect.
 - Use a feature branch and PR for repository changes.
 - Run review and checks before pushing.
 - After PR checks are acceptable, merge the PR.
-- After merge, run `rtk npm run supabase:migration:list`.
-- Run `rtk npm run supabase:db:push` only if the migration list shows pending local migrations or a
+- After merge, run `npm run supabase:migration:list`.
+- Run `npm run supabase:db:push` only if the migration list shows pending local migrations or a
   migration was added during this phase. No new Supabase migration is expected for Phase 6.
 - After merge/deployment, rerun the production cache PNG probe. If the deployment is not updated or
   still does not serve cache PNGs, document the blocker instead of claiming `UXR-001` closure.
@@ -114,23 +114,23 @@ finds a real release-blocking defect.
 1. Preflight the worktree and current live production image state.
 2. Add and review this Phase 6 plan.
 3. Run focused source/data verification:
-   - `rtk npm run verify:real-chart-images`
-   - `rtk npm run verify:release-data`
+   - `npm run verify:real-chart-images`
+   - `npm run verify:release-data`
 4. Run required quality gates:
-   - `rtk npm run lint`
-   - `rtk npm run typecheck`
-   - `rtk npm run test`
-   - `rtk npm run build`
-   - `rtk git diff --check`
+   - `npm run lint`
+   - `npm run typecheck`
+   - `npm run test`
+   - `npm run build`
+   - `git diff --check`
 5. Run browser evidence:
-   - `rtk npm run test:e2e`
-   - `rtk npm run test:e2e:production-flow:validate`
-   - `rtk npm run test:e2e:production-flow`
+   - `npm run test:e2e`
+   - `npm run test:e2e:production-flow:validate`
+   - `npm run test:e2e:production-flow`
 6. Run release-supporting checks where available and not already covered:
-   - `rtk npm run test:load`
-   - `rtk npm run test:load:player-routes`
-   - `rtk npm audit --omit=dev`
-   - `rtk npm run supabase:migration:list`
+   - `npm run test:load`
+   - `npm run test:load:player-routes`
+   - `npm audit --omit=dev`
+   - `npm run supabase:migration:list`
 7. Update `docs/phase-status.md`, `docs/release-checklist.md`, and the UX/UI checklist according to
    the evidence actually collected.
 8. Review the final diff against product and security rules.

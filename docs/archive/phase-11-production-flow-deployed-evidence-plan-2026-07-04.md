@@ -27,7 +27,7 @@ No tournament rules change in this phase.
 ## Current Baseline
 
 Phase 10 already upgraded the production-flow helpers so
-`rtk npm run test:e2e:production-flow` runs the hosted four-round Supabase rehearsal with:
+`npm run test:e2e:production-flow` runs the hosted four-round Supabase rehearsal with:
 
 - Round 1: 48 active voting players and 48 submitted UI ballots.
 - Round 2: 36 active voting players after exactly 12 voting players are marked inactive.
@@ -42,9 +42,9 @@ external deployed mode that cannot be mistaken for memory or local smoke evidenc
 ## Implementation Plan
 
 1. Preserve the production-flow gate as the release command.
-   - Keep `rtk npm run test:e2e:production-flow` as the canonical grouped evidence command.
+   - Keep `npm run test:e2e:production-flow` as the canonical grouped evidence command.
    - Do not add `.github/workflows/*`; CI workflow creation stays deferred to Phase 12.
-   - Keep `rtk npm run test:e2e:production-flow:validate` as the fast environment probe.
+   - Keep `npm run test:e2e:production-flow:validate` as the fast environment probe.
 
 2. Add Phase 11 visual/image evidence to the production-flow run.
    - Collect projector evidence during Round 1 voting, before bulk ballot submission mutates turnout.
@@ -134,45 +134,45 @@ Review result after audit:
 Focused checks:
 
 ```text
-rtk npm run test -- tests/phase9/fixtures/rehearsal-plan.test.ts
-rtk npm run test:e2e:no-build -- --project=visual-evidence-chromium
-rtk npm run test:e2e:production-flow:validate
+npm run test -- tests/phase9/fixtures/rehearsal-plan.test.ts
+npm run test:e2e:no-build -- --project=visual-evidence-chromium
+npm run test:e2e:production-flow:validate
 ```
 
 Phase-wide checks:
 
 ```text
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
-rtk npm run test:e2e
-rtk npm run test:phase9
-rtk npm run test:load:player-routes
-rtk npm run test:e2e:production-flow:validate
-rtk npm run test:e2e:production-flow
-rtk git diff --check
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run test:e2e
+npm run test:phase9
+npm run test:load:player-routes
+npm run test:e2e:production-flow:validate
+npm run test:e2e:production-flow
+git diff --check
 ```
 
 Data/image checks:
 
 ```text
-rtk npm run verify:real-chart-images
-rtk npm run verify:release-data
+npm run verify:real-chart-images
+npm run verify:release-data
 ```
 
 Supabase checks:
 
 ```text
-rtk npm run supabase:migration:list
+npm run supabase:migration:list
 ```
 
-Run `rtk npm run supabase:db:push` only if a new migration is created or migration list shows a local
+Run `npm run supabase:db:push` only if a new migration is created or migration list shows a local
 pending migration for the linked project.
 
 ## Acceptance Criteria
 
-- `rtk npm run test:e2e:production-flow` still proves the full 48 -> 36 -> 24 -> 12 rehearsal.
+- `npm run test:e2e:production-flow` still proves the full 48 -> 36 -> 24 -> 12 rehearsal.
 - The same production-flow run emits Phase 11 projector/mobile/image evidence artifacts.
 - All four private CSVs are saved and checked.
 - External deployed production-flow mode refuses to run without deployed commit evidence.

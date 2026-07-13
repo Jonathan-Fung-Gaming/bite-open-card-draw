@@ -35,27 +35,27 @@ helpers, and `/api/e2e/load-ballot` plus `/api/e2e/private-csv` are hard-disable
 Run before deployment:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run test:e2e
-rtk npm run test:e2e:production-flow
-rtk npm run test:load
-rtk npm run test:load:player-routes
-rtk npm run test:phase9
-rtk npm run supabase:migration:list
-rtk npm run import:charts
-rtk npm run cache:chart-images
-rtk npm run verify:real-chart-images
-rtk npm run verify:release-data
-rtk npm audit --omit=dev
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run test:e2e
+npm run test:e2e:production-flow
+npm run test:load
+npm run test:load:player-routes
+npm run test:phase9
+npm run supabase:migration:list
+npm run import:charts
+npm run cache:chart-images
+npm run verify:real-chart-images
+npm run verify:release-data
+npm audit --omit=dev
+npm run build
 ```
 
 Playwright requires a local browser install:
 
 ```bash
-rtk npx playwright install chromium webkit
+npx playwright install chromium webkit
 ```
 
 ## Release Blockers To Clear
@@ -70,7 +70,7 @@ Do not use the release for tournament operation until:
 - Supabase migrations are applied through
   `20260713010000_event_scoped_voter_device_binding.sql`.
 - `TOURNAMENT_TEST_ROUTE_TOKEN` is absent from production environment variables.
-- `rtk npm run cache:chart-images` produces at least one non-fallback cached artwork file and
+- `npm run cache:chart-images` produces at least one non-fallback cached artwork file and
   `public/chart-images/cache` or the chosen controlled storage has real files.
 - Rehearsal mode has been reset or a clean production event namespace has been selected before real
   tournament operation.
@@ -90,18 +90,18 @@ Hosted Supabase rehearsal is no longer an unresolved release blocker as of 2026-
 
 - Production Supabase was used by explicit exception because no spare project remained. The accepted
   risk is that global migrations were applied to the existing production project.
-- `rtk npx supabase db lint --linked` passed with no schema errors.
-- Historical `rtk npx supabase migration list --linked` showed remote migration `20260630041000`.
+- `npx supabase db lint --linked` passed with no schema errors.
+- Historical `npx supabase migration list --linked` showed remote migration `20260630041000`.
   Current readiness requires `20260713010000_event_scoped_voter_device_binding.sql`.
-- Hosted `rtk npm run test:e2e` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
+- Hosted `npm run test:e2e` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
   `phase9-e2e-2026-06-30-prod-23`.
-- Hosted `rtk npm run test:load` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
+- Hosted `npm run test:load` passed with `TOURNAMENT_STATE_BACKEND=supabase` and event id
   `phase9-load-2026-06-30-prod-07`.
 - Hosted four-round Phase 9 rehearsal evidence was recorded before the command split. Current
-  release four-round runs use `rtk npm run test:e2e:production-flow`; the default
-  `rtk npm run test:phase9` now runs the shorter one-round smoke path. The Supabase-dev full profile
-  is available only as `rtk npm run test:diagnostic:supabase-dev-full`.
-- Historical hosted `rtk npm run test:phase9` passed a four-round rehearsal with event id
+  release four-round runs use `npm run test:e2e:production-flow`; the default
+  `npm run test:phase9` now runs the shorter one-round smoke path. The Supabase-dev full profile
+  is available only as `npm run test:diagnostic:supabase-dev-full`.
+- Historical hosted `npm run test:phase9` passed a four-round rehearsal with event id
   `phase9-fourround-2026-06-30-prod-05`.
 - The Vercel non-root route failure reported with digest `2042555441` was resolved by configuring
   the production runtime environment variables and redeploying.
@@ -114,15 +114,15 @@ For a step-by-step hosted rehearsal walkthrough, use
 Apply migrations before event use:
 
 ```bash
-rtk npx supabase link --project-ref <project-ref>
-rtk npm run supabase:db:push
+npx supabase link --project-ref <project-ref>
+npm run supabase:db:push
 ```
 
 Then verify:
 
 ```bash
-rtk npm run supabase:migration:list
-rtk npm run test
+npm run supabase:migration:list
+npm run test
 ```
 
 For event or deployed use, set `TOURNAMENT_STATE_BACKEND=supabase` and a nonblank
@@ -133,23 +133,23 @@ local demos, or single-process development only.
 ## Data Setup Workflow
 
 1. Replace `data/source/charts.csv` only with the approved chart export.
-2. Run `rtk npm run import:charts`.
+2. Run `npm run import:charts`.
 3. Confirm the output says `Imported ... charts` and prints required pool counts with every
    required pool at 7 or more. If it prints `Required pools with fewer than 7 eligible charts`,
    stop and repair the CSV or exclusions before drawing.
-4. If `rtk npm run import:charts -- --strict` fails because repaired or skipped diagnostics remain,
+4. If `npm run import:charts -- --strict` fails because repaired or skipped diagnostics remain,
    rerun the import with explicit review evidence:
-   `rtk npm run import:charts -- --reviewed-by=<reviewer> --reviewed-commit=<commit>`.
+   `npm run import:charts -- --reviewed-by=<reviewer> --reviewed-commit=<commit>`.
    The report must include `reviewedBy`, ISO `reviewedAt`, and `reviewedCommit`.
-5. Run `rtk npm run cache:chart-images` for remote artwork caching. Expected success output is
+5. Run `npm run cache:chart-images` for remote artwork caching. Expected success output is
    `Prepared ... image assets: N cached, M using fallback /chart-images/fallback-card.svg`.
    `N` must be greater than 0 before claiming real cached artwork is ready.
-6. Run `rtk npm run verify:real-chart-images`; it must report non-fallback cached image assets and
+6. Run `npm run verify:real-chart-images`; it must report non-fallback cached image assets and
    chart assignments before release closure.
-7. Run `rtk npm run verify:release-data`; it must pass with either strict-clean import artifacts or
+7. Run `npm run verify:release-data`; it must pass with either strict-clean import artifacts or
    signed diagnostics and must report matching source CSV, import report, runtime catalog, and image
    manifest hashes.
-8. If remote fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only` and
+8. If remote fetching is unavailable, run `npm run cache:chart-images -- --fallback-only` and
    explicitly accept fallback artwork for rehearsal only. This does not close the real-image
    remediation items.
 9. Confirm `public/chart-images/cache` contains real cached image files before relying on deployed
@@ -171,19 +171,19 @@ operation.
 1. Record the deployed URL, Vercel deployment id, deployed source commit, and deployment time.
 2. Confirm `NEXT_PUBLIC_SITE_URL` in the deployed environment is the same public origin that phones
    should open.
-3. Run `rtk npm run verify:real-chart-images` locally and copy one
+3. Run `npm run verify:real-chart-images` locally and copy one
    `Sample runtime cached artwork` path from the output.
 4. Probe that exact path on the deployed URL. It must return 200. Example:
 
    ```powershell
-   rtk proxy powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://your-deployment.example/chart-images/cache/<sample>.png' -Method Head"
+   powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://your-deployment.example/chart-images/cache/<sample>.png' -Method Head"
    ```
 
 5. Probe the fallback asset too. It should return 200, but it must not be the only chart art used by
    live chart cards:
 
    ```powershell
-   rtk proxy powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://your-deployment.example/chart-images/fallback-card.svg' -Method Head"
+   powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://your-deployment.example/chart-images/fallback-card.svg' -Method Head"
    ```
 
 6. Open `/stage` and `/charts` on the deployed URL and record route/network evidence that chart-card
@@ -207,8 +207,8 @@ Local production-build evidence:
 ```powershell
 $env:E2E_TOURNAMENT_EVENT_ID = "rehearsal-YYYY-MM-DD-disposable"
 $env:E2E_ALLOW_DESTRUCTIVE_RESET = "true"
-rtk npm run test:e2e:production-flow:validate
-rtk npm run test:e2e:production-flow
+npm run test:e2e:production-flow:validate
+npm run test:e2e:production-flow
 ```
 
 External deployed evidence needs the same Supabase/rehearsal variables plus deployed route metadata:
@@ -218,8 +218,8 @@ $env:E2E_SERVER_MODE = "external"
 $env:E2E_BASE_URL = "https://your-deployed-preview-or-production-url.example"
 $env:E2E_DEPLOYED_TEST_ROUTE_TOKEN = "<deployed probe token value for negative /api/e2e/* checks>"
 $env:E2E_DEPLOYED_COMMIT_SHA = "<deployed commit sha>"
-rtk npm run test:e2e:production-flow:validate
-rtk npm run test:e2e:production-flow
+npm run test:e2e:production-flow:validate
+npm run test:e2e:production-flow
 ```
 
 The external command must use a disposable `E2E_TOURNAMENT_EVENT_ID`. It probes `/api/e2e/*` with

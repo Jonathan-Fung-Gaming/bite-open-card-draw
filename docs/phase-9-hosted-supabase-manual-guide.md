@@ -36,9 +36,9 @@ For the 2026-07-03 production-readiness remediation plan, Phase 9 is narrower an
 Current focused commands:
 
 ```bash
-rtk npm run test:phase9:supabase-dev
-rtk npm run test:load:api-injection
-rtk npm run test:load:player-routes
+npm run test:phase9:supabase-dev
+npm run test:load:api-injection
+npm run test:load:player-routes
 ```
 
 `test:load:api-injection` is the 100-player API pressure profile. `test:load:player-routes` is a
@@ -143,7 +143,7 @@ prompt blank.
 Use the helper script from an interactive PowerShell terminal:
 
 ```bash
-rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1
 ```
 
 The script asks for values. Paste only into the terminal prompts:
@@ -158,7 +158,7 @@ The script asks for values. Paste only into the terminal prompts:
 If `.env.local` already exists and you intentionally want to replace it:
 
 ```bash
-rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1 -Overwrite
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1 -Overwrite
 ```
 
 Then add these two lines to `.env.local` manually:
@@ -177,13 +177,13 @@ Preferred path: Supabase CLI.
 1. Confirm the CLI works:
 
 ```bash
-rtk npx supabase --version
+npx supabase --version
 ```
 
 2. Log in if needed:
 
 ```bash
-rtk npx supabase login
+npx supabase login
 ```
 
 This may open a browser. Follow the Supabase login prompt.
@@ -191,13 +191,13 @@ This may open a browser. Follow the Supabase login prompt.
 3. If the repo has no `supabase/config.toml`, initialize local Supabase metadata:
 
 ```bash
-rtk npx supabase init
+npx supabase init
 ```
 
 4. Link the non-production project:
 
 ```bash
-rtk npx supabase link --project-ref <project-ref>
+npx supabase link --project-ref <project-ref>
 ```
 
 Supabase may ask for the database password. Type it into the terminal only.
@@ -205,7 +205,7 @@ Supabase may ask for the database password. Type it into the terminal only.
 5. Push migrations:
 
 ```bash
-rtk npx supabase db push
+npx supabase db push
 ```
 
 Expected result:
@@ -265,10 +265,10 @@ Expected result:
 From the repo root:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 If any command fails, stop and fix it before hosted rehearsal.
@@ -276,8 +276,8 @@ If any command fails, stop and fix it before hosted rehearsal.
 Run e2e and load if the local browser dependencies are ready:
 
 ```bash
-rtk npm run test:e2e
-rtk npm run test:load
+npm run test:e2e
+npm run test:load
 ```
 
 The local load test still uses the memory backend by design. It does not replace hosted Supabase
@@ -288,7 +288,7 @@ rehearsal.
 Start the local Next.js app:
 
 ```bash
-rtk npm run dev
+npm run dev
 ```
 
 Keep this terminal open.
@@ -380,8 +380,8 @@ At least once during the rehearsal:
 - Verify the wheel runs for about 10 seconds and reveals the backend-committed winner.
 - Use two admin browser windows to test host lock read-only and takeover behavior.
 - Restart the app and confirm state survives:
-  1. Stop `rtk npm run dev` with `Ctrl+C`.
-  2. Start it again with `rtk npm run dev`.
+  1. Stop `npm run dev` with `Ctrl+C`.
+  2. Start it again with `npm run dev`.
   3. Refresh `/coolguy69`, `/stage`, `/vote`, `/charts`, and `/results`.
   4. Confirm draws, voting windows, ballots, results, admin session behavior, and host lock behavior are sane.
 
@@ -429,24 +429,24 @@ After the hosted rehearsal completes:
 1. Run final local gates:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
-rtk npm run test:e2e
-rtk npm run test:load
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run test:e2e
+npm run test:load
 ```
 
 2. Run a whitespace check:
 
 ```bash
-rtk git diff --check
+git diff --check
 ```
 
 3. Confirm no secrets are staged:
 
 ```bash
-rtk git status --short
+git status --short
 ```
 
 4. Update release evidence docs:

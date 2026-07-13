@@ -4,22 +4,11 @@ import type { Database, Json } from "@/lib/db/database.types";
 import { getTournamentEventId } from "@/lib/server/env";
 import {
   acquireHostLockInputSchema,
-  advanceResultRevealInputSchema,
   closeVotingWindowInputSchema,
-  computeResultsInputSchema,
   drawRoundSetInputSchema,
   manualBallotOverrideInputSchema,
-  markResultsRevealedInputSchema,
-  openVotingWindowInputSchema,
   overrideResultInputSchema,
-  pauseVotingWindowInputSchema,
   releaseHostLockInputSchema,
-  reopenVotingWindowInputSchema,
-  rerollFullRoundInputSchema,
-  rerollOneChartInputSchema,
-  rerollRoundSetInputSchema,
-  resetRoundInputSchema,
-  resumeVotingWindowInputSchema,
   submitBallotInputSchema,
 } from "@/lib/server/mutation-contracts";
 import { invalidateTournamentReadCaches } from "@/lib/server/public-hydration-cache";
@@ -34,10 +23,7 @@ type RpcError = {
 type RpcClient = {
   rpc(
     functionName: NormalizedRuntimeRpcName,
-    args: {
-      p_event_id: string;
-      p_payload: Json;
-    },
+    args: Record<string, Json>,
   ): Promise<{
     data: Json | null;
     error: RpcError | null;
@@ -51,6 +37,105 @@ type TransactionDependencies = {
 
 const uuidSchema = z.string().uuid();
 const isoDateTimeSchema = z.string().datetime({ offset: true });
+const publicGenerationSchema = z.number().int().nonnegative();
+const hostTokenHashSchema = z.string().regex(/^[0-9a-f]{64}$/i);
+
+const PHASE1_CAPABILITY_GATED_MUTATIONS = new Set<NormalizedTransactionalMutationName>([
+  "submitBallot",
+  "computeResults",
+  "pauseVotingWindow",
+  "resumeVotingWindow",
+  "reopenVotingWindow",
+  "resetRound",
+  "openVotingWindow",
+  "rerollOneChart",
+  "rerollRoundSet",
+  "rerollFullRound",
+  "advanceResultReveal",
+  "markResultsRevealed",
+]);
+
+const normalizedAdminTransitionSchema = z.object({
+  requestId: uuidSchema,
+  roundNumber: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  adminSessionId: uuidSchema,
+  hostTokenHash: hostTokenHashSchema,
+  expectedGeneration: publicGenerationSchema,
+});
+
+const normalizedNextDrawSchema = z.object({
+  id: uuidSchema,
+  roundSetId: uuidSchema,
+  version: z.number().int().positive(),
+  eligiblePoolCount: z.number().int().nonnegative(),
+  eligibleChartIds: z.array(uuidSchema),
+  excludedChartKeysSnapshot: z.array(z.string()),
+  selectedSongKeysSnapshot: z.array(z.string()),
+  sameRoundBlockedSongKeysSnapshot: z.array(z.string()),
+  charts: z
+    .array(
+      z.object({
+        id: uuidSchema,
+        name: z.string().trim().min(1),
+        artist: z.string().trim().min(1),
+        displayDifficulty: z.string().regex(/^[SD]\d{1,2}$/),
+        songKey: z.string().trim().min(1),
+        chartKey: z.string().trim().min(1),
+        sourceBgImg: z.string(),
+        localImagePath: z.string().nullable(),
+      }),
+    )
+    .length(7),
+});
+
+const normalizedRerollDrawSchema = z
+  .object({
+    expectedDrawId: uuidSchema,
+    expectedDrawVersion: z.number().int().positive(),
+    nextDraw: normalizedNextDrawSchema,
+  })
+  .superRefine((value, context) => {
+    if (value.nextDraw.version !== value.expectedDrawVersion + 1) {
+      context.addIssue({
+        code: "custom",
+        message: "Next draw version must increment the expected draw version by one.",
+        path: ["nextDraw", "version"],
+      });
+    }
+  });
+
+const normalizedRerollBaseSchema = normalizedAdminTransitionSchema.extend({
+  reason: z.string().trim().min(1),
+});
+
+const normalizedRerollOneChartSchema = normalizedRerollBaseSchema.extend({
+  targetChartId: uuidSchema,
+  draws: z.array(normalizedRerollDrawSchema).length(1),
+});
+
+const normalizedRerollRoundSetSchema = normalizedRerollBaseSchema.extend({
+  draws: z.array(normalizedRerollDrawSchema).length(1),
+});
+
+const normalizedRerollFullRoundSchema = normalizedRerollBaseSchema.extend({
+  draws: z.array(normalizedRerollDrawSchema).length(2),
+});
+
+const normalizedAdvanceResultRevealSchema = normalizedAdminTransitionSchema.extend({
+  expectedResultId: uuidSchema,
+  expectedRevealPhase: z.enum([
+    "computed",
+    "set_1_counts",
+    "set_1_resolved",
+    "set_2_counts",
+    "set_2_resolved",
+  ]),
+});
+
+const normalizedMarkResultsRevealedSchema = normalizedAdminTransitionSchema.extend({
+  expectedResultId: uuidSchema,
+  expectedRevealPhase: z.literal("final"),
+});
 
 const activeVoterPresenceInputSchema = z.object({
   roundNumber: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
@@ -77,17 +162,14 @@ const normalizedManualBallotOverrideInputSchema = manualBallotOverrideInputSchem
     adminSessionId: uuidSchema,
   });
 
-const normalizedReopenVotingWindowInputSchema = reopenVotingWindowInputSchema
-  .omit({ adminPassword: true })
-  .extend({
-    adminSessionId: uuidSchema,
-  });
+const normalizedReopenVotingWindowInputSchema = normalizedAdminTransitionSchema.extend({
+  durationMinutes: z.number().int().min(1).max(10),
+  reason: z.string().trim().min(1),
+});
 
-const normalizedResetRoundInputSchema = resetRoundInputSchema
-  .omit({ adminPassword: true })
-  .extend({
-    adminSessionId: uuidSchema,
-  });
+const normalizedResetRoundInputSchema = normalizedAdminTransitionSchema.extend({
+  reason: z.string().trim().min(1),
+});
 
 const normalizedCloseVotingWindowInputSchema = closeVotingWindowInputSchema.extend({
   adminSessionId: uuidSchema,
@@ -109,13 +191,23 @@ const adminSessionEndInputSchema = z.object({
 
 export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   claimActiveVoterPresence: activeVoterPresenceInputSchema,
-  submitBallot: submitBallotInputSchema,
-  computeResults: computeResultsInputSchema,
+  submitBallot: submitBallotInputSchema.extend({
+    expectedGeneration: publicGenerationSchema,
+  }),
+  computeResults: normalizedAdminTransitionSchema,
   advanceVotingTimer: advanceVotingTimerInputSchema,
+  pauseVotingWindow: normalizedAdminTransitionSchema,
+  resumeVotingWindow: normalizedAdminTransitionSchema,
   closeVotingWindow: normalizedCloseVotingWindowInputSchema,
   manualBallotOverride: normalizedManualBallotOverrideInputSchema,
   reopenVotingWindow: normalizedReopenVotingWindowInputSchema,
   resetRound: normalizedResetRoundInputSchema,
+  openVotingWindow: normalizedAdminTransitionSchema,
+  rerollOneChart: normalizedRerollOneChartSchema,
+  rerollRoundSet: normalizedRerollRoundSetSchema,
+  rerollFullRound: normalizedRerollFullRoundSchema,
+  advanceResultReveal: normalizedAdvanceResultRevealSchema,
+  markResultsRevealed: normalizedMarkResultsRevealedSchema,
 } as const;
 
 export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
@@ -123,16 +215,8 @@ export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   acquireHostLock: acquireHostLockInputSchema,
   refreshHostLock: acquireHostLockInputSchema,
   releaseHostLock: releaseHostLockInputSchema,
-  openVotingWindow: openVotingWindowInputSchema,
-  pauseVotingWindow: pauseVotingWindowInputSchema,
-  resumeVotingWindow: resumeVotingWindowInputSchema,
   drawRoundSet: drawRoundSetInputSchema,
-  rerollOneChart: rerollOneChartInputSchema,
-  rerollRoundSet: rerollRoundSetInputSchema,
-  rerollFullRound: rerollFullRoundInputSchema,
   postVoteRerollInvalidation: postVoteRerollInvalidationInputSchema,
-  advanceResultReveal: advanceResultRevealInputSchema,
-  markResultsRevealed: markResultsRevealedInputSchema,
   overrideResult: overrideResultInputSchema,
   adminSessionCreate: adminSessionCreateInputSchema,
   adminSessionTouch: adminSessionTouchInputSchema,
@@ -145,8 +229,7 @@ export type NormalizedTransactionalMutationName =
 export type NormalizedBlockedTransactionalMutationName =
   keyof typeof NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS;
 export type NormalizedRuntimeMutationName =
-  | NormalizedTransactionalMutationName
-  | NormalizedBlockedTransactionalMutationName;
+  NormalizedTransactionalMutationName | NormalizedBlockedTransactionalMutationName;
 
 export type NormalizedTransactionalMutationInput<
   TName extends NormalizedTransactionalMutationName,
@@ -157,10 +240,18 @@ export const NORMALIZED_RUNTIME_RPC_NAMES = {
   submitBallot: "normalized_submit_ballot",
   computeResults: "normalized_compute_results",
   advanceVotingTimer: "normalized_advance_voting_timer",
+  pauseVotingWindow: "normalized_pause_voting_window",
+  resumeVotingWindow: "normalized_resume_voting_window",
   closeVotingWindow: "normalized_close_voting_window",
   manualBallotOverride: "normalized_manual_ballot_override",
   reopenVotingWindow: "normalized_reopen_voting_window",
   resetRound: "normalized_reset_round",
+  openVotingWindow: "normalized_open_voting_window",
+  rerollOneChart: "normalized_reroll_one_chart",
+  rerollRoundSet: "normalized_reroll_round_set",
+  rerollFullRound: "normalized_reroll_full_round",
+  advanceResultReveal: "normalized_advance_result_reveal",
+  markResultsRevealed: "normalized_mark_results_revealed",
 } as const satisfies Record<NormalizedTransactionalMutationName, NormalizedRuntimeRpcName>;
 
 export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
@@ -168,16 +259,8 @@ export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
   acquireHostLock: "normalized_acquire_host_lock",
   refreshHostLock: "normalized_heartbeat_host_lock",
   releaseHostLock: "normalized_release_host_lock",
-  openVotingWindow: "normalized_open_voting_window",
-  pauseVotingWindow: "normalized_pause_voting_window",
-  resumeVotingWindow: "normalized_resume_voting_window",
   drawRoundSet: "normalized_draw_round_set",
-  rerollOneChart: "normalized_reroll_one_chart",
-  rerollRoundSet: "normalized_reroll_round_set",
-  rerollFullRound: "normalized_reroll_full_round",
   postVoteRerollInvalidation: "normalized_invalidate_post_vote_reroll_ballots",
-  advanceResultReveal: "normalized_advance_result_reveal",
-  markResultsRevealed: "normalized_mark_results_revealed",
   overrideResult: "normalized_override_result",
   adminSessionCreate: "normalized_create_admin_session",
   adminSessionTouch: "normalized_touch_admin_session",
@@ -246,7 +329,44 @@ function isPlaceholderCommitAck(data: Json | null) {
 
   const record = data as Record<string, unknown>;
 
-  return record.committed === true && !("rows_changed" in record) && !("changed_rows" in record);
+  return (
+    record.committed === true &&
+    !("rows_changed" in record) &&
+    !("changed_rows" in record) &&
+    !("generation" in record) &&
+    !("adminActionId" in record)
+  );
+}
+
+async function assertPhase1MutationCapability(
+  name: NormalizedTransactionalMutationName,
+  eventId: string,
+  supabase: RpcClient,
+) {
+  if (!PHASE1_CAPABILITY_GATED_MUTATIONS.has(name)) {
+    return;
+  }
+
+  const { data, error } = await supabase.rpc("normalized_read_public_generation_key", {
+    p_event_id: eventId,
+  });
+
+  if (error) {
+    throw new Error(
+      `Normalized runtime mutation ${name} is unavailable until the Phase 1 database migration is applied: ${error.message}`,
+    );
+  }
+
+  if (
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data) ||
+    typeof (data as Record<string, unknown>).generationKey !== "string"
+  ) {
+    throw new Error(
+      `Normalized runtime mutation ${name} is unavailable because the Phase 1 capability preflight returned an invalid response.`,
+    );
+  }
 }
 
 export async function executeNormalizedTransactionalMutation<
@@ -268,6 +388,7 @@ export async function executeNormalizedTransactionalMutation<
   const eventId = dependencies.eventId ?? getTournamentEventId();
   const supabase = dependencies.supabase ?? createRpcClient();
   const rpcName = NORMALIZED_RUNTIME_RPC_NAMES[name];
+  await assertPhase1MutationCapability(name, eventId, supabase);
   const { data, error } = await supabase.rpc(rpcName, {
     p_event_id: eventId,
     p_payload: payload,

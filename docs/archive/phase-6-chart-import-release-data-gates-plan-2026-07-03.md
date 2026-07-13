@@ -161,23 +161,23 @@ Release/script tests:
   - missing or empty image asset manifest;
   - missing or empty runtime catalog.
 - Run the actual commands:
-  - `rtk npm run import:charts -- --strict`
-  - `rtk npm run cache:chart-images`
-  - `rtk npm run verify:real-chart-images`
-  - `rtk npm run verify:release-data`
+  - `npm run import:charts -- --strict`
+  - `npm run cache:chart-images`
+  - `npm run verify:real-chart-images`
+  - `npm run verify:release-data`
 
 Project-wide checks:
 
-- `rtk npm run lint`
-- `rtk npm run typecheck`
-- `rtk npm run test`
-- `rtk npm run build`
-- `rtk npm run test:e2e`
-- `rtk git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `npm run test:e2e`
+- `git diff --check`
 
 Browser-visible behavior is not intentionally changed, but
 `docs/phase-gates.md` requires e2e checks once available. Run
-`rtk npm run test:e2e` and stop if it fails.
+`npm run test:e2e` and stop if it fails.
 
 ## Acceptance Mapping
 
@@ -185,8 +185,8 @@ Browser-visible behavior is not intentionally changed, but
 | --- | --- |
 | Tests reject extra headers, misordered headers, and unexpected trailing columns | Importer unit tests |
 | Tests cover Korean-only and mixed-Unicode title/artist keys | Normalize unit tests |
-| `rtk npm run import:charts -- --strict` passes or signed-review path is explicit | Import command output and release gate behavior |
-| `rtk npm run verify:real-chart-images` passes against final artifacts | Runtime image verification command |
+| `npm run import:charts -- --strict` passes or signed-review path is explicit | Import command output and release gate behavior |
+| `npm run verify:real-chart-images` passes against final artifacts | Runtime image verification command |
 | Current cached/controlled image artifacts are regenerated or explicitly verified | `cache:chart-images`, runtime catalog/image manifest SHAs, and `verify:real-chart-images` |
 | Release data gate fails on unsigned repaired/skipped diagnostics | Release gate unit/script tests |
 

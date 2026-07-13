@@ -50,6 +50,61 @@ function freshness(overrides: Partial<PublicRouteFreshnessInput> = {}) {
 }
 
 describe("public route freshness", () => {
+  it("orders open, reroll-ready, and restarted voting by generation", () => {
+    const openGeneration = freshness({
+      publicStateGeneration: 10,
+      publicStateTransitionKind: "voting_opened",
+      votingStatus: "voting_open",
+    });
+    const rerollGeneration = freshness({
+      activeDrawVersions: [DRAW_ONE_REROLLED, DRAW_TWO],
+      latestTournamentActionAt: "2026-07-08T00:00:40.000Z",
+      publicStateGeneration: 11,
+      publicStateTransitionKind: "reroll_one_chart",
+      votingStatus: "ready_to_vote",
+      votingWindowOpenedAt: null,
+      votingWindowUpdatedAt: null,
+    });
+    const restartedGeneration = freshness({
+      activeDrawVersions: [DRAW_ONE_REROLLED, DRAW_TWO],
+      latestTournamentActionAt: "2026-07-08T00:00:50.000Z",
+      publicStateGeneration: 12,
+      publicStateTransitionKind: "voting_opened",
+      votingStatus: "voting_open",
+      votingWindowOpenedAt: "2026-07-08T00:00:50.000Z",
+      votingWindowUpdatedAt: "2026-07-08T00:00:50.000Z",
+    });
+
+    expect(shouldAcceptPublicRoutePayload(rerollGeneration, openGeneration)).toBe(true);
+    expect(shouldAcceptPublicRoutePayload(restartedGeneration, rerollGeneration)).toBe(true);
+    expect(shouldAcceptPublicRoutePayload(openGeneration, restartedGeneration)).toBe(false);
+    expect(shouldAcceptPublicRoutePayload(rerollGeneration, restartedGeneration)).toBe(false);
+  });
+
+  it("rejects a lower generation even when its legacy timestamps look newer", () => {
+    const accepted = freshness({
+      publicStateGeneration: 7,
+      publicStateTransitionKind: "result_reveal_advanced",
+      resultComputedAt: "2026-07-08T00:00:10.000Z",
+      resultRevealPhase: "set_1_resolved",
+      resultRevealPhaseStartedAt: "2026-07-08T00:00:20.000Z",
+      resultSnapshotId: "accepted-result",
+      votingStatus: "results_revealing",
+    });
+    const stale = freshness({
+      latestTournamentActionAt: "2026-07-08T01:00:00.000Z",
+      publicStateGeneration: 6,
+      publicStateTransitionKind: "result_reveal_advanced",
+      resultComputedAt: "2026-07-08T01:00:00.000Z",
+      resultRevealPhase: "final",
+      resultRevealPhaseStartedAt: "2026-07-08T01:00:00.000Z",
+      resultSnapshotId: "stale-result",
+      votingStatus: "results_revealed",
+    });
+
+    expect(shouldAcceptPublicRoutePayload(stale, accepted)).toBe(false);
+  });
+
   it("rejects older reveal-phase payloads for the same result snapshot", () => {
     const accepted = freshness({
       latestTournamentActionAt: "2026-07-08T00:00:30.000Z",
@@ -464,6 +519,7 @@ describe("public route freshness", () => {
   it("accepts round advance and rejects a later-arriving older-round payload", () => {
     const accepted = freshness({
       latestTournamentActionAt: "2026-07-08T00:00:30.000Z",
+      publicStateGeneration: 8,
       resultFinalRevealedAt: "2026-07-08T00:00:30.000Z",
       resultRevealPhase: "final",
       resultRevealPhaseStartedAt: "2026-07-08T00:00:30.000Z",
@@ -475,6 +531,7 @@ describe("public route freshness", () => {
       activeDrawVersions: [],
       currentRound: 2,
       latestTournamentActionAt: "2026-07-08T00:01:00.000Z",
+      publicStateGeneration: 0,
       resultFinalRevealedAt: null,
       resultRevealPhase: null,
       resultRevealPhaseStartedAt: null,
@@ -487,6 +544,7 @@ describe("public route freshness", () => {
     });
     const staleRoundOne = freshness({
       latestTournamentActionAt: "2026-07-08T00:00:30.000Z",
+      publicStateGeneration: 8,
       resultFinalRevealedAt: "2026-07-08T00:00:30.000Z",
       resultRevealPhase: "final",
       resultRevealPhaseStartedAt: "2026-07-08T00:00:30.000Z",

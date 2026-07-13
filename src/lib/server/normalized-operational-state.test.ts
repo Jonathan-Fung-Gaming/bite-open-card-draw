@@ -212,6 +212,148 @@ function chartsFor(level: string, startRow: number, prefix: string) {
 }
 
 describe("normalized operational state repository", () => {
+  it("hydrates one coherent RPC snapshot including its public generation", async () => {
+    const rpc = vi.fn(async () => ({
+      data: {
+        eventId: "coherent-read-test",
+        databaseTime: "2026-07-13T00:00:00.000Z",
+        eventRuntimeState: [
+          {
+            event_id: "coherent-read-test",
+            current_round: 1,
+            rehearsal_mode: false,
+            updated_at: "2026-07-13T00:00:00.000Z",
+          },
+        ],
+        players: [
+          {
+            id: "00000000-0000-4000-8000-000000000001",
+            event_id: "coherent-read-test",
+            startgg_username: "Alpha",
+            startgg_username_normalized: "alpha",
+            active: true,
+            has_tournament_history: false,
+            created_at: "2026-07-13T00:00:00.000Z",
+            updated_at: "2026-07-13T00:00:00.000Z",
+          },
+        ],
+        chartExclusions: [],
+        adminActions: [],
+        draws: [],
+        drawnCharts: [],
+        votingWindows: [],
+        roundPlayerEligibility: [],
+        activeVoterPresence: [],
+        voterDeviceBindings: [],
+        ballots: [],
+        ballotChoices: [],
+        ballotRevisions: [],
+        ballotInvalidations: [],
+        resultSnapshots: [],
+        resultRows: [],
+        tiebreaks: [],
+        hostLocks: [],
+        publicStateGenerations: [
+          {
+            event_id: "coherent-read-test",
+            round_number: 1,
+            generation: 7,
+            transition_kind: "reroll_one_chart",
+            result_mode: false,
+            set_1_draw_id: "00000000-0000-4000-8000-000000000099",
+            set_1_draw_version: 2,
+            set_2_draw_id: null,
+            set_2_draw_version: null,
+            voting_status: "not_started",
+            voting_closes_at: null,
+            result_id: null,
+            result_phase: null,
+            result_phase_started_at: null,
+            set_1_tiebreak_started_at: null,
+            set_2_tiebreak_started_at: null,
+            phone_release_state: "voting_open",
+            phone_released_at: null,
+            updated_at: "2026-07-13T00:00:00.000Z",
+          },
+        ],
+      },
+      error: null,
+    }));
+    const from = vi.fn(() => {
+      throw new Error("coherent reads must not fall back to independent table selects");
+    });
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "coherent-read-test",
+      supabase: { rpc, from } as unknown as NormalizedOperationalSupabaseClient,
+    });
+
+    const restored = await repository.load();
+
+    expect(rpc).toHaveBeenCalledWith("normalized_read_coherent_state", {
+      p_event_id: "coherent-read-test",
+      p_payload: { includeBallotTables: true },
+    });
+    expect(from).not.toHaveBeenCalled();
+    expect(restored?.roster.players[0]?.startggUsername).toBe("Alpha");
+    expect(restored?.publicStateGeneration?.rounds[0]).toMatchObject({
+      generation: 7,
+      transitionKind: "reroll_one_chart",
+      activeDraws: [],
+    });
+  });
+
+  it("falls back to legacy reads only when the Phase 1 read RPCs are unavailable", async () => {
+    const legacyClient = new FakeNormalizedSupabaseClient();
+    const rpc = vi.fn(async (functionName: string) => ({
+      data: null,
+      error: {
+        message: `Could not find the function public.${functionName} in the schema cache`,
+      },
+    }));
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "phase1-read-fallback-test",
+      supabase: {
+        rpc,
+        from: legacyClient.from.bind(legacyClient),
+      } as unknown as NormalizedOperationalSupabaseClient,
+    });
+
+    await expect(repository.readPublicGenerationKey()).resolves.toBe("legacy");
+    await expect(repository.load()).resolves.toBeNull();
+
+    expect(rpc).toHaveBeenCalledWith("normalized_read_public_generation_key", {
+      p_event_id: "phase1-read-fallback-test",
+    });
+    expect(rpc).toHaveBeenCalledWith("normalized_read_coherent_state", {
+      p_event_id: "phase1-read-fallback-test",
+      p_payload: { includeBallotTables: true },
+    });
+    expect(legacyClient.touchedTables).toContain("event_runtime_state");
+    expect(legacyClient.touchedTables).toContain("voting_windows");
+  });
+
+  it("does not hide unrelated Phase 1 read RPC errors behind the legacy fallback", async () => {
+    const from = vi.fn(() => {
+      throw new Error("Legacy reads must not run for an unrelated database error.");
+    });
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "connection terminated unexpectedly" },
+    }));
+    const repository = new NormalizedOperationalStateRepository({
+      eventId: "phase1-read-error-test",
+      supabase: { rpc, from } as unknown as NormalizedOperationalSupabaseClient,
+    });
+
+    await expect(repository.readPublicGenerationKey()).rejects.toThrow(
+      "Could not read the public-state generation key: connection terminated unexpectedly",
+    );
+    await expect(repository.load()).rejects.toThrow(
+      "Could not read coherent tournament state: connection terminated unexpectedly",
+    );
+    expect(from).not.toHaveBeenCalled();
+  });
+
   it("preserves concurrent partial admin audit rows append-only", async () => {
     const supabase = new FakeNormalizedSupabaseClient();
     const repository = new NormalizedOperationalStateRepository({
@@ -408,6 +550,7 @@ describe("normalized operational state repository", () => {
       same_round_blocked_song_keys_snapshot: firstDraw.sameRoundBlockedSongKeysSnapshot,
     });
     expect(supabase.rows.get("charts")).toHaveLength(14);
+    expect(supabase.rows.get("public_state_generations")).toHaveLength(4);
     expect(
       supabase.rows
         .get("charts")
@@ -427,7 +570,13 @@ describe("normalized operational state repository", () => {
 
     const restored = await repository.load();
 
-    expect(supabase.rpcCalls).toEqual([]);
+    expect(supabase.rpcCalls).toContainEqual({
+      functionName: "normalized_read_coherent_state",
+      args: {
+        p_event_id: "phase-5-test",
+        p_payload: { includeBallotTables: true },
+      },
+    });
     expect(restored?.roster.players.map((candidate) => candidate.startggUsername)).toEqual([
       "Alpha",
     ]);

@@ -105,21 +105,21 @@ Add a focused Phase 9 smoke spec that starts a 12-player rehearsal and proves:
 Run these first:
 
 ```text
-rtk npm run test:phase9
+npm run test:phase9
 ```
 
 Then run the default phase gate:
 
 ```text
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Run broader browser checks after the focused pass:
 
 ```text
-rtk npm run test:e2e
-rtk npm run test:e2e:production-flow:validate
+npm run test:e2e
+npm run test:e2e:production-flow:validate
 ```

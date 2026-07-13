@@ -79,14 +79,16 @@ describe("admin action production safeguards", () => {
       "utf8",
     );
     const block = getActionBlock(actionsSource, "advanceResultRevealAction");
-    const persistIndex = block.indexOf("await persistTournamentState();");
-    const revalidateIndex = block.indexOf("revalidateTournamentViews(revalidatePath)");
+    const atomicPersistIndex = block.indexOf("await withActiveHostResultAdminState");
+    const revalidateIndex = block.lastIndexOf("revalidateTournamentViews(revalidatePath)");
 
     expect(block).toContain('if (result.revealPhase === "final")');
     expect(block).toContain("holdFinalResultsForStageCompletion(roundNumber)");
-    expect(persistIndex).toBeGreaterThanOrEqual(0);
+    expect(block).toContain("advanceNormalizedResultReveal({");
+    expect(block).toContain('transitionKind: "result_reveal_advanced"');
+    expect(atomicPersistIndex).toBeGreaterThanOrEqual(0);
     expect(revalidateIndex).toBeGreaterThanOrEqual(0);
-    expect(persistIndex).toBeLessThan(revalidateIndex);
+    expect(atomicPersistIndex).toBeLessThan(revalidateIndex);
   });
 
   it("persists explicit public result release before route revalidation", () => {
@@ -95,15 +97,17 @@ describe("admin action production safeguards", () => {
       "utf8",
     );
     const block = getActionBlock(actionsSource, "releaseFinalResultsAction");
-    const persistIndex = block.indexOf("await persistTournamentState();");
-    const revalidateIndex = block.indexOf("revalidateTournamentViews(revalidatePath)");
+    const atomicPersistIndex = block.indexOf("await withActiveHostResultAdminState");
+    const revalidateIndex = block.lastIndexOf("revalidateTournamentViews(revalidatePath)");
 
     expect(block).toContain('result.revealPhase !== "final"');
     expect(block).toContain("releaseFinalResultsToPublic(roundNumber, result)");
     expect(actionsSource).toContain('setResultsPhase(roundNumber, "results_revealed")');
-    expect(persistIndex).toBeGreaterThanOrEqual(0);
+    expect(block).toContain("releaseNormalizedFinalResults({");
+    expect(block).toContain('transitionKind: "results_released"');
+    expect(atomicPersistIndex).toBeGreaterThanOrEqual(0);
     expect(revalidateIndex).toBeGreaterThanOrEqual(0);
-    expect(persistIndex).toBeLessThan(revalidateIndex);
+    expect(atomicPersistIndex).toBeLessThan(revalidateIndex);
   });
 
   it("binds emergency inactive-player eligibility to the authoritative current round", () => {
@@ -266,9 +270,7 @@ describe("admin action production safeguards", () => {
     const reopenStart = actionsSource.indexOf("export async function reopenVotingAction");
     const reopenSource = actionsSource.slice(reopenStart);
 
-    expect(reopenSource).toContain(
-      'assertSupabaseTransactionalMutationImplemented("reopenVotingWindow")',
-    );
+    expect(reopenSource).toContain("await withActiveHostTournamentState");
     expect(reopenSource).toContain(
       "await verifyDangerousActionPassword(getAdminPassword(formData))",
     );
@@ -427,7 +429,8 @@ describe("admin action production safeguards", () => {
           "allow ballot edits for the chosen duration",
         ],
         guardSnippets: [
-          'assertSupabaseTransactionalMutationImplemented("reopenVotingWindow")',
+          "reopenNormalizedVotingWindow({",
+          "withActiveHostTournamentState",
           'result && result.revealPhase !== "computed"',
         ],
       },
@@ -535,7 +538,7 @@ describe("admin action production safeguards", () => {
           "clear that round's draws, ballots, voting window, result snapshot, and reveal state",
           "Reset Round",
         ],
-        guardSnippets: ['assertSupabaseTransactionalMutationImplemented("resetRound")'],
+        guardSnippets: ["resetNormalizedRound({", "withActiveHostTournamentState"],
       },
       {
         productRule: "reset all tournament data",
@@ -667,16 +670,19 @@ describe("admin action production safeguards", () => {
         actionName: "manualBallotAction",
         wrapperCall: "submitNormalizedManualBallotOverride({",
         rpcName: '"manualBallotOverride"',
+        keepsLegacySnapshotPersist: true,
       },
       {
         actionName: "reopenVotingAction",
         wrapperCall: "reopenNormalizedVotingWindow({",
         rpcName: '"reopenVotingWindow"',
+        keepsLegacySnapshotPersist: false,
       },
       {
         actionName: "resetRoundAction",
         wrapperCall: "resetNormalizedRound({",
         rpcName: '"resetRound"',
+        keepsLegacySnapshotPersist: false,
       },
     ];
 
@@ -697,7 +703,12 @@ describe("admin action production safeguards", () => {
       expect(wrapperCall, workflow.actionName).toBeGreaterThan(passwordCheck);
       expect(revalidate, workflow.actionName).toBeGreaterThan(wrapperCall);
       expect(branchReturn, workflow.actionName).toBeGreaterThan(revalidate);
-      expect(snapshotPersist, workflow.actionName).toBeGreaterThan(branchReturn);
+      if (workflow.keepsLegacySnapshotPersist) {
+        expect(snapshotPersist, workflow.actionName).toBeGreaterThan(branchReturn);
+      } else {
+        expect(snapshotPersist, workflow.actionName).toBe(-1);
+        expect(block, workflow.actionName).toContain("withActiveHostTournamentState");
+      }
       expect(wrapperSource, workflow.actionName).toContain(
         `executeNormalizedTransactionalMutation(${workflow.rpcName}`,
       );
@@ -730,5 +741,48 @@ describe("admin action production safeguards", () => {
     expect(branchReturn).toBeGreaterThan(revalidate);
     expect(snapshotPath).toBeGreaterThan(branchReturn);
     expect(wrapperSource).toContain('executeNormalizedTransactionalMutation("closeVotingWindow"');
+  });
+
+  it("routes Supabase pause and resume through atomic Phase 1 transitions", () => {
+    const actionsSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
+      "utf8",
+    );
+    const transitionSource = readFileSync(
+      path.join(process.cwd(), "src/lib/server/normalized-round-transitions.ts"),
+      "utf8",
+    );
+    const workflows = [
+      {
+        actionName: "pauseVotingAction",
+        wrapperCall: "pauseNormalizedVotingWindow(context)",
+        mutationName: "pauseVotingWindow",
+      },
+      {
+        actionName: "resumeVotingAction",
+        wrapperCall: "resumeNormalizedVotingWindow(context)",
+        mutationName: "resumeVotingWindow",
+      },
+    ];
+
+    for (const workflow of workflows) {
+      const block = getActionBlock(actionsSource, workflow.actionName);
+      const supabaseBranch = block.indexOf('getTournamentStateBackend() === "supabase"');
+      const context = block.indexOf("requireNormalizedTransitionContext(roundNumber)");
+      const wrapperCall = block.indexOf(workflow.wrapperCall, context);
+      const hydrate = block.indexOf("await hydrateTournamentState()", wrapperCall);
+      const branchReturn = block.indexOf("return;", hydrate);
+      const snapshotPath = block.indexOf("withActiveHostVotingAdminState", branchReturn);
+
+      expect(supabaseBranch, workflow.actionName).toBeGreaterThanOrEqual(0);
+      expect(context, workflow.actionName).toBeGreaterThan(supabaseBranch);
+      expect(wrapperCall, workflow.actionName).toBeGreaterThan(context);
+      expect(hydrate, workflow.actionName).toBeGreaterThan(wrapperCall);
+      expect(branchReturn, workflow.actionName).toBeGreaterThan(hydrate);
+      expect(snapshotPath, workflow.actionName).toBeGreaterThan(branchReturn);
+      expect(transitionSource).toContain(
+        `executeNormalizedTransactionalMutation("${workflow.mutationName}"`,
+      );
+    }
   });
 });

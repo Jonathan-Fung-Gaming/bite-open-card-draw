@@ -91,4 +91,25 @@ describe("public hydration cache", () => {
 
     expect(loadSnapshot).toHaveBeenCalledTimes(2);
   });
+
+  it("does not reuse a maximum-TTL snapshot after the public generation key changes", async () => {
+    vi.stubEnv("TOURNAMENT_PUBLIC_READ_CACHE_MS", "5000");
+    const loadSnapshot = vi
+      .fn()
+      .mockResolvedValueOnce(createSnapshot("Before Reroll"))
+      .mockResolvedValueOnce(createSnapshot("After Reroll"));
+
+    const before = await readCachedPublicOperationalStateSnapshot(
+      "event-a:1|1:4,2:0,3:0,4:0",
+      loadSnapshot,
+    );
+    const after = await readCachedPublicOperationalStateSnapshot(
+      "event-a:1|1:5,2:0,3:0,4:0",
+      loadSnapshot,
+    );
+
+    expect(before?.roster.players[0]?.startggUsername).toBe("Before Reroll");
+    expect(after?.roster.players[0]?.startggUsername).toBe("After Reroll");
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+  });
 });

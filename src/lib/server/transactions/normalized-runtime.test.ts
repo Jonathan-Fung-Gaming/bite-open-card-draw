@@ -21,6 +21,12 @@ vi.mock("server-only", () => ({}));
 const uuidA = "00000000-0000-4000-8000-000000000001";
 const uuidB = "00000000-0000-4000-8000-000000000002";
 const uuidC = "00000000-0000-4000-8000-000000000003";
+const normalizedAdminContext = {
+  requestId: uuidA,
+  adminSessionId: uuidB,
+  hostTokenHash: "a".repeat(64),
+  expectedGeneration: 0,
+};
 
 type TransactionDependencies = NonNullable<
   Parameters<typeof executeNormalizedTransactionalMutation>[2]
@@ -29,11 +35,8 @@ type MockRpcClient = NonNullable<TransactionDependencies["supabase"]>;
 type RpcFunctionName = (typeof NORMALIZED_RUNTIME_RPC_NAMES)[NormalizedTransactionalMutationName];
 
 type RpcCall = {
-  functionName: RpcFunctionName;
-  args: {
-    p_event_id: string;
-    p_payload: Json;
-  };
+  functionName: RpcFunctionName | "normalized_read_public_generation_key";
+  args: Record<string, Json>;
 };
 
 const implementedMutationNames: NormalizedTransactionalMutationName[] = [
@@ -41,10 +44,18 @@ const implementedMutationNames: NormalizedTransactionalMutationName[] = [
   "submitBallot",
   "computeResults",
   "advanceVotingTimer",
+  "pauseVotingWindow",
+  "resumeVotingWindow",
   "closeVotingWindow",
   "manualBallotOverride",
   "reopenVotingWindow",
   "resetRound",
+  "openVotingWindow",
+  "rerollOneChart",
+  "rerollRoundSet",
+  "rerollFullRound",
+  "advanceResultReveal",
+  "markResultsRevealed",
 ];
 
 const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
@@ -52,16 +63,8 @@ const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
   "acquireHostLock",
   "refreshHostLock",
   "releaseHostLock",
-  "openVotingWindow",
-  "pauseVotingWindow",
-  "resumeVotingWindow",
   "drawRoundSet",
-  "rerollOneChart",
-  "rerollRoundSet",
-  "rerollFullRound",
   "postVoteRerollInvalidation",
-  "advanceResultReveal",
-  "markResultsRevealed",
   "overrideResult",
   "adminSessionCreate",
   "adminSessionTouch",
@@ -84,17 +87,52 @@ function readMigrations() {
     .join("\n");
 }
 
-function latestRpcDefinition(migrations: string, rpcName: string) {
-  const matches = [
+function readPhase1Migration() {
+  return readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20260713020000_phase1_atomic_reroll_reveal_public_state.sql",
+    ),
+    "utf8",
+  );
+}
+
+function phase1FunctionDefinition(source: string, functionName: string) {
+  const start = source.lastIndexOf(`create or replace function public.${functionName}(`);
+
+  if (start < 0) {
+    return "";
+  }
+
+  const end = source.indexOf("\n$$;", start);
+
+  return end < 0 ? source.slice(start) : source.slice(start, end + "\n$$;".length);
+}
+
+function rpcDefinitions(migrations: string, rpcName: string) {
+  return [
     ...migrations.matchAll(
       new RegExp(
         `create or replace function public\\.${rpcName}\\s*\\(\\s*p_event_id text,\\s*p_payload jsonb\\s*\\)[\\s\\S]*?(?=\\ncreate or replace function public\\.|\\nrevoke execute on function public\\.|$)`,
         "gi",
       ),
     ),
-  ];
+  ].map((match) => match[0]);
+}
 
-  return matches.at(-1)?.[0] ?? "";
+function latestRpcDefinition(migrations: string, rpcName: string) {
+  const matches = rpcDefinitions(migrations, rpcName);
+
+  return matches.at(-1) ?? "";
+}
+
+function latestRowChangingRpcDefinition(migrations: string, rpcName: string) {
+  const definitions = rpcDefinitions(migrations, rpcName);
+  const latest = definitions.at(-1) ?? "";
+
+  return latest.includes("_without_phase1_projection_20260713")
+    ? (definitions.at(-2) ?? latest)
+    : latest;
 }
 
 function createMockRpcClient(
@@ -107,9 +145,13 @@ function createMockRpcClient(
   return {
     async rpc(functionName, args) {
       calls.push({
-        functionName: functionName as RpcFunctionName,
+        functionName: functionName as RpcCall["functionName"],
         args,
       });
+
+      if (functionName === "normalized_read_public_generation_key") {
+        return { data: { generationKey: "phase1-capability" }, error: null };
+      }
 
       return response;
     },
@@ -185,6 +227,7 @@ describe("normalized runtime transactional mutations", () => {
       "submitBallot",
       {
         roundNumber: 1,
+        expectedGeneration: 0,
         playerId: uuidA,
         deviceId: "device-event-a",
         choices: [
@@ -201,11 +244,16 @@ describe("normalized runtime transactional mutations", () => {
     expect(result).toEqual({ committed: true, rows_changed: 1 });
     expect(calls).toEqual([
       {
+        functionName: "normalized_read_public_generation_key",
+        args: { p_event_id: "event-a" },
+      },
+      {
         functionName: "normalized_submit_ballot",
         args: {
           p_event_id: "event-a",
           p_payload: {
             roundNumber: 1,
+            expectedGeneration: 0,
             playerId: uuidA,
             deviceId: "device-event-a",
             choices: [
@@ -249,6 +297,47 @@ describe("normalized runtime transactional mutations", () => {
     ]);
   });
 
+  it("executes pause and resume with Phase 1 host and generation context", async () => {
+    const calls: RpcCall[] = [];
+    const supabase = createMockRpcClient(calls);
+
+    await executeNormalizedTransactionalMutation(
+      "pauseVotingWindow",
+      { ...normalizedAdminContext, roundNumber: 1 },
+      { eventId: "event-a", supabase },
+    );
+    await executeNormalizedTransactionalMutation(
+      "resumeVotingWindow",
+      { ...normalizedAdminContext, expectedGeneration: 1, roundNumber: 1 },
+      { eventId: "event-a", supabase },
+    );
+
+    expect(calls).toEqual([
+      {
+        functionName: "normalized_read_public_generation_key",
+        args: { p_event_id: "event-a" },
+      },
+      {
+        functionName: "normalized_pause_voting_window",
+        args: {
+          p_event_id: "event-a",
+          p_payload: { ...normalizedAdminContext, roundNumber: 1 },
+        },
+      },
+      {
+        functionName: "normalized_read_public_generation_key",
+        args: { p_event_id: "event-a" },
+      },
+      {
+        functionName: "normalized_resume_voting_window",
+        args: {
+          p_event_id: "event-a",
+          p_payload: { ...normalizedAdminContext, expectedGeneration: 1, roundNumber: 1 },
+        },
+      },
+    ]);
+  });
+
   it("executes emergency admin RPCs with sanitized server-side payloads", async () => {
     const calls: RpcCall[] = [];
 
@@ -274,6 +363,7 @@ describe("normalized runtime transactional mutations", () => {
     await executeNormalizedTransactionalMutation(
       "reopenVotingWindow",
       {
+        ...normalizedAdminContext,
         roundNumber: 1,
         durationMinutes: 3,
         reason: "phone issue",
@@ -300,6 +390,7 @@ describe("normalized runtime transactional mutations", () => {
     await executeNormalizedTransactionalMutation(
       "resetRound",
       {
+        ...normalizedAdminContext,
         roundNumber: 1,
         reason: "operator correction",
         adminSessionId: uuidB,
@@ -312,11 +403,13 @@ describe("normalized runtime transactional mutations", () => {
 
     expect(calls.map((call) => call.functionName)).toEqual([
       "normalized_manual_ballot_override",
+      "normalized_read_public_generation_key",
       "normalized_reopen_voting_window",
       "normalized_close_voting_window",
+      "normalized_read_public_generation_key",
       "normalized_reset_round",
     ]);
-    for (const call of calls) {
+    for (const call of calls.filter((call) => "p_payload" in call.args)) {
       expect(call.args.p_payload).not.toHaveProperty("adminPassword");
       expect(call.args.p_payload).toHaveProperty("adminSessionId", uuidB);
       if (call.functionName !== "normalized_close_voting_window") {
@@ -332,7 +425,7 @@ describe("normalized runtime transactional mutations", () => {
 
     await executeNormalizedTransactionalMutation(
       "computeResults",
-      { roundNumber: 1 },
+      { ...normalizedAdminContext, roundNumber: 1 },
       { supabase: createMockRpcClient(calls) },
     );
 
@@ -347,6 +440,7 @@ describe("normalized runtime transactional mutations", () => {
         "submitBallot",
         {
           roundNumber: 1,
+          expectedGeneration: 0,
           playerId: "not-a-uuid",
           deviceId: "device-event-a",
           choices: [],
@@ -365,7 +459,7 @@ describe("normalized runtime transactional mutations", () => {
     await expect(
       executeNormalizedTransactionalMutation(
         "computeResults",
-        { roundNumber: 1 },
+        { ...normalizedAdminContext, roundNumber: 1 },
         {
           eventId: "event-a",
           supabase: createMockRpcClient([], {
@@ -377,12 +471,37 @@ describe("normalized runtime transactional mutations", () => {
     ).rejects.toThrow(/computeResults failed: transaction failed/);
   });
 
+  it("fails closed before an upgraded legacy RPC can mutate without the Phase 1 capability", async () => {
+    const calls: RpcCall[] = [];
+    const supabase: MockRpcClient = {
+      async rpc(functionName, args) {
+        calls.push({ functionName: functionName as RpcCall["functionName"], args });
+        return { data: null, error: { message: "function does not exist" } };
+      },
+    };
+
+    await expect(
+      executeNormalizedTransactionalMutation(
+        "computeResults",
+        { ...normalizedAdminContext, roundNumber: 1 },
+        { eventId: "event-a", supabase },
+      ),
+    ).rejects.toThrow(/unavailable until the Phase 1 database migration is applied/);
+    expect(calls).toEqual([
+      {
+        functionName: "normalized_read_public_generation_key",
+        args: { p_event_id: "event-a" },
+      },
+    ]);
+  });
+
   it("rejects placeholder commit acknowledgements that do not prove rows changed", async () => {
     await expect(
       executeNormalizedTransactionalMutation(
         "submitBallot",
         {
           roundNumber: 1,
+          expectedGeneration: 0,
           playerId: uuidA,
           deviceId: "device-event-a",
           choices: [
@@ -408,13 +527,11 @@ describe("normalized runtime transactional mutations", () => {
         /create or replace function public\.normalized_submit_ballot\(p_event_id text, p_payload jsonb\)[\s\S]*?grant execute on function public\.normalized_submit_ballot\(text, jsonb\) to service_role;/gi,
       ),
     ];
-    const computeFunctions = [
-      ...migrations.matchAll(
-        /create or replace function public\.normalized_compute_results\(p_event_id text, p_payload jsonb\)[\s\S]*?grant execute on function public\.normalized_compute_results\(text, jsonb\) to service_role;/gi,
-      ),
-    ];
     const submitFunction = submitFunctions.at(-1)?.[0];
-    const computeFunction = computeFunctions.at(-1)?.[0];
+    const computeFunction = latestRowChangingRpcDefinition(
+      migrations,
+      "normalized_compute_results",
+    );
 
     expect(migrations).not.toContain("least(v_closes_at, p_now + interval '30 seconds')");
     expect(submitFunction).toContain("normalized_apply_voting_deadline_locked");
@@ -424,12 +541,8 @@ describe("normalized runtime transactional mutations", () => {
     expect(submitFunction).toContain("v_now + interval '30 seconds'");
     expect(submitFunction).not.toContain("least(coalesce(closes_at");
     expect(migrations).toContain("voter_device_bindings");
-    expect(migrations).toContain(
-      "normalized_submit_ballot_without_device_binding_20260713",
-    );
-    expect(migrations).toContain(
-      "already registered to a different start.gg username",
-    );
+    expect(migrations).toContain("normalized_submit_ballot_without_device_binding_20260713");
+    expect(migrations).toContain("already registered to a different start.gg username");
     expect(submitFunction?.indexOf("normalized_apply_voting_deadline_locked")).toBeLessThan(
       submitFunction?.indexOf("Voting is not open for ballot changes.") ?? 0,
     );
@@ -456,9 +569,7 @@ describe("normalized runtime transactional mutations", () => {
     );
     expect(migrations).toContain("round_player_eligibility");
     expect(migrations).toContain("active_voter_presence");
-    expect(migrations).toContain(
-      "on conflict (event_id, round_number, player_id, device_id)",
-    );
+    expect(migrations).toContain("on conflict (event_id, round_number, player_id, device_id)");
     expect(claimFunction).not.toContain("normalized_runtime_transaction_disabled");
     expect(claimFunction).not.toContain("normalized_runtime_transaction_ack");
   });
@@ -466,29 +577,36 @@ describe("normalized runtime transactional mutations", () => {
   it("implements durable voting timer advancement as a database-time transaction", () => {
     const migrations = readMigrations();
     const timerFunction = latestRpcDefinition(migrations, "normalized_advance_voting_timer");
+    const timerDefinitions = rpcDefinitions(migrations, "normalized_advance_voting_timer")
+      .slice(-2)
+      .join("\n");
 
     expect(timerFunction).not.toBe("");
     expect(timerFunction).toContain("normalized_database_time");
     expect(timerFunction).toContain("pg_advisory_xact_lock");
-    expect(timerFunction).toContain("normalized_apply_voting_deadline_locked");
-    expect(timerFunction).toContain("'rows_changed'");
-    expect(timerFunction).toContain("'changed'");
+    expect(timerFunction).toContain("normalized_refresh_public_state_generation");
+    expect(timerDefinitions).toContain("normalized_apply_voting_deadline_locked");
+    expect(timerDefinitions).toContain("'rows_changed'");
+    expect(timerDefinitions).toContain("'changed'");
     expect(timerFunction).not.toContain("normalized_runtime_transaction_disabled");
     expect(timerFunction).not.toContain("normalized_runtime_transaction_ack");
   });
 
   it("implements emergency admin workflow RPCs as row-changing service-role transactions", () => {
     const migrations = readMigrations();
-    const manualFunction = latestRpcDefinition(migrations, "normalized_manual_ballot_override");
-    const reopenFunction = latestRpcDefinition(migrations, "normalized_reopen_voting_window");
-    const closeFunction = latestRpcDefinition(migrations, "normalized_close_voting_window");
-    const resetFunction = latestRpcDefinition(migrations, "normalized_reset_round");
+    const combinedDefinitions = (name: string) =>
+      rpcDefinitions(migrations, name).slice(-2).join("\n");
+    const manualFunction = combinedDefinitions("normalized_manual_ballot_override");
+    const reopenFunction = combinedDefinitions("normalized_reopen_voting_window");
+    const closeFunction = combinedDefinitions("normalized_close_voting_window");
+    const resetFunction = combinedDefinitions("normalized_reset_round");
 
     for (const definition of [manualFunction, reopenFunction, closeFunction, resetFunction]) {
       expect(definition).not.toBe("");
       expect(definition).toContain("normalized_database_time");
       expect(definition).toContain("pg_advisory_xact_lock");
       expect(definition).toContain("insert into public.admin_actions");
+      expect(definition).toContain("normalized_refresh_public_state_generation");
       expect(definition).not.toContain("normalized_runtime_transaction_disabled");
       expect(definition).not.toContain("normalized_runtime_transaction_ack");
       expect(definition).not.toContain("adminPassword");
@@ -514,6 +632,149 @@ describe("normalized runtime transactional mutations", () => {
     expect(resetFunction).not.toContain("delete from public.players");
   });
 
+  it("keeps every Phase 1 administrative wrapper host-verified, generation-checked, and idempotent", () => {
+    const migration = readPhase1Migration();
+    const wrapperNames = [
+      "normalized_compute_results",
+      "normalized_pause_voting_window",
+      "normalized_resume_voting_window",
+      "normalized_reopen_voting_window",
+      "normalized_reset_round",
+      "normalized_open_voting_window",
+    ];
+
+    for (const functionName of wrapperNames) {
+      const definition = phase1FunctionDefinition(migration, functionName);
+
+      expect(definition, `${functionName} should exist in the Phase 1 migration`).not.toBe("");
+      expect(definition, `${functionName} should verify the active host`).toContain(
+        "normalized_assert_phase1_host",
+      );
+      expect(definition, `${functionName} should parse expectedGeneration`).toContain(
+        "v_expected_generation",
+      );
+      expect(definition, `${functionName} should reject stale generations`).toContain(
+        "v_projection.generation <> v_expected_generation",
+      );
+      expect(definition, `${functionName} should require requestId`).toContain("v_request_id");
+      expect(definition, `${functionName} should deduplicate committed requests`).toContain(
+        "action.mutation_request_id = v_request_id",
+      );
+    }
+  });
+
+  it("keeps rollback compatibility mutations owned by the active host in the transaction", () => {
+    const migration = readPhase1Migration();
+    const wrappers = [
+      {
+        name: "normalized_compute_results",
+        legacyCall: "normalized_compute_results_without_phase1_projection_20260713",
+      },
+      {
+        name: "normalized_reopen_voting_window",
+        legacyCall: "normalized_reopen_voting_window_pre_phase1_20260713",
+      },
+      {
+        name: "normalized_reset_round",
+        legacyCall: "normalized_reset_round_without_phase1_projection_20260713",
+      },
+    ];
+
+    expect(migration).toContain(
+      "create or replace function public.normalized_assert_phase1_legacy_host_owner",
+    );
+    expect(migration).toContain("session.revoked_at is null");
+    expect(migration).toContain("session.expires_at > p_now");
+    expect(migration).toContain("host_lock.released_at is null");
+
+    for (const wrapper of wrappers) {
+      const definition = phase1FunctionDefinition(migration, wrapper.name);
+      const legacyHostCheck = definition.indexOf("normalized_assert_phase1_legacy_host_owner");
+      const legacyMutation = definition.indexOf(wrapper.legacyCall);
+
+      expect(
+        legacyHostCheck,
+        `${wrapper.name} should verify legacy host ownership`,
+      ).toBeGreaterThan(-1);
+      expect(
+        legacyHostCheck,
+        `${wrapper.name} should verify before the legacy mutation`,
+      ).toBeLessThan(legacyMutation);
+    }
+  });
+
+  it("commits pause and resume window state with their public generation", () => {
+    const migration = readPhase1Migration();
+    const pause = phase1FunctionDefinition(migration, "normalized_pause_voting_window");
+    const resume = phase1FunctionDefinition(migration, "normalized_resume_voting_window");
+
+    expect(pause).toContain("status = 'voting_paused'");
+    expect(pause).toContain("remaining_ms_when_paused = v_remaining_ms");
+    expect(pause.indexOf("update public.voting_windows")).toBeLessThan(
+      pause.indexOf("normalized_refresh_public_state_generation"),
+    );
+    expect(pause).toContain("'voting_paused'");
+
+    expect(resume).toContain("set status = v_resume_status");
+    expect(resume).toContain("remaining_ms_when_paused = null");
+    expect(resume.indexOf("update public.voting_windows")).toBeLessThan(
+      resume.indexOf("normalized_refresh_public_state_generation"),
+    );
+    expect(resume).toContain("'voting_resumed'");
+  });
+
+  it("preserves the round eligibility snapshot through reroll and reuses it when voting restarts", () => {
+    const migration = readPhase1Migration();
+    const rerollFunction = phase1FunctionDefinition(migration, "normalized_apply_phase1_reroll");
+    const openVotingFunction = phase1FunctionDefinition(migration, "normalized_open_voting_window");
+
+    expect(rerollFunction).not.toContain("delete from public.round_player_eligibility");
+    expect(rerollFunction).toContain("Preserved from the pre-reroll voting-window eligibility");
+    expect(rerollFunction.indexOf("insert into public.round_player_eligibility")).toBeLessThan(
+      rerollFunction.indexOf("delete from public.voting_windows"),
+    );
+    expect(openVotingFunction).toContain("v_has_eligibility_snapshot");
+    expect(openVotingFunction).toContain("and v_has_eligibility_snapshot");
+    expect(openVotingFunction).toContain("if not v_has_eligibility_snapshot then");
+    expect(openVotingFunction).toContain("Captured when voting opened.");
+    expect(openVotingFunction).not.toContain("eligibility.active_at_round_start = false");
+    expect(migration).toContain("Backfilled from the durable voting-window eligibility snapshot.");
+  });
+
+  it("keeps replacement chart catalog insertion inside the atomic reroll transaction", () => {
+    const rerollFunction = phase1FunctionDefinition(
+      readPhase1Migration(),
+      "normalized_apply_phase1_reroll",
+    );
+
+    expect(rerollFunction).toContain("insert into public.charts");
+    expect(rerollFunction).toContain("on conflict (id) do nothing");
+    expect(rerollFunction).toContain(
+      "Replacement chart metadata conflicts with the canonical chart catalog",
+    );
+    expect(rerollFunction.indexOf("normalized_assert_phase1_host")).toBeLessThan(
+      rerollFunction.indexOf("insert into public.charts"),
+    );
+    expect(rerollFunction.indexOf("insert into public.charts")).toBeLessThan(
+      rerollFunction.indexOf("insert into public.draws"),
+    );
+  });
+
+  it("rejects opening voting when the round already has a window or result snapshot", () => {
+    const openVotingFunction = phase1FunctionDefinition(
+      readPhase1Migration(),
+      "normalized_open_voting_window",
+    );
+
+    expect(openVotingFunction).toContain("from public.voting_windows as voting_window");
+    expect(openVotingFunction).toContain("Voting has already opened for this round.");
+    expect(openVotingFunction).toContain("from public.result_snapshots as result_snapshot");
+    expect(openVotingFunction).toContain(
+      "Round results must be reset before voting can open again.",
+    );
+    expect(openVotingFunction).not.toContain("status = 'round_complete'");
+  });
+
   it("persists normalized draw state through one transactional RPC", () => {
     const migrations = readMigrations();
     const drawPersistFunctions = [
@@ -532,7 +793,9 @@ describe("normalized runtime transactional mutations", () => {
     expect(drawPersistFunction).toContain("delete from public.drawn_charts");
     expect(drawPersistFunction).toContain("insert into public.draws");
     expect(drawPersistFunction).toContain("insert into public.drawn_charts");
-    expect(drawPersistFunction).toContain("revoke execute on function public.normalized_replace_draw_state");
+    expect(drawPersistFunction).toContain(
+      "revoke execute on function public.normalized_replace_draw_state",
+    );
     expect(repositorySource).toContain('"normalized_replace_draw_state"');
     expect(deleteBatchDeclaration).not.toContain('"draws"');
     expect(deleteBatchDeclaration).not.toContain('"drawn_charts"');

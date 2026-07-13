@@ -26,16 +26,14 @@ evidence.
 
 ## Local command rule
 
-Prefix shell commands with `rtk`.
+Run shell commands directly. The former command wrapper has been removed.
 
 Examples:
 
 ```bash
-rtk git status
-rtk npm run build
+git status
+npm run build
 ```
-
-Use `rtk proxy <cmd>` when raw command output is needed.
 
 ## Core tournament rules
 

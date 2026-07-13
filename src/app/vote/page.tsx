@@ -63,6 +63,8 @@ export default async function VotePage() {
   const draws = getRoundDrawRecords(roundNumber);
   const phoneStatus = adminState.ballotStore.getPhoneStatus(roundNumber);
   const result = adminState.resultStore.getRoundResult(roundNumber);
+  const publicStateGeneration =
+    adminState.publicStateGenerationStore.getRound(roundNumber).generation;
   const freshness = buildPublicRouteFreshness({
     currentRound: roundNumber,
     result,
@@ -183,6 +185,7 @@ export default async function VotePage() {
           draws={draws}
           eligibleCount={snapshot.eligibleCount}
           players={snapshot.eligiblePlayers}
+          publicStateGeneration={publicStateGeneration}
           remainingMs={snapshot.remainingMs}
           roundNumber={roundNumber}
           serverNowMs={nowMs}

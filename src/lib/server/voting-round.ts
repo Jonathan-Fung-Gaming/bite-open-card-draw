@@ -9,6 +9,7 @@ import {
   withPersistedVotingState,
 } from "@/lib/server/persistence";
 import { invalidateTournamentReadCaches } from "@/lib/server/public-hydration-cache";
+import { advancePublicStateGeneration } from "@/lib/server/public-state-projection";
 import { withNormalizedEventPersistenceLock } from "@/lib/server/normalized-operational-state";
 import { executeNormalizedTransactionalMutation } from "@/lib/server/transactions/normalized-runtime";
 import { isPlayerSubmissionOpen, type VotingWindowRecord } from "@/lib/vote/voting-window";
@@ -145,6 +146,28 @@ export async function advanceVotingTimerIfDue(roundNumber: 1 | 2 | 3 | 4, nowMs:
       getSubmittedPlayerIdsForRound(roundNumber),
       nowMs,
     );
+
+    const projection = adminState.publicStateGenerationStore.getRound(roundNumber);
+    const snapshot = getVotingRoundSnapshot(roundNumber, nowMs);
+
+    if (
+      projection.votingStatus !== snapshot.status ||
+      projection.votingDeadline !== snapshot.closesAt
+    ) {
+      advancePublicStateGeneration({
+        expectedGeneration: projection.generation,
+        roundNumber,
+        transitionKind:
+          snapshot.status === "final_30_seconds"
+            ? "voting_final_warning"
+            : snapshot.status === "extension_1_minute"
+              ? "voting_extended"
+              : snapshot.status === "voting_closed"
+                ? "voting_closed"
+                : "voting_timer_updated",
+        updatedAt: new Date(nowMs).toISOString(),
+      });
+    }
 
     return true;
   });

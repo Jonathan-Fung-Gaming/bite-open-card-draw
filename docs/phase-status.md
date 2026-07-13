@@ -17,6 +17,119 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 1 - Atomic State And Freshness - 2026-07-13
+
+Status: implementation plus local and disposable-hosted verification complete; phase closure
+remains open only for PR merge and the post-merge production migration. A non-persistent Supabase
+preview branch was created under the linked `bite-open-card-draw` project without production data,
+used only with generated `e2e-` event namespaces, and deleted after the hosted gates passed. No
+destructive evidence or pre-merge migration was run against the production database.
+
+### Scope And Changed Files
+
+- Added the reviewed Phase 1 plan under `docs/phase-plans/` with migration ordering,
+  fail-closed pre-migration behavior, previous-application compatibility, forward-only rollback,
+  security boundaries, and evidence requirements.
+- Added `public_state_generations`, coherent public projection reads, generation-keyed cache
+  invalidation, and service-role-only transactional RPCs for one-chart/set/full rerolls, result
+  reveal advancement, final public release, voting open/pause/resume/close, compute, reopen, reset,
+  manual ballot override, and ballot submission.
+- Preserved draw history and eligibility snapshots, invalidated whole-round ballots through the
+  same audited reroll transaction, and retained immediately previous application payload contracts
+  with transaction-time host-owner checks.
+- Added generation-first stage/vote freshness, out-of-order poll rejection, non-destructive
+  generation-only reconciliation, draw-aware draft clearing, saved identity preservation, bounded
+  refresh retries, and typed stale-submit recovery.
+- Added timestamp-derived count/tiebreak reveal recovery and result-mode stickiness so reloads
+  resume authoritative progress and never reveal a browser-selected winner.
+- Added `playwright.phase1.config.ts`, five focused Phase 1 browser scenarios, hardened profile
+  validation/process-tree cleanup, and memory/local-Supabase/cache-zero/cache-max scripts.
+
+### Checks Run
+
+- Prettier on every changed supported code/config file - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 66 files / 453 tests.
+- `npm run build` - passed.
+- `npx supabase db reset --local --no-seed` - passed through the complete migration chain.
+- `npx supabase db lint --local` - passed with no schema errors.
+- Phase 1 memory profile - passed, 5/5 browser tests in 2.2 minutes.
+- Phase 1 local Supabase profile - passed, 5/5 browser tests in 2.6 minutes.
+- Phase 1 local Supabase cache TTL 0 profile - passed, 5/5 browser tests in 2.6 minutes.
+- Phase 1 local Supabase cache TTL 5000 profile - passed, 5/5 browser tests in 2.5 minutes.
+- Phase 1 disposable hosted Supabase normal-cache profile - passed, 5/5 browser tests in 3.3
+  minutes.
+- Phase 1 disposable hosted Supabase cache TTL 0 profile - passed, 5/5 browser tests in 3.3
+  minutes on a fresh event namespace.
+- Phase 1 disposable hosted Supabase cache TTL 5000 profile - passed, 5/5 browser tests in 3.6
+  minutes on a separate fresh event namespace.
+- Preview-branch migration parity - passed through `20260713020000` after applying the Phase 1
+  migration with the session-pooler endpoint.
+- Preview-branch `supabase db lint --level warning` - passed with no schema errors.
+- `npm run test:e2e` - passed, 6/6 browser tests in 7.2 minutes.
+- Direct local SQL smoke passed: pause generation 0 -> 1, resume 1 -> 2, wrong-host legacy reset
+  rejected without mutation, and the owning legacy session completed the old reset payload.
+- `git diff --check`, the case-insensitive obsolete-wrapper search, and the invalid bare-proxy
+  search passed.
+
+### Evidence
+
+- One-chart, set, and full-round rerolls replace exactly the requested active draws, retain
+  superseded draw rows, invalidate the existing whole-round ballot with the same admin-action id,
+  write exactly one matching audit, and advance generation exactly once.
+- Already-mounted independent desktop and phone voters accept replacement draws without reload,
+  clear only replaced-set choices, preserve locked/unlocked start.gg identities, reject stale
+  generations, and show no RSC/page/5xx/overlay failure.
+- Three independent readers sampled before/during/after reroll and observed only the exact coherent
+  before or after `{generation, activeDrawKey}` pair at normal, zero, and maximum local cache TTL.
+- Generation-only pause/resume advanced generation exactly once per action without changing draw
+  keys; a submitted ballot and a separate unsaved selected ban both survived with controls
+  recovering automatically.
+- Both tiebreak reload paths resumed nonzero authoritative progress, completed from stored server
+  timestamps, consumed the newer final-release generation, and never exposed timer/card-draw DOM in
+  result mode.
+- Disposable hosted normal, zero-cache, and maximum-cache runs each passed the coherent-reader,
+  mounted desktop/phone reroll, pause/resume preservation, set/full reroll, and both-tiebreak
+  recovery scenarios. The first TTL-0 attempt reused the normal-profile event namespace and its
+  audit assertion correctly found the prior run's audit; rerunning with a fresh namespace passed
+  5/5, and TTL-max used a third namespace to preserve isolation.
+
+### Diff Review And Resolved Findings
+
+- Database review found and fixed code-before-migration mutation risk, legacy-read column
+  compatibility, eligibility backfill/preservation, pause/resume projection drift, and missing
+  transaction-time host verification in rollback-compatible payloads.
+- Client review found and fixed monotonic reset generations, invalid-timing copy, generation-only
+  saved-ballot clearing, stale-submit ordering races, refresh loops, and confirmed reroll-message
+  downgrades.
+- Test review found and fixed profile override gaps, POSIX/Windows process-tree cleanup, weak
+  audit/generation assertions, shared participant device state, and missing concurrent-reader and
+  pause/resume coverage.
+- Final database, client, and test re-reviews reported no remaining actionable findings in their
+  assigned scope.
+
+### Risks, Rollout, And Blockers
+
+- The migration is verified locally and on the deleted disposable preview branch. New application
+  mutations perform a read-only capability preflight and fail closed until the migration exists.
+  Production migration push, parity, permission verification, and database lint occur only after
+  the phase PR is merged and the intended linked target is reconfirmed.
+- PR #101 remains the merge gate. Production migration verification and final checklist closure
+  remain intentionally unchecked until that merge completes.
+- No production namespace, production schema, secret file, tournament rule, or browser randomness
+  changed during pre-merge evidence.
+
+## Obsolete Command Wrapper Reference Removal - 2026-07-13
+
+Status: implementation and local verification complete; PR merge remains open.
+
+- Updated `AGENTS.md`, current docs, archived historical command examples, and command-generating
+  scripts to use direct commands while preserving every command argument and recorded outcome.
+- Added a scoped plan and checklist. Repository-wide case-insensitive search returns no reference
+  to the removed wrapper, and no invalid bare proxy command remains.
+- The same formatting, lint, typecheck, unit, build, database, and browser gates listed above passed.
+
 ## Production Readiness Remediation Phase 0 - Reproduction And Contracts - 2026-07-13
 
 Status: complete. Phase 0 implementation, hosted/memory evidence, default checks, manual diff review,
@@ -66,7 +179,7 @@ not applicable.
   zero JWT, Supabase secret, private key, password hash, assigned secret, or sensitive JSON-key
   matches; no `.env` file changed.
 
-The required `rtk` wrapper crashed and became unavailable during the diagnostic work. Equivalent
+The former command wrapper became unavailable during the diagnostic work. Equivalent
 direct commands were used for the final checks; this tooling failure did not change test scope.
 
 ### Evidence
@@ -152,22 +265,22 @@ persistence schema, RPCs, Supabase migrations, or tournament-changing action bou
 
 ### Checks Run
 
-- `rtk npx prettier --write src/lib/charts/normalize.ts src/lib/charts/normalize.test.ts src/lib/charts/importer.ts src/lib/charts/importer.test.ts src/lib/charts/runtime-catalog.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/release-data-gate.test.ts src/lib/charts/types.ts scripts/import-charts.ts` - passed.
-- `rtk npx vitest run src/lib/charts/normalize.test.ts src/lib/charts/importer.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/release-data-gate.test.ts` - passed, 4 files / 32 tests.
-- `rtk npm run import:charts` - passed; imported 4,135 charts and filtered 295 Short Cut or Full
+- `npx prettier --write src/lib/charts/normalize.ts src/lib/charts/normalize.test.ts src/lib/charts/importer.ts src/lib/charts/importer.test.ts src/lib/charts/runtime-catalog.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/release-data-gate.test.ts src/lib/charts/types.ts scripts/import-charts.ts` - passed.
+- `npx vitest run src/lib/charts/normalize.test.ts src/lib/charts/importer.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/release-data-gate.test.ts` - passed, 4 files / 32 tests.
+- `npm run import:charts` - passed; imported 4,135 charts and filtered 295 Short Cut or Full
   Song source rows.
-- `rtk npm run cache:chart-images` - passed; prepared 559 image assets, all cached, against the
+- `npm run cache:chart-images` - passed; prepared 559 image assets, all cached, against the
   filtered local chart catalog.
-- `rtk npm run verify:release-data` - failed after artifact regeneration only because the existing
+- `npm run verify:release-data` - failed after artifact regeneration only because the existing
   source import still has unsigned repaired/skipped diagnostics requiring `reviewedBy`,
   `reviewedAt`, and `reviewedCommit` release evidence; chart/image artifact identity and pool counts
   no longer failed.
-- `rtk git diff --check` - passed.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 60 files / 365 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `git diff --check` - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 60 files / 365 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 
 ### Evidence
 
@@ -243,15 +356,15 @@ Supabase migrations.
 
 ### Checks Run
 
-- `rtk npx prettier --write tests/e2e/full-flow.spec.ts src/lib/round/public-route-freshness.ts src/lib/round/public-route-freshness.test.ts` - passed.
-- `rtk npx vitest run src/lib/round/public-route-freshness.test.ts src/lib/vote/voting-window.test.ts` - passed, 2 files / 33 tests.
-- `rtk git diff --check` - passed.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 60 files / 362 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e:no-build -- --project=desktop-chromium --grep "full round smoke flow reaches final reveal and downloads private CSV"` - passed after the admin-action click hardening; earlier attempts exposed a Next dev `.next` manifest/chunk race and a stale manual CSV click.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npx prettier --write tests/e2e/full-flow.spec.ts src/lib/round/public-route-freshness.ts src/lib/round/public-route-freshness.test.ts` - passed.
+- `npx vitest run src/lib/round/public-route-freshness.test.ts src/lib/vote/voting-window.test.ts` - passed, 2 files / 33 tests.
+- `git diff --check` - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 60 files / 362 tests.
+- `npm run build` - passed.
+- `npm run test:e2e:no-build -- --project=desktop-chromium --grep "full round smoke flow reaches final reveal and downloads private CSV"` - passed after the admin-action click hardening; earlier attempts exposed a Next dev `.next` manifest/chunk race and a stale manual CSV click.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 
 ### Evidence
 
@@ -312,24 +425,24 @@ affected desktop specs passed.
 
 ### Checks Run
 
-- `rtk npx prettier --write src/components/RuneWheel.tsx src/components/rune-wheel-rotation.ts src/components/rune-wheel-rotation.test.ts src/app/globals.css tests/e2e/full-flow.spec.ts tests/phase9/pfr-timer-tiebreak-evidence.spec.ts` - passed.
-- `rtk npx vitest run src/components/rune-wheel-rotation.test.ts` - passed, 1 file / 4 tests.
-- `rtk git diff --check` - passed.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 59 files / 346 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - first run failed in the desktop full-flow smoke on
+- `npx prettier --write src/components/RuneWheel.tsx src/components/rune-wheel-rotation.ts src/components/rune-wheel-rotation.test.ts src/app/globals.css tests/e2e/full-flow.spec.ts tests/phase9/pfr-timer-tiebreak-evidence.spec.ts` - passed.
+- `npx vitest run src/components/rune-wheel-rotation.test.ts` - passed, 1 file / 4 tests.
+- `git diff --check` - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 59 files / 346 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - first run failed in the desktop full-flow smoke on
   `Download private ballot CSV` after final reveal; the mobile route projects and visual evidence
   project passed before the run aborted.
-- `rtk npm run test:e2e:no-build -- --project=desktop-chromium --grep "full round smoke flow reaches final reveal and downloads private CSV"` - passed on rerun.
-- `rtk npm run test:e2e:no-build -- --project=desktop-chromium --grep "unsaved vote draft survives pause"` - passed.
-- `rtk npm run test:e2e:no-build -- --project=desktop-chromium --grep "stage tiebreak wheel hides"` - passed.
+- `npm run test:e2e:no-build -- --project=desktop-chromium --grep "full round smoke flow reaches final reveal and downloads private CSV"` - passed on rerun.
+- `npm run test:e2e:no-build -- --project=desktop-chromium --grep "unsaved vote draft survives pause"` - passed.
+- `npm run test:e2e:no-build -- --project=desktop-chromium --grep "stage tiebreak wheel hides"` - passed.
 
 ### Additional Observed Gate Debt
 
-- `rtk npm run test:e2e:no-build -- --config=playwright.phase9.config.ts --grep "PFR-023 browser tiebreak evidence"` failed before the Phase 4 assertions during Phase 9 rehearsal setup.
-- `rtk npm run test:phase9` failed in the same existing Phase 9 memory-profile rehearsal setup path:
+- `npm run test:e2e:no-build -- --config=playwright.phase9.config.ts --grep "PFR-023 browser tiebreak evidence"` failed before the Phase 4 assertions during Phase 9 rehearsal setup.
+- `npm run test:phase9` failed in the same existing Phase 9 memory-profile rehearsal setup path:
   the admin page stayed in tournament mode/host-lock-inactive while waiting for `Rehearsal mode`.
 
 ### Evidence
@@ -378,12 +491,12 @@ change result computation, tiebreak selection, persistence schema, RPCs, or Supa
 
 ### Checks Run
 
-- `rtk npx vitest run src/components/result-presentation.test.ts src/lib/results/result-engine.test.ts src/components/rune-wheel-rotation.test.ts` - passed, 3 files / 14 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 59 files / 345 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npx vitest run src/components/result-presentation.test.ts src/lib/results/result-engine.test.ts src/components/rune-wheel-rotation.test.ts` - passed, 3 files / 14 tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 59 files / 345 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 
 ### Evidence
 
@@ -434,13 +547,13 @@ change tournament rules, result selection, persistence schema, RPCs, or Supabase
 
 ### Checks Run
 
-- `rtk npx vitest run src/lib/vote/ballot.test.ts src/lib/results/result-engine.test.ts src/lib/admin/live-counts.test.ts` - passed, 3 files / 29 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed after rerun; an earlier parallel run raced with `next build`
+- `npx vitest run src/lib/vote/ballot.test.ts src/lib/results/result-engine.test.ts src/lib/admin/live-counts.test.ts` - passed, 3 files / 29 tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed after rerun; an earlier parallel run raced with `next build`
   deleting/regenerating `.next/types`.
-- `rtk npm run test` - passed, 58 files / 342 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test` - passed, 58 files / 342 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 
 ### Evidence
 
@@ -493,12 +606,12 @@ change tournament rules, result computation, persistence schema, RPCs, or Supaba
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 57 files / 338 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "unsaved vote draft survives pause and resume reloads"` - passed after fixing the remembered-identity draft reload guard.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 57 files / 338 tests.
+- `npm run build` - passed.
+- `npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "unsaved vote draft survives pause and resume reloads"` - passed after fixing the remembered-identity draft reload guard.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 
 ### Evidence
 
@@ -566,12 +679,12 @@ confirmation rules, database schema, RPCs, or Supabase migrations.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed after rerun; an earlier parallel run raced with `next build`
+- `npm run lint` - passed.
+- `npm run typecheck` - passed after rerun; an earlier parallel run raced with `next build`
   deleting/regenerating `.next/types`.
-- `rtk npm run test` - passed, 57 files / 334 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test` - passed, 57 files / 334 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 
 ### Evidence
 
@@ -663,14 +776,14 @@ tournament rules or database schema. Supabase migrations are not applicable.
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/charts/public-chart-view.test.ts` - passed, 2 tests.
-- `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "full round smoke flow"` - passed.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 55 files / 318 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test -- src/lib/charts/public-chart-view.test.ts` - passed, 2 tests.
+- `npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "full round smoke flow"` - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 55 files / 318 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 - Earlier focused e2e attempts exposed two implementation/test issues: the seeded long-name roster
   player was still active and therefore changed private CSV row expectations, and long native admin
   select values could widen the admin page. The long-name player is now marked inactive before the
@@ -784,15 +897,15 @@ tournament rules or database schema. Supabase migrations are not applicable.
 
 ### Checks Run
 
-- `rtk npm run test -- src/app/stage/error.test.ts` - passed, 2 tests.
-- `rtk npm run test:e2e -- tests/e2e/mobile-routes.spec.ts` - passed, 2 Playwright tests.
-- `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts` - passed, 3 Playwright tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 54 files / 316 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test -- src/app/stage/error.test.ts` - passed, 2 tests.
+- `npm run test:e2e -- tests/e2e/mobile-routes.spec.ts` - passed, 2 Playwright tests.
+- `npm run test:e2e -- tests/e2e/full-flow.spec.ts` - passed, 3 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 54 files / 316 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 - Earlier focused mobile e2e runs exposed two implementation/test issues: admin setup was trying to
   click host controls after navigating the same page to public routes, and mobile WebKit did not
   complete lazy public chart-image loads before the metadata check. The final passing run uses a
@@ -922,13 +1035,13 @@ tournament rules or database schema. Supabase migrations are not applicable.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test -- src/lib/vote/phone-view.test.ts` - passed, 6 tests.
-- `rtk npm run test` - passed, 53 files / 314 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test -- src/lib/vote/phone-view.test.ts` - passed, 6 tests.
+- `npm run test` - passed, 53 files / 314 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 - Earlier e2e attempts exposed 720p stage overflow, a hydration-missed image 404 fallback path, and
   stale expected copy in tests. Those were fixed before the final passing gate run.
 
@@ -1032,16 +1145,16 @@ tournament rules or database schema. Supabase migrations are not applicable.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test -- src/lib/vote/phone-view.test.ts src/lib/results/result-store.test.ts src/lib/server/admin-actions.test.ts src/lib/server/normalized-operational-state.test.ts`
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test -- src/lib/vote/phone-view.test.ts src/lib/results/result-store.test.ts src/lib/server/admin-actions.test.ts src/lib/server/normalized-operational-state.test.ts`
   - passed, 4 files / 40 tests.
-- `rtk npm run test` - passed, 53 files / 314 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test` - passed, 53 files / 314 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 - An earlier parallel typecheck/build attempt hit Next `.next/types` contention while build was
-  regenerating `.next`; the serial rerun of `rtk npm run typecheck` passed.
+  regenerating `.next`; the serial rerun of `npm run typecheck` passed.
 
 ### Manual Review
 
@@ -1120,7 +1233,7 @@ tournament rules or database schema. Supabase migrations are not applicable.
 - `tests/e2e/full-flow.spec.ts`, `tests/e2e/projector-mobile-evidence.spec.ts`, and
   `tests/phase9/fixtures/phase11-visual-evidence.ts` assert the QR square is centered within
   `room-qr-panel` while retaining the `/room` QR target.
-- `rtk npm run test:e2e` passed with desktop admin/stage evidence, mobile route evidence, and
+- `npm run test:e2e` passed with desktop admin/stage evidence, mobile route evidence, and
   1280x720/desktop projector screenshots.
 
 ### Changed Files
@@ -1141,16 +1254,16 @@ tournament rules or database schema. Supabase migrations are not applicable.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test -- src/lib/server/admin-actions.test.ts src/lib/public-url.test.ts` - passed,
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test -- src/lib/server/admin-actions.test.ts src/lib/public-url.test.ts` - passed,
   23 tests.
-- `rtk npm run test` - passed, 53 files / 310 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test` - passed, 53 files / 310 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 - An earlier parallel build/e2e attempt hit Next `.next` contention during page collection; the
-  serial `rtk npm run build` rerun passed.
+  serial `npm run build` rerun passed.
 
 ### Manual Review
 
@@ -1215,7 +1328,7 @@ an absolute public `/room` URL.
     fallback art with 200.
   - `/vote` and `/results`: no chart image requests were present in the currently rendered live
     state.
-- Local image verification passed: `rtk npm run verify:real-chart-images` verified
+- Local image verification passed: `npm run verify:real-chart-images` verified
   `data/generated/charts-with-images.json`, 639 public cache files, and 4,426 runtime charts using
   non-fallback artwork.
 - Local `public/chart-images/cache` contains 639 PNGs, and `git ls-files` confirms the cache PNGs
@@ -1262,22 +1375,22 @@ then investigate runtime catalog/data behavior.
 
 ### Checks Run
 
-- `rtk npm run verify:real-chart-images` - passed for 4,426 runtime charts and 639 public cache
+- `npm run verify:real-chart-images` - passed for 4,426 runtime charts and 639 public cache
   files.
-- `rtk proxy npx vercel inspect https://bite-open-card-draw.vercel.app` - passed; production
+- `npx vercel inspect https://bite-open-card-draw.vercel.app` - passed; production
   deployment metadata captured.
-- `rtk proxy npx vercel inspect https://bite-open-card-draw.vercel.app --logs` - passed; build-file
+- `npx vercel inspect https://bite-open-card-draw.vercel.app --logs` - passed; build-file
   count and build timing captured.
 - Live Playwright route probe against `/stage`, `/charts`, `/vote`, and `/results` - completed;
   route image/QR evidence captured above.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 53 files / 310 tests.
-- `rtk npm run verify:release-data` - passed with signed diagnostics and verified 639 public cache
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 53 files / 310 tests.
+- `npm run verify:release-data` - passed with signed diagnostics and verified 639 public cache
   files for 4,426 runtime charts.
-- `rtk proxy git diff --check` - passed.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `git diff --check` - passed.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 
 ### Manual Review
 
@@ -1342,39 +1455,39 @@ commit matching remain release checklist items and were not claimed as complete.
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/server/ci-workflow.test.ts` - passed, 3 tests.
-- `rtk npm run test -- src/lib/server/normalized-operational-state.test.ts src/lib/server/ci-workflow.test.ts`
+- `npm run test -- src/lib/server/ci-workflow.test.ts` - passed, 3 tests.
+- `npm run test -- src/lib/server/normalized-operational-state.test.ts src/lib/server/ci-workflow.test.ts`
   - passed, 15 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 53 files / 310 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk npm run test:phase9` - passed, 2 passed and 1 Supabase-only invariant skipped under memory.
-- `rtk npm run test:e2e:production-flow:validate` - passed against linked Supabase disposable event
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 53 files / 310 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test:phase9` - passed, 2 passed and 1 Supabase-only invariant skipped under memory.
+- `npm run test:e2e:production-flow:validate` - passed against linked Supabase disposable event
   `rehearsal-2026-07-03-prod-db-01`.
-- `rtk npm run test:e2e:production-flow` - passed after the private CSV persistence change in 20.0
+- `npm run test:e2e:production-flow` - passed after the private CSV persistence change in 20.0
   minutes against linked Supabase disposable event `rehearsal-2026-07-03-prod-db-01`; host-lock
   two-session evidence and the full four-round 48 -> 36 -> 24 -> 12 rehearsal passed.
-- `rtk npm run import:charts` - passed, then rerun with
+- `npm run import:charts` - passed, then rerun with
   `--reviewed-by=Codex --reviewed-commit=a67f4f1e1f5bfbe2c46869586a45a3932bb2f6f2` so repaired and
   skipped diagnostics retain signed review evidence.
-- `rtk npm run cache:chart-images` - passed with 639 cached assets and 0 fallback assets.
-- `rtk npm run verify:real-chart-images` - passed for 4,426 runtime charts and 639 public cache
+- `npm run cache:chart-images` - passed with 639 cached assets and 0 fallback assets.
+- `npm run verify:real-chart-images` - passed for 4,426 runtime charts and 639 public cache
   files.
-- `rtk npm run verify:release-data` - passed with signed diagnostics and current import report hash
+- `npm run verify:release-data` - passed with signed diagnostics and current import report hash
   `43ac5e28174a2912338e9d2a905c38f317c0d04081b9cf761cce31f9631041fd`.
-- `rtk npm run test:load` - passed, API-injection load profile.
-- `rtk npm run test:load:player-routes` - passed, normal `/room -> /vote` route-player profile with
+- `npm run test:load` - passed, API-injection load profile.
+- `npm run test:load:player-routes` - passed, normal `/room -> /vote` route-player profile with
   spectator traffic.
-- `rtk npm audit --omit=dev` - passed with 0 vulnerabilities.
-- `rtk npm run supabase:migration:list` - passed; local and remote migrations are aligned through
+- `npm audit --omit=dev` - passed with 0 vulnerabilities.
+- `npm run supabase:migration:list` - passed; local and remote migrations are aligned through
   `20260704010000`.
-- `rtk npm run supabase:db:lint` - failed because local Supabase Postgres is not running
+- `npm run supabase:db:lint` - failed because local Supabase Postgres is not running
   (`LegacyDbConnectError`).
-- `rtk npx supabase db lint --linked` - passed, no remote schema errors found.
-- `rtk git diff --check` - passed.
-- `rtk npm run test:diagnostic:supabase-dev-full` - not a release gate and intentionally not rerun
+- `npx supabase db lint --linked` - passed, no remote schema errors found.
+- `git diff --check` - passed.
+- `npm run test:diagnostic:supabase-dev-full` - not a release gate and intentionally not rerun
   after the command rename. The previous legacy command name exposed why the dev-profile full run
   was too expensive and easy to confuse with production-flow evidence.
 
@@ -1397,7 +1510,7 @@ commit matching remain release checklist items and were not claimed as complete.
   merge/deploy.
 - The old `test:phase9:full` name was removed to prevent accidental release use. The remaining
   `test:diagnostic:supabase-dev-full` command is diagnostic only; the release-blocking full gate is
-  `rtk npm run test:e2e:production-flow`.
+  `npm run test:e2e:production-flow`.
 - External deployed production-flow evidence still requires `E2E_BASE_URL`,
   `E2E_DEPLOYED_COMMIT_SHA`, and the deployed e2e-route probe token after merge/deploy.
 - The linked Supabase disposable event id must not be reused as the real tournament event namespace.
@@ -1464,33 +1577,33 @@ as completed release evidence.
 
 ### Checks Run
 
-- `rtk npm run test -- tests/phase9/fixtures/rehearsal-plan.test.ts src/lib/server/ci-workflow.test.ts`
+- `npm run test -- tests/phase9/fixtures/rehearsal-plan.test.ts src/lib/server/ci-workflow.test.ts`
   - passed, 5 tests.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run lint` - passed.
-- `rtk npm run test` - passed, 53 files / 309 tests.
-- `rtk npm run build` - passed. An earlier parallel build/e2e attempt contended for `.next`; the
+- `npm run typecheck` - passed.
+- `npm run lint` - passed.
+- `npm run test` - passed, 53 files / 309 tests.
+- `npm run build` - passed. An earlier parallel build/e2e attempt contended for `.next`; the
   serial rerun passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests. An earlier parallel build/e2e attempt
+- `npm run test:e2e` - passed, 6 Playwright tests. An earlier parallel build/e2e attempt
   contended for `.next`; the serial rerun passed.
-- `rtk npm run test:e2e:no-build -- --project=visual-evidence-chromium` - passed after tightening
+- `npm run test:e2e:no-build -- --project=visual-evidence-chromium` - passed after tightening
   the QR sizing layout to avoid 1280x720 overflow.
-- `rtk npm run test:e2e:production-flow:validate` - passed against linked Supabase event
+- `npm run test:e2e:production-flow:validate` - passed against linked Supabase event
   `rehearsal-2026-07-03-prod-db-01`, with backend `supabase`, server mode `start`, test routes
   disabled, and a fresh build.
-- `rtk npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
+- `npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
   skipped under memory.
-- `rtk npm run test:load:player-routes` - passed.
-- `rtk npm run test:load:api-injection` - passed.
-- `rtk npm run verify:real-chart-images` - passed for 4,426 runtime charts and 639 public cache
+- `npm run test:load:player-routes` - passed.
+- `npm run test:load:api-injection` - passed.
+- `npm run verify:real-chart-images` - passed for 4,426 runtime charts and 639 public cache
   files.
-- `rtk npm run verify:release-data` - passed.
-- `rtk npm run supabase:migration:list` - passed; local and remote migrations are aligned through
+- `npm run verify:release-data` - passed.
+- `npm run supabase:migration:list` - passed; local and remote migrations are aligned through
   `20260704010000`.
-- `rtk npm run test:e2e:production-flow` - passed in 21.6 minutes against linked Supabase event
+- `npm run test:e2e:production-flow` - passed in 21.6 minutes against linked Supabase event
   `rehearsal-2026-07-03-prod-db-01`; host-lock two-session evidence passed and the hosted four-round
   rehearsal passed.
-- `rtk git diff --check` - passed.
+- `git diff --check` - passed.
 
 ### Full Production-Flow Evidence
 
@@ -1597,32 +1710,32 @@ Status: implemented and verified. The production-flow rehearsal now completes th
 
 ### Checks Run
 
-- `rtk npm run test -- tests/phase9/fixtures/rehearsal-plan.test.ts` - passed, 3 tests.
-- `rtk npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-rpc-locking.test.ts tests/phase9/fixtures/rehearsal-plan.test.ts` - passed, 22 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 53 files / 309 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
+- `npm run test -- tests/phase9/fixtures/rehearsal-plan.test.ts` - passed, 3 tests.
+- `npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-rpc-locking.test.ts tests/phase9/fixtures/rehearsal-plan.test.ts` - passed, 22 tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 53 files / 309 tests.
+- `npm run build` - passed.
+- `npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
   skipped under memory. The smoke run covered the new initial public voting denominator assertion.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk npm run test:e2e:production-flow:validate` - passed against disposable Supabase event id
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test:e2e:production-flow:validate` - passed against disposable Supabase event id
   `rehearsal-2026-07-03-prod-db-01`; this now runs a lightweight `@validate` Playwright route
   probe and verifies `/api/e2e/*` returns 404 with no token and with the configured test token.
-- `rtk npm run test:e2e:production-flow:list` - passed and selected exactly the two current
+- `npm run test:e2e:production-flow:list` - passed and selected exactly the two current
   `@full` specs: host-lock two-session evidence and hosted four-round rehearsal.
-- `rtk npx supabase migration list` - passed before and after migration; it initially showed
+- `npx supabase migration list` - passed before and after migration; it initially showed
   `20260704010000` pending remotely and then showed local/remote in sync.
-- `rtk npx supabase db push` - applied
+- `npx supabase db push` - applied
   `20260704010000_normalized_voter_presence_rpc.sql` to the linked Supabase database. The CLI
   exited successfully after applying the migration, with a post-apply pg-delta catalog cache warning.
-- `rtk npx supabase db lint` - could not run because the local Supabase Postgres instance was not
+- `npx supabase db lint` - could not run because the local Supabase Postgres instance was not
   running (`LegacyDbConnectError`).
-- `rtk git diff --check` - passed.
+- `git diff --check` - passed.
 
 ### Full Production-Flow Probe
 
-- `rtk npm run test:e2e:production-flow` passed against linked Supabase event
+- `npm run test:e2e:production-flow` passed against linked Supabase event
   `rehearsal-2026-07-03-prod-db-01`: host-lock two-session evidence passed and the hosted four-round
   rehearsal passed.
 - Round 1 prewarmed 48 voter room pages and submitted all 48 browser ballots before the real
@@ -1658,7 +1771,7 @@ Status: implemented and verified. The production-flow rehearsal now completes th
 - The disposable Supabase event namespace used by validation/list/full probes must not be reused as
   the real tournament namespace.
 - The linked Supabase database has already received migration `20260704010000`; after merge/deploy,
-  re-run `rtk npx supabase migration list` to confirm there are no pending migrations.
+  re-run `npx supabase migration list` to confirm there are no pending migrations.
 
 ## Production Readiness Remediation Phase 9 - Real Supabase And Load Confidence - 2026-07-03
 
@@ -1697,31 +1810,31 @@ operator documentation.
 
 ### Checks Run
 
-- `rtk npm run test -- src/app/api/e2e/private-csv/route.test.ts` - passed, 7 tests.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test:load:player-routes` - initially exposed unstable dynamic Playwright project
+- `npm run test -- src/app/api/e2e/private-csv/route.test.ts` - passed, 7 tests.
+- `npm run typecheck` - passed.
+- `npm run test:load:player-routes` - initially exposed unstable dynamic Playwright project
   naming and memory event-id inheritance from `.env.local`; after runner/config fixes, rerun passed.
   A later parallel rerun with the API-injection profile was discarded because simultaneous dev
   servers contended for `.next`; the serial rerun passed.
-- `rtk npm run test:load:api-injection` - passed.
-- `rtk npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
+- `npm run test:load:api-injection` - passed.
+- `npm run test:phase9` - passed, 2 smoke tests passed and the Supabase-only invariant spec
   skipped under memory.
-- `rtk npm run test:phase9:supabase-dev` - initially exposed the Supabase RPC payload assertion and
+- `npm run test:phase9:supabase-dev` - initially exposed the Supabase RPC payload assertion and
   the memory-only Phase 8 regression being selected by the Supabase script; after fixes, rerun
   passed with hosted one-round smoke and Supabase invariant/concurrency/host-lock evidence passing.
-- `rtk node scripts/run-playwright.mjs --profile=supabase-dev-rehearsal test --config=playwright.phase9.config.ts tests/phase9/host-lock-two-session.spec.ts --grep "@full"` -
+- `node scripts/run-playwright.mjs --profile=supabase-dev-rehearsal test --config=playwright.phase9.config.ts tests/phase9/host-lock-two-session.spec.ts --grep "@full"` -
   attempted twice; both attempts failed before host-lock assertions because admin login hit
   `Supabase rate limit failed: TypeError: fetch failed`, and the wrapper did not exit before the
   tool timeout. Phase 9 host-lock database invariants are covered by the passing
   `test:phase9:supabase-dev` smoke instead; browser-level host-lock rehearsal remains later
   production-flow/deployed evidence work.
-- `rtk npm run lint` - passed.
-- `rtk npm run test` - passed, 52 files / 305 tests.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk npm run build` - an initial parallel run conflicted with simultaneous typecheck/e2e access
+- `npm run lint` - passed.
+- `npm run test` - passed, 52 files / 305 tests.
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run build` - an initial parallel run conflicted with simultaneous typecheck/e2e access
   to `.next`; serial rerun passed.
-- `rtk npm run test:e2e:production-flow:validate` - passed.
-- `rtk git diff --check` - passed.
+- `npm run test:e2e:production-flow:validate` - passed.
+- `git diff --check` - passed.
 
 ### Manual Review
 
@@ -1795,16 +1908,16 @@ test-only private CSV parity with the admin export path.
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test:phase9` - passed, 2 Playwright smoke tests including the focused Phase 8
+- `npm run typecheck` - passed.
+- `npm run test:phase9` - passed, 2 Playwright smoke tests including the focused Phase 8
   regression.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - rerun passed.
-- `rtk npm run test` - passed, 52 files / 305 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk npm run test:e2e:production-flow:validate` - passed.
-- `rtk git diff --check` - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - rerun passed.
+- `npm run test` - passed, 52 files / 305 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test:e2e:production-flow:validate` - passed.
+- `git diff --check` - passed.
 
 ### Manual Review
 
@@ -1823,7 +1936,7 @@ test-only private CSV parity with the admin export path.
 - The focused regression runs in the memory-dev smoke profile. Emergency current-round add is not a
   normalized Supabase RPC, so hosted Supabase parity for that workflow remains outside this phase.
 - A direct one-off Playwright runner invocation for only the Phase 8 spec passed the test body but
-  did not exit before the tool timeout; the recorded evidence uses the normal `rtk npm run
+  did not exit before the tool timeout; the recorded evidence uses the normal `npm run
 test:phase9` command, which exited successfully.
 
 ## Production Readiness Remediation Phase 6 - Chart Import And Release Data Gates - 2026-07-03
@@ -1843,7 +1956,7 @@ verification wiring, e2e assertion robustness, and operator documentation.
   9-column mirrored-title comma shape present in the current source CSV.
 - PRC-027 is closed: Unicode-only title/artist key parts now receive deterministic hash-backed
   `unicode-...` key parts instead of collapsing to `unknown`.
-- PRC-028 is closed locally: `rtk npm run verify:release-data` validates source CSV SHA, import
+- PRC-028 is closed locally: `npm run verify:release-data` validates source CSV SHA, import
   report SHA, fixture mode, pool counts, duplicate keys, signed diagnostics, imported chart catalog
   identity, image manifest identity, runtime catalog identity, imported/runtime/image chart ID
   consistency, and the same public-cache checks used by `verify:real-chart-images`.
@@ -1875,32 +1988,32 @@ verification wiring, e2e assertion robustness, and operator documentation.
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/charts/importer.test.ts src/lib/charts/normalize.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/image-cache.test.ts src/lib/charts/release-data-gate.test.ts`
+- `npm run test -- src/lib/charts/importer.test.ts src/lib/charts/normalize.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/image-cache.test.ts src/lib/charts/release-data-gate.test.ts`
   - passed, 5 files / 32 tests.
-- `rtk npm run import:charts -- --strict`
+- `npm run import:charts -- --strict`
   - expected failure: strict mode found 154 diagnostics from the current source CSV
     (9 repaired mirrored-title rows and 145 skipped unsupported rows).
-- `rtk npm run import:charts -- --reviewed-by=Codex --reviewed-commit=c58dda2496db13d9b16a74a63dfde9a9e1e64343`
+- `npm run import:charts -- --reviewed-by=Codex --reviewed-commit=c58dda2496db13d9b16a74a63dfde9a9e1e64343`
   - passed, generated signed local import evidence.
-- `rtk npm run cache:chart-images`
+- `npm run cache:chart-images`
   - passed, 639 cached assets / 0 fallback assets.
-- `rtk npm run verify:real-chart-images`
+- `npm run verify:real-chart-images`
   - passed, verified `data/generated/charts-with-images.json` against 639 public cache files for
     4,426 charts.
-- `rtk npm run verify:release-data`
+- `npm run verify:release-data`
   - passed with `strictClean=false`, `signedDiagnostics=true`, import report SHA
     `c36424754ec19d615fa6057e34d852fbbc96df2fb8a991a2a9813a167a9331b7`, imported catalog SHA
     `ac5d46321c151bb748f102acf739c00ce6f310da96e5e0480dfda5b526f23175`, runtime catalog SHA
     `f5dc28ca048e69c33af9cd97b0c566a87bac1e386796c0743f028f1dbf2f2e2b`, and image manifest SHA
     `f5d886138bee349a88f942d1196f0bc219c5e2211bcff0014497a437d76653e0`.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 52 files / 304 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e`
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 52 files / 304 tests.
+- `npm run build` - passed.
+- `npm run test:e2e`
   - first run exposed an existing hard-coded memory event id in private CSV filename assertions;
     after the assertion was made event-id aware, rerun passed, 6 Playwright tests.
-- `rtk git diff --check` - passed.
+- `git diff --check` - passed.
 
 ### Manual Review
 
@@ -1969,20 +2082,20 @@ Supabase project before relying on `(event_id, chart_id)` chart-exclusion upsert
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/server/normalized-operational-state.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts src/lib/admin/host-lock.test.ts src/lib/charts/normalize.test.ts src/lib/draw/draw-state.test.ts src/lib/db/schema.test.ts src/lib/admin/session.test.ts src/lib/server/admin-auth.test.ts src/lib/server/admin-actions.test.ts`
+- `npm run test -- src/lib/server/normalized-operational-state.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts src/lib/admin/host-lock.test.ts src/lib/charts/normalize.test.ts src/lib/draw/draw-state.test.ts src/lib/db/schema.test.ts src/lib/admin/session.test.ts src/lib/server/admin-auth.test.ts src/lib/server/admin-actions.test.ts`
   - passed, 10 files / 84 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 51 files / 290 tests.
-- `rtk npm run build` - passed.
-- `rtk powershell -NoProfile -Command "& { $env:E2E_TOURNAMENT_EVENT_ID='e2e-memory-dev-smoke'; $env:TOURNAMENT_EVENT_ID='e2e-memory-dev-smoke'; npm.cmd run test:e2e }"`
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 51 files / 290 tests.
+- `npm run build` - passed.
+- `powershell -NoProfile -Command "& { $env:E2E_TOURNAMENT_EVENT_ID='e2e-memory-dev-smoke'; $env:TOURNAMENT_EVENT_ID='e2e-memory-dev-smoke'; npm.cmd run test:e2e }"`
   - passed, 6 Playwright tests.
-- `rtk npm run test:phase9:supabase-dev` - failed in the existing direct Supabase fixture setup
+- `npm run test:phase9:supabase-dev` - failed in the existing direct Supabase fixture setup
   after the fixture wrote `start_rehearsal_mode`: the page showed rehearsal mode but active roster
   stayed at 0. This appears tied to the Supabase-dev fixture/stale in-memory persistence path, not
   the Phase 5 migration; production-flow env validation below still passed.
-- `rtk npm run test:e2e:production-flow:validate` - passed.
-- `rtk git diff --check` - passed.
+- `npm run test:e2e:production-flow:validate` - passed.
+- `git diff --check` - passed.
 
 ### Manual Review
 
@@ -2037,25 +2150,25 @@ target Supabase project before these workflows are available in Supabase mode.
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/admin-actions.test.ts`
+- `npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/admin-actions.test.ts`
   - passed, 2 files / 33 tests.
-- `rtk npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/results/private-csv.test.ts src/lib/server/admin-actions.test.ts`
+- `npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/results/private-csv.test.ts src/lib/server/admin-actions.test.ts`
   - passed, 4 files / 47 tests.
-- `rtk npm run test -- src/lib/vote/voting-window.test.ts src/lib/vote/ballot.test.ts src/lib/server/admin-local-flow.test.ts src/lib/server/mutation-contracts.test.ts src/lib/admin/action-policy.test.ts src/lib/db/schema.test.ts src/lib/server/authoritative-clock.test.ts`
+- `npm run test -- src/lib/vote/voting-window.test.ts src/lib/vote/ballot.test.ts src/lib/server/admin-local-flow.test.ts src/lib/server/mutation-contracts.test.ts src/lib/admin/action-policy.test.ts src/lib/db/schema.test.ts src/lib/server/authoritative-clock.test.ts`
   - passed, 7 files / 71 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 51 files / 280 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed.
-- `rtk npm run test:e2e` - first run had one existing timing-sensitive tiebreak-wheel assertion
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 51 files / 280 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- `npm run test:e2e` - first run had one existing timing-sensitive tiebreak-wheel assertion
   miss the pre-reveal window; rerun passed, 6 Playwright tests.
-- `rtk npm run test:phase9` - passed, one-round memory smoke rehearsal.
-- `rtk npm run test:phase9:supabase-dev` - not run; environment validation failed because
+- `npm run test:phase9` - passed, one-round memory smoke rehearsal.
+- `npm run test:phase9:supabase-dev` - not run; environment validation failed because
   `E2E_TOURNAMENT_EVENT_ID` is unset and `E2E_ALLOW_DESTRUCTIVE_RESET=true` is not configured.
-- `rtk npm run test:e2e:production-flow:validate` - not run; environment validation failed for the
+- `npm run test:e2e:production-flow:validate` - not run; environment validation failed for the
   same missing disposable Supabase settings.
-- `rtk npx supabase db lint --linked` - passed, no schema errors found.
+- `npx supabase db lint --linked` - passed, no schema errors found.
 
 ### Manual Review
 
@@ -2122,19 +2235,19 @@ missing local Supabase rehearsal environment variables.
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/vote/voting-window.test.ts src/lib/server/voting-round.test.ts src/lib/server/transactions/normalized-runtime.test.ts` - passed, 3 files / 39 tests.
-- `rtk npm run test -- src/lib/db/schema.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/server/persistence.test.ts` - passed, 3 files / 33 tests.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run lint` - passed.
-- `rtk npm run test` - passed, 51 files / 278 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk npm run test:phase9` - passed, one-round memory smoke rehearsal.
-- `rtk npm run test:phase9:supabase-dev` - not run; environment validation failed because
+- `npm run test -- src/lib/vote/voting-window.test.ts src/lib/server/voting-round.test.ts src/lib/server/transactions/normalized-runtime.test.ts` - passed, 3 files / 39 tests.
+- `npm run test -- src/lib/db/schema.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/server/persistence.test.ts` - passed, 3 files / 33 tests.
+- `npm run typecheck` - passed.
+- `npm run lint` - passed.
+- `npm run test` - passed, 51 files / 278 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test:phase9` - passed, one-round memory smoke rehearsal.
+- `npm run test:phase9:supabase-dev` - not run; environment validation failed because
   `E2E_TOURNAMENT_EVENT_ID` is unset and `E2E_ALLOW_DESTRUCTIVE_RESET=true` is not configured.
-- `rtk npm run test:e2e:production-flow:validate` - not run; environment validation failed for the
+- `npm run test:e2e:production-flow:validate` - not run; environment validation failed for the
   same missing disposable Supabase settings.
-- `rtk git diff --check` - passed.
+- `git diff --check` - passed.
 
 ### Manual Review
 
@@ -2196,13 +2309,13 @@ Status: complete.
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/admin/action-policy.test.ts src/lib/server/admin-actions.test.ts src/lib/results/result-engine.test.ts src/components/rune-wheel-rotation.test.ts` - passed, 4 files / 30 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 47 files / 242 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk git diff --check` - passed.
+- `npm run test -- src/lib/admin/action-policy.test.ts src/lib/server/admin-actions.test.ts src/lib/results/result-engine.test.ts src/components/rune-wheel-rotation.test.ts` - passed, 4 files / 30 tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 47 files / 242 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `git diff --check` - passed.
 
 ### Manual Review
 
@@ -2243,15 +2356,15 @@ where the checklist says so.
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/vote/ballot.test.ts src/lib/vote/phone-view.test.ts src/lib/round/round-state.test.ts src/lib/server/admin-actions.test.ts src/lib/admin/audit.test.ts` - passed, 5 files / 38 tests.
-- `rtk npm run test -- src/lib/server/normalized-rpc-locking.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/admin/host-lock.test.ts src/lib/server/admin-actions.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts` - passed, 7 files / 48 tests.
-- `rtk npm run test -- src/lib/vote/ballot.test.ts src/lib/vote/phone-view.test.ts src/lib/round/round-state.test.ts src/lib/admin/audit.test.ts` - passed, 4 files / 29 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 45 files / 221 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed.
-- `rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-asset-audit.ps1` - passed.
+- `npm run test -- src/lib/vote/ballot.test.ts src/lib/vote/phone-view.test.ts src/lib/round/round-state.test.ts src/lib/server/admin-actions.test.ts src/lib/admin/audit.test.ts` - passed, 5 files / 38 tests.
+- `npm run test -- src/lib/server/normalized-rpc-locking.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/admin/host-lock.test.ts src/lib/server/admin-actions.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts` - passed, 7 files / 48 tests.
+- `npm run test -- src/lib/vote/ballot.test.ts src/lib/vote/phone-view.test.ts src/lib/round/round-state.test.ts src/lib/admin/audit.test.ts` - passed, 4 files / 29 tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 45 files / 221 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-asset-audit.ps1` - passed.
 - Playwright was not run because the local changes were covered by unit/source/build checks and the
   remaining Playwright items require a deliberate live Supabase/browser evidence window.
 
@@ -2296,21 +2409,21 @@ release evidence are still required before production readiness can be claimed.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 44 files / 214 tests.
-- `rtk npm run import:charts` - passed, 4,426 charts imported; 9 repaired rows and 145 skipped
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 44 files / 214 tests.
+- `npm run import:charts` - passed, 4,426 charts imported; 9 repaired rows and 145 skipped
   malformed rows were reported for release review.
-- `rtk npm run import:charts -- --strict` - failed as intended with 154 strict issues, proving final
+- `npm run import:charts -- --strict` - failed as intended with 154 strict issues, proving final
   event imports fail closed instead of silently accepting repaired/skipped source data.
-- `rtk npm run verify:real-chart-images` - passed against
+- `npm run verify:real-chart-images` - passed against
   `data/generated/charts-with-images.json`, 639 public cache files, and 4,426 charts.
-- `rtk npm run cache:chart-images` - passed, 639 cached image assets and 0 fallbacks.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e:memory-dev-smoke -- --validate-env-only` - passed.
-- `rtk npm run test:e2e:production-flow:validate` - passed with disposable dummy Supabase-shaped
+- `npm run cache:chart-images` - passed, 639 cached image assets and 0 fallbacks.
+- `npm run build` - passed.
+- `npm run test:e2e:memory-dev-smoke -- --validate-env-only` - passed.
+- `npm run test:e2e:production-flow:validate` - passed with disposable dummy Supabase-shaped
   env values for validation only; no browser run or external Supabase mutation was performed.
-- `rtk git diff --check` - passed.
+- `git diff --check` - passed.
 
 ### Manual Review
 
@@ -2327,7 +2440,7 @@ release evidence are still required before production readiness can be claimed.
 ### Risks And Assumptions
 
 - Full Playwright/browser evidence was intentionally not run in this pass. Run the grouped
-  `rtk npm run test:e2e:production-flow` window with real disposable Supabase credentials before
+  `npm run test:e2e:production-flow` window with real disposable Supabase credentials before
   checking off browser-dependent PFR items.
 - The current real chart CSV is not strict-clean. Release requires either corrected source data or
   an approved import report with reviewer/date/commit evidence.
@@ -2347,29 +2460,29 @@ pre-event command, not a default PR/smoke gate.
   and `tests/phase9/hosted-full-rehearsal.spec.ts`.
 - Added Phase 9 helper modules under `tests/phase9/fixtures`, `tests/phase9/pages`,
   `tests/phase9/flows`, and `tests/phase9/assertions`.
-- Updated `package.json` so `rtk npm run test:phase9` runs the `@smoke` one-round path and the
+- Updated `package.json` so `npm run test:phase9` runs the `@smoke` one-round path and the
   Supabase-dev full diagnostic command runs the `@full` four-round path.
 - Updated rehearsal/release/deployment docs with the new command split.
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed.
-- `rtk npm run lint` - passed.
-- `rtk npx playwright test --config=playwright.phase9.config.ts --grep "@smoke" --list` - passed,
+- `npm run typecheck` - passed.
+- `npm run lint` - passed.
+- `npx playwright test --config=playwright.phase9.config.ts --grep "@smoke" --list` - passed,
   one smoke spec selected.
-- `rtk npx playwright test --config=playwright.phase9.config.ts --grep "@full" --list` - passed,
+- `npx playwright test --config=playwright.phase9.config.ts --grep "@full" --list` - passed,
   one full rehearsal spec selected.
-- `rtk npm run test:phase9` - passed, one-round smoke rehearsal.
-- `rtk npm run test` - passed, 41 files / 163 tests.
-- `rtk git diff --check` - passed.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 4 Playwright tests.
+- `npm run test:phase9` - passed, one-round smoke rehearsal.
+- `npm run test` - passed, 41 files / 163 tests.
+- `git diff --check` - passed.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 4 Playwright tests.
 
 ### Risks And Assumptions
 
 - The Supabase-dev full diagnostic was not run during this refactor because it is the long hosted
   four-round rehearsal profile. It is diagnostic only; current release evidence uses
-  `rtk npm run test:e2e:production-flow` with hosted Supabase variables and a disposable
+  `npm run test:e2e:production-flow` with hosted Supabase variables and a disposable
   `TOURNAMENT_EVENT_ID`.
 - The refactor preserves the existing hosted fallback helpers for Supabase host lock, current-round
   updates, and final reveal recovery; those are harness stabilizers rather than tournament logic.
@@ -2381,7 +2494,7 @@ explicit exception because no spare hosted project remained; the accepted risk i
 migrations were applied to the existing production project before final event use.
 
 `docs/pump_open_stage_repo_validation_checklist.md` is present in the workspace and is intentionally
-called out as a required-read project document. As of this Phase 0 remediation note, `rtk git status
+called out as a required-read project document. As of this Phase 0 remediation note, `git status
 --short` reports it as untracked alongside the remediation plan and issue checklist, so these docs
 must be added to version control before release if they are not already tracked by the user's
 branch workflow.
@@ -2431,18 +2544,18 @@ external deployment gates are complete.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 38 files / 149 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 4 Playwright tests.
-- `rtk npm run test:load` - passed, 100-player browser rehearsal.
-- `rtk npm run test:phase9` - passed, four-round hosted-rehearsal spec.
-- `rtk npm run import:charts` - passed, 4,426 charts imported with required pool counts.
-- `rtk npm run cache:chart-images` - passed, 639 cached and 0 fallback image assets.
-- `rtk npm run verify:real-chart-images` - passed, 639 non-fallback cached images for 4,426 charts.
-- `rtk npm audit --omit=dev` - passed, 0 vulnerabilities.
-- `rtk git diff --check` - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 38 files / 149 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 4 Playwright tests.
+- `npm run test:load` - passed, 100-player browser rehearsal.
+- `npm run test:phase9` - passed, four-round hosted-rehearsal spec.
+- `npm run import:charts` - passed, 4,426 charts imported with required pool counts.
+- `npm run cache:chart-images` - passed, 639 cached and 0 fallback image assets.
+- `npm run verify:real-chart-images` - passed, 639 non-fallback cached images for 4,426 charts.
+- `npm audit --omit=dev` - passed, 0 vulnerabilities.
+- `git diff --check` - passed.
 
 ### Manual Review
 
@@ -2472,11 +2585,11 @@ non-production `TOURNAMENT_EVENT_ID`.
 
 ### Acceptance Criteria
 
-- Real chart artwork: `rtk npm run cache:chart-images` runs through Node with `--use-system-ca` and
+- Real chart artwork: `npm run cache:chart-images` runs through Node with `--use-system-ca` and
   produced `639 cached, 0 using fallback /chart-images/fallback-card.svg`.
 - Deployable cache: `public/chart-images/cache` contains 639 real PNG files totaling 209,721,036
   bytes.
-- Real-image gate: `rtk npm run verify:real-chart-images` verifies 639 non-fallback cached image
+- Real-image gate: `npm run verify:real-chart-images` verifies 639 non-fallback cached image
   assets assigned across 4,426 charts.
 - Rendering verification: Playwright now requires rendered image paths to use `/chart-images/cache/`
   and not `fallback-card.svg` on `/stage`, `/vote`, `/charts`, and `/results`.
@@ -2499,25 +2612,25 @@ non-production `TOURNAMENT_EVENT_ID`.
 
 ### Checks Run
 
-- `rtk npm run cache:chart-images` - initially reproduced `0 cached, 639 using fallback` before the
+- `npm run cache:chart-images` - initially reproduced `0 cached, 639 using fallback` before the
   Node CA fix; after the fix, repeated normal runs passed with `639 cached, 0 using fallback`.
-- `rtk curl.exe -I https://piugame.com/data/song_img/3f951d73d3c1c32c7d238b2ce184459d.png` -
+- `curl.exe -I https://piugame.com/data/song_img/3f951d73d3c1c32c7d238b2ce184459d.png` -
   returned `200 OK`, proving the source URL was reachable outside Node.
-- `rtk node -e "fetch(...)"` - reproduced Node's `UNABLE_TO_VERIFY_LEAF_SIGNATURE` cause.
-- `rtk node --use-system-ca -e "fetch(...)"` - fetched the representative image successfully.
-- `rtk npm run import:charts` - passed, imported 4,426 charts with required pool counts S16 189,
+- `node -e "fetch(...)"` - reproduced Node's `UNABLE_TO_VERIFY_LEAF_SIGNATURE` cause.
+- `node --use-system-ca -e "fetch(...)"` - fetched the representative image successfully.
+- `npm run import:charts` - passed, imported 4,426 charts with required pool counts S16 189,
   S17 196, S18 189, S19 167, S20 135, S21 150, S22 97, D23 125.
-- `rtk npm run verify:real-chart-images` - passed, verified 639 non-fallback cached image assets for
+- `npm run verify:real-chart-images` - passed, verified 639 non-fallback cached image assets for
   4,426 charts.
 - Cache file count check - passed, 639 real files and 209,721,036 bytes under
   `public/chart-images/cache`.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 26 files / 76 tests.
-- `rtk npm audit --omit=dev` - passed, 0 vulnerabilities.
-- `rtk git diff --check` - passed.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 26 files / 76 tests.
+- `npm audit --omit=dev` - passed, 0 vulnerabilities.
+- `git diff --check` - passed.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 2 Playwright tests.
 
 ### Manual Review
 
@@ -2540,7 +2653,7 @@ non-production `TOURNAMENT_EVENT_ID`.
 - The real cached image files add about 200 MB of deployable public assets. Individual files are well
   below common Git host single-file limits, but the repository and deployment artifact are larger.
 - If future environments cannot reach `piugame.com` or cannot use the system CA store, keep the
-  committed cache files in place and rerun `rtk npm run verify:real-chart-images` before release.
+  committed cache files in place and rerun `npm run verify:real-chart-images` before release.
 
 ## Remediation Phase 0 - Align Instructions And Docs
 
@@ -2572,13 +2685,13 @@ Status: complete
 
 ### Checks Run
 
-- `rtk rg -n "4\\+3|4 cards on top|3 cards on bottom|compact 4\\+3|compact set panel" docs AGENTS.md`
-- `rtk rg -n "not event-ready|remediation in progress|remediation-plan-2026-06-28|remediation-issue-checklist|pump_open_stage_repo_validation_checklist|source of truth" AGENTS.md docs/phase-status.md docs/event-day-runbook.md docs/release-checklist.md`
-- `rtk npm run lint`
-- `rtk npm run typecheck`
-- `rtk npm run test`
-- `rtk npm run build`
-- `rtk npm run test:e2e`
+- `rg -n "4\\+3|4 cards on top|3 cards on bottom|compact 4\\+3|compact set panel" docs AGENTS.md`
+- `rg -n "not event-ready|remediation in progress|remediation-plan-2026-06-28|remediation-issue-checklist|pump_open_stage_repo_validation_checklist|source of truth" AGENTS.md docs/phase-status.md docs/event-day-runbook.md docs/release-checklist.md`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `npm run test:e2e`
 
 ### Manual Review
 
@@ -2615,7 +2728,7 @@ remains open in `docs/remediation-issue-checklist.md`.
 - Runtime images: draw state now prefers `data/generated/charts-with-images.json` and verifies cached
   local public files before preserving non-fallback `localImagePath`.
 - Fallback behavior: fallback art is used for missing, failed, or absent cached images.
-- Real image cache attempt: `rtk npm run cache:chart-images` completed with 0 cached real images and
+- Real image cache attempt: `npm run cache:chart-images` completed with 0 cached real images and
   639 fallback assets; `public/chart-images/cache` contained 0 files.
 
 ### Changed Files
@@ -2635,14 +2748,14 @@ remains open in `docs/remediation-issue-checklist.md`.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed
-- `rtk npm run typecheck` - passed
-- `rtk npm run test` - passed, 20 files / 54 tests
-- `rtk npm run build` - passed
-- `rtk npm run test:e2e` - passed, 1 Playwright test
-- `rtk npm run cache:chart-images` - completed, but cached 0 real images and generated fallback
+- `npm run lint` - passed
+- `npm run typecheck` - passed
+- `npm run test` - passed, 20 files / 54 tests
+- `npm run build` - passed
+- `npm run test:e2e` - passed, 1 Playwright test
+- `npm run cache:chart-images` - completed, but cached 0 real images and generated fallback
   metadata for all 639 image assets
-- `rtk proxy powershell -NoProfile -Command "Get-ChildItem -Recurse -File -LiteralPath 'public\chart-images\cache' -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count"` - returned 0
+- `powershell -NoProfile -Command "Get-ChildItem -Recurse -File -LiteralPath 'public\chart-images\cache' -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count"` - returned 0
 
 ### Manual Review
 
@@ -2705,12 +2818,12 @@ and later remediation phases remain open.
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed
-- `rtk npm run test -- src/lib/public-url.test.ts src/lib/results/result-store.test.ts src/lib/results/result-engine.test.ts` - passed
-- `rtk npm run test:e2e` - initially exposed an e2e wait issue around the second tiebreak panel, then passed after the helper waited for the current reveal panel
-- `rtk npm run lint` - passed
-- `rtk npm run test` - passed, 22 files / 58 tests
-- `rtk npm run build` - passed
+- `npm run typecheck` - passed
+- `npm run test -- src/lib/public-url.test.ts src/lib/results/result-store.test.ts src/lib/results/result-engine.test.ts` - passed
+- `npm run test:e2e` - initially exposed an e2e wait issue around the second tiebreak panel, then passed after the helper waited for the current reveal panel
+- `npm run lint` - passed
+- `npm run test` - passed, 22 files / 58 tests
+- `npm run build` - passed
 - Final required checks were rerun after documentation updates; see the final Phase 2 handoff.
 
 ### Manual Review
@@ -2768,11 +2881,11 @@ admin safety, persistence, and later remediation phases remain open.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed
-- `rtk npm run typecheck` - passed
-- `rtk npm run test` - passed, 22 files / 59 tests
-- `rtk npm run test:e2e` - passed, 2 Playwright tests
-- `rtk npm run build` - passed
+- `npm run lint` - passed
+- `npm run typecheck` - passed
+- `npm run test` - passed, 22 files / 59 tests
+- `npm run test:e2e` - passed, 2 Playwright tests
+- `npm run build` - passed
 
 ### Manual Review
 
@@ -2832,13 +2945,13 @@ cached artwork population remain open.
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed
-- `rtk npm run test -- src/lib/admin/host-lock.test.ts src/lib/admin/audit.test.ts src/lib/vote/voting-window.test.ts src/lib/results/result-store.test.ts` - passed
-- `rtk npm run lint` - passed
-- `rtk npm run test` - passed, 23 files / 64 tests
-- `rtk git diff --check` - passed
-- `rtk npm run test:e2e` - passed, 2 Playwright tests
-- `rtk npm run build` - passed
+- `npm run typecheck` - passed
+- `npm run test -- src/lib/admin/host-lock.test.ts src/lib/admin/audit.test.ts src/lib/vote/voting-window.test.ts src/lib/results/result-store.test.ts` - passed
+- `npm run lint` - passed
+- `npm run test` - passed, 23 files / 64 tests
+- `git diff --check` - passed
+- `npm run test:e2e` - passed, 2 Playwright tests
+- `npm run build` - passed
 
 ### Manual Review
 
@@ -2902,13 +3015,13 @@ chart exclusion UI/image pipeline hardening, and final rehearsal/CI reconciliati
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed
-- `rtk npm run test -- src/lib/persistence/operational-state.test.ts src/lib/admin/host-lock.test.ts src/lib/vote/voting-window.test.ts src/lib/results/result-store.test.ts src/lib/draw/draw-state.test.ts` - passed
-- `rtk npm run lint` - passed
-- `rtk npm run test` - passed, 24 files / 67 tests
-- `rtk git diff --check` - passed
-- `rtk npm run build` - passed
-- `rtk npm run test:e2e` - passed, 2 Playwright tests
+- `npm run typecheck` - passed
+- `npm run test -- src/lib/persistence/operational-state.test.ts src/lib/admin/host-lock.test.ts src/lib/vote/voting-window.test.ts src/lib/results/result-store.test.ts src/lib/draw/draw-state.test.ts` - passed
+- `npm run lint` - passed
+- `npm run test` - passed, 24 files / 67 tests
+- `git diff --check` - passed
+- `npm run build` - passed
+- `npm run test:e2e` - passed, 2 Playwright tests
 
 ### Manual Review
 
@@ -2937,7 +3050,7 @@ event setup still produced 0 real cached artwork files in this environment.
 
 ### Acceptance Criteria
 
-- Chart import exclusions: `rtk npm run import:charts` now reads
+- Chart import exclusions: `npm run import:charts` now reads
   `data/generated/chart-exclusions.json` before validating required pool counts.
 - Admin chart eligibility: `/coolguy69` shows required pool counts and renders a selected pool's
   chart exclusion/re-inclusion controls.
@@ -2951,7 +3064,7 @@ event setup still produced 0 real cached artwork files in this environment.
   deterministic cache paths from source `bg_img` when deployable public cache files exist.
 - Image rendering checks: Playwright now verifies rendered artwork on `/stage`, `/vote`, `/charts`,
   and `/results` through natural-width checks.
-- Real artwork blocker: normal and unsandboxed `rtk npm run cache:chart-images` both completed with
+- Real artwork blocker: normal and unsandboxed `npm run cache:chart-images` both completed with
   `0 cached, 639 using fallback`; `public/chart-images/cache` still had 0 real files.
 
 ### Changed Files
@@ -2973,17 +3086,17 @@ event setup still produced 0 real cached artwork files in this environment.
 
 ### Checks Run
 
-- `rtk npm run test -- --run src/lib/charts/importer.test.ts src/lib/draw/draw-state.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/server/mutation-contracts.test.ts` - passed, 4 files / 12 tests
-- `rtk npm run import:charts` - passed, imported 4426 charts with required pool counts S16 189, S17 196, S18 189, S19 167, S20 135, S21 150, S22 97, D23 125
-- `rtk npm run cache:chart-images` - completed with 0 cached, 639 fallback
-- `rtk npm run cache:chart-images` unsandboxed - completed with 0 cached, 639 fallback
+- `npm run test -- --run src/lib/charts/importer.test.ts src/lib/draw/draw-state.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/server/mutation-contracts.test.ts` - passed, 4 files / 12 tests
+- `npm run import:charts` - passed, imported 4426 charts with required pool counts S16 189, S17 196, S18 189, S19 167, S20 135, S21 150, S22 97, D23 125
+- `npm run cache:chart-images` - completed with 0 cached, 639 fallback
+- `npm run cache:chart-images` unsandboxed - completed with 0 cached, 639 fallback
 - Real cache file count: `public/chart-images/cache` contained 0 files excluding `.gitkeep`
-- `rtk npm run lint` - passed
-- `rtk npm run typecheck` - passed
-- `rtk npm run test` - passed, 24 files / 71 tests
-- `rtk git diff --check` - passed
-- `rtk npm run build` - passed
-- `rtk npm run test:e2e` - passed, 2 Playwright tests
+- `npm run lint` - passed
+- `npm run typecheck` - passed
+- `npm run test` - passed, 24 files / 71 tests
+- `git diff --check` - passed
+- `npm run build` - passed
+- `npm run test:e2e` - passed, 2 Playwright tests
 
 ### Manual Review
 
@@ -3035,15 +3148,15 @@ remediation rows still include real cached artwork population and `/charts` live
 
 ### Checks Run
 
-- `rtk npm run test -- --run src/lib/integration/persistent-tournament-flow.test.ts src/lib/server/ci-workflow.test.ts` - passed, 2 files / 4 tests
-- `rtk npm run test` - passed, 26 files / 75 tests
-- `rtk npm run import:charts` - passed, imported 4426 charts with all required pools at 7+
-- `rtk npm run cache:chart-images -- --fallback-only` - passed, 639 fallback assets
-- `rtk npm run lint` - passed
-- `rtk npm run typecheck` - passed
-- `rtk git diff --check` - passed
-- `rtk npm run build` - passed
-- `rtk npm run test:e2e` - passed, 2 Playwright tests
+- `npm run test -- --run src/lib/integration/persistent-tournament-flow.test.ts src/lib/server/ci-workflow.test.ts` - passed, 2 files / 4 tests
+- `npm run test` - passed, 26 files / 75 tests
+- `npm run import:charts` - passed, imported 4426 charts with all required pools at 7+
+- `npm run cache:chart-images -- --fallback-only` - passed, 639 fallback assets
+- `npm run lint` - passed
+- `npm run typecheck` - passed
+- `git diff --check` - passed
+- `npm run build` - passed
+- `npm run test:e2e` - passed, 2 Playwright tests
 
 ### Manual Review
 
@@ -3060,7 +3173,7 @@ remediation rows still include real cached artwork population and `/charts` live
 - Phase 7 does not run against a live Supabase project in CI; it verifies the repository/snapshot
   boundary used by both memory and Supabase persistence without production credentials.
 - CI intentionally runs fallback image cache generation. Real non-fallback artwork remains an event
-  setup blocker until `rtk npm run cache:chart-images` can produce cached assets.
+  setup blocker until `npm run cache:chart-images` can produce cached assets.
 - `/charts` live-refresh coverage remains open until Remediation Phase 8.
 
 ## Remediation Phase 8 - Final Documentation And Release Reconciliation
@@ -3095,16 +3208,16 @@ real cached artwork verification and the full four-round persistent rehearsal re
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed
-- `rtk npm run test:e2e` - passed, 2 Playwright tests
-- `rtk npm run lint` - passed
-- `rtk npm run test` - passed, 26 files / 75 tests
-- `rtk npm run import:charts` - passed, imported 4426 charts with required pool counts S16 189,
+- `npm run typecheck` - passed
+- `npm run test:e2e` - passed, 2 Playwright tests
+- `npm run lint` - passed
+- `npm run test` - passed, 26 files / 75 tests
+- `npm run import:charts` - passed, imported 4426 charts with required pool counts S16 189,
   S17 196, S18 189, S19 167, S20 135, S21 150, S22 97, D23 125
-- `rtk npm run cache:chart-images -- --fallback-only` - passed, 0 cached and 639 fallback assets
-- `rtk npm audit --omit=dev` - passed
-- `rtk git diff --check` - passed
-- `rtk npm run build` - passed
+- `npm run cache:chart-images -- --fallback-only` - passed, 0 cached and 639 fallback assets
+- `npm audit --omit=dev` - passed
+- `git diff --check` - passed
+- `npm run build` - passed
 
 ### Manual Review
 
@@ -4079,11 +4192,11 @@ Status: complete with `CR-001` explicitly deferred to remediation Phase 9.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 33 files / 115 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 33 files / 115 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 2 Playwright tests.
   - Note: one attempted parallel `build` + `test:e2e` run hit a `.next` rename race while
     Playwright was also building/starting the app. Rerunning the gates sequentially passed.
 
@@ -4136,11 +4249,11 @@ Status: complete.
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 35 files / 122 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 35 files / 122 tests.
+- `npm run lint` - passed.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 2 Playwright tests.
 
 ### Manual Review
 
@@ -4186,11 +4299,11 @@ database-time timer mutation remains deferred to remediation Phase 9.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 36 files / 127 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 36 files / 127 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 2 Playwright tests.
 
 ### Manual Review
 
@@ -4241,13 +4354,13 @@ Status: complete.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 36 files / 134 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 36 files / 134 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 2 Playwright tests.
 - Additional focused regression command passed before full gates:
-  `rtk npm run test -- src/lib/draw/draw-state.test.ts src/lib/results/result-engine.test.ts src/lib/integration/tournament-flow.test.ts src/lib/persistence/operational-state.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/db/schema.test.ts`
+  `npm run test -- src/lib/draw/draw-state.test.ts src/lib/results/result-engine.test.ts src/lib/integration/tournament-flow.test.ts src/lib/persistence/operational-state.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/db/schema.test.ts`
 
 ### Manual Review
 
@@ -4299,13 +4412,13 @@ Status: complete.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 36 files / 134 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 36 files / 134 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 2 Playwright tests.
 - Additional focused regression command passed before full gates:
-  `rtk npm run test -- src/lib/admin/session.test.ts src/lib/server/admin-session-store.test.ts src/lib/persistence/debug-export.test.ts`
+  `npm run test -- src/lib/admin/session.test.ts src/lib/server/admin-session-store.test.ts src/lib/persistence/debug-export.test.ts`
 
 ### Manual Review
 
@@ -4358,16 +4471,16 @@ Status: complete.
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test -- src/components/rune-wheel-rotation.test.ts` - passed, 1 file / 3 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run test` - passed, 37 files / 137 tests.
-- `rtk npm run test:e2e` - initially exposed voting-stage overflow and an obsolete two-visible-wheel
+- `npm run typecheck` - passed.
+- `npm run test -- src/components/rune-wheel-rotation.test.ts` - passed, 1 file / 3 tests.
+- `npm run lint` - passed.
+- `npm run test` - passed, 37 files / 137 tests.
+- `npm run test:e2e` - initially exposed voting-stage overflow and an obsolete two-visible-wheel
   assertion, then passed after layout tuning and test update. GitHub Actions later reproduced an
   Ubuntu-only 11px voting-stage overflow, fixed by trimming standard stage card height below `2xl`;
   local e2e passed again after that fix.
-- `rtk npm run build` - passed.
-- Final `rtk npm run test:e2e` after the CI-height fix passed, 2 Playwright tests.
+- `npm run build` - passed.
+- Final `npm run test:e2e` after the CI-height fix passed, 2 Playwright tests.
 
 ### Manual Review
 
@@ -4418,15 +4531,15 @@ Status: complete.
 
 ### Checks Run
 
-- `rtk npm run typecheck` - passed during implementation.
-- `rtk npm run lint` - passed during implementation.
-- `rtk npm run test:e2e` - initially exposed a strict locator conflict after adding `Edit S16`,
+- `npm run typecheck` - passed during implementation.
+- `npm run lint` - passed during implementation.
+- `npm run test:e2e` - initially exposed a strict locator conflict after adding `Edit S16`,
   then passed after the set-label assertion was made exact.
-- Final `rtk npm run lint` - passed.
-- Final `rtk npm run typecheck` - passed.
-- Final `rtk npm run test` - passed, 37 files / 137 tests.
-- Final `rtk npm run build` - passed.
-- Final `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- Final `npm run lint` - passed.
+- Final `npm run typecheck` - passed.
+- Final `npm run test` - passed, 37 files / 137 tests.
+- Final `npm run build` - passed.
+- Final `npm run test:e2e` - passed, 2 Playwright tests.
 
 ### Manual Review
 
@@ -4479,18 +4592,18 @@ Status: complete.
 
 ### Checks Run
 
-- Final `rtk npm run lint` - passed.
-- Final `rtk npm run typecheck` - passed.
-- Final `rtk npm run test` - passed, 37 files / 137 tests.
-- Final `rtk npm run build` - passed.
-- Final `rtk npm run test:e2e` - passed, 4 Playwright tests across desktop Chromium, mobile
+- Final `npm run lint` - passed.
+- Final `npm run typecheck` - passed.
+- Final `npm run test` - passed, 37 files / 137 tests.
+- Final `npm run build` - passed.
+- Final `npm run test:e2e` - passed, 4 Playwright tests across desktop Chromium, mobile
   Chromium, and mobile WebKit.
-- Final `rtk npm run test:load` - passed, 1 Playwright load test with 100 player submissions and
+- Final `npm run test:load` - passed, 1 Playwright load test with 100 player submissions and
   edits plus final private CSV verification.
-- `rtk npm run test:e2e` - initially exposed the mobile WebKit admin-host setup issue, then passed
+- `npm run test:e2e` - initially exposed the mobile WebKit admin-host setup issue, then passed
   after WebKit was scoped to public/player phone routes and Chromium handled setup. Final passing
   run: 4 Playwright tests.
-- `rtk npm run test:load` - initially exposed the impractical runtime of 200 browser-only mobile
+- `npm run test:load` - initially exposed the impractical runtime of 200 browser-only mobile
   ballot interactions and a reveal-timing assumption, then passed after switching ballot load to a
   gated HTTP route and waiting through reveal timing. Final passing run: 1 load Playwright test,
   100 player submissions and edits, final CSV verified.
@@ -4544,7 +4657,7 @@ Status: complete.
   reuse the rehearsal event id for the real tournament.
 - Migrations applied to the linked hosted Supabase project through
   `20260630041000_normalized_submit_ballot_rpc.sql`.
-- Supabase schema lint passed with `rtk npx supabase db lint --linked`.
+- Supabase schema lint passed with `npx supabase db lint --linked`.
 - Supabase migration list confirmed remote migration `20260630041000`.
 - Hosted route issue reported as Vercel digest `2042555441` was fixed by setting the production
   Vercel environment variables and redeploying; non-root route smoke checks passed afterward.
@@ -4559,23 +4672,23 @@ Status: complete.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 37 files / 143 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 4 Playwright tests.
-- `rtk npm run test:load` - passed, 1 Playwright load test with 100 player submissions/edits and
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 37 files / 143 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 4 Playwright tests.
+- `npm run test:load` - passed, 1 Playwright load test with 100 player submissions/edits and
   final private CSV verification.
-- Hosted `rtk npm run test:e2e` with `TOURNAMENT_STATE_BACKEND=supabase` - passed, 4 Playwright
+- Hosted `npm run test:e2e` with `TOURNAMENT_STATE_BACKEND=supabase` - passed, 4 Playwright
   tests.
-- Hosted `rtk npm run test:load` with `TOURNAMENT_STATE_BACKEND=supabase` - passed, 1 Playwright
+- Hosted `npm run test:load` with `TOURNAMENT_STATE_BACKEND=supabase` - passed, 1 Playwright
   load test.
-- Hosted `rtk npm run test:phase9` with `TOURNAMENT_STATE_BACKEND=supabase` - passed, 1 Playwright
+- Hosted `npm run test:phase9` with `TOURNAMENT_STATE_BACKEND=supabase` - passed, 1 Playwright
   four-round rehearsal test in about 6.3 minutes.
-- `rtk npx supabase db lint --linked` - passed, no schema errors found.
-- `rtk npx supabase migration list --linked` - passed and showed remote migration
+- `npx supabase db lint --linked` - passed, no schema errors found.
+- `npx supabase migration list --linked` - passed and showed remote migration
   `20260630041000`.
-- `rtk git diff --check` - passed after the final documentation update.
+- `git diff --check` - passed after the final documentation update.
 
 ### Remaining Release Notes
 
@@ -4613,14 +4726,14 @@ Status: complete.
 
 ### Checks Run
 
-- `rtk npm run test -- src/app/api/e2e/load-ballot/route.test.ts src/app/api/e2e/private-csv/route.test.ts src/lib/server/authoritative-clock.test.ts src/lib/server/admin-auth.test.ts src/lib/server/deployment-safety.test.ts src/lib/server/persistence.test.ts src/lib/server/security-boundary.test.ts`
+- `npm run test -- src/app/api/e2e/load-ballot/route.test.ts src/app/api/e2e/private-csv/route.test.ts src/lib/server/authoritative-clock.test.ts src/lib/server/admin-auth.test.ts src/lib/server/deployment-safety.test.ts src/lib/server/persistence.test.ts src/lib/server/security-boundary.test.ts`
   - passed, 7 files / 38 tests.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 50 files / 263 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk rg -n 'SUPABASE_SERVICE_ROLE_KEY|SESSION_SECRET|ADMIN_PASSWORD_HASH|TOURNAMENT_TEST_ROUTE_TOKEN' .next/static`
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 50 files / 263 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `rg -n 'SUPABASE_SERVICE_ROLE_KEY|SESSION_SECRET|ADMIN_PASSWORD_HASH|TOURNAMENT_TEST_ROUTE_TOKEN' .next/static`
   - no matches in generated browser chunks.
 
 ### Manual Review
@@ -4670,16 +4783,16 @@ release evidence can claim live database execution.
 
 ### Checks Run
 
-- `rtk npm run test -- src/lib/draw/draw-state.test.ts src/lib/draw/round-readiness.test.ts src/lib/results/selected-song-blocks.test.ts src/lib/results/result-engine.test.ts src/lib/integration/tournament-flow.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/db/schema.test.ts`
+- `npm run test -- src/lib/draw/draw-state.test.ts src/lib/draw/round-readiness.test.ts src/lib/results/selected-song-blocks.test.ts src/lib/results/result-engine.test.ts src/lib/integration/tournament-flow.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/db/schema.test.ts`
   - passed, 7 files / 57 tests.
-- `rtk npm run lint` - passed after removing an unused import.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 50 files / 270 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk npm run test:phase9` - passed, one-round memory smoke.
-- `rtk npm run test:phase9:supabase-dev` - not run; environment validation failed before browser
+- `npm run lint` - passed after removing an unused import.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 50 files / 270 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test:phase9` - passed, one-round memory smoke.
+- `npm run test:phase9:supabase-dev` - not run; environment validation failed before browser
   execution because `E2E_TOURNAMENT_EVENT_ID` was unset and
   `E2E_ALLOW_DESTRUCTIVE_RESET=true` was not configured. No Supabase data was touched.
 
@@ -4732,16 +4845,16 @@ Status: complete for local memory, load, browser-smoke, and Supabase production-
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 52 files / 305 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
-- `rtk npm run test:phase9` - passed, one-round memory smoke.
-- `$env:E2E_TOURNAMENT_EVENT_ID='load-memory-dev-smoke'; rtk npm run test:load` - passed,
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 52 files / 305 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test:phase9` - passed, one-round memory smoke.
+- `$env:E2E_TOURNAMENT_EVENT_ID='load-memory-dev-smoke'; npm run test:load` - passed,
   100-player memory load smoke.
-- `rtk npm run test:e2e:production-flow:validate` - passed.
-- `rtk npm run test:e2e:production-flow` - passed, hosted Supabase host-lock evidence plus
+- `npm run test:e2e:production-flow:validate` - passed.
+- `npm run test:e2e:production-flow` - passed, hosted Supabase host-lock evidence plus
   four-round production-flow rehearsal.
 
 ### Manual Review
@@ -4803,13 +4916,13 @@ Status: complete for local memory-dev validation and Playwright evidence.
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 57 files / 333 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "stage tiebreak"` - passed during
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 57 files / 333 tests.
+- `npm run build` - passed.
+- `npm run test:e2e -- tests/e2e/full-flow.spec.ts --grep "stage tiebreak"` - passed during
   targeted regression validation.
-- `rtk npm run test:e2e` - passed, 6 Playwright tests.
+- `npm run test:e2e` - passed, 6 Playwright tests.
 
 ### Manual Review
 
@@ -4868,16 +4981,16 @@ Status: complete for local memory validation, production build, and full Playwri
 
 ### Checks Run
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
 - Focused stage, ballot, mutation, normalized RPC, schema, persistence, and merge tests - passed,
   85 tests across 8 files.
-- `rtk npm run test` - passed, 60 files / 372 tests.
-- `rtk npm run build` - passed.
-- `rtk git diff --check` - passed before the final documentation entry and rerun in final review.
-- `rtk npm run test:e2e:no-build -- tests/e2e/full-flow.spec.ts --grep "full round smoke"` -
+- `npm run test` - passed, 60 files / 372 tests.
+- `npm run build` - passed.
+- `git diff --check` - passed before the final documentation entry and rerun in final review.
+- `npm run test:e2e:no-build -- tests/e2e/full-flow.spec.ts --grep "full round smoke"` -
   passed, including the exact reveal and same-device regression path.
-- `rtk npm run test:e2e` - passed, all 6 Playwright tests in desktop Chromium, mobile Chromium,
+- `npm run test:e2e` - passed, all 6 Playwright tests in desktop Chromium, mobile Chromium,
   mobile WebKit, and visual-evidence Chromium.
 
 ### Manual Review

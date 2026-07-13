@@ -7,6 +7,7 @@ export const CORE_DATABASE_TABLES = [
   "chart_exclusions",
   "rounds",
   "event_runtime_state",
+  "public_state_generations",
   "round_sets",
   "draws",
   "drawn_charts",
@@ -35,6 +36,7 @@ export type CoreDatabaseTable = (typeof CORE_DATABASE_TABLES)[number];
 export const EVENT_SCOPED_DATABASE_TABLES = [
   "players",
   "event_runtime_state",
+  "public_state_generations",
   "chart_exclusions",
   "draws",
   "drawn_charts",

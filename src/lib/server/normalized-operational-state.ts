@@ -24,6 +24,7 @@ import type {
 } from "@/lib/persistence/repository";
 import type { ResultRevealPhase, ResultSetSnapshot } from "@/lib/results/result-engine";
 import { resultRevealPhaseRank } from "@/lib/results/reveal-phase-order";
+import type { PublicStateGenerationRecord } from "@/lib/round/public-state-generation";
 import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
 import type { BallotSetChoice, PhoneRoundStatus, RoundBallot } from "@/lib/vote/ballot";
 import type { EligiblePlayerSnapshot } from "@/lib/vote/voting-window";
@@ -80,6 +81,8 @@ type NormalizedTableClient<TTable extends TableName> = {
 
 type NormalizedRuntimeRpcName =
   | "normalized_acquire_event_persistence_lock"
+  | "normalized_read_coherent_state"
+  | "normalized_read_public_generation_key"
   | "normalized_release_event_persistence_lock"
   | "normalized_replace_draw_state";
 
@@ -126,11 +129,10 @@ const EVENT_SELECT_COLUMNS: Partial<Record<TableName, string>> = {
   admin_actions:
     "id,admin_session_id,action_type,action_summary,reason,requires_password_reentry,metadata,created_at",
   ballot_choices: "ballot_id,draw_id,round_set_id,no_bans,banned_chart_ids",
-  ballot_invalidations:
-    "id,round_number,invalidated_at,reason,admin_session_id,ballot_ids,payload",
+  ballot_invalidations: "id,round_number,invalidated_at,reason,admin_session_id,ballot_ids,payload",
   ballot_revisions: "ballot_id,payload",
   ballots:
-    "id,round_number,player_id,submitted_at,last_revision_at,updated_at,created_at,latest_revision_number,edit_token_hash,override_reason,manual_override,replaced_existing_ballot",
+    "id,round_number,player_id,submitted_at,last_revision_at,updated_at,created_at,latest_revision_number,edit_token_hash,override_reason,manual_override,replaced_existing_ballot,invalidated_at,invalidated_by_admin_action_id,invalidation_reason",
   chart_exclusions: "chart_id,excluded,reason,updated_at",
   drawn_charts: "draw_id,chart_id,draw_order",
   draws:
@@ -294,6 +296,28 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isMissingPhase1ReadCapability(error: SupabaseError, functionName: string) {
+  const message = error.message.toLowerCase();
+
+  return (
+    message.includes(functionName.toLowerCase()) &&
+    (message.includes("does not exist") ||
+      message.includes("could not find") ||
+      message.includes("schema cache"))
+  );
+}
+
+function isMissingPhase1TableCapability(error: SupabaseError, tableName: string) {
+  const message = error.message.toLowerCase();
+
+  return (
+    message.includes(tableName.toLowerCase()) &&
+    (message.includes("does not exist") ||
+      message.includes("could not find") ||
+      message.includes("schema cache"))
+  );
+}
+
 export class NormalizedOperationalStateRepository implements OperationalStateRepository {
   private readonly eventId: string;
   private readonly supabase: NormalizedOperationalSupabaseClient;
@@ -307,6 +331,28 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
 
   async load(): Promise<OperationalStateSnapshot | null> {
     return this.loadUnlocked();
+  }
+
+  async readPublicGenerationKey(): Promise<string> {
+    const { data, error } = await this.supabase.rpc("normalized_read_public_generation_key", {
+      p_event_id: this.eventId,
+    });
+
+    if (error) {
+      if (isMissingPhase1ReadCapability(error, "normalized_read_public_generation_key")) {
+        return "legacy";
+      }
+
+      throw new Error(`Could not read the public-state generation key: ${error.message}`);
+    }
+
+    const payload = asRecord(data);
+
+    if (typeof payload.generationKey !== "string" || !payload.generationKey) {
+      throw new Error("The public-state generation key RPC returned an invalid payload.");
+    }
+
+    return payload.generationKey;
   }
 
   async loadVotingAdminState(): Promise<OperationalStateSnapshot | null> {
@@ -400,7 +446,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         latest.reveal_phase_started_at ?? result.revealPhaseStartedAt;
       const latestStartedLater =
         latestRank === currentRank &&
-        resultRevealTime(latestRevealPhaseStartedAt) > resultRevealTime(result.revealPhaseStartedAt);
+        resultRevealTime(latestRevealPhaseStartedAt) >
+          resultRevealTime(result.revealPhaseStartedAt);
 
       if (latestRank >= 0 && (latestRank > currentRank || latestStartedLater)) {
         return {
@@ -433,7 +480,83 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
 
       return Promise.resolve([] as TableRow<TTable>[]);
     };
-    const [
+    const coherent = await this.readCoherentEventRows(includeBallotTables);
+    const rows =
+      coherent ??
+      (await (async () => {
+        const [
+          runtimeState,
+          players,
+          chartExclusions,
+          adminActions,
+          draws,
+          drawnCharts,
+          votingWindows,
+          roundEligibility,
+          activeVoterPresence,
+          voterDeviceBindings,
+          ballots,
+          ballotChoices,
+          ballotRevisions,
+          ballotInvalidations,
+          resultSnapshots,
+          resultRows,
+          tiebreaks,
+          hostLocks,
+        ] = await Promise.all([
+          this.selectEventRows("event_runtime_state"),
+          this.selectEventRows("players"),
+          this.selectEventRows("chart_exclusions"),
+          this.selectEventRows("admin_actions"),
+          this.selectEventRows("draws"),
+          this.selectEventRows("drawn_charts"),
+          this.selectEventRows("voting_windows"),
+          this.selectEventRows("round_player_eligibility"),
+          includeBallotTables
+            ? this.selectEventRows("active_voter_presence")
+            : emptyRows("active_voter_presence"),
+          includeBallotTables
+            ? this.selectEventRows("voter_device_bindings")
+            : emptyRows("voter_device_bindings"),
+          includeBallotTables ? this.selectEventRows("ballots") : emptyRows("ballots"),
+          includeBallotTables
+            ? this.selectEventRows("ballot_choices")
+            : emptyRows("ballot_choices"),
+          includeBallotTables
+            ? this.selectEventRows("ballot_revisions")
+            : emptyRows("ballot_revisions"),
+          includeBallotTables
+            ? this.selectEventRows("ballot_invalidations")
+            : emptyRows("ballot_invalidations"),
+          this.selectEventRows("result_snapshots"),
+          this.selectEventRows("result_rows"),
+          this.selectEventRows("tiebreaks"),
+          this.selectEventRows("host_locks"),
+        ]);
+
+        return {
+          runtimeState,
+          players,
+          chartExclusions,
+          adminActions,
+          draws,
+          drawnCharts,
+          votingWindows,
+          roundEligibility,
+          activeVoterPresence,
+          voterDeviceBindings,
+          ballots,
+          ballotChoices,
+          ballotRevisions,
+          ballotInvalidations,
+          resultSnapshots,
+          resultRows,
+          tiebreaks,
+          hostLocks,
+          publicStateGenerations: [] as TableRow<"public_state_generations">[],
+        };
+      })());
+    const {
       runtimeState,
       players,
       chartExclusions,
@@ -452,34 +575,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       resultRows,
       tiebreaks,
       hostLocks,
-    ] = await Promise.all([
-      this.selectEventRows("event_runtime_state"),
-      this.selectEventRows("players"),
-      this.selectEventRows("chart_exclusions"),
-      this.selectEventRows("admin_actions"),
-      this.selectEventRows("draws"),
-      this.selectEventRows("drawn_charts"),
-      this.selectEventRows("voting_windows"),
-      this.selectEventRows("round_player_eligibility"),
-      includeBallotTables
-        ? this.selectEventRows("active_voter_presence")
-        : emptyRows("active_voter_presence"),
-      includeBallotTables
-        ? this.selectEventRows("voter_device_bindings")
-        : emptyRows("voter_device_bindings"),
-      includeBallotTables ? this.selectEventRows("ballots") : emptyRows("ballots"),
-      includeBallotTables ? this.selectEventRows("ballot_choices") : emptyRows("ballot_choices"),
-      includeBallotTables
-        ? this.selectEventRows("ballot_revisions")
-        : emptyRows("ballot_revisions"),
-      includeBallotTables
-        ? this.selectEventRows("ballot_invalidations")
-        : emptyRows("ballot_invalidations"),
-      this.selectEventRows("result_snapshots"),
-      this.selectEventRows("result_rows"),
-      this.selectEventRows("tiebreaks"),
-      this.selectEventRows("host_locks"),
-    ]);
+      publicStateGenerations,
+    } = rows;
 
     const hasRuntimeRows =
       runtimeState.length > 0 ||
@@ -487,7 +584,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       draws.length > 0 ||
       ballots.length > 0 ||
       resultSnapshots.length > 0 ||
-      hostLocks.length > 0;
+      hostLocks.length > 0 ||
+      publicStateGenerations.length > 0;
 
     if (!hasRuntimeRows) {
       return null;
@@ -545,14 +643,13 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
             updatedAt: row.updated_at,
           }))
           .sort((left, right) => left.startggUsername.localeCompare(right.startggUsername)),
-        currentRoundEligibility: roundEligibility
-          .filter((row) => !row.active_at_round_start)
-          .map((row) => ({
-            playerId: row.player_id,
-            roundNumber: row.round_number as 1 | 2 | 3 | 4,
-            reason: row.reason ?? "Restored normalized eligibility entry.",
-            addedAt: row.added_at ?? row.created_at,
-          })),
+        currentRoundEligibility: roundEligibility.map((row) => ({
+          playerId: row.player_id,
+          roundNumber: row.round_number as 1 | 2 | 3 | 4,
+          reason: row.reason ?? "Restored normalized eligibility entry.",
+          addedAt: row.added_at ?? row.created_at,
+          activeAtRoundStart: row.active_at_round_start,
+        })),
       },
       draw: {
         drawHistory,
@@ -621,6 +718,108 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         currentRound: (runtimeState[0]?.current_round ?? 1) as 1 | 2 | 3 | 4,
         rehearsalMode: runtimeState[0]?.rehearsal_mode ?? false,
       },
+      publicStateGeneration: {
+        rounds: publicStateGenerations.map((row): PublicStateGenerationRecord => {
+          const activeDraws = [
+            row.set_1_draw_id && row.set_1_draw_version
+              ? { drawId: row.set_1_draw_id, version: row.set_1_draw_version }
+              : null,
+            row.set_2_draw_id && row.set_2_draw_version
+              ? { drawId: row.set_2_draw_id, version: row.set_2_draw_version }
+              : null,
+          ].flatMap((candidate) => {
+            if (!candidate) {
+              return [];
+            }
+
+            const draw = draws.find((drawRow) => drawRow.id === candidate.drawId);
+
+            if (!draw || !ROUND_SET_DEFINITIONS.some((set) => set.id === draw.round_set_id)) {
+              return [];
+            }
+
+            return [
+              {
+                drawId: candidate.drawId,
+                roundSetId: draw.round_set_id,
+                version: candidate.version,
+              },
+            ];
+          });
+
+          return {
+            roundNumber: row.round_number as 1 | 2 | 3 | 4,
+            generation: row.generation,
+            transitionKind: row.transition_kind,
+            resultMode: row.result_mode,
+            updatedAt: row.updated_at,
+            activeDraws,
+            votingStatus: row.voting_status as never,
+            votingDeadline: row.voting_closes_at,
+            resultId: row.result_id,
+            resultPhase: row.result_phase as ResultRevealPhase | null,
+            resultPhaseStartedAt: row.result_phase_started_at,
+            tiebreakStarts: [
+              row.set_1_tiebreak_started_at
+                ? { setOrder: 1 as const, startedAt: row.set_1_tiebreak_started_at }
+                : null,
+              row.set_2_tiebreak_started_at
+                ? { setOrder: 2 as const, startedAt: row.set_2_tiebreak_started_at }
+                : null,
+            ].filter((start): start is NonNullable<typeof start> => start !== null),
+            phoneReleaseStatus: row.phone_release_state === "revealed" ? "released" : "held",
+            phoneReleasedAt: row.phone_released_at,
+          };
+        }),
+      },
+    };
+  }
+
+  private async readCoherentEventRows(includeBallotTables: boolean) {
+    const { data, error } = await this.supabase.rpc("normalized_read_coherent_state", {
+      p_event_id: this.eventId,
+      p_payload: { includeBallotTables },
+    });
+
+    if (error) {
+      if (isMissingPhase1ReadCapability(error, "normalized_read_coherent_state")) {
+        return null;
+      }
+
+      throw new Error(`Could not read coherent tournament state: ${error.message}`);
+    }
+
+    const payload = asRecord(data);
+
+    // This fallback keeps old in-memory test doubles usable. A deployed RPC always
+    // returns eventId plus every array, even for an empty event.
+    if (payload.eventId !== this.eventId) {
+      return null;
+    }
+
+    const rows = <TTable extends TableName>(key: string) =>
+      (Array.isArray(payload[key]) ? payload[key] : []) as TableRow<TTable>[];
+
+    return {
+      runtimeState: rows<"event_runtime_state">("eventRuntimeState"),
+      players: rows<"players">("players"),
+      chartExclusions: rows<"chart_exclusions">("chartExclusions"),
+      adminActions: rows<"admin_actions">("adminActions"),
+      draws: rows<"draws">("draws"),
+      drawnCharts: rows<"drawn_charts">("drawnCharts"),
+      votingWindows: rows<"voting_windows">("votingWindows"),
+      roundEligibility: rows<"round_player_eligibility">("roundPlayerEligibility"),
+      activeVoterPresence: rows<"active_voter_presence">("activeVoterPresence"),
+      voterDeviceBindings: rows<"voter_device_bindings">("voterDeviceBindings"),
+      ballots: rows<"ballots">("ballots"),
+      ballotChoices: rows<"ballot_choices">("ballotChoices"),
+      ballotRevisions: rows<"ballot_revisions">("ballotRevisions"),
+      ballotInvalidations: rows<"ballot_invalidations">("ballotInvalidations"),
+      resultSnapshots: rows<"result_snapshots">("resultSnapshots"),
+      resultRows: rows<"result_rows">("resultRows"),
+      tiebreaks: rows<"tiebreaks">("tiebreaks"),
+      hostLocks: rows<"host_locks">("hostLocks"),
+      publicStateGenerations: rows<"public_state_generations">("publicStateGenerations"),
     };
   }
 
@@ -646,6 +845,8 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.saveDeviceBindings(snapshot),
       this.saveHostLock(snapshot),
     ]);
+
+    await this.savePublicStateGenerations(snapshot);
   }
 
   private async saveVotingStateUnlocked(
@@ -879,6 +1080,62 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     });
   }
 
+  private async savePublicStateGenerations(snapshot: OperationalStateSnapshot) {
+    const rows: TableInsert<"public_state_generations">[] = (
+      snapshot.publicStateGeneration?.rounds ?? []
+    ).map((record) => {
+      const setOne = record.activeDraws.find(
+        (draw) => requireRoundSet(draw.roundSetId).setOrder === 1,
+      );
+      const setTwo = record.activeDraws.find(
+        (draw) => requireRoundSet(draw.roundSetId).setOrder === 2,
+      );
+      const setOneTiebreak = record.tiebreakStarts.find((start) => start.setOrder === 1);
+      const setTwoTiebreak = record.tiebreakStarts.find((start) => start.setOrder === 2);
+
+      return {
+        event_id: this.eventId,
+        round_number: record.roundNumber,
+        generation: record.generation,
+        transition_kind: record.transitionKind,
+        result_mode: record.resultMode,
+        set_1_draw_id: setOne?.drawId ?? null,
+        set_1_draw_version: setOne?.version ?? null,
+        set_2_draw_id: setTwo?.drawId ?? null,
+        set_2_draw_version: setTwo?.version ?? null,
+        voting_status: record.votingStatus,
+        voting_closes_at: record.votingDeadline,
+        result_id: record.resultId,
+        result_phase: record.resultPhase,
+        result_phase_started_at: record.resultPhaseStartedAt,
+        set_1_tiebreak_started_at: setOneTiebreak?.startedAt ?? null,
+        set_2_tiebreak_started_at: setTwoTiebreak?.startedAt ?? null,
+        phone_release_state:
+          record.phoneReleaseStatus === "released"
+            ? "revealed"
+            : record.resultMode
+              ? "closed_revealing"
+              : "voting_open",
+        phone_released_at: record.phoneReleasedAt,
+        updated_at: record.updatedAt ?? snapshot.savedAt,
+      };
+    });
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    const { error } = await this.supabase
+      .from("public_state_generations")
+      .upsert(rows, { onConflict: "event_id,round_number" });
+
+    if (error && !isMissingPhase1TableCapability(error, "public_state_generations")) {
+      throw new Error(
+        `Could not insert public_state_generations normalized runtime rows: ${error.message}`,
+      );
+    }
+  }
+
   private async savePlayers(snapshot: OperationalStateSnapshot) {
     await this.insertMany(
       "players",
@@ -1044,7 +1301,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
         event_id: this.eventId,
         round_number: entry.roundNumber,
         player_id: entry.playerId,
-        active_at_round_start: false,
+        active_at_round_start: entry.activeAtRoundStart ?? false,
         reason: entry.reason,
         added_at: entry.addedAt,
         created_at: entry.addedAt,
@@ -1418,38 +1675,40 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       revisionPayloads.set(revision.ballot_id, asRecord(revision.payload));
     }
 
-    return ballots.map((ballot) => {
-      const payload = revisionPayloads.get(ballot.id);
-      const source = payload?.source === "manual_admin" ? "manual_admin" : "player";
+    return ballots
+      .filter((ballot) => !ballot.invalidated_at)
+      .map((ballot) => {
+        const payload = revisionPayloads.get(ballot.id);
+        const source = payload?.source === "manual_admin" ? "manual_admin" : "player";
 
-      return {
-        id: ballot.id,
-        roundNumber: ballot.round_number as 1 | 2 | 3 | 4,
-        playerId: ballot.player_id,
-        playerStartggUsername:
-          playersById.get(ballot.player_id)?.startgg_username ?? ballot.player_id,
-        choices: (choicesByBallotId.get(ballot.id) ?? []).map((choice): BallotSetChoice => {
-          const set = requireRoundSet(choice.round_set_id);
+        return {
+          id: ballot.id,
+          roundNumber: ballot.round_number as 1 | 2 | 3 | 4,
+          playerId: ballot.player_id,
+          playerStartggUsername:
+            playersById.get(ballot.player_id)?.startgg_username ?? ballot.player_id,
+          choices: (choicesByBallotId.get(ballot.id) ?? []).map((choice): BallotSetChoice => {
+            const set = requireRoundSet(choice.round_set_id);
 
-          return {
-            drawId: choice.draw_id,
-            roundSetId: choice.round_set_id,
-            displayLabel: set.displayLabel,
-            noBans: choice.no_bans,
-            bannedChartIds: [...choice.banned_chart_ids],
-          };
-        }),
-        submittedAt: ballot.last_revision_at ?? ballot.submitted_at ?? ballot.updated_at,
-        firstSubmittedAt: ballot.submitted_at ?? ballot.created_at,
-        lastRevisionAt: ballot.last_revision_at ?? ballot.updated_at,
-        revision: ballot.latest_revision_number,
-        editTokenHash: ballot.edit_token_hash,
-        source,
-        manualReason: ballot.override_reason,
-        manualOverride: ballot.manual_override,
-        replacedExistingBallot: ballot.replaced_existing_ballot,
-      };
-    });
+            return {
+              drawId: choice.draw_id,
+              roundSetId: choice.round_set_id,
+              displayLabel: set.displayLabel,
+              noBans: choice.no_bans,
+              bannedChartIds: [...choice.banned_chart_ids],
+            };
+          }),
+          submittedAt: ballot.last_revision_at ?? ballot.submitted_at ?? ballot.updated_at,
+          firstSubmittedAt: ballot.submitted_at ?? ballot.created_at,
+          lastRevisionAt: ballot.last_revision_at ?? ballot.updated_at,
+          revision: ballot.latest_revision_number,
+          editTokenHash: ballot.edit_token_hash,
+          source,
+          manualReason: ballot.override_reason,
+          manualOverride: ballot.manual_override,
+          replacedExistingBallot: ballot.replaced_existing_ballot,
+        };
+      });
   }
 
   private buildResults(

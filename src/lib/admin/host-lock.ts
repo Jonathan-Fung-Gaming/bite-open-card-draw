@@ -57,16 +57,12 @@ export type HostLockPersistenceDecision =
     }
   | {
       action: "noop";
-      outcome:
-        | "unchanged"
-        | "stale_acquire"
-        | "stale_heartbeat"
-        | "stale_release";
+      outcome: "unchanged" | "stale_acquire" | "stale_heartbeat" | "stale_release";
       lock: HostLockRecord | null;
       snapshot: HostLockStoreSnapshot;
     };
 
-function hashHostToken(hostToken: string) {
+export function hashHostToken(hostToken: string) {
   return createHash("sha256").update(hostToken).digest("hex");
 }
 
@@ -99,9 +95,9 @@ function sameHostIdentity(
 ) {
   return Boolean(
     left &&
-      right &&
-      left.ownerSessionId === right.ownerSessionId &&
-      left.hostTokenHash === right.hostTokenHash,
+    right &&
+    left.ownerSessionId === right.ownerSessionId &&
+    left.hostTokenHash === right.hostTokenHash,
   );
 }
 
@@ -112,14 +108,12 @@ function sameLockAcquisition(
   return sameHostIdentity(left, right) && left?.acquiredAt === right?.acquiredAt;
 }
 
-export function resolveHostLockPersistence(
-  input: {
-    baseline: HostLockStoreSnapshot | null;
-    current: HostLockStoreSnapshot;
-    latest: HostLockStoreSnapshot | null;
-    now?: number;
-  },
-): HostLockPersistenceDecision {
+export function resolveHostLockPersistence(input: {
+  baseline: HostLockStoreSnapshot | null;
+  current: HostLockStoreSnapshot;
+  latest: HostLockStoreSnapshot | null;
+  now?: number;
+}): HostLockPersistenceDecision {
   const now = input.now ?? Date.now();
   const baseline = input.baseline ?? { lock: null };
   const latest = input.latest ?? { lock: null };
@@ -210,7 +204,8 @@ export function resolveHostLockPersistence(
   return {
     action: "noop",
     outcome:
-      sameLockAcquisition(currentLock, baselineLock) || sameHostIdentity(currentLock, activeLatestLock)
+      sameLockAcquisition(currentLock, baselineLock) ||
+      sameHostIdentity(currentLock, activeLatestLock)
         ? "stale_heartbeat"
         : "stale_acquire",
     lock: cloneLock(latestLock),

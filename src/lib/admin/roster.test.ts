@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { VotingWindowStore } from "@/lib/vote/voting-window";
 import { RosterStore } from "./roster";
 
 describe("roster store", () => {
@@ -103,7 +104,11 @@ describe("roster store", () => {
 
   it("keeps inactive players visible and restorable", () => {
     const store = new RosterStore();
-    const player = store.createOrUpdatePlayer({ startggUsername: "PlayerTwo", active: true, now: "now" });
+    const player = store.createOrUpdatePlayer({
+      startggUsername: "PlayerTwo",
+      active: true,
+      now: "now",
+    });
 
     store.setPlayerActiveStatus(player.id, false, "later");
     expect(store.listPlayers()[0]?.active).toBe(false);
@@ -114,7 +119,11 @@ describe("roster store", () => {
 
   it("requires a reason for emergency current-round eligibility", () => {
     const store = new RosterStore();
-    const player = store.createOrUpdatePlayer({ startggUsername: "PlayerThree", active: false, now: "now" });
+    const player = store.createOrUpdatePlayer({
+      startggUsername: "PlayerThree",
+      active: false,
+      now: "now",
+    });
 
     expect(() =>
       store.addPlayerToCurrentRoundEligibility({
@@ -127,8 +136,16 @@ describe("roster store", () => {
 
   it("includes emergency current-round players in the round eligibility list", () => {
     const store = new RosterStore();
-    const active = store.createOrUpdatePlayer({ startggUsername: "ActivePlayer", active: true, now: "now" });
-    const inactive = store.createOrUpdatePlayer({ startggUsername: "InactivePlayer", active: false, now: "now" });
+    const active = store.createOrUpdatePlayer({
+      startggUsername: "ActivePlayer",
+      active: true,
+      now: "now",
+    });
+    const inactive = store.createOrUpdatePlayer({
+      startggUsername: "InactivePlayer",
+      active: false,
+      now: "now",
+    });
 
     store.addPlayerToCurrentRoundEligibility({
       playerId: inactive.id,
@@ -136,6 +153,66 @@ describe("roster store", () => {
       reason: "late correction",
     });
 
-    expect(store.listEligiblePlayersForRound(1).map((player) => player.id)).toEqual([active.id, inactive.id]);
+    expect(store.listEligiblePlayersForRound(1).map((player) => player.id)).toEqual([
+      active.id,
+      inactive.id,
+    ]);
+  });
+
+  it("preserves the opened-round eligibility snapshot across reroll and routine reactivation", () => {
+    const roster = new RosterStore();
+    const voting = new VotingWindowStore();
+    const alpha = roster.createOrUpdatePlayer({
+      startggUsername: "Alpha",
+      active: true,
+      now: "2026-07-13T00:00:00.000Z",
+    });
+    const bravo = roster.createOrUpdatePlayer({
+      startggUsername: "Bravo",
+      active: true,
+      now: "2026-07-13T00:00:00.000Z",
+    });
+    const charlie = roster.createOrUpdatePlayer({
+      startggUsername: "Charlie",
+      active: false,
+      now: "2026-07-13T00:00:00.000Z",
+    });
+    const initialEligibility = roster.listEligiblePlayersForRound(1);
+
+    voting.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: initialEligibility,
+      nowMs: 0,
+    });
+    roster.snapshotRoundEligibility({
+      roundNumber: 1,
+      playerIds: initialEligibility.map((player) => player.id),
+      now: "2026-07-13T00:00:00.000Z",
+    });
+
+    // Routine roster changes after opening affect future rounds only.
+    roster.setPlayerActiveStatus(bravo.id, false, "2026-07-13T00:01:00.000Z");
+    roster.setPlayerActiveStatus(charlie.id, true, "2026-07-13T00:01:00.000Z");
+
+    // A post-open reroll resets the voting window, not the authoritative roster snapshot.
+    voting.resetRound(1);
+    const restartedEligibility = roster.listEligiblePlayersForRound(1);
+    voting.openVoting({
+      roundNumber: 1,
+      drawsReady: true,
+      eligiblePlayers: restartedEligibility,
+      nowMs: 120_000,
+    });
+
+    expect(restartedEligibility.map((player) => player.id)).toEqual([alpha.id, bravo.id]);
+    expect(voting.exportSnapshot().windows[0]?.eligiblePlayers.map((player) => player.id)).toEqual([
+      alpha.id,
+      bravo.id,
+    ]);
+    expect(roster.listEligiblePlayersForRound(2).map((player) => player.id)).toEqual([
+      alpha.id,
+      charlie.id,
+    ]);
   });
 });

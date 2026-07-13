@@ -94,7 +94,10 @@ async function submitSupabaseLoadBallot(input: {
   }
 
   if (!(runtimeState as { rehearsal_mode?: boolean } | null)?.rehearsal_mode) {
-    return { error: "Synthetic load ballots are only available in rehearsal mode.", statusCode: 403 as const };
+    return {
+      error: "Synthetic load ballots are only available in rehearsal mode.",
+      statusCode: 403 as const,
+    };
   }
 
   const { data: player, error: playerError } = await supabase
@@ -185,6 +188,16 @@ async function submitSupabaseLoadBallot(input: {
   const validatedChoices = choices.filter((choice): choice is NonNullable<typeof choice> =>
     Boolean(choice),
   );
+  const { data: generationRow, error: generationError } = await supabase
+    .from("public_state_generations")
+    .select("generation")
+    .eq("event_id", eventId)
+    .eq("round_number", input.roundNumber)
+    .maybeSingle();
+
+  if (generationError) {
+    throw new Error(`Could not load the synthetic ballot generation: ${generationError.message}`);
+  }
 
   return submitNormalizedPlayerBallot({
     roundNumber: input.roundNumber,
@@ -192,6 +205,7 @@ async function submitSupabaseLoadBallot(input: {
     deviceId: `e2e-load:${loadPlayer.id}`,
     choices: validatedChoices,
     editTokenHash: hashBallotEditToken(`e2e-load:${input.roundNumber}:${loadPlayer.id}`),
+    expectedGeneration: (generationRow as { generation?: number } | null)?.generation ?? 0,
   });
 }
 

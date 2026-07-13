@@ -10,7 +10,7 @@ Remediation Phase 8. The app is not event-ready until the final closure gate in
   commit `89326838660d565664ab20d135c6bdb6f7615e40`.
 - Product behavior sources of truth: `docs/product-spec.md` and
   `docs/pump_open_stage_repo_validation_checklist.md`.
-- Required command rule: prefix shell commands with `rtk`.
+- Required command rule: run shell commands directly.
 - Do not change tournament rules unless the user explicitly asks.
 - Do not close `RIC-020`, `RIC-021`, `RIC-022`, or `RIC-028` until real cached chart artwork is
   populated and verified.
@@ -39,7 +39,7 @@ docs/remediation-issue-checklist.md, docs/phase-status.md,
 docs/deployment-readiness.md, docs/event-day-runbook.md,
 docs/release-checklist.md, docs/phase-gates.md, and docs/security-notes.md.
 
-Use rtk for all shell commands. Preserve the tournament rules from the product spec and validation
+Run all shell commands directly. Preserve the tournament rules from the product spec and validation
 checklist. Do not mark RIC-020, RIC-021, RIC-022, or RIC-028 closed unless real cached chart artwork
 files and real artwork rendering are verified. Do not treat the app as event-ready until the final
 closure gate in docs/remediation-issue-checklist.md passes.
@@ -55,14 +55,14 @@ and merge it.
 
 Inspect why the normal cache step still reports `0 cached`.
 
-- Run `rtk npm run cache:chart-images` without `--fallback-only`.
+- Run `npm run cache:chart-images` without `--fallback-only`.
 - Inspect generated image metadata for representative `failureReason` values.
 - Determine whether failures are caused by invalid source URLs, network restrictions, redirects,
   required headers, upstream blocking, or missing source files.
 - Choose an event-safe source of real artwork:
   - fix the remote fetch path if it is reliable and reproducible, or
   - populate `public/chart-images/cache` from an approved controlled image pack or storage source.
-- Verify `rtk npm run cache:chart-images` reports `N cached` where `N > 0`.
+- Verify `npm run cache:chart-images` reports `N cached` where `N > 0`.
 - Verify `public/chart-images/cache` or the chosen controlled storage contains real image files.
 
 ### 2. Harden Image Verification
@@ -121,15 +121,15 @@ Update documentation only after evidence exists.
 
 Run these before the PR is merged:
 
-- `rtk npm run lint`
-- `rtk npm run typecheck`
-- `rtk npm run test`
-- `rtk npm run import:charts`
-- `rtk npm run cache:chart-images`
-- `rtk npm audit --omit=dev`
-- `rtk git diff --check`
-- `rtk npm run build`
-- `rtk npm run test:e2e`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run import:charts`
+- `npm run cache:chart-images`
+- `npm audit --omit=dev`
+- `git diff --check`
+- `npm run build`
+- `npm run test:e2e`
 
 ## Acceptance Criteria
 
@@ -148,7 +148,7 @@ Run these before the PR is merged:
   `node --use-system-ca --import tsx scripts/cache-chart-images.ts`.
 - Repeated normal cache runs produced `639 cached, 0 using fallback`, and
   `public/chart-images/cache` contains 639 real PNG files.
-- `rtk npm run verify:real-chart-images` verifies non-fallback cached assets and chart assignments.
+- `npm run verify:real-chart-images` verifies non-fallback cached assets and chart assignments.
 - Playwright now requires real `/chart-images/cache/...` rendering, not `fallback-card.svg`, across
   `/stage`, `/vote`, `/charts`, and `/results`.
 - An automated four-round repository-backed persistent rehearsal test now completes all rounds and

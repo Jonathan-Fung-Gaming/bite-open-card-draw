@@ -5,6 +5,10 @@ import { DrawStateStore, type DrawStateStoreSnapshot } from "@/lib/draw/draw-sta
 import { getRoundSetDefinition } from "@/lib/draw/draw-engine";
 import { selectedSongKeysFromResults } from "@/lib/results/selected-song-blocks";
 import { ResultStore, type ResultStoreSnapshot } from "@/lib/results/result-store";
+import {
+  PublicStateGenerationStore,
+  type PublicStateGenerationStoreSnapshot,
+} from "@/lib/round/public-state-generation";
 import { RoundStateStore, type RoundStateSnapshot } from "@/lib/round/round-state";
 import { BallotStore, type BallotStoreSnapshot } from "@/lib/vote/ballot-store";
 import { VotingWindowStore, type VotingWindowStoreSnapshot } from "@/lib/vote/voting-window";
@@ -20,6 +24,7 @@ export type AdminStateStores = {
   votingWindowStore: VotingWindowStore;
   resultStore: ResultStore;
   roundStateStore: RoundStateStore;
+  publicStateGenerationStore: PublicStateGenerationStore;
 };
 
 export type OperationalStateSnapshot = {
@@ -33,6 +38,7 @@ export type OperationalStateSnapshot = {
   votingWindow: VotingWindowStoreSnapshot;
   result: ResultStoreSnapshot;
   roundState: RoundStateSnapshot;
+  publicStateGeneration?: PublicStateGenerationStoreSnapshot;
 };
 
 export function createAdminStateStores(): AdminStateStores {
@@ -45,6 +51,7 @@ export function createAdminStateStores(): AdminStateStores {
     votingWindowStore: new VotingWindowStore(),
     resultStore: new ResultStore(),
     roundStateStore: new RoundStateStore(),
+    publicStateGenerationStore: new PublicStateGenerationStore(),
   };
 }
 
@@ -63,6 +70,7 @@ export function createOperationalStateSnapshot(
     votingWindow: stores.votingWindowStore.exportSnapshot(),
     result: stores.resultStore.exportSnapshot(),
     roundState: stores.roundStateStore.exportSnapshot(),
+    publicStateGeneration: stores.publicStateGenerationStore.exportSnapshot(),
   };
 }
 
@@ -79,6 +87,7 @@ export function restoreOperationalStateSnapshot(
   stores.votingWindowStore.importSnapshot(migratedSnapshot.votingWindow);
   stores.resultStore.importSnapshot(migratedSnapshot.result);
   stores.roundStateStore.importSnapshot(migratedSnapshot.roundState);
+  stores.publicStateGenerationStore.importSnapshot(migratedSnapshot.publicStateGeneration);
 
   const selectedSongKeys = selectedSongKeysFromResults(migratedSnapshot.result.results);
 
@@ -92,7 +101,9 @@ export function cloneOperationalStateSnapshot(snapshot: OperationalStateSnapshot
   return JSON.parse(JSON.stringify(snapshot)) as OperationalStateSnapshot;
 }
 
-function migrateSnapshotIdentityFields(snapshot: OperationalStateSnapshot): OperationalStateSnapshot {
+function migrateSnapshotIdentityFields(
+  snapshot: OperationalStateSnapshot,
+): OperationalStateSnapshot {
   const cloned = cloneOperationalStateSnapshot(snapshot);
   const drawsById = new Map(
     cloned.draw.drawHistory.map((draw) => {
@@ -147,10 +158,9 @@ function migrateSnapshotIdentityFields(snapshot: OperationalStateSnapshot): Oper
   return cloned;
 }
 
-function migrateResultSetIdentity<TSet extends ResultStoreSnapshot["results"][number]["sets"][number]>(
-  set: TSet,
-  drawsById: Map<string, { roundSetId: string; version: number }>,
-): TSet {
+function migrateResultSetIdentity<
+  TSet extends ResultStoreSnapshot["results"][number]["sets"][number],
+>(set: TSet, drawsById: Map<string, { roundSetId: string; version: number }>): TSet {
   const legacyDrawId = set.drawId ?? set.roundSetId;
   const draw = drawsById.get(legacyDrawId);
 

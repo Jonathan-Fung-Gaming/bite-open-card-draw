@@ -24,6 +24,7 @@ export type NormalizedRepositoryBoundary =
   | "players"
   | "chartExclusions"
   | "runtimeState"
+  | "publicState"
   | "draws"
   | "votingWindows"
   | "ballots"
@@ -70,6 +71,7 @@ export abstract class EventScopedRepository<TTable extends EventScopedDatabaseTa
 const PLAYER_TABLES = ["players", "round_player_eligibility", "active_voter_presence"] as const;
 const CHART_EXCLUSION_TABLES = ["chart_exclusions"] as const;
 const RUNTIME_STATE_TABLES = ["event_runtime_state"] as const;
+const PUBLIC_STATE_TABLES = ["public_state_generations"] as const;
 const DRAW_TABLES = ["draws", "drawn_charts"] as const;
 const VOTING_WINDOW_TABLES = ["voting_windows"] as const;
 const BALLOT_TABLES = [
@@ -104,6 +106,14 @@ export class RuntimeStateRepository extends EventScopedRepository<
 > {
   constructor(dependencies?: RepositoryDependencies) {
     super({ boundary: "runtimeState", tables: RUNTIME_STATE_TABLES }, dependencies);
+  }
+}
+
+export class PublicStateRepository extends EventScopedRepository<
+  (typeof PUBLIC_STATE_TABLES)[number]
+> {
+  constructor(dependencies?: RepositoryDependencies) {
+    super({ boundary: "publicState", tables: PUBLIC_STATE_TABLES }, dependencies);
   }
 }
 
@@ -165,6 +175,7 @@ export type NormalizedRuntimeRepositories = {
   playerRepository: PlayerRepository;
   chartExclusionRepository: ChartExclusionRepository;
   runtimeStateRepository: RuntimeStateRepository;
+  publicStateRepository: PublicStateRepository;
   drawRepository: DrawRepository;
   votingWindowRepository: VotingWindowRepository;
   ballotRepository: BallotRepository;
@@ -187,6 +198,7 @@ export function createNormalizedRuntimeRepositories(
     playerRepository: new PlayerRepository(sharedDependencies),
     chartExclusionRepository: new ChartExclusionRepository(sharedDependencies),
     runtimeStateRepository: new RuntimeStateRepository(sharedDependencies),
+    publicStateRepository: new PublicStateRepository(sharedDependencies),
     drawRepository: new DrawRepository(sharedDependencies),
     votingWindowRepository: new VotingWindowRepository(sharedDependencies),
     ballotRepository: new BallotRepository(sharedDependencies),

@@ -211,7 +211,7 @@ export class VotingWindowStore {
 
     const existing = this.windows.get(input.roundNumber);
 
-    if (existing && existing.status !== "round_complete") {
+    if (existing) {
       throw new Error("Voting has already opened for this round.");
     }
 

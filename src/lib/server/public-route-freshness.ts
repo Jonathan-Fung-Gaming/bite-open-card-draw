@@ -7,6 +7,7 @@ import {
 } from "@/lib/round/public-route-freshness";
 import type { PublicRouteState, PublicTournamentRoute } from "@/lib/round/round-state";
 import { adminState } from "@/lib/server/admin-state";
+import { stageShouldUseResultMode } from "@/lib/stage/stage-view";
 import type { VotingRoundSnapshot } from "@/lib/vote/voting-window";
 
 type TournamentActionRecord = {
@@ -21,9 +22,10 @@ function latestIso(values: readonly (string | null | undefined)[]) {
   );
 }
 
-function latestTournamentAction(
-  records: readonly TournamentActionRecord[],
-): { createdAt: string | null; sequence: number } {
+function latestTournamentAction(records: readonly TournamentActionRecord[]): {
+  createdAt: string | null;
+  sequence: number;
+} {
   const latest = records.reduce<{ createdAt: string; index: number } | null>(
     (selected, record, index) => {
       if (selected === null) {
@@ -33,7 +35,10 @@ function latestTournamentAction(
       const recordEpoch = Date.parse(record.createdAt);
       const selectedEpoch = Date.parse(selected.createdAt);
 
-      if (recordEpoch > selectedEpoch || (recordEpoch === selectedEpoch && index < selected.index)) {
+      if (
+        recordEpoch > selectedEpoch ||
+        (recordEpoch === selectedEpoch && index < selected.index)
+      ) {
         return { createdAt: record.createdAt, index };
       }
 
@@ -55,6 +60,7 @@ export function buildPublicRouteFreshness(input: {
   routeSource: PublicRouteState["source"];
   votingSnapshot: VotingRoundSnapshot;
 }): PublicRouteFreshnessKey {
+  const publicState = adminState.publicStateGenerationStore.getRound(input.routeRoundNumber);
   const activeDraws = adminState.drawStateStore
     .getRoundDraws(input.routeRoundNumber)
     .filter((draw): draw is NonNullable<typeof draw> => draw !== null)
@@ -96,5 +102,10 @@ export function buildPublicRouteFreshness(input: {
     votingWindowClosedAt: votingWindow?.closedAt ?? input.votingSnapshot.closedAt,
     votingWindowOpenedAt: votingWindow?.openedAt ?? input.votingSnapshot.openedAt,
     votingWindowUpdatedAt: votingWindow?.updatedAt ?? input.votingSnapshot.updatedAt,
+    publicStateGeneration: publicState.generation,
+    publicStateResultMode:
+      publicState.resultMode ||
+      stageShouldUseResultMode(input.votingSnapshot.status, Boolean(input.result)),
+    publicStateTransitionKind: publicState.transitionKind,
   });
 }

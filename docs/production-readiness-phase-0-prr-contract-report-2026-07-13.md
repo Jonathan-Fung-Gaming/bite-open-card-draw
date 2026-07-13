@@ -498,7 +498,7 @@ Secret scan result: pending the final changed-file/artifact scan in the Run Ledg
 | Phase merge                           | [PR #99](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/99); Quality Gates passed | Complete        |
 | Post-merge migrations                 | No migration in Phase 0; push/parity/database lint                                                  | Not applicable  |
 
-The project-required `rtk` wrapper crashed and was unavailable after the early diagnostic runs, so
+The former project command wrapper was unavailable after the early diagnostic runs, so
 the equivalent direct commands were used and are recorded above. No environment file was changed
 or added.
 

@@ -54,6 +54,49 @@ export type Database = {
           updated_at?: Timestamp;
         }
       >;
+      public_state_generations: TableDefinition<
+        {
+          event_id: string;
+          round_number: number;
+          generation: number;
+          transition_kind: string;
+          result_mode: boolean;
+          set_1_draw_id: Uuid | null;
+          set_1_draw_version: number | null;
+          set_2_draw_id: Uuid | null;
+          set_2_draw_version: number | null;
+          voting_status: string;
+          voting_closes_at: Timestamp | null;
+          result_id: Uuid | null;
+          result_phase: string | null;
+          result_phase_started_at: Timestamp | null;
+          set_1_tiebreak_started_at: Timestamp | null;
+          set_2_tiebreak_started_at: Timestamp | null;
+          phone_release_state: string;
+          phone_released_at: Timestamp | null;
+          updated_at: Timestamp;
+        },
+        EventScopedInsert & {
+          round_number: number;
+          generation?: number;
+          transition_kind?: string;
+          result_mode?: boolean;
+          set_1_draw_id?: Uuid | null;
+          set_1_draw_version?: number | null;
+          set_2_draw_id?: Uuid | null;
+          set_2_draw_version?: number | null;
+          voting_status?: string;
+          voting_closes_at?: Timestamp | null;
+          result_id?: Uuid | null;
+          result_phase?: string | null;
+          result_phase_started_at?: Timestamp | null;
+          set_1_tiebreak_started_at?: Timestamp | null;
+          set_2_tiebreak_started_at?: Timestamp | null;
+          phone_release_state?: string;
+          phone_released_at?: Timestamp | null;
+          updated_at?: Timestamp;
+        }
+      >;
       round_sets: TableDefinition<
         {
           id: Uuid;
@@ -186,6 +229,7 @@ export type Database = {
           action_summary: string;
           reason: string | null;
           requires_password_reentry: boolean;
+          mutation_request_id: Uuid | null;
           created_at: Timestamp;
           metadata: Json;
         },
@@ -196,6 +240,7 @@ export type Database = {
           action_summary: string;
           reason?: string | null;
           requires_password_reentry?: boolean;
+          mutation_request_id?: Uuid | null;
           created_at?: Timestamp;
           metadata?: Json;
         }
@@ -657,6 +702,11 @@ export type Database = {
       normalized_compute_results: NormalizedRuntimeRpc;
       normalized_advance_result_reveal: NormalizedRuntimeRpc;
       normalized_mark_results_revealed: NormalizedRuntimeRpc;
+      normalized_read_coherent_state: NormalizedRuntimeRpc;
+      normalized_read_public_generation_key: {
+        Args: { p_event_id: string };
+        Returns: Json;
+      };
       normalized_override_result: NormalizedRuntimeRpc;
       normalized_reset_round: NormalizedRuntimeRpc;
       normalized_create_admin_session: NormalizedRuntimeRpc;

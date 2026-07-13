@@ -13,16 +13,16 @@ Use this checklist on the event machine before players arrive and before every r
 
 ## Before the Event
 
-- Run `rtk npm run lint`, `rtk npm run typecheck`, `rtk npm run test`, and
-  `rtk npm run build` on the release branch.
-- Run `rtk npm run test:e2e:production-flow:validate` with the intended disposable Supabase
+- Run `npm run lint`, `npm run typecheck`, `npm run test`, and
+  `npm run build` on the release branch.
+- Run `npm run test:e2e:production-flow:validate` with the intended disposable Supabase
   rehearsal event before the grouped browser evidence window. Confirm the output says
   `profile=production-flow`, `backend=supabase`, production server mode, explicit disposable
   `eventId`, `adminSessionHeartbeat=enabled`, `hostHeartbeat=enabled`,
   `voteLivePolling=enabled`, `publicRouteRefresh=enabled`, and `adminActionsOnly=enabled`.
-- Run `rtk npm run test:e2e:production-flow` only as the grouped Phase 11 browser evidence command.
-  Do not substitute `rtk npm run test:e2e`, `rtk npm run test:diagnostic:supabase-dev-full`, or
-  `rtk npm run test:load:api-injection` as production-flow closure evidence.
+- Run `npm run test:e2e:production-flow` only as the grouped Phase 11 browser evidence command.
+  Do not substitute `npm run test:e2e`, `npm run test:diagnostic:supabase-dev-full`, or
+  `npm run test:load:api-injection` as production-flow closure evidence.
 - Confirm the grouped production-flow Playwright run starts Round 1 with 48 active voting players,
   marks exactly 12 voting players inactive before Round 2, exactly 12 more before Round 3, and
   exactly 12 more before Round 4, leaving active voting-player counts of 48, 36, 24, and 12.
@@ -31,20 +31,20 @@ Use this checklist on the event machine before players arrive and before every r
 - Confirm production environment variables are set in Vercel and not committed to Git.
 - Confirm Supabase migrations are applied through
   `20260713010000_event_scoped_voter_device_binding.sql` with
-  `rtk npm run supabase:migration:list`.
+  `npm run supabase:migration:list`.
 - Confirm `TOURNAMENT_STATE_BACKEND=supabase` and a stable `TOURNAMENT_EVENT_ID` are configured for
   deployed or event use.
-- Run `rtk npm run import:charts` and confirm the output prints `Imported ... charts` plus required
+- Run `npm run import:charts` and confirm the output prints `Imported ... charts` plus required
   pool counts with every required pool at 7 or more.
 - If strict import is not clean, confirm `data/generated/chart-import-report.json` records
   `reviewedBy`, ISO `reviewedAt`, and `reviewedCommit` for every repaired or skipped diagnostic.
-- Run `rtk npm run cache:chart-images` before the event. Expected output is
+- Run `npm run cache:chart-images` before the event. Expected output is
   `Prepared ... image assets: N cached, M using fallback /chart-images/fallback-card.svg`; `N` must
   be greater than 0 before claiming real cached artwork is ready.
-- Run `rtk npm run verify:real-chart-images` and confirm it reports non-fallback cached image assets.
-- Run `rtk npm run verify:release-data` and confirm it passes with matching source CSV, import
+- Run `npm run verify:real-chart-images` and confirm it reports non-fallback cached image assets.
+- Run `npm run verify:release-data` and confirm it passes with matching source CSV, import
   report, runtime catalog, and image manifest hashes.
-- If remote artwork fetching is unavailable, run `rtk npm run cache:chart-images -- --fallback-only`
+- If remote artwork fetching is unavailable, run `npm run cache:chart-images -- --fallback-only`
   only after explicitly accepting fallback cards for rehearsal or emergency operation.
 - Confirm `public/chart-images/cache` contains real files when non-fallback artwork is required.
 - Confirm the tournament logo renders correctly.

@@ -19,9 +19,9 @@ Review tracks used:
 
 Checks run during this review:
 
-- `rtk npm run verify:real-chart-images` - passed in the chart-data review; verified 4,426 runtime
+- `npm run verify:real-chart-images` - passed in the chart-data review; verified 4,426 runtime
   charts against 639 local cache files with no runtime remote image paths or fallback assignments.
-- `rtk git diff --check` - passed after documentation updates.
+- `git diff --check` - passed after documentation updates.
 - Full lint/typecheck/test/build/e2e were not run as part of this review checklist generation.
 
 ## First Pass - Blocking And High-Risk Issues
@@ -48,7 +48,7 @@ Checks run during this review:
   - Suggested tests: assert admin active count, `/vote` eligibility, turnout denominator,
     eligibility snapshot, submitted ballot count, and CSV row count for every round.
   - Closure evidence: Phase 10 added the 48 -> 36 -> 24 -> 12 production-flow planner and Phase 11
-    tightened active/inactive transition assertions. `rtk npm run test:e2e:production-flow` passed
+    tightened active/inactive transition assertions. `npm run test:e2e:production-flow` passed
     on 2026-07-04 against linked Supabase event `rehearsal-2026-07-03-prod-db-01`.
 
 - [x] **PRC-003 - Critical - Full rehearsal submits only 2 UI ballots per round.**
@@ -97,9 +97,9 @@ Checks run during this review:
   - Expected: release readiness has a named production-flow Supabase gate with fresh build, real
     admin actions, heartbeats, polling, public refresh, test routes disabled, and the 48/36/24/12
     attrition flow.
-  - Suggested tests: require `rtk npm run test:e2e:production-flow` plus release artifacts before
+  - Suggested tests: require `npm run test:e2e:production-flow` plus release artifacts before
     event signoff.
-  - Closure evidence: `rtk npm run test:e2e:production-flow` now runs a fresh build in Supabase
+  - Closure evidence: `npm run test:e2e:production-flow` now runs a fresh build in Supabase
     start mode with admin actions, heartbeats, polling, public refresh, test routes disabled, and
     the required attrition flow. Phase 11 also removes the premature `.github/workflows/ci.yml`
     because workflow automation remains deferred until Phase 12.
@@ -166,7 +166,7 @@ Checks run during this review:
   - Closure evidence: Phase 8 added stable admin roster/count markers plus
     `AdminPage.markPlayersInactive(names)`, `AdminPage.expectActiveCount(count)`,
     `AdminPage.expectVotingEligibleCount(count)`, and `VotePage.expectEligiblePlayers(names)`.
-    `rtk npm run test:phase9` passes with the focused Phase 8 smoke regression.
+    `npm run test:phase9` passes with the focused Phase 8 smoke regression.
 
 - [ ] **PRC-014 - Medium - 100-player load test is one-round and API-heavy.**
   - Files: `tests/load/load-rehearsal.spec.ts`.

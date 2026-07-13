@@ -230,12 +230,20 @@ export async function hydratePublicTournamentState(
   stores: AdminStateStores = adminState,
   repository = getOperationalStateRepository(),
 ) {
-  const snapshot =
-    getTournamentStateBackend() === "supabase"
-      ? await readCachedPublicOperationalStateSnapshot(getTournamentEventId(), () =>
-          repository.load(),
-        )
-      : await repository.load();
+  let snapshot: OperationalStateSnapshot | null;
+
+  if (getTournamentStateBackend() === "supabase") {
+    const eventId = getTournamentEventId();
+    const generationKey = repository.readPublicGenerationKey
+      ? await repository.readPublicGenerationKey()
+      : "legacy";
+
+    snapshot = await readCachedPublicOperationalStateSnapshot(`${eventId}:${generationKey}`, () =>
+      repository.load(),
+    );
+  } else {
+    snapshot = await repository.load();
+  }
 
   restoreHydratedTournamentState(stores, snapshot);
 }
