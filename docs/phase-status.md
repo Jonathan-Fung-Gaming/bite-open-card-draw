@@ -19,11 +19,11 @@ status text when there is a conflict.
 
 ## Production Readiness Remediation Phase 1 - Atomic State And Freshness - 2026-07-13
 
-Status: implementation and local verification complete; phase closure remains open. The Phase 1
-checklist rows backed by code and local evidence are marked complete. The hosted disposable-project
-gate, PR merge, and post-merge production migration remain unchecked because no safe disposable
-remote Supabase project/branch is configured. The only available linked target is the real
-tournament project; no destructive evidence or pre-merge migration was run against it.
+Status: implementation plus local and disposable-hosted verification complete; phase closure
+remains open only for PR merge and the post-merge production migration. A non-persistent Supabase
+preview branch was created under the linked `bite-open-card-draw` project without production data,
+used only with generated `e2e-` event namespaces, and deleted after the hosted gates passed. No
+destructive evidence or pre-merge migration was run against the production database.
 
 ### Scope And Changed Files
 
@@ -58,6 +58,15 @@ tournament project; no destructive evidence or pre-merge migration was run again
 - Phase 1 local Supabase profile - passed, 5/5 browser tests in 2.6 minutes.
 - Phase 1 local Supabase cache TTL 0 profile - passed, 5/5 browser tests in 2.6 minutes.
 - Phase 1 local Supabase cache TTL 5000 profile - passed, 5/5 browser tests in 2.5 minutes.
+- Phase 1 disposable hosted Supabase normal-cache profile - passed, 5/5 browser tests in 3.3
+  minutes.
+- Phase 1 disposable hosted Supabase cache TTL 0 profile - passed, 5/5 browser tests in 3.3
+  minutes on a fresh event namespace.
+- Phase 1 disposable hosted Supabase cache TTL 5000 profile - passed, 5/5 browser tests in 3.6
+  minutes on a separate fresh event namespace.
+- Preview-branch migration parity - passed through `20260713020000` after applying the Phase 1
+  migration with the session-pooler endpoint.
+- Preview-branch `supabase db lint --level warning` - passed with no schema errors.
 - `npm run test:e2e` - passed, 6/6 browser tests in 7.2 minutes.
 - Direct local SQL smoke passed: pause generation 0 -> 1, resume 1 -> 2, wrong-host legacy reset
   rejected without mutation, and the owning legacy session completed the old reset payload.
@@ -80,6 +89,11 @@ tournament project; no destructive evidence or pre-merge migration was run again
 - Both tiebreak reload paths resumed nonzero authoritative progress, completed from stored server
   timestamps, consumed the newer final-release generation, and never exposed timer/card-draw DOM in
   result mode.
+- Disposable hosted normal, zero-cache, and maximum-cache runs each passed the coherent-reader,
+  mounted desktop/phone reroll, pause/resume preservation, set/full reroll, and both-tiebreak
+  recovery scenarios. The first TTL-0 attempt reused the normal-profile event namespace and its
+  audit assertion correctly found the prior run's audit; rerunning with a fresh namespace passed
+  5/5, and TTL-max used a third namespace to preserve isolation.
 
 ### Diff Review And Resolved Findings
 
@@ -97,15 +111,14 @@ tournament project; no destructive evidence or pre-merge migration was run again
 
 ### Risks, Rollout, And Blockers
 
-- Genuine remote hosted Supabase transaction/race/permission/browser evidence is still required.
-  The configured project list contains the production tournament project and an unrelated project,
-  not an approved disposable target. The hosted Phase 1 row and combined phase gate remain open.
-- The migration has been verified locally only. New application mutations perform a read-only
-  capability preflight and fail closed until the migration exists. Production migration push,
-  parity, permission verification, and database lint occur only after the phase PR is merged and the
-  intended linked target is reconfirmed.
-- No production namespace, remote schema, secret file, tournament rule, or browser randomness was
-  changed during local implementation/evidence.
+- The migration is verified locally and on the deleted disposable preview branch. New application
+  mutations perform a read-only capability preflight and fail closed until the migration exists.
+  Production migration push, parity, permission verification, and database lint occur only after
+  the phase PR is merged and the intended linked target is reconfirmed.
+- PR #101 remains the merge gate. Production migration verification and final checklist closure
+  remain intentionally unchecked until that merge completes.
+- No production namespace, production schema, secret file, tournament rule, or browser randomness
+  changed during pre-merge evidence.
 
 ## Obsolete Command Wrapper Reference Removal - 2026-07-13
 
