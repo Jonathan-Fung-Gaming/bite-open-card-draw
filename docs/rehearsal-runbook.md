@@ -13,18 +13,18 @@ Supabase four-round rehearsal with `TOURNAMENT_STATE_BACKEND=supabase` and a dis
 The Phase 9 Playwright rehearsal is split into reusable page objects and flows under
 `tests/phase9/`:
 
-- `rtk npm run test:e2e:memory-dev-smoke` runs the local memory/dev smoke path. It is useful after
+- `npm run test:e2e:memory-dev-smoke` runs the local memory/dev smoke path. It is useful after
   routine UI or route changes and is not release evidence for PFR-003 or PFR-004.
-- `rtk npm run test:phase9` runs the one-round Phase 9 smoke path in the memory/dev profile.
-- `rtk npm run test:phase9:supabase-dev` runs the one-round Supabase rehearsal on `next dev` with
+- `npm run test:phase9` runs the one-round Phase 9 smoke path in the memory/dev profile.
+- `npm run test:phase9:supabase-dev` runs the one-round Supabase rehearsal on `next dev` with
   test liveness shortcuts. It is useful for debugging Supabase data setup, but is not production
   release evidence.
-- `rtk npm run test:diagnostic:supabase-dev-full` runs the four-round Supabase/dev rehearsal tagged
+- `npm run test:diagnostic:supabase-dev-full` runs the four-round Supabase/dev rehearsal tagged
   `@full`. It still keeps the dev server and test liveness shortcuts, so treat it as diagnostic
   debugging only, not release evidence.
-- `rtk npm run test:e2e:production-flow:validate` prints and validates the production-flow
+- `npm run test:e2e:production-flow:validate` prints and validates the production-flow
   environment without launching Playwright.
-- `rtk npm run test:e2e:production-flow` is the release-evidence browser command for Phase 11. It
+- `npm run test:e2e:production-flow` is the release-evidence browser command for Phase 11. It
   requires Supabase, an explicit disposable event id, production server mode, enabled admin session
   heartbeat, enabled host heartbeat, enabled vote polling, enabled public refresh, and UI ballot
   submission. It must also prove the 48 -> 36 -> 24 -> 12 active voting-player progression across
@@ -41,7 +41,7 @@ $env:E2E_ALLOW_DESTRUCTIVE_RESET = "true"
 $env:NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co"
 $env:NEXT_PUBLIC_SUPABASE_ANON_KEY = "<anon key>"
 $env:SUPABASE_SERVICE_ROLE_KEY = "<service-role key>"
-rtk npm run test:e2e:production-flow:validate
+npm run test:e2e:production-flow:validate
 ```
 
 Expected validation output includes `profile=production-flow`, `backend=supabase`,
@@ -68,7 +68,7 @@ the admin action being rehearsed.
 
 ## Load Rehearsal Commands
 
-- `rtk npm run test:load:api-injection` runs the focused synthetic `/api/e2e/load-ballot` load tool.
+- `npm run test:load:api-injection` runs the focused synthetic `/api/e2e/load-ballot` load tool.
   It defaults to 100 eligible players, multiple edits, stage connected, and spectator traffic on
   `/room`, `/charts`, and `/results`.
 - This synthetic API load is not release evidence for real player-route behavior. Phase 11 must add

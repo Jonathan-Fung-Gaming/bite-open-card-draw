@@ -265,7 +265,7 @@ Add source assertions for the migration:
 ### Supabase / Hosted Evidence
 
 Run local/source checks in this phase. Run
-`rtk npm run test:phase9:supabase-dev` only when disposable Supabase settings
+`npm run test:phase9:supabase-dev` only when disposable Supabase settings
 are present:
 
 - `E2E_TOURNAMENT_EVENT_ID`

@@ -287,7 +287,7 @@ The main-workspace rerun passed all e2e tests, but earlier review runs saw two d
 
 Current status:
 
-`rtk npm run test:e2e` passed on rerun.
+`npm run test:e2e` passed on rerun.
 
 Recommended fix:
 
@@ -358,16 +358,16 @@ Add a `test:e2e:no-build` mode or env flag for CI after the explicit build gate.
 
 Passed in the main workspace:
 
-- `rtk npm run lint`
-- `rtk npm run typecheck`
-- `rtk npm run test`
-- `rtk npm run import:charts`
-- `rtk npm run build`
-- `rtk npm run test:e2e`
-- `rtk npm run test:load`
-- `rtk npm run verify:real-chart-images`
-- `rtk npm audit --omit=dev`
-- `rtk git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run import:charts`
+- `npm run build`
+- `npm run test:e2e`
+- `npm run test:load`
+- `npm run verify:real-chart-images`
+- `npm audit --omit=dev`
+- `git diff --check`
 
 Observed details:
 

@@ -86,18 +86,18 @@ not require production secrets.
 5. Verification gates.
    - Run focused tests for the CI workflow and release documentation if practical.
    - Run project gates:
-     - `rtk npm run lint`
-     - `rtk npm run typecheck`
-     - `rtk npm run test`
-     - `rtk npm run build`
+     - `npm run lint`
+     - `npm run typecheck`
+     - `npm run test`
+     - `npm run build`
    - Run release data gates:
-     - `rtk npm run verify:real-chart-images`
-     - `rtk npm run verify:release-data`
-     - `rtk git diff --check`
+     - `npm run verify:real-chart-images`
+     - `npm run verify:release-data`
+     - `git diff --check`
    - Run broader browser/release gates when feasible in this environment:
-     - `rtk npm run test:e2e`
-     - `rtk npm run test:phase9`
-     - `rtk npm run test:e2e:production-flow:validate`
+     - `npm run test:e2e`
+     - `npm run test:phase9`
+     - `npm run test:e2e:production-flow:validate`
    - Run full production-flow and load gates only if the linked disposable Supabase environment is
      available and the time budget permits.
 
@@ -117,8 +117,8 @@ not require production secrets.
    - Merge only after local review passes and remote checks are acceptable.
 
 8. Supabase migrations after merge.
-   - Re-check migration status after merge with `rtk npm run supabase:migration:list`.
-   - If local migrations are pending remotely, run `rtk npm run supabase:db:push`.
+   - Re-check migration status after merge with `npm run supabase:migration:list`.
+   - If local migrations are pending remotely, run `npm run supabase:db:push`.
    - If no migration was added in Phase 12 and local/remote are already aligned, record that no
      migration push was applicable.
 

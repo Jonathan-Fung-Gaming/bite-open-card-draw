@@ -73,19 +73,19 @@
 
 ## Phase 0 Checks Run
 
-- `rtk git status --short --branch`
-- `rtk git diff --cached --name-only`
-- `rtk git --version`
-- `rtk node --version`
-- `rtk npm --version`
-- `rtk powershell ... supabase --version`
-- `rtk powershell ... vercel --version`
-- `rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-data-audit.ps1`
-- `rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-asset-audit.ps1`
-- `rtk rg -n "SUPABASE_SERVICE_ROLE_KEY=" .`
-- `rtk rg -n "SESSION_SECRET=" .`
-- `rtk rg -n "ADMIN_PASSWORD=" .`
-- `rtk rg -n "eyJ" .`
+- `git status --short --branch`
+- `git diff --cached --name-only`
+- `git --version`
+- `node --version`
+- `npm --version`
+- `powershell ... supabase --version`
+- `powershell ... vercel --version`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-data-audit.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-asset-audit.ps1`
+- `rg -n "SUPABASE_SERVICE_ROLE_KEY=" .`
+- `rg -n "SESSION_SECRET=" .`
+- `rg -n "ADMIN_PASSWORD=" .`
+- `rg -n "eyJ" .`
 
 ## Blockers
 

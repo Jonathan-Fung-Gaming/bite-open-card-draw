@@ -109,22 +109,22 @@ Update the mobile route Playwright test to assert:
 Run these first:
 
 ```text
-rtk npm run test -- src/lib/results/result-engine.test.ts src/lib/vote/phone-view.test.ts src/lib/server/admin-actions.test.ts
-rtk npm run test:e2e:memory-dev-smoke
+npm run test -- src/lib/results/result-engine.test.ts src/lib/vote/phone-view.test.ts src/lib/server/admin-actions.test.ts
+npm run test:e2e:memory-dev-smoke
 ```
 
 Then run the default phase gate:
 
 ```text
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Run broader browser checks if the focused e2e pass is stable:
 
 ```text
-rtk npm run test:e2e
-rtk npm run test:phase9
+npm run test:e2e
+npm run test:phase9
 ```

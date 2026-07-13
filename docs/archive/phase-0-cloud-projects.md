@@ -25,12 +25,12 @@ Notes:
 Commands run:
 
 ```bash
-rtk vercel whoami
-rtk vercel teams ls
-rtk vercel project list --scope jonathansminigameparty
-rtk vercel project inspect bite-open-card-draw --scope jonathansminigameparty
-rtk vercel project add bite-open-card-draw --scope jonathansminigameparty
-rtk vercel project inspect bite-open-card-draw --scope jonathansminigameparty
+vercel whoami
+vercel teams ls
+vercel project list --scope jonathansminigameparty
+vercel project inspect bite-open-card-draw --scope jonathansminigameparty
+vercel project add bite-open-card-draw --scope jonathansminigameparty
+vercel project inspect bite-open-card-draw --scope jonathansminigameparty
 ```
 
 ## Supabase
@@ -40,9 +40,9 @@ Status: PARTIAL PASS
 Supabase CLI access works through `npx`:
 
 ```bash
-rtk npx supabase --version
-rtk npx supabase orgs list
-rtk npx supabase projects list
+npx supabase --version
+npx supabase orgs list
+npx supabase projects list
 ```
 
 Current observed Supabase organization:
@@ -83,7 +83,7 @@ Do not add real values to Git. Add them to `.env.local` only after Phase 1 scaff
 Local helper:
 
 ```bash
-rtk powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/write-local-env.ps1
 ```
 
 This helper writes `.env.local`, which is ignored by Git. It does not commit or print server-only values.

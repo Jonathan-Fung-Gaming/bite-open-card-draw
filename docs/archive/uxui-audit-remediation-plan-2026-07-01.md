@@ -288,12 +288,12 @@ Run the checklist in `docs/uxui-audit-checklist-2026-07-01.md` after each select
 
 Recommended automated checks after code changes:
 
-- `rtk npm run lint`
-- `rtk npm run typecheck`
-- `rtk npm run test`
-- `rtk npm run build`
-- `rtk npm run test:e2e`
-- `rtk git diff --check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `npm run test:e2e`
+- `git diff --check`
 
 Recommended targeted UX checks:
 

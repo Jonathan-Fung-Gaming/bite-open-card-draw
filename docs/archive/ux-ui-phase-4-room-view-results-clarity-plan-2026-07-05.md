@@ -99,13 +99,13 @@ stage recovery copy unambiguous for event spectators, players, and the projector
 
 ## Verification Plan
 
-- `rtk npm run lint`
-- `rtk npm run typecheck`
+- `npm run lint`
+- `npm run typecheck`
 - Focused tests for changed helpers/components when practical.
-- `rtk npm run test`
-- `rtk npm run build`
-- `rtk git diff --check`
-- `rtk npm run test:e2e`
+- `npm run test`
+- `npm run build`
+- `git diff --check`
+- `npm run test:e2e`
 
 If available e2e covers the Phase 4 routes, use it for route screenshots/evidence. If a full e2e
 run fails for an unrelated environmental issue, record the failure, stop, and do not close Phase 4.

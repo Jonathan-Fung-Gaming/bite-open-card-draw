@@ -93,11 +93,11 @@ the post-merge migration push. Each applicable phase plan must document rollout 
 Before moving to the next phase:
 
 - all phase acceptance criteria pass;
-- `rtk npm run lint` passes;
-- `rtk npm run typecheck` passes;
-- `rtk npm run test` passes;
-- `rtk npm run build` passes;
-- relevant `rtk npm run test:e2e` coverage passes;
+- `npm run lint` passes;
+- `npm run typecheck` passes;
+- `npm run test` passes;
+- `npm run build` passes;
+- relevant `npm run test:e2e` coverage passes;
 - relevant hosted Supabase/database checks pass when persistence behavior changes;
 - changed files, evidence, risks, assumptions, and self-review findings are recorded;
 - the phase PR is merged;

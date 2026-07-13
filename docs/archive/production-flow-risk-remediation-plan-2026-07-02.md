@@ -66,7 +66,7 @@ after every individual code edit.
 The target end state is a single release browser command, for example:
 
 ```bash
-rtk npm run test:e2e:production-flow
+npm run test:e2e:production-flow
 ```
 
 That command should start from a production build, run the full production-flow browser suite and
@@ -146,7 +146,7 @@ Primary work:
 Exit evidence:
 
 - Evidence log location exists or is documented.
-- `rtk git diff --check` passes for documentation edits.
+- `git diff --check` passes for documentation edits.
 
 ## Phase 1 - Authoritative Persistence And Mutation Boundaries
 
@@ -186,10 +186,10 @@ Evidence required before closure:
 Checks:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Do not run Playwright in this phase unless a lower-level reproduction is impossible.
@@ -235,10 +235,10 @@ Evidence required before closure:
 Checks:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Do not close browser-visible route items until Phase 7 provides route evidence.
@@ -274,10 +274,10 @@ Evidence required before closure:
 Checks:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Full admin UI browser coverage is deferred to Phase 7.
@@ -325,10 +325,10 @@ Evidence required before closure:
 Checks:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Browser confirmation for these flows is grouped into Phase 7.
@@ -378,13 +378,13 @@ Evidence required before closure:
 Checks:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run import:charts
-rtk npm run cache:chart-images
-rtk npm run verify:real-chart-images
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run import:charts
+npm run cache:chart-images
+npm run verify:real-chart-images
+npm run build
 ```
 
 If chart image caching needs network access, record whether the command used cached artifacts or an
@@ -426,10 +426,10 @@ Evidence required before closure:
 Checks:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Do not run the full Playwright window until Phases 1 through 6 are implemented and passing.
@@ -507,20 +507,20 @@ Primary work:
 Final gate commands:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run import:charts
-rtk npm run cache:chart-images
-rtk npm run verify:real-chart-images
-rtk npm run build
-rtk npm run test:e2e:production-flow
-rtk git diff --check
+npm run lint
+npm run typecheck
+npm run test
+npm run import:charts
+npm run cache:chart-images
+npm run verify:real-chart-images
+npm run build
+npm run test:e2e:production-flow
+git diff --check
 ```
 
 If `test:e2e:production-flow` has not been added, use the explicit production-like Playwright
 commands defined in Phase 6 and record them exactly. Do not substitute the current default
-`rtk npm run test:e2e` unless PFR-004 evidence proves it now runs the intended production-like gate.
+`npm run test:e2e` unless PFR-004 evidence proves it now runs the intended production-like gate.
 
 ## Phase Handoff Template
 

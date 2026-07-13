@@ -100,7 +100,7 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test -- src/lib/server/admin-actions.test.ts src/lib/results/result-engine.test.ts
+npm run test -- src/lib/server/admin-actions.test.ts src/lib/results/result-engine.test.ts
 ```
 
 Risks:
@@ -161,11 +161,11 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test -- src/app/api/e2e/load-ballot/route.test.ts src/app/api/e2e/private-csv/route.test.ts src/lib/server/authoritative-clock.test.ts src/lib/server/admin-auth.test.ts src/lib/server/security-boundary.test.ts
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run test -- src/app/api/e2e/load-ballot/route.test.ts src/app/api/e2e/private-csv/route.test.ts src/lib/server/authoritative-clock.test.ts src/lib/server/admin-auth.test.ts src/lib/server/security-boundary.test.ts
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Risks:
@@ -208,7 +208,7 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test -- src/lib/draw/draw-state.test.ts src/lib/draw/round-readiness.test.ts src/lib/results/selected-song-blocks.test.ts src/lib/integration/tournament-flow.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/db/schema.test.ts
+npm run test -- src/lib/draw/draw-state.test.ts src/lib/draw/round-readiness.test.ts src/lib/results/selected-song-blocks.test.ts src/lib/integration/tournament-flow.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/db/schema.test.ts
 ```
 
 Risks:
@@ -255,7 +255,7 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test -- src/lib/vote/voting-window.test.ts src/lib/server/voting-round.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts
+npm run test -- src/lib/vote/voting-window.test.ts src/lib/server/voting-round.test.ts src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts
 ```
 
 Risks:
@@ -317,8 +317,8 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/results/private-csv.test.ts src/lib/server/admin-actions.test.ts
-rtk npm run test:phase9:supabase-dev
+npm run test -- src/lib/server/transactions/normalized-runtime.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/results/private-csv.test.ts src/lib/server/admin-actions.test.ts
+npm run test:phase9:supabase-dev
 ```
 
 Risks:
@@ -367,7 +367,7 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test -- src/lib/server/normalized-operational-state.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts src/lib/admin/host-lock.test.ts src/lib/charts/exclusions.test.ts
+npm run test -- src/lib/server/normalized-operational-state.test.ts src/lib/server/persistence.test.ts src/lib/persistence/merge.test.ts src/lib/admin/host-lock.test.ts src/lib/charts/exclusions.test.ts
 ```
 
 Risks:
@@ -416,17 +416,17 @@ Acceptance criteria:
 - Tests reject extra headers, misordered headers, and unexpected trailing
   columns.
 - Tests cover Korean-only and mixed-Unicode title/artist keys.
-- `rtk npm run import:charts -- --strict` passes or the signed-review path is
+- `npm run import:charts -- --strict` passes or the signed-review path is
   explicit and documented.
-- `rtk npm run verify:real-chart-images` passes against the final artifacts.
+- `npm run verify:real-chart-images` passes against the final artifacts.
 - Release data gate fails on unsigned repaired/skipped diagnostics.
 
 Suggested focused checks:
 
 ```text
-rtk npm run test -- src/lib/charts/importer.test.ts src/lib/charts/normalize.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/image-cache.test.ts
-rtk npm run import:charts
-rtk npm run verify:real-chart-images
+npm run test -- src/lib/charts/importer.test.ts src/lib/charts/normalize.test.ts src/lib/charts/runtime-catalog.test.ts src/lib/charts/image-cache.test.ts
+npm run import:charts
+npm run verify:real-chart-images
 ```
 
 Risks:
@@ -481,8 +481,8 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test -- src/lib/vote/phone-view.test.ts src/lib/results/result-engine.test.ts src/components/rune-wheel-rotation.test.ts
-rtk npm run test:e2e:memory-dev-smoke
+npm run test -- src/lib/vote/phone-view.test.ts src/lib/results/result-engine.test.ts src/components/rune-wheel-rotation.test.ts
+npm run test:e2e:memory-dev-smoke
 ```
 
 Risks:
@@ -533,8 +533,8 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test:e2e:memory-dev-smoke
-rtk npm run test:phase9
+npm run test:e2e:memory-dev-smoke
+npm run test:phase9
 ```
 
 Risks:
@@ -582,9 +582,9 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test:phase9:supabase-dev
-rtk npm run test:load:api-injection
-rtk npm run test:load:player-routes
+npm run test:phase9:supabase-dev
+npm run test:load:api-injection
+npm run test:load:player-routes
 ```
 
 Risks:
@@ -646,14 +646,14 @@ Acceptance criteria:
 Suggested focused checks:
 
 ```text
-rtk npm run test -- tests/phase9/fixtures tests/phase9/assertions
-rtk npm run test:phase9
-rtk npm run test:e2e:production-flow:validate
+npm run test -- tests/phase9/fixtures tests/phase9/assertions
+npm run test:phase9
+npm run test:e2e:production-flow:validate
 ```
 
 Risks:
 
-- The command `rtk npm run test:e2e:production-flow` already exists, but the
+- The command `npm run test:e2e:production-flow` already exists, but the
   checklist says the body still behaves like a smaller smoke. Do not close
   PRC-002 or PRC-003 until behavior, not just command existence, is proven.
 
@@ -724,7 +724,7 @@ Implementation parts:
 
 Acceptance criteria:
 
-- `rtk npm run test:e2e:production-flow` proves the full 48 -> 36 -> 24 -> 12
+- `npm run test:e2e:production-flow` proves the full 48 -> 36 -> 24 -> 12
   release rehearsal.
 - All four private CSVs are saved and checked.
 - The release evidence is not conflated with smaller memory smoke tests.
@@ -734,15 +734,15 @@ Acceptance criteria:
 Suggested final checks for this phase:
 
 ```text
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
-rtk npm run test:e2e
-rtk npm run test:phase9
-rtk npm run test:load:player-routes
-rtk npm run test:e2e:production-flow:validate
-rtk npm run test:e2e:production-flow
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run test:e2e
+npm run test:phase9
+npm run test:load:player-routes
+npm run test:e2e:production-flow:validate
+npm run test:e2e:production-flow
 ```
 
 Risks:
@@ -793,8 +793,8 @@ Implementation parts:
 
 Acceptance criteria:
 
-- `rtk git status --short` is clean.
-- `rtk git rev-parse HEAD` matches the release checklist source commit.
+- `git status --short` is clean.
+- `git rev-parse HEAD` matches the release checklist source commit.
 - Deployed commit matches the release checklist deployed commit.
 - All final release checklist rows are checked with dated artifact evidence.
 - Historical evidence is clearly marked as historical and not used as current
@@ -803,19 +803,19 @@ Acceptance criteria:
 Suggested final checks:
 
 ```text
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run test:e2e
-rtk npm run test:e2e:production-flow
-rtk npm run test:load
-rtk npm run test:phase9
-rtk npm run import:charts
-rtk npm run cache:chart-images
-rtk npm run verify:real-chart-images
-rtk npm audit --omit=dev
-rtk git diff --check
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run test:e2e
+npm run test:e2e:production-flow
+npm run test:load
+npm run test:phase9
+npm run import:charts
+npm run cache:chart-images
+npm run verify:real-chart-images
+npm audit --omit=dev
+git diff --check
+npm run build
 ```
 
 Risks:
@@ -823,7 +823,7 @@ Risks:
 - If any artifact is regenerated after metadata is recorded, release metadata
   becomes stale and must be redone from the relevant data/evidence phase.
 - The Supabase-dev full diagnostic command is not a release gate. Use
-  `rtk npm run test:e2e:production-flow` for the release-blocking four-round
+  `npm run test:e2e:production-flow` for the release-blocking four-round
   Supabase evidence.
 
 ## Issue Coverage Matrix
@@ -873,32 +873,32 @@ After each implementation phase, run focused tests first, then the available
 project-wide checks:
 
 ```text
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
 Run browser checks when the phase touches browser-visible behavior:
 
 ```text
-rtk npm run test:e2e
-rtk npm run test:phase9
+npm run test:e2e
+npm run test:phase9
 ```
 
 Run Supabase checks when the phase touches normalized runtime, SQL, or hosted
 persistence:
 
 ```text
-rtk npm run test:phase9:supabase-dev
-rtk npm run test:e2e:production-flow:validate
+npm run test:phase9:supabase-dev
+npm run test:e2e:production-flow:validate
 ```
 
 Run the full production-flow gate only near the end with an explicitly
 configured disposable Supabase environment:
 
 ```text
-rtk npm run test:e2e:production-flow
+npm run test:e2e:production-flow
 ```
 
 ## Definition Of Done

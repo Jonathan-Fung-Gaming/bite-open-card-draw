@@ -38,7 +38,7 @@ execution-plan Phase 9. The target issues are:
 ### 1. Supabase Invariant Evidence
 
 Add a focused Supabase-only Playwright spec that is included in
-`rtk npm run test:phase9:supabase-dev` and skipped in memory-only smoke runs.
+`npm run test:phase9:supabase-dev` and skipped in memory-only smoke runs.
 
 The spec should verify, against a configured disposable Supabase target:
 
@@ -141,30 +141,30 @@ runs against disposable Supabase.
 | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | Critical Supabase invariants have real DB coverage or explicit hosted disposable evidence. | Supabase-only invariant/concurrency/host-lock spec plus hosted one-round smoke.                   |
 | Load evidence labels API-injection versus route-player behavior.                           | Separate `@api-injection` and `@player-route` tests and evidence JSON.                           |
-| Private CSV route security is covered at route level and later by deployed probes.         | Existing route tests remain in `rtk npm run test`; Phase 11 deployed probes stay documented.     |
+| Private CSV route security is covered at route level and later by deployed probes.         | Existing route tests remain in `npm run test`; Phase 11 deployed probes stay documented.     |
 
 ## Verification Commands
 
 Focused checks:
 
 ```text
-rtk npm run test -- src/app/api/e2e/private-csv/route.test.ts
-rtk npm run test:load:api-injection
-rtk npm run test:load:player-routes
-rtk npm run test:phase9:supabase-dev
+npm run test -- src/app/api/e2e/private-csv/route.test.ts
+npm run test:load:api-injection
+npm run test:load:player-routes
+npm run test:phase9:supabase-dev
 ```
 
 Project gates:
 
 ```text
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
-rtk git diff --check
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+git diff --check
 ```
 
-Run `rtk npm run test:phase9:supabase-dev` only with an explicit disposable
+Run `npm run test:phase9:supabase-dev` only with an explicit disposable
 Supabase event id and the required Supabase environment variables. If that
 environment is unavailable, record the validation failure rather than weakening
 the guard.

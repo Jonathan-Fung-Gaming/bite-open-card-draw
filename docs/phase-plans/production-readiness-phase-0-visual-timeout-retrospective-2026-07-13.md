@@ -1,6 +1,6 @@
 # Phase 0 Visual Diagnostic Timeout Retrospective - 2026-07-13
 
-Command: `rtk npm run test:phase0:memory`
+Command: `npm run test:phase0:memory`
 Observed duration: 904 seconds
 Outcome: command-level timeout; no valid Phase 0 visual evidence claimed
 

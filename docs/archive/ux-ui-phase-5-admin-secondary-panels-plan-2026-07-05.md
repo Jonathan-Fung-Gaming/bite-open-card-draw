@@ -98,14 +98,14 @@ re-hideable, and reduce public `/charts` client data to display-safe fields.
 
 ## Verification Plan
 
-- `rtk npm run lint`
-- `rtk npm run typecheck`
+- `npm run lint`
+- `npm run typecheck`
 - Focused unit/source tests for public chart view models or client data contracts.
 - Focused Playwright tests for changed admin and `/charts` evidence.
-- `rtk npm run test`
-- `rtk npm run build`
-- `rtk git diff --check`
-- `rtk npm run test:e2e`
+- `npm run test`
+- `npm run build`
+- `git diff --check`
+- `npm run test:e2e`
 
 If any required command is unavailable, record why. If a required gate fails, stop before closing
 Phase 5 or merging.

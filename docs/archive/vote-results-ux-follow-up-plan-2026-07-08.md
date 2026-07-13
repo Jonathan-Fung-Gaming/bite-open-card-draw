@@ -220,7 +220,7 @@ Tasks:
    - `full song`
 4. Keep names matching `remix`.
 5. Report filtered rows in the chart import report with clear reasons.
-6. Regenerate chart data with `rtk npm run import:charts`.
+6. Regenerate chart data with `npm run import:charts`.
 7. Verify required pool counts after filtering.
 
 Acceptance criteria:
@@ -235,11 +235,11 @@ Acceptance criteria:
 For implementation work, run the available checks after each phase:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
-rtk npm run test:e2e
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run test:e2e
 ```
 
 If a check is intentionally skipped for a docs-only change or by explicit user direction, record that

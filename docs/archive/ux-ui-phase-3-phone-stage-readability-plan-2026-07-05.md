@@ -198,13 +198,13 @@ selection, chart eligibility, or admin security boundaries.
 
 Run after implementation:
 
-- `rtk npm run lint`
-- `rtk npm run typecheck`
-- `rtk npm run test -- src/lib/vote/phone-view.test.ts`
-- `rtk npm run test`
-- `rtk npm run build`
-- `rtk git diff --check`
-- `rtk npm run test:e2e`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test -- src/lib/vote/phone-view.test.ts`
+- `npm run test`
+- `npm run build`
+- `git diff --check`
+- `npm run test:e2e`
 
 Supabase migration commands are not expected for this phase because the planned
 changes are UI, client fallback behavior, browser evidence, and docs only.

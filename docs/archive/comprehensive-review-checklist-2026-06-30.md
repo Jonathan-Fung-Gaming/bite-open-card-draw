@@ -23,17 +23,17 @@ Companion remediation plan: `docs/comprehensive-review-remediation-plan-2026-06-
 
 ## Checks Run
 
-- [x] `rtk npm run lint` - passed.
-- [x] `rtk npm run typecheck` - passed.
-- [x] `rtk npm run test` - passed, 33 files / 108 tests.
-- [x] `rtk npm run build` - passed.
-- [x] `rtk npm run test:e2e` - initially failed once because port `127.0.0.1:3100`
+- [x] `npm run lint` - passed.
+- [x] `npm run typecheck` - passed.
+- [x] `npm run test` - passed, 33 files / 108 tests.
+- [x] `npm run build` - passed.
+- [x] `npm run test:e2e` - initially failed once because port `127.0.0.1:3100`
       was still in use/TIME_WAIT; retry passed, 2 Playwright tests.
-- [x] Phase 9 hosted Supabase `rtk npm run test:e2e` - passed, 4 Playwright tests with
+- [x] Phase 9 hosted Supabase `npm run test:e2e` - passed, 4 Playwright tests with
       `TOURNAMENT_STATE_BACKEND=supabase`.
-- [x] Phase 9 hosted Supabase `rtk npm run test:load` - passed, 100 player submissions/edits with
+- [x] Phase 9 hosted Supabase `npm run test:load` - passed, 100 player submissions/edits with
       final private CSV verification.
-- [x] Phase 9 hosted Supabase `rtk npm run test:phase9` - passed, four-round rehearsal against
+- [x] Phase 9 hosted Supabase `npm run test:phase9` - passed, four-round rehearsal against
       production Supabase by approved exception using event id
       `phase9-fourround-2026-06-30-prod-05`.
 - [x] Validation checklist grep targets were reviewed.

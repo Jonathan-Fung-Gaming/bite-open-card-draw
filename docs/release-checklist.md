@@ -37,14 +37,14 @@ deployment, real roster, production environment, or venue-distance manual eviden
 These entries are retained for context only. They do not satisfy the current release-blocking gates
 unless they are rerun or explicitly linked to dated evidence for the current release commit.
 
-- Phase 8 clean e2e evidence was previously recorded with `rtk npm run test:e2e`.
-- Phase 8 load evidence was previously recorded with `rtk npm run test:load`.
+- Phase 8 clean e2e evidence was previously recorded with `npm run test:e2e`.
+- Phase 8 load evidence was previously recorded with `npm run test:load`.
 - Hosted Supabase rehearsal evidence was previously recorded with a disposable
   `TOURNAMENT_EVENT_ID`; production Supabase was used by explicit exception because no spare project
   remained.
 - Phase 9 hosted four-round evidence was previously recorded before the command split. The current
-  release-blocking four-round rehearsal is `rtk npm run test:e2e:production-flow`; the older
-  Supabase-dev full profile has been renamed `rtk npm run test:diagnostic:supabase-dev-full` and is
+  release-blocking four-round rehearsal is `npm run test:e2e:production-flow`; the older
+  Supabase-dev full profile has been renamed `npm run test:diagnostic:supabase-dev-full` and is
   diagnostic only.
 - Phase 9 hosted load evidence was previously recorded with `TOURNAMENT_STATE_BACKEND=supabase`.
 
@@ -69,7 +69,7 @@ workflow.
 - [ ] Deployed commit recorded: pending deployed URL/deployment metadata.
 - [x] Reviewer/operator recorded for source closure: `Codex`.
 - [ ] Deployed chart-art cache probe passes: a sampled `/chart-images/cache/*.png` URL from
-      `rtk npm run verify:real-chart-images` returns 200 from the deployed URL.
+      `npm run verify:real-chart-images` returns 200 from the deployed URL.
 - [ ] Deployed route image evidence for `/stage`, `/charts`, `/vote`, and `/results` uses
       `/chart-images/cache/*` where chart cards are rendered, not only
       `/chart-images/fallback-card.svg`.
@@ -107,14 +107,14 @@ workflow.
 - [ ] No `.env` or `.env.local` file is committed.
 - [ ] Supabase migrations are applied through
       `20260713010000_event_scoped_voter_device_binding.sql`.
-- [ ] `rtk npm run supabase:migration:list` confirms local and remote migrations are in sync.
+- [ ] `npm run supabase:migration:list` confirms local and remote migrations are in sync.
 
 ## Data
 
 - [ ] `data/source/charts.csv` is the approved event chart export.
 - [ ] Chart CSV SHA-256 recorded: `8FADB13C6E3F153DF5DA3CBC0B62A753771B12E8A34086AA87A677F5EC8885F5`.
 - [ ] Chart CSV row count recorded: `4,571 source rows`.
-- [ ] `rtk npm run import:charts` completed.
+- [ ] `npm run import:charts` completed.
 - [ ] `data/generated/chart-import-report.json` archived with SHA-256 from
       `data/generated/chart-import-report.sha256`:
       `43AC5E28174A2912338E9D2A905C38F317C0D04081B9CF761CCE31F9631041FD`.
@@ -127,15 +127,15 @@ workflow.
 - [ ] Chart exclusions were reviewed.
 - [ ] Imported chart catalog identity recorded from `data/generated/charts.json`:
       `AC5D46321C151BB748F102ACF739C00CE6F310DA96E5E0480DFDA5B526F23175`.
-- [ ] `rtk npm run cache:chart-images` completed with at least 1 real cached image asset.
+- [ ] `npm run cache:chart-images` completed with at least 1 real cached image asset.
 - [ ] Image cache manifest identity recorded from `data/generated/image-assets.json`:
       `F5D886138BEE349A88F942D1196F0BC219C5E2211BCFF0014497A437D76653E0`
       with 639 cached assets and 0 fallback assets.
-- [ ] `rtk npm run verify:real-chart-images` completed.
-- [ ] Runtime catalog identity recorded from `rtk npm run verify:real-chart-images`:
+- [ ] `npm run verify:real-chart-images` completed.
+- [ ] Runtime catalog identity recorded from `npm run verify:real-chart-images`:
       `F5DC28CA048E69C33AF9CD97B0C566A87BAC1E386796C0743F028F1DBF2F2E2B`
       for 4,426 runtime charts and 639 public PNG cache files.
-- [ ] `rtk npm run verify:release-data` completed and passed with signed diagnostics or strict-clean
+- [ ] `npm run verify:release-data` completed and passed with signed diagnostics or strict-clean
       import evidence.
 - [ ] `public/chart-images/cache` contains real cached image files.
 - [ ] Tournament logo source exists at `public/brand/tournament-logo.png`.
@@ -202,20 +202,20 @@ workflow.
 
 ## Final Checks
 
-- [ ] `rtk npm run lint`
-- [ ] `rtk npm run typecheck`
-- [ ] `rtk npm run test`
-- [ ] `rtk npm run test:e2e`
-- [ ] `rtk npm run test:e2e:production-flow`
-- [ ] `rtk npm run supabase:migration:list`
-- [ ] `rtk npm run test:load`
-- [ ] `rtk npm run test:load:player-routes`
-- [ ] `rtk npm run test:phase9`
-- [ ] `rtk npm run import:charts`
-- [ ] `rtk npm run cache:chart-images`
-- [ ] `rtk npm run verify:real-chart-images`
-- [ ] `rtk npm run verify:release-data`
-- [ ] `rtk npm audit --omit=dev`
-- [ ] `rtk git diff --check`
-- [ ] `rtk npm run build`
+- [ ] `npm run lint`
+- [ ] `npm run typecheck`
+- [ ] `npm run test`
+- [ ] `npm run test:e2e`
+- [ ] `npm run test:e2e:production-flow`
+- [ ] `npm run supabase:migration:list`
+- [ ] `npm run test:load`
+- [ ] `npm run test:load:player-routes`
+- [ ] `npm run test:phase9`
+- [ ] `npm run import:charts`
+- [ ] `npm run cache:chart-images`
+- [ ] `npm run verify:real-chart-images`
+- [ ] `npm run verify:release-data`
+- [ ] `npm audit --omit=dev`
+- [ ] `git diff --check`
+- [ ] `npm run build`
 - [ ] Final release commit recorded: `git rev-parse HEAD`

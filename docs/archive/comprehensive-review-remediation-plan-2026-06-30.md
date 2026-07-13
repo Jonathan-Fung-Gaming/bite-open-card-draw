@@ -25,11 +25,11 @@ criteria and the phase gates below have been run.
 After each phase, run:
 
 ```bash
-rtk npm run lint
-rtk npm run typecheck
-rtk npm run test
-rtk npm run build
-rtk npm run test:e2e
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run test:e2e
 ```
 
 If a command does not exist or cannot run in the current environment, record the reason in the phase
@@ -122,11 +122,11 @@ Implementation notes:
 
 Verification:
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 35 files / 122 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 35 files / 122 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 2 Playwright tests.
 
 ## Phase 3 - Voting Timer Correctness
 
@@ -179,11 +179,11 @@ Implementation notes to preserve:
 
 Verification:
 
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 36 files / 127 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 2 Playwright tests.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 36 files / 127 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 2 Playwright tests.
 
 ## Phase 4 - Draw And Result Rule Hardening
 
@@ -239,7 +239,7 @@ Implementation notes to preserve:
 Verification:
 
 - Focused regression command passed:
-  `rtk npm run test -- src/lib/draw/draw-state.test.ts src/lib/results/result-engine.test.ts src/lib/integration/tournament-flow.test.ts src/lib/persistence/operational-state.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/db/schema.test.ts`
+  `npm run test -- src/lib/draw/draw-state.test.ts src/lib/results/result-engine.test.ts src/lib/integration/tournament-flow.test.ts src/lib/persistence/operational-state.test.ts src/lib/server/normalized-operational-state.test.ts src/lib/db/schema.test.ts`
 - Full phase gates are recorded in `docs/phase-status.md`.
 
 Deferred items:
@@ -301,7 +301,7 @@ Implementation notes to preserve:
 Verification:
 
 - Focused regression command passed:
-  `rtk npm run test -- src/lib/admin/session.test.ts src/lib/server/admin-session-store.test.ts src/lib/persistence/debug-export.test.ts`
+  `npm run test -- src/lib/admin/session.test.ts src/lib/server/admin-session-store.test.ts src/lib/persistence/debug-export.test.ts`
 - Full phase gates are recorded in `docs/phase-status.md`.
 
 Deferred items:
@@ -361,9 +361,9 @@ Implementation notes to preserve:
 Verification:
 
 - Focused regression command passed:
-  `rtk npm run test -- src/components/rune-wheel-rotation.test.ts`
-- `rtk npm run test` passed, 37 files / 137 tests.
-- `rtk npm run test:e2e` initially exposed voting-stage overflow and stale two-panel tiebreak
+  `npm run test -- src/components/rune-wheel-rotation.test.ts`
+- `npm run test` passed, 37 files / 137 tests.
+- `npm run test:e2e` initially exposed voting-stage overflow and stale two-panel tiebreak
   assumptions, then passed after compact stage layout tuning and collapsed Set 1 result summary
   assertions. GitHub Actions later reproduced an Ubuntu-only 11px voting-stage overflow; standard
   stage chart cards were trimmed below `2xl`, and local e2e passed again.
@@ -423,9 +423,9 @@ Implementation notes to preserve:
 
 Verification:
 
-- `rtk npm run typecheck` - passed during implementation.
-- `rtk npm run lint` - passed during implementation.
-- `rtk npm run test:e2e` passed after adding mobile `/charts`, 390px phone ballot, third-ban, and
+- `npm run typecheck` - passed during implementation.
+- `npm run lint` - passed during implementation.
+- `npm run test:e2e` passed after adding mobile `/charts`, 390px phone ballot, third-ban, and
   direct saved-edit assertions.
 - Full phase gates are recorded in `docs/phase-status.md`.
 
@@ -451,7 +451,7 @@ Primary work:
 
 Exit criteria:
 
-- `rtk npm run test:e2e` passes retry-free from a clean shell with no prior dev server.
+- `npm run test:e2e` passes retry-free from a clean shell with no prior dev server.
 - Mobile coverage verifies `/vote`, `/room`, `/charts`, `/results`, and phone layout constraints.
 - Load rehearsal submits and edits 100 player ballots while stage/admin/spectator routes are active.
 - Final CSV verification passes under load.
@@ -486,14 +486,14 @@ Implementation notes to preserve:
 
 Verification:
 
-- `rtk npm run typecheck` - passed during implementation.
-- `rtk npm run lint` - passed during implementation.
-- `rtk npm run test:e2e` - passed, 4 Playwright tests across desktop Chromium, mobile Chromium, and
+- `npm run typecheck` - passed during implementation.
+- `npm run lint` - passed during implementation.
+- `npm run test:e2e` - passed, 4 Playwright tests across desktop Chromium, mobile Chromium, and
   mobile WebKit.
-- `rtk npm run test:load` - passed, 100 player submissions and edits with final private CSV
+- `npm run test:load` - passed, 100 player submissions and edits with final private CSV
   verification.
-- `rtk npm run test` - passed, 37 files / 137 tests.
-- `rtk npm run build` - passed.
+- `npm run test` - passed, 37 files / 137 tests.
+- `npm run build` - passed.
 - Full final gates are recorded in `docs/phase-status.md`.
 
 Deferred items:
@@ -566,21 +566,21 @@ Implementation notes to preserve:
 
 Verification:
 
-- `rtk npx supabase db lint --linked` - passed, no schema errors found.
-- `rtk npx supabase migration list --linked` - passed and showed remote migration
+- `npx supabase db lint --linked` - passed, no schema errors found.
+- `npx supabase migration list --linked` - passed and showed remote migration
   `20260630041000`.
-- `rtk npm run lint` - passed.
-- `rtk npm run typecheck` - passed.
-- `rtk npm run test` - passed, 37 files / 143 tests.
-- `rtk npm run build` - passed.
-- `rtk npm run test:e2e` - passed, 4 Playwright tests.
-- `rtk npm run test:load` - passed, 1 Playwright load test with 100 player submissions/edits and
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 37 files / 143 tests.
+- `npm run build` - passed.
+- `npm run test:e2e` - passed, 4 Playwright tests.
+- `npm run test:load` - passed, 1 Playwright load test with 100 player submissions/edits and
   final private CSV verification.
-- Hosted `rtk npm run test:e2e` with event id `phase9-e2e-2026-06-30-prod-23` - passed, 4
+- Hosted `npm run test:e2e` with event id `phase9-e2e-2026-06-30-prod-23` - passed, 4
   Playwright tests.
-- Hosted `rtk npm run test:load` with event id `phase9-load-2026-06-30-prod-07` - passed, 1 load
+- Hosted `npm run test:load` with event id `phase9-load-2026-06-30-prod-07` - passed, 1 load
   Playwright test.
-- Hosted `rtk npm run test:phase9` with event id `phase9-fourround-2026-06-30-prod-05` - passed, 1
+- Hosted `npm run test:phase9` with event id `phase9-fourround-2026-06-30-prod-05` - passed, 1
   four-round rehearsal test in about 6.3 minutes.
 
 Risks and follow-up:

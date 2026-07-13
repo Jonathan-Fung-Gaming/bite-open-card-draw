@@ -144,18 +144,18 @@ $($recommendationLines -join "`n")
 
 Fill these values for the current release commit before tournament use.
 
-- Runtime catalog source reported by rtk npm run verify:real-chart-images: $(if ($runtimeCatalogExists) { $RuntimeCatalogPath } else { "TODO" })
+- Runtime catalog source reported by npm run verify:real-chart-images: $(if ($runtimeCatalogExists) { $RuntimeCatalogPath } else { "TODO" })
 - Runtime catalog SHA-256: $runtimeCatalogSha
 - Image asset manifest SHA-256 for data/generated/image-assets.json: $imageAssetManifestSha
 - Public cache file count verified against runtime catalog: $publicCacheCount PNG files
 - Runtime charts with non-fallback cached artwork: $runtimeChartCount
 - Total public cache size: $publicCacheTotalBytes bytes ($publicCacheTotalMb MB)
 - Largest public cache file size: $publicCacheLargestBytes bytes ($publicCacheLargestKb KB)
-- Verification command/date/commit: rtk npm run verify:real-chart-images / TODO date / TODO commit
-- Combined release data gate: rtk npm run verify:release-data / TODO date / TODO commit
+- Verification command/date/commit: npm run verify:real-chart-images / TODO date / TODO commit
+- Combined release data gate: npm run verify:release-data / TODO date / TODO commit
 
-rtk npm run verify:real-chart-images must validate the same runtime catalog source and public
-cache paths that the deployed app uses, not only generated image metadata. rtk npm run
+npm run verify:real-chart-images must validate the same runtime catalog source and public
+cache paths that the deployed app uses, not only generated image metadata. npm run
 verify:release-data must pass before release closure so the image manifest/runtime catalog hashes are
 tied to the import report and source CSV evidence.
 
