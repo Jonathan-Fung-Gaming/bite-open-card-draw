@@ -9,9 +9,27 @@ export type OperationalDebugSnapshotExport = {
 };
 
 const REDACTED = "[redacted]";
+const SENSITIVE_METADATA_KEY = /(?:session.?id|token|password|secret|credential)/i;
 
 function fileSafeTimestamp(value: string) {
   return value.replaceAll(":", "-").replaceAll(".", "-");
+}
+
+function redactSensitiveMetadata(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(redactSensitiveMetadata);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [
+      key,
+      SENSITIVE_METADATA_KEY.test(key) ? REDACTED : redactSensitiveMetadata(nestedValue),
+    ]),
+  );
 }
 
 export function createOperationalDebugSnapshotExport(
@@ -30,7 +48,9 @@ export function createOperationalDebugSnapshotExport(
   };
 }
 
-export function serializeOperationalDebugSnapshotExport(exportData: OperationalDebugSnapshotExport) {
+export function serializeOperationalDebugSnapshotExport(
+  exportData: OperationalDebugSnapshotExport,
+) {
   return `${JSON.stringify(exportData, null, 2)}\n`;
 }
 
@@ -38,7 +58,9 @@ export function operationalDebugSnapshotFilename(snapshot: OperationalStateSnaps
   return `operational-debug-snapshot-${fileSafeTimestamp(snapshot.savedAt)}.json`;
 }
 
-function redactOperationalDebugSnapshot(snapshot: OperationalStateSnapshot): OperationalStateSnapshot {
+function redactOperationalDebugSnapshot(
+  snapshot: OperationalStateSnapshot,
+): OperationalStateSnapshot {
   const redacted = JSON.parse(JSON.stringify(snapshot)) as OperationalStateSnapshot;
 
   if (redacted.hostLock.lock) {
@@ -49,6 +71,7 @@ function redactOperationalDebugSnapshot(snapshot: OperationalStateSnapshot): Ope
   redacted.audit.records = redacted.audit.records.map((record) => ({
     ...record,
     sessionId: REDACTED,
+    metadata: redactSensitiveMetadata(record.metadata) as Record<string, unknown>,
   }));
   redacted.ballot.ballots = redacted.ballot.ballots.map((ballot) => ({
     ...ballot,

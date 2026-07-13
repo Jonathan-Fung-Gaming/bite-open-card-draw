@@ -6,7 +6,11 @@ import { REQUIRED_CHART_POOLS, type NormalizedChart } from "@/lib/charts/types";
 import type { HostLockSnapshot } from "@/lib/admin/host-lock";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import { adminState } from "@/lib/server/admin-state";
-import { getAdminSessionFromCookies } from "@/lib/server/admin-auth";
+import {
+  getAdminSessionFromCookies,
+  getHostTokenCookie,
+  getVerifiedHostRecoveryProof,
+} from "@/lib/server/admin-auth";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { getDeploymentSafetySnapshot } from "@/lib/server/deployment-safety";
 import { hydrateTournamentState } from "@/lib/server/persistence";
@@ -30,6 +34,7 @@ import {
   downloadPrivateCsvAction,
   drawRoundSetAction,
   releaseHostControlAction,
+  restoreHostControlAction,
   releaseFinalResultsAction,
   manualBallotAction,
   openVotingAction,
@@ -66,6 +71,7 @@ type AdminPageProps = {
   searchParams?: Promise<{
     chartPool?: string;
     error?: string;
+    notice?: string;
   }>;
 };
 
@@ -162,14 +168,12 @@ function readinessTextClass(isReady: boolean) {
   return isReady ? "text-white" : "text-ember-300";
 }
 
-function sessionPrefix(sessionId: string | null) {
-  return sessionId ? sessionId.slice(0, 8) : "none";
-}
-
 function hostStateHeading(status: HostLockSnapshot["status"]) {
   switch (status) {
     case "active":
       return "This browser is active host";
+    case "recoverable":
+      return "Original host can be restored";
     case "readonly":
       return "Read-only admin";
     default:
@@ -181,8 +185,10 @@ function hostStateDetail(status: HostLockSnapshot["status"]) {
   switch (status) {
     case "active":
       return "Tournament controls are enabled here. Release host control before handing operation to another browser.";
+    case "recoverable":
+      return "Ownership is retained, but tournament controls stay disabled until this secured browser rotates its host credential with Restore.";
     case "readonly":
-      return "Another browser has host control. Controls stay disabled here unless the host releases, the heartbeat expires, or you force takeover.";
+      return "Another browser has persistent host control. Controls stay disabled here unless that host releases or you complete the explicit forced-takeover flow.";
     default:
       return "Take host control from this browser before running tournament actions.";
   }
@@ -191,7 +197,9 @@ function hostStateDetail(status: HostLockSnapshot["status"]) {
 function hostTakeoverText(hostSnapshot: HostLockSnapshot) {
   switch (hostSnapshot.status) {
     case "active":
-      return "Heartbeat protected";
+      return "Verified control";
+    case "recoverable":
+      return "Restore available";
     case "readonly":
       return "Password required";
     default:
@@ -462,23 +470,20 @@ function DrawControlCard({
 
 function HostControlPanel({
   canControl,
-  currentSessionId,
   hostSnapshot,
   serverNowMs,
 }: {
   canControl: boolean;
-  currentSessionId: string;
   hostSnapshot: HostLockSnapshot;
   serverNowMs: number;
 }) {
   const hostStatus = hostSnapshot.status;
-  const ownerIsCurrentSession = hostSnapshot.ownerSessionId === currentSessionId;
   const ownerLabel =
     hostStatus === "inactive"
       ? "No active owner"
-      : ownerIsCurrentSession
-        ? `This session (${sessionPrefix(currentSessionId)})`
-        : `Session ${sessionPrefix(hostSnapshot.ownerSessionId)}`;
+      : hostStatus === "readonly"
+        ? "Another authenticated browser"
+        : "This browser";
 
   return (
     <section className="metal-panel rounded-lg p-4" data-testid="admin-host-control-panel">
@@ -514,15 +519,13 @@ function HostControlPanel({
             {hostTakeoverText(hostSnapshot)}
           </p>
           <p className="mt-1 break-words text-xs text-metal-300">
-            Use the heartbeat panel for the live expiry window. Taking control from another active
-            host requires the shared password and an audit reason.
+            Heartbeat reports health only. Taking control from another owner always requires the
+            shared password, a clear warning, and an audit reason.
           </p>
         </div>
       </div>
       <HostHeartbeat
-        expiresAt={hostSnapshot.expiresAt}
         heartbeatAt={hostSnapshot.heartbeatAt}
-        ownerSessionId={hostSnapshot.ownerSessionId}
         serverNowMs={serverNowMs}
         status={hostStatus}
       />
@@ -544,8 +547,9 @@ function HostControlPanel({
                 passwordId="force-host-takeover-password"
               >
                 <p className="rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm text-ember-300">
-                  Another admin has an unexpired host lock. Force takeover only if that host is
-                  unavailable or explicitly handed control to you.
+                  Another admin remains the persistent host owner even if its heartbeat is missing.
+                  Force takeover only if that host is unavailable or explicitly handed control to
+                  you.
                 </p>
                 <label
                   className="mt-4 block text-sm font-semibold text-metal-300"
@@ -569,26 +573,36 @@ function HostControlPanel({
               </button>
             </form>
           </details>
-        ) : (
+        ) : hostStatus === "recoverable" ? (
+          <form action={restoreHostControlAction}>
+            <button
+              className="button-metal rounded px-4 py-2 font-bold uppercase"
+              data-testid="restore-host-control"
+              type="submit"
+            >
+              Restore Host Control
+            </button>
+          </form>
+        ) : hostStatus === "inactive" ? (
           <form action={takeHostControlAction}>
             <button
               className="button-metal rounded px-4 py-2 font-bold uppercase disabled:opacity-40"
-              disabled={hostStatus === "active"}
               type="submit"
             >
               Take Host Control
             </button>
           </form>
-        )}
-        <form action={releaseHostControlAction}>
-          <button
-            className="rounded border border-metal-700 px-4 py-2 font-bold uppercase text-metal-300 disabled:opacity-40"
-            disabled={!canControl}
-            type="submit"
-          >
-            Release
-          </button>
-        </form>
+        ) : null}
+        {canControl ? (
+          <form action={releaseHostControlAction}>
+            <button
+              className="rounded border border-metal-700 px-4 py-2 font-bold uppercase text-metal-300"
+              type="submit"
+            >
+              Release
+            </button>
+          </form>
+        ) : null}
       </div>
     </section>
   );
@@ -598,6 +612,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const session = await getAdminSessionFromCookies();
   const params = await searchParams;
   const error = params?.error;
+  const notice = params?.notice;
 
   if (!session) {
     return (
@@ -639,7 +654,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   await hydrateTournamentState();
 
   const nowMs = await getAuthoritativeNowMs();
-  const hostSnapshot = adminState.hostLockStore.getSnapshot(session.sessionId, nowMs);
+  const [hostToken, recoveryProof] = await Promise.all([
+    getHostTokenCookie(),
+    getVerifiedHostRecoveryProof(),
+  ]);
+  const hostSnapshot = adminState.hostLockStore.getSnapshot(session.sessionId, nowMs, {
+    hostToken,
+    recoveryHostTokenHash: recoveryProof?.hostTokenHash,
+    recoveryOwnerSessionId: recoveryProof?.ownerSessionId,
+  });
   const players = adminState.rosterStore.listPlayers();
   const inactivePlayers = players.filter((player) => !player.active);
   const activeCount = adminState.rosterStore.getActivePlayerCount();
@@ -708,8 +731,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_440px] 2xl:grid-cols-[minmax(0,1fr)_520px]">
         <div className="flex min-w-0 flex-col gap-5">
           {error ? (
-            <section className="order-0 rounded-lg border border-ember-500/35 bg-ember-900/20 p-4 text-sm text-ember-300">
+            <section
+              aria-live="assertive"
+              className="order-0 rounded-lg border border-ember-500/35 bg-ember-900/20 p-4 text-sm text-ember-300"
+            >
               {error}
+            </section>
+          ) : null}
+          {notice ? (
+            <section
+              aria-live="polite"
+              className="order-0 rounded-lg border border-green-400/35 bg-green-950/25 p-4 text-sm text-green-200"
+              data-testid="admin-action-notice"
+            >
+              {notice}
             </section>
           ) : null}
           <div className="order-1">
@@ -724,7 +759,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <div className="grid gap-4">
                 <HostControlPanel
                   canControl={canControl}
-                  currentSessionId={session.sessionId}
                   hostSnapshot={hostSnapshot}
                   serverNowMs={nowMs}
                 />
@@ -1688,11 +1722,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
         </div>
         <aside className="grid min-w-0 content-start gap-5">
-          <AdminRosterPanel
-            activeCount={activeCount}
-            canControl={canControl}
-            players={players}
-          />
+          <AdminRosterPanel activeCount={activeCount} canControl={canControl} players={players} />
           <AdminCollapsiblePanel
             eyebrow="Operator Support"
             id="admin-support-panels"

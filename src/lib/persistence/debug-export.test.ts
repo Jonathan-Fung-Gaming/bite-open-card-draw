@@ -15,24 +15,31 @@ describe("operational debug snapshot export", () => {
       sessionId: "session-a",
       action: "debug_snapshot_export",
       summary: "Downloaded debug operational state snapshot.",
+      metadata: {
+        previousOwnerSessionId: "previous-session",
+        nested: { recoveryOwnerSessionId: "recovery-session", safeCount: 2 },
+      },
       tournamentChanging: false,
       now: "2026-06-29T00:00:00.000Z",
     });
     const snapshot = createOperationalStateSnapshot(stores, "2026-06-29T00:01:00.000Z");
-    const exportData = createOperationalDebugSnapshotExport(
-      snapshot,
-      "2026-06-29T00:02:00.000Z",
-    );
+    const exportData = createOperationalDebugSnapshotExport(snapshot, "2026-06-29T00:02:00.000Z");
     const serialized = serializeOperationalDebugSnapshotExport(exportData);
 
     expect(exportData.authoritativeRuntimeSource).toBe(false);
     expect(exportData.snapshot.hostLock.lock?.ownerSessionId).toBe("[redacted]");
     expect(exportData.snapshot.hostLock.lock?.hostTokenHash).toBe("[redacted]");
     expect(exportData.snapshot.audit.records[0]?.sessionId).toBe("[redacted]");
+    expect(exportData.snapshot.audit.records[0]?.metadata).toEqual({
+      previousOwnerSessionId: "[redacted]",
+      nested: { recoveryOwnerSessionId: "[redacted]", safeCount: 2 },
+    });
     expect(exportData.warning).toContain("normalized Supabase tables");
     expect(serialized).toContain('"exportType": "debug_operational_state_snapshot"');
     expect(serialized).toContain('"action": "debug_snapshot_export"');
     expect(serialized).not.toContain("session-a");
+    expect(serialized).not.toContain("previous-session");
+    expect(serialized).not.toContain("recovery-session");
     expect(operationalDebugSnapshotFilename(snapshot)).toBe(
       "operational-debug-snapshot-2026-06-29T00-01-00-000Z.json",
     );

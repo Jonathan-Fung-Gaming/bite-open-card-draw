@@ -114,11 +114,13 @@ export async function resetNormalizedRound(
 export async function closeNormalizedVotingWindow(input: {
   roundNumber: 1 | 2 | 3 | 4;
   adminSessionId: string;
+  hostTokenHash: string;
 }): Promise<NormalizedCloseVotingWindowResult> {
   const result = await withNormalizedEventPersistenceLock(() =>
     executeNormalizedTransactionalMutation("closeVotingWindow", {
       roundNumber: input.roundNumber,
       adminSessionId: input.adminSessionId,
+      hostTokenHash: input.hostTokenHash,
     }),
   );
 

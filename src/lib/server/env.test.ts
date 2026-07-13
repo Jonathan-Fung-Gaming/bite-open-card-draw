@@ -43,6 +43,18 @@ describe("server environment validation", () => {
     ).not.toThrow();
   });
 
+  it.each([
+    "NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT",
+    "NEXT_PUBLIC_E2E_DISABLE_HOST_HEARTBEAT",
+  ] as const)("fails closed when %s is enabled in production", (flag) => {
+    expect(() =>
+      assertProductionTestFlagsDisabled({
+        NODE_ENV: "production",
+        [flag]: "true",
+      }),
+    ).toThrow(`${flag} cannot be enabled`);
+  });
+
   it("validates production test flags before returning the event id", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL", "true");

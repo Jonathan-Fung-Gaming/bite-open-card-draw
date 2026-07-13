@@ -505,7 +505,11 @@ describe("server persistence safety", () => {
     await hydrateTournamentState(restored, repository);
 
     expect(restored.ballotStore.listForRound(1)).toHaveLength(1);
-    expect(restored.hostLockStore.getSnapshot("session-a", 1_001)).toMatchObject({
+    expect(
+      restored.hostLockStore.getSnapshot("session-a", 1_001, {
+        hostToken: "host-token-a",
+      }),
+    ).toMatchObject({
       status: "active",
       heartbeatAt: 1_000,
     });
@@ -535,7 +539,11 @@ describe("server persistence safety", () => {
 
     await hydrateTournamentState(restored, repository);
 
-    expect(restored.hostLockStore.getSnapshot("session-b", 1_201)).toMatchObject({
+    expect(
+      restored.hostLockStore.getSnapshot("session-b", 1_201, {
+        hostToken: "host-token-b",
+      }),
+    ).toMatchObject({
       status: "active",
       ownerSessionId: "session-b",
       heartbeatAt: 1_200,
@@ -577,7 +585,11 @@ describe("server persistence safety", () => {
 
     await hydrateTournamentState(restored, repository);
 
-    expect(restored.hostLockStore.getSnapshot("session-b", 1_201)).toMatchObject({
+    expect(
+      restored.hostLockStore.getSnapshot("session-b", 1_201, {
+        hostToken: "host-token-b",
+      }),
+    ).toMatchObject({
       status: "active",
       ownerSessionId: "session-b",
       heartbeatAt: 1_200,

@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createHostToken, hashHostToken, type HostLockReleaseOutcome } from "@/lib/admin/host-lock";
+import { createHostToken, hashHostToken } from "@/lib/admin/host-lock";
 import { buildAdminLiveCountRows } from "@/lib/admin/live-counts";
 import type { AdminSessionPayload } from "@/lib/admin/session";
 import {
@@ -79,16 +79,22 @@ import {
 } from "@/lib/server/voting-round";
 import {
   clearAdminCookies,
-  clearHostTokenCookie,
+  clearHostCredentials,
+  clearHostRecoveryCookie,
   createAdminSessionCookie,
   getAdminSessionFromCookies,
-  getAdminSessionPayloadFromCookiesForCleanup,
   getHostTokenCookie,
+  getVerifiedHostRecoveryProof,
   refreshAdminSessionCookie,
   requireAdminSession,
-  setHostTokenCookie,
+  setHostCredentials,
   verifyDangerousActionPassword,
 } from "@/lib/server/admin-auth";
+import {
+  acquireNormalizedHostLock,
+  heartbeatNormalizedHostLock,
+  releaseNormalizedHostLock,
+} from "@/lib/server/normalized-host-lock";
 import {
   durationMinutesInputSchema,
   overrideResultTargetInputSchema,
@@ -122,6 +128,10 @@ function getStringList(formData: FormData, name: string, maxLength = FORM_TEXT_M
 
 function redirectWithError(message: string) {
   redirect(`/coolguy69?error=${encodeURIComponent(message)}`);
+}
+
+function redirectWithNotice(message: string) {
+  redirect(`/coolguy69?notice=${encodeURIComponent(message)}`);
 }
 
 function getRoundNumber(formData: FormData) {
@@ -338,37 +348,12 @@ export async function adminLoginAction(formData: FormData) {
   redirect("/coolguy69");
 }
 
-async function bestEffortReleaseHostLockForCurrentCookies(
-  options: { allowExpiredSession?: boolean } = {},
-) {
-  const session = options.allowExpiredSession
-    ? await getAdminSessionPayloadFromCookiesForCleanup()
-    : await getAdminSessionFromCookies();
-  const hostToken = await getHostTokenCookie();
-
-  if (!session || !hostToken) {
-    return false;
-  }
-
-  try {
-    return await withPersistedHostLockState(async () => {
-      const nowMs = await getAuthoritativeNowMs();
-
-      return adminState.hostLockStore.release(session.sessionId, hostToken, nowMs).released;
-    });
-  } catch {
-    return false;
-  }
-}
-
 export async function adminLogoutAction() {
-  await bestEffortReleaseHostLockForCurrentCookies();
   await clearAdminCookies();
   redirect("/coolguy69");
 }
 
 export async function expireAdminSessionAction() {
-  await bestEffortReleaseHostLockForCurrentCookies({ allowExpiredSession: true });
   await clearAdminCookies();
 }
 
@@ -379,126 +364,268 @@ export async function refreshAdminSessionAction() {
 }
 
 export async function takeHostControlAction(formData: FormData) {
-  const session = await requireAdminSession();
-  const hostToken = createHostToken();
-  const force = getString(formData, "forceHostTakeover") === "true";
+  let force = false;
+  let committed = false;
 
   try {
+    const session = await requireAdminSession();
+    const hostToken = createHostToken();
+
+    force = getString(formData, "forceHostTakeover") === "true";
     const reason = force ? getRequiredReason(formData) : null;
 
     if (force) {
       await verifyDangerousActionPassword(getAdminPassword(formData));
     }
 
-    let acquiredAtMs = 0;
-    const { before, result } = await withPersistedHostLockState(async () => {
-      const nowMs = await getAuthoritativeNowMs();
-
-      acquiredAtMs = nowMs;
-      const previous = adminState.hostLockStore.getSnapshot(session.sessionId, nowMs);
-      const acquired = adminState.hostLockStore.acquire(session.sessionId, hostToken, nowMs, {
-        force,
+    if (getTournamentStateBackend() === "supabase") {
+      await acquireNormalizedHostLock({
+        requestId: randomUUID(),
+        mode: force ? "force" : "take",
+        adminSessionId: session.sessionId,
+        hostTokenHash: hashHostToken(hostToken),
+        reason,
       });
+    } else {
+      await withPersistedTournamentState(async () => {
+        const nowMs = await getAuthoritativeNowMs();
+        const before = adminState.hostLockStore.getSnapshot(session.sessionId, nowMs);
+        const result = adminState.hostLockStore.acquire(session.sessionId, hostToken, nowMs, {
+          force,
+        });
 
-      return { before: previous, result: acquired };
-    });
+        audit(session, {
+          action: result.takeover ? "host_lock_takeover" : "host_lock_acquire",
+          summary: result.takeover
+            ? "Forced takeover of the active host lock."
+            : "Acquired host control.",
+          reason,
+          dangerous: result.takeover,
+          tournamentChanging: false,
+          metadata: {
+            force,
+            previousOwnerSessionId: result.takeover ? before.ownerSessionId : null,
+          },
+        });
+      });
+    }
 
-    if (adminState.hostLockStore.getSnapshot(session.sessionId, acquiredAtMs).status !== "active") {
-      throw new Error(
-        "Host control changed before this request could save. Refresh and try again.",
+    committed = true;
+    await setHostCredentials(hostToken, session.sessionId);
+  } catch (error) {
+    if (committed) {
+      redirectWithError(
+        "Host ownership was committed, but this browser could not save its host credentials. Retry Restore Host Control while this admin session remains active; otherwise another authenticated admin must use the password-confirmed forced-takeover flow.",
       );
     }
 
-    await setHostTokenCookie(hostToken);
-    audit(session, {
-      action: result.takeover ? "host_lock_takeover" : "host_lock_acquire",
-      summary: result.takeover
-        ? "Forced takeover of the active host lock."
-        : "Acquired host control.",
-      reason,
-      dangerous: result.takeover,
-      tournamentChanging: false,
-      metadata: {
-        force,
-        previousOwnerSessionId: result.takeover ? before.ownerSessionId : null,
-      },
-    });
-    await persistTournamentState();
-  } catch (error) {
     redirectWithError(error instanceof Error ? error.message : "Could not take host control.");
   }
 
   revalidatePath("/coolguy69");
-  redirect("/coolguy69");
+  redirectWithNotice(force ? "Forced host takeover completed." : "Host control acquired.");
+}
+
+export async function restoreHostControlAction() {
+  let committed = false;
+
+  try {
+    const session = await requireAdminSession();
+    const recoveryProof = await getVerifiedHostRecoveryProof();
+    const hostToken = createHostToken();
+    await hydrateTournamentState();
+    const currentLock = adminState.hostLockStore.exportSnapshot().lock;
+
+    if (
+      recoveryProof &&
+      currentLock?.ownerSessionId === session.sessionId &&
+      (recoveryProof.ownerSessionId !== currentLock.ownerSessionId ||
+        recoveryProof.hostTokenHash !== currentLock.hostTokenHash)
+    ) {
+      await clearHostRecoveryCookie();
+      throw new Error("Stale host recovery proof was cleared. Retry Restore Host Control.");
+    }
+
+    const recoveryOwnerSessionId = recoveryProof?.ownerSessionId ?? session.sessionId;
+    const expectedHostTokenHash =
+      recoveryProof?.hostTokenHash ??
+      (currentLock?.ownerSessionId === session.sessionId ? currentLock.hostTokenHash : null);
+
+    if (!expectedHostTokenHash) {
+      throw new Error("This browser does not have valid original-host recovery proof.");
+    }
+
+    if (getTournamentStateBackend() === "supabase") {
+      await acquireNormalizedHostLock({
+        requestId: randomUUID(),
+        mode: "restore",
+        adminSessionId: session.sessionId,
+        hostTokenHash: hashHostToken(hostToken),
+        expectedHostTokenHash,
+        recoveryOwnerSessionId,
+      });
+    } else {
+      await withPersistedTournamentState(async () => {
+        const nowMs = await getAuthoritativeNowMs();
+        const restored = adminState.hostLockStore.restore(session.sessionId, hostToken, nowMs, {
+          expectedHostTokenHash,
+          recoveryOwnerSessionId,
+        });
+
+        if (!restored.restored) {
+          throw new Error(
+            restored.outcome === "no_active_lock"
+              ? "There is no host owner to restore."
+              : "This browser does not have valid original-host recovery proof.",
+          );
+        }
+
+        audit(session, {
+          action: "host_lock_restore",
+          summary: "Restored the persistent host owner after credential rotation.",
+          tournamentChanging: false,
+          metadata: { recoveryOwnerSessionId },
+        });
+      });
+    }
+
+    committed = true;
+    await setHostCredentials(hostToken, session.sessionId);
+  } catch (error) {
+    if (committed) {
+      redirectWithError(
+        "Host restore was committed, but this browser could not save the rotated credentials. Retry Restore Host Control while this admin session remains active; otherwise another authenticated admin must use the password-confirmed forced-takeover flow.",
+      );
+    }
+
+    redirectWithError(error instanceof Error ? error.message : "Could not restore host control.");
+  }
+
+  revalidatePath("/coolguy69");
+  redirectWithNotice("Host control restored and credentials rotated.");
 }
 
 export async function refreshHostLockAction() {
   const session = await getAdminSessionFromCookies();
   const hostToken = await getHostTokenCookie();
 
-  if (!session || !hostToken) {
-    return false;
+  if (!session) {
+    return {
+      ok: false as const,
+      code: "session_required" as const,
+      message: "Admin session renewal is required.",
+    };
   }
 
-  let refreshedAtMs = 0;
-  const refreshed = await withPersistedHostLockState(async () => {
-    const nowMs = await getAuthoritativeNowMs();
+  if (!hostToken) {
+    return {
+      ok: false as const,
+      code: "credential_required" as const,
+      message: "Host credential restore is required.",
+    };
+  }
 
-    refreshedAtMs = nowMs;
-    return adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs);
-  });
+  let heartbeatAt: number;
 
-  return (
-    refreshed &&
-    adminState.hostLockStore.getSnapshot(session.sessionId, refreshedAtMs).status === "active"
-  );
+  try {
+    if (getTournamentStateBackend() === "supabase") {
+      const result = await heartbeatNormalizedHostLock({
+        requestId: randomUUID(),
+        adminSessionId: session.sessionId,
+        hostTokenHash: hashHostToken(hostToken),
+      });
+
+      heartbeatAt = Date.parse(result.heartbeatAt);
+    } else {
+      heartbeatAt = await withPersistedHostLockState(async () => {
+        const nowMs = await getAuthoritativeNowMs();
+
+        if (!adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs)) {
+          throw new Error("Host ownership or credential changed.");
+        }
+
+        return nowMs;
+      });
+    }
+  } catch {
+    return {
+      ok: false as const,
+      code: "heartbeat_failed" as const,
+      message: "Host heartbeat could not be verified; ownership remains retained.",
+    };
+  }
+
+  try {
+    const refreshedSession = await refreshAdminSessionCookie(session);
+
+    return {
+      ok: true as const,
+      heartbeatAt,
+      sessionExpiresAt: refreshedSession.expiresAt,
+    };
+  } catch {
+    return {
+      ok: false as const,
+      code: "renewal_failed" as const,
+      message:
+        "Host heartbeat was recorded, but the admin session could not be renewed. Ownership remains retained; reauthenticate and Restore if needed.",
+    };
+  }
 }
 
 export async function releaseHostControlAction() {
-  const session = await requireAdminSession();
-  const hostToken = await getHostTokenCookie();
-  let releasedAtMs = 0;
+  let committed = false;
 
-  const releaseResult = await withPersistedHostLockState(
-    async (): Promise<HostLockReleaseOutcome> => {
-      const nowMs = await getAuthoritativeNowMs();
+  try {
+    const session = await requireAdminSession();
+    const hostToken = await getHostTokenCookie();
 
-      releasedAtMs = nowMs;
+    if (!hostToken) {
+      throw new Error("Host credential is required to release control.");
+    }
 
-      if (!hostToken) {
-        return "no_active_lock";
-      }
+    if (getTournamentStateBackend() === "supabase") {
+      await releaseNormalizedHostLock({
+        requestId: randomUUID(),
+        adminSessionId: session.sessionId,
+        hostTokenHash: hashHostToken(hostToken),
+      });
+    } else {
+      await withPersistedTournamentState(async () => {
+        const nowMs = await getAuthoritativeNowMs();
+        const result = adminState.hostLockStore.release(session.sessionId, hostToken, nowMs);
 
-      return adminState.hostLockStore.release(session.sessionId, hostToken, nowMs).outcome;
-    },
-  );
-  let releaseOutcome = releaseResult;
+        if (!result.released) {
+          throw new Error(
+            result.outcome === "no_active_lock"
+              ? "There is no active host owner to release."
+              : "This session and credential are not the active host.",
+          );
+        }
 
-  if (
-    releaseOutcome === "released" &&
-    adminState.hostLockStore.getSnapshot(session.sessionId, releasedAtMs).status !== "inactive"
-  ) {
-    releaseOutcome = "not_active_host";
+        audit(session, {
+          action: "host_lock_release",
+          summary: "Released host control.",
+          tournamentChanging: false,
+          metadata: { releaseOutcome: result.outcome },
+        });
+      });
+    }
+
+    committed = true;
+    await clearHostCredentials();
+  } catch (error) {
+    if (committed) {
+      redirectWithError(
+        "Host control was released, but this browser could not clear its stale host credentials. Ownership is inactive; reload before continuing.",
+      );
+    }
+
+    redirectWithError(error instanceof Error ? error.message : "Could not release host control.");
   }
 
-  const released = releaseOutcome === "released";
-
-  audit(session, {
-    action: released ? "host_lock_release" : "host_lock_release_noop",
-    summary: released
-      ? "Released host control."
-      : releaseOutcome === "not_active_host"
-        ? "Ignored release host control request because this session is not the active host."
-        : "Ignored release host control request because there is no active host lock.",
-    tournamentChanging: false,
-    metadata: {
-      releaseOutcome,
-    },
-  });
-  await persistTournamentState();
-  await clearHostTokenCookie();
   revalidatePath("/coolguy69");
-  redirect("/coolguy69");
+  redirectWithNotice("Host control released.");
 }
 
 async function requireActiveHost() {
@@ -1218,10 +1345,16 @@ export async function closeVotingAction(formData: FormData) {
 
     if (getTournamentStateBackend() === "supabase") {
       const session = await requireActiveHostForNormalizedAction();
+      const hostToken = await getHostTokenCookie();
+
+      if (!hostToken) {
+        throw new Error("Host control is required for this action.");
+      }
 
       await closeNormalizedVotingWindow({
         roundNumber,
         adminSessionId: session.sessionId,
+        hostTokenHash: hashHostToken(hostToken),
       });
       revalidateTournamentViews(revalidatePath);
       return;

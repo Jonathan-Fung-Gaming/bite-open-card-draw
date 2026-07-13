@@ -17,6 +17,150 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 3 - Non-Expiring Host - 2026-07-14
+
+Status: implementation and pre-merge evidence complete. Every Phase 3 acceptance row and the
+implementation, test, security-review, and evidence gate rows are checked. The phase PR and
+post-merge production migration deployment remain intentionally unchecked until the required PR
+merge, application deployment, migration push, parity verification, and linked database lint are
+complete.
+
+### Scope And Changed Files
+
+- Added the reviewed and amended Phase 3 plan under `docs/phase-plans/`, including persistent
+  ownership invariants, recovery proof, transaction ordering, rollout, forward-only rollback,
+  hosted safety, accessibility, soak evidence, and 24 implementation/review amendments.
+- Replaced lease authority with explicit inactive, active, recoverable, and read-only host states.
+  Legacy expiry is ignored for authority and written only as a far-future compatibility value.
+- Added signed, event/owner/credential-generation-bound HttpOnly recovery proof and persistent
+  primary host credentials. Logout and inactivity revoke only the admin session; explicit Release
+  is the normal ownership-ending action.
+- Added transactional service-role-only Supabase Take, Restore, Force, heartbeat, and Release RPC
+  behavior with advisory/row locking and lifecycle audits in the same transaction. Close voting now
+  verifies both the active session and host credential without an expiry predicate.
+- Added credential-aware server actions and mutually exclusive Take, Restore, Force, and Release
+  UI with visible notices/errors, semantic browser labels, authority/health separation, and
+  active-host-only session renewal.
+- Made normalized host ownership lifecycle-RPC-only, made existing audit rows immutable under
+  generic persistence, prevented revoked-session resurrection, recursively redacted sensitive
+  debug metadata, and rejected heartbeat-disable flags in production.
+- Added `playwright.phase3.config.ts`, guarded hosted/soak runners, memory and hosted lifecycle
+  scenarios, concurrent Restore evidence, and a fixed opt-in 35-minute no-input soak.
+- Added `break-words` to result titles after the complete visual gate exposed a 60-character
+  unbroken projector title overflowing its row.
+
+### Checks Run
+
+- Prettier on every changed supported file - passed.
+- `npm run lint` - passed after workspace-local generated Next output was removed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 70 files / 515 tests.
+- `npm run build` - passed.
+- `npm run test:phase3:memory` - passed, 1/1 lifecycle/recovery/two-browser scenario in 41.6
+  seconds.
+- `npm run test:phase3:soak` - passed, 1/1 accelerated no-input scenario in 35.9 seconds.
+- `E2E_PHASE3_REAL_SOAK=true npm run test:phase3:soak:real` - passed, 1/1 fixed 35-minute
+  no-input scenario in 35.3 minutes.
+- Final disposable no-data Supabase preview gate - migration push passed in 15.9 seconds, migration
+  parity passed 24/24 through `20260714010000`, database lint passed in 4.6 seconds, and hosted
+  lifecycle plus concurrent Restore passed 2/2 in 55.5 seconds.
+- `npm run test:phase1:memory` - passed, 5/5 in 2.1 minutes.
+- `npm run test:phase2:memory` - passed, 3/3 in 1.1 minutes.
+- Final `npm run test:e2e` - passed, 6/6 in 5.7 minutes, including the required 48, 36, 24, and 12
+  active-voter sequence, desktop/mobile browsers, tiebreak timing, and projector visual evidence.
+- Focused projector title regression - passed, 1/1.
+- Hosted runner negative safety checks - passed for missing destructive opt-in, missing
+  non-production attestation, configured-event collision, and missing real-soak opt-in; positive
+  hosted listing found both intended tests.
+- `npm run supabase:migration:list` - linked production is in parity through `20260713020000`; only
+  the Phase 3 migration is pending locally as required before merge.
+- `npx supabase db lint --linked --level error --fail-on error` - passed with no schema errors.
+- `npx supabase db push --linked --dry-run` - passed and would apply only
+  `20260714010000_phase3_non_expiring_host_recovery.sql`; no production write occurred.
+- `npm run supabase:status` - unavailable because Docker Desktop's Linux engine is not running.
+  Disposable hosted migration parity/lint and linked preflight checks passed; local Docker is not a
+  substitute for the mandatory post-merge linked verification.
+- `git diff --check`, client/static secret-boundary scans, tracked-env scan, new-test-route scan,
+  hosted destructive-runner safety review, and migration target review - passed.
+
+### Evidence
+
+- A host with an artificially old heartbeat and already-past legacy expiry remained authoritative.
+  Another authenticated browser stayed read-only and retained the password-confirmed, warned,
+  reason-required Force path.
+- Logout and reauthentication preserved ownership but disabled mutations until Restore atomically
+  rebound the new admin session and rotated the primary credential. Clearing the primary host
+  cookie produced the same recoverable state.
+- A stale original Release after forced takeover failed visibly and produced no release audit. The
+  new owner then released successfully, and the authoritative host row became absent with exactly
+  one matching release audit.
+- Two racing normal Takes produced exactly one active browser and one authoritative owner. Two
+  racing Restores from one recovery generation produced exactly one successful rotation and one
+  stale-proof failure.
+- The real soak sent no user input for 35 minutes. The original active host retained the same
+  session id with a later expiry and could explicitly Release; the idle standby session expired,
+  required reauthentication, and remained read-only afterward.
+- Host lifecycle audits retained transaction metadata through unrelated persistence, while debug
+  export and client/static output contained no session-derived owner labels, host-token hashes,
+  service-role key, session secret, or admin password hash.
+
+### Diff Review And Resolved Findings
+
+- Multiple delegated requirement, implementation, SQL, test, and diff reviews were combined with a
+  complete manual review against the product spec and security notes.
+- Review found generic persistence could rewrite rich lifecycle audit metadata. Audit persistence
+  is now insert-only/conflict-ignore, with a regression proving takeover metadata remains intact.
+- Review found concurrent Restore could accept the same recovery proof twice. Recovery proof now
+  binds the current credential generation, SQL compares/rotates it under the lifecycle lock, and
+  hosted evidence proves one winner.
+- Review found generic persistence could resurrect host state and normalized session upsert could
+  resurrect a revoked session. Host ownership is lifecycle-RPC-only and session touch/revoke now use
+  conditional updates.
+- Review found even a short owner-session prefix was unnecessary client disclosure. The client now
+  receives only semantic `this browser` / `another browser` state.
+- Review found same-timestamp Force could be classified as Restore. Memory and SQL takeover epochs
+  now advance strictly, with focused regression coverage.
+- The first hosted lifecycle attempt exposed an audit-only event hydration bug after successful
+  Release: the loader returned no snapshot and retained stale process state. Audit-only events now
+  hydrate an authoritative empty host snapshot, covered by a coherent-read regression.
+- The next hosted attempt proved exactly one concurrent Take at the database but sampled both pages
+  before hosted navigations settled. The harness now polls for exactly one Release UI before
+  comparing that browser to the authoritative owner; the final clean hosted run passed.
+- The complete visual gate exposed the long unbroken title overflow; the shared result row now
+  breaks long words and the focused/default visual gates pass.
+- Final review found no remaining tournament-rule, result/tiebreak authority, browser-randomness,
+  stale-state, race, secret-exposure, accessibility, data-loss, or migration-order regression.
+
+### Migration And Rollout State
+
+- The configured linked project name was verified exactly as `bite-open-card-draw`; identifiers and
+  credentials were not printed. Linked production has not received the Phase 3 migration before
+  merge.
+- Every hosted run used a uniquely named non-persistent Supabase preview with production data
+  disabled. Failed attempts stopped safely, each preview was deleted, and an independent final
+  relist confirmed zero matching Phase 3 previews remain.
+- The application is backward-compatible/fail-closed before migration: compatibility expiry keeps
+  old close behavior safe, while unavailable lifecycle RPCs return a visible migration-required
+  error rather than falling back to split writes.
+- After PR merge and successful application deployment, verify the same linked target, push only
+  migration `20260714010000`, verify exact local/remote parity and linked lint, run permission/
+  capability probes, record evidence, and only then check the final two Phase 3 gate rows.
+- Rollback after migration is forward-only because the corrected close payload requires
+  `hostTokenHash`; keep the migration and deploy a forward patch rather than restoring automatic
+  expiry or deleting authoritative ownership/audit data.
+
+### Risks And Assumptions
+
+- Heartbeat remains health telemetry and a five-second active-host session-renewal signal. It never
+  transfers or releases ownership.
+- Recovery depends on the secured browser retaining a signed HttpOnly proof or the owning session
+  remaining continuous. Shared-password Force remains the audited recovery path for a different
+  authenticated device.
+- The only unavailable local check is Docker-backed Supabase status. Final disposable hosted
+  migration/lint/e2e passed, and post-merge linked production push/parity/lint remain mandatory.
+- Phase 3 changes no tournament round, chart-set, draw, ballot, result-selection, tiebreak, player
+  identity, or timing rule.
+
 ## Production Readiness Remediation Phase 2 - Stage Reveal And Countdown - 2026-07-14
 
 Status: complete. Phase 2 implementation and evidence merged in

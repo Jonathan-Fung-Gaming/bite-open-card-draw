@@ -111,10 +111,12 @@ const PROFILES = new Set([
   "phase1-supabase-cache-zero",
   "phase1-supabase-cache-max",
   "phase2-memory",
+  "phase3-memory",
+  "phase3-supabase",
   "supabase-dev-rehearsal",
   "production-flow",
 ]);
-const DISPOSABLE_EVENT_ID_PATTERN = /^(e2e|phase0|phase9|load|rehearsal)-[a-z0-9-]+$/i;
+const DISPOSABLE_EVENT_ID_PATTERN = /^(e2e|phase0|phase3|phase9|load|rehearsal)-[a-z0-9-]+$/i;
 
 function optionValue(args, optionName) {
   const prefix = `${optionName}=`;
@@ -134,7 +136,7 @@ function isLocalUrl(value) {
 }
 
 function profileDefaults(profile, context) {
-  if (profile === "phase1-memory" || profile === "phase2-memory") {
+  if (profile === "phase1-memory" || profile === "phase2-memory" || profile === "phase3-memory") {
     return {
       backend: "memory",
       serverMode: "dev",
@@ -167,6 +169,22 @@ function profileDefaults(profile, context) {
           ? "5000"
           : "1000",
       useAdminActionsOnly: "false",
+    };
+  }
+
+  if (profile === "phase3-supabase") {
+    return {
+      backend: "supabase",
+      serverMode: "dev",
+      disableAdminSessionHeartbeat: "true",
+      disableHostHeartbeat: "true",
+      disableVoteLivePolling: "true",
+      disablePublicRefresh: "false",
+      allowE2eRoutes: "false",
+      allowMemoryBackend: "false",
+      phase9BallotMode: undefined,
+      publicReadCacheMs: "0",
+      useAdminActionsOnly: "true",
     };
   }
 
@@ -246,7 +264,7 @@ function collectSupabaseValidationErrors(config) {
     errors.push("E2E_TOURNAMENT_EVENT_ID must be set for Supabase Playwright rehearsal.");
   } else if (!DISPOSABLE_EVENT_ID_PATTERN.test(config.eventId)) {
     errors.push(
-      "E2E_TOURNAMENT_EVENT_ID must start with e2e-, phase0-, phase9-, load-, or rehearsal-.",
+      "E2E_TOURNAMENT_EVENT_ID must start with e2e-, phase0-, phase3-, phase9-, load-, or rehearsal-.",
     );
   } else if (
     config.eventId.toLowerCase().startsWith("phase0-") &&
@@ -302,6 +320,49 @@ function collectPhase1SupabaseValidationErrors(config) {
     errors.push(
       "E2E_CONFIRMED_NON_PRODUCTION_SUPABASE_PROJECT=true is required for a non-local Phase 1 Supabase target.",
     );
+  }
+
+  return [...errors, ...collectSupabaseValidationErrors(config)];
+}
+
+function collectPhase3SupabaseValidationErrors(config) {
+  const errors = [];
+
+  if (config.backend !== "supabase") {
+    errors.push(`backend must be supabase, got ${config.backend}.`);
+  }
+
+  if (!config.explicitE2eTournamentEventId) {
+    errors.push("Phase 3 Supabase profile requires an explicit generated E2E_TOURNAMENT_EVENT_ID.");
+  } else if (!config.explicitE2eTournamentEventId.toLowerCase().startsWith("phase3-")) {
+    errors.push("Phase 3 Supabase event id must start with phase3-.");
+  } else if (
+    config.configuredTournamentEventId &&
+    config.explicitE2eTournamentEventId === config.configuredTournamentEventId
+  ) {
+    errors.push("Phase 3 Supabase profile refuses the normally configured TOURNAMENT_EVENT_ID.");
+  }
+
+  if (
+    process.env.E2E_PHASE3_GENERATED_DISPOSABLE_EVENT_ID !== config.explicitE2eTournamentEventId
+  ) {
+    errors.push(
+      "Phase 3 Supabase profile must be launched by the generated disposable-event runner.",
+    );
+  }
+
+  if (process.env.E2E_CONFIRMED_NON_PRODUCTION_SUPABASE_PROJECT !== "true") {
+    errors.push(
+      "E2E_CONFIRMED_NON_PRODUCTION_SUPABASE_PROJECT=true is required for Phase 3 hosted evidence.",
+    );
+  }
+
+  if (config.allowE2eRoutes !== "false") {
+    errors.push("TOURNAMENT_TEST_ALLOW_E2E_ROUTES=false is required for Phase 3 hosted evidence.");
+  }
+
+  if (config.useAdminActionsOnly !== "true") {
+    errors.push("E2E_USE_ADMIN_ACTIONS_ONLY=true is required for Phase 3 hosted evidence.");
   }
 
   return [...errors, ...collectSupabaseValidationErrors(config)];
@@ -497,7 +558,9 @@ const defaults = profileDefaults(requestedProfile, {
 const requestedBackendOverride = process.env.E2E_TOURNAMENT_STATE_BACKEND?.trim();
 
 if (
-  (requestedProfile === "phase1-memory" || requestedProfile === "phase2-memory") &&
+  (requestedProfile === "phase1-memory" ||
+    requestedProfile === "phase2-memory" ||
+    requestedProfile === "phase3-memory") &&
   requestedBackendOverride &&
   requestedBackendOverride !== "memory"
 ) {
@@ -508,7 +571,9 @@ if (
 }
 
 const memoryLockedProfile =
-  requestedProfile === "phase1-memory" || requestedProfile === "phase2-memory";
+  requestedProfile === "phase1-memory" ||
+  requestedProfile === "phase2-memory" ||
+  requestedProfile === "phase3-memory";
 const e2eTournamentStateBackend = memoryLockedProfile
   ? "memory"
   : (requestedBackendOverride ?? defaults.backend);
@@ -581,7 +646,8 @@ const e2eAllowRehearsalAdminControls =
   requestedProfile === "production-flow" ||
   requestedProfile === "supabase-dev-rehearsal" ||
   requestedProfile.startsWith("phase1-") ||
-  requestedProfile === "phase2-memory"
+  requestedProfile === "phase2-memory" ||
+  requestedProfile.startsWith("phase3-")
     ? "true"
     : "false");
 const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
@@ -603,7 +669,7 @@ const e2eNextDistDir =
     ? ".next-phase2"
     : (requestedNextDistDirOverride ?? (usesPhase0Config ? ".next-phase0" : undefined));
 const e2ePublicSiteUrl =
-  requestedProfile === "phase2-memory"
+  requestedProfile === "phase2-memory" || requestedProfile.startsWith("phase3-")
     ? e2eBaseURL
     : (process.env.NEXT_PUBLIC_SITE_URL ??
       (isProductionFlowLocalStart ? "https://event.example.test" : e2eBaseURL));
@@ -655,6 +721,8 @@ if (requestedProfile === "production-flow") {
   failValidation(requestedProfile, collectPhase2MemoryValidationErrors(runConfig));
 } else if (requestedProfile.startsWith("phase1-supabase")) {
   failValidation(requestedProfile, collectPhase1SupabaseValidationErrors(runConfig));
+} else if (requestedProfile === "phase3-supabase") {
+  failValidation(requestedProfile, collectPhase3SupabaseValidationErrors(runConfig));
 } else if (e2eTournamentStateBackend === "supabase") {
   failValidation(requestedProfile, collectSupabaseValidationErrors(runConfig));
 }

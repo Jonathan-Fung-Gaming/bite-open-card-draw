@@ -15,7 +15,13 @@ import { ResultStore } from "@/lib/results/result-store";
 import { selectedSongBlocksFromResultStoreBeforeRound } from "@/lib/results/selected-song-blocks";
 import { ROUND_SET_DEFINITIONS, type RoundSetDefinition } from "@/lib/tournament";
 
-function chartsFor(type: "s" | "d", level: string, count: number, startRow: number, prefix: string) {
+function chartsFor(
+  type: "s" | "d",
+  level: string,
+  count: number,
+  startRow: number,
+  prefix: string,
+) {
   return Array.from({ length: count }, (_, index) =>
     normalizeChartRow(
       {
@@ -33,10 +39,7 @@ function chartsFor(type: "s" | "d", level: string, count: number, startRow: numb
 }
 
 function testCharts() {
-  return [
-    ...chartsFor("s", "16", 10, 10, "S16"),
-    ...chartsFor("s", "17", 10, 40, "S17"),
-  ];
+  return [...chartsFor("s", "16", 10, 10, "S16"), ...chartsFor("s", "17", 10, 40, "S17")];
 }
 
 async function persistAndRestore(
@@ -88,11 +91,7 @@ function createDeterministicStores(): AdminStateStores {
   };
 }
 
-function sharedChartFor(
-  set: RoundSetDefinition,
-  sharedIndex: number,
-  sourceRowNumber: number,
-) {
+function sharedChartFor(set: RoundSetDefinition, sharedIndex: number, sourceRowNumber: number) {
   return normalizeChartRow(
     {
       name: `Shared Song ${sharedIndex.toString().padStart(2, "0")}`,
@@ -107,11 +106,7 @@ function sharedChartFor(
   );
 }
 
-function uniqueChartFor(
-  set: RoundSetDefinition,
-  uniqueIndex: number,
-  sourceRowNumber: number,
-) {
+function uniqueChartFor(set: RoundSetDefinition, uniqueIndex: number, sourceRowNumber: number) {
   return normalizeChartRow(
     {
       name: `${set.displayLabel} Unique ${uniqueIndex.toString().padStart(2, "0")}`,
@@ -130,12 +125,8 @@ function fourRoundRehearsalCharts() {
   let sourceRowNumber = 1_000;
 
   return ROUND_SET_DEFINITIONS.flatMap((set) => [
-    ...Array.from({ length: 20 }, (_, index) =>
-      sharedChartFor(set, index, sourceRowNumber++),
-    ),
-    ...Array.from({ length: 10 }, (_, index) =>
-      uniqueChartFor(set, index, sourceRowNumber++),
-    ),
+    ...Array.from({ length: 20 }, (_, index) => sharedChartFor(set, index, sourceRowNumber++)),
+    ...Array.from({ length: 10 }, (_, index) => uniqueChartFor(set, index, sourceRowNumber++)),
   ]);
 }
 
@@ -165,7 +156,9 @@ describe("repository-backed tournament integration", () => {
     stores = await persistAndRestore(repository, stores);
 
     expect(stores.rosterStore.listPlayers()).toHaveLength(4);
-    expect(stores.hostLockStore.getSnapshot("session-a", 1_000).status).toBe("active");
+    expect(
+      stores.hostLockStore.getSnapshot("session-a", 1_000, { hostToken: "host-token-a" }).status,
+    ).toBe("active");
 
     stores.drawStateStore.setChartsForTest(testCharts());
     stores.drawStateStore.drawRoundSet({ roundNumber: 1, setOrder: 1 });

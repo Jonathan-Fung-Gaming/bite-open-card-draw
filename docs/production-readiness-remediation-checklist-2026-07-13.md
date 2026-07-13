@@ -113,26 +113,26 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 
 ### PRR-011 - Host Ownership And Recovery
 
-- [ ] Active host ownership has no automatic inactivity expiration.
-- [ ] Missing heartbeat does not release ownership.
-- [ ] Missing heartbeat keeps forced takeover available from another authenticated device.
-- [ ] Explicit Release is the normal ownership-ending action.
-- [ ] Forced takeover requires password, warning, and audit reason.
-- [ ] Original secured host can recover after reauthentication.
-- [ ] Recovery works after sleep/temporary network loss.
-- [ ] Recovery works after missing/rotated host credential.
-- [ ] `canControl` requires verified session and host credential.
-- [ ] Take/Restore, Release, and Force Takeover states are mutually consistent.
-- [ ] Every enabled host action produces visible success or typed error.
-- [ ] Non-host and standby sessions retain inactivity protection.
-- [ ] Accelerated recovery tests and opt-in 35-minute soak pass.
+- [x] Active host ownership has no automatic inactivity expiration.
+- [x] Missing heartbeat does not release ownership.
+- [x] Missing heartbeat keeps forced takeover available from another authenticated device.
+- [x] Explicit Release is the normal ownership-ending action.
+- [x] Forced takeover requires password, warning, and audit reason.
+- [x] Original secured host can recover after reauthentication.
+- [x] Recovery works after sleep/temporary network loss.
+- [x] Recovery works after missing/rotated host credential.
+- [x] `canControl` requires verified session and host credential.
+- [x] Take/Restore, Release, and Force Takeover states are mutually consistent.
+- [x] Every enabled host action produces visible success or typed error.
+- [x] Non-host and standby sessions retain inactivity protection.
+- [x] Accelerated recovery tests and opt-in 35-minute soak pass.
 
 ### Phase Gate
 
-- [ ] Phase plan self-reviewed and amended.
-- [ ] Lint, typecheck, unit, build, host e2e, and two-session tests pass.
-- [ ] Security and code/diff review completed with findings resolved.
-- [ ] Checklist/phase-status evidence recorded.
+- [x] Phase plan self-reviewed and amended.
+- [x] Lint, typecheck, unit, build, host e2e, and two-session tests pass.
+- [x] Security and code/diff review completed with findings resolved.
+- [x] Checklist/phase-status evidence recorded.
 - [ ] Phase PR merged.
 - [ ] Post-merge migration step marked not applicable or completed and verified.
 

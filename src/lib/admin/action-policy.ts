@@ -49,8 +49,7 @@ export const ADMIN_ACTION_POLICIES = [
     audited: false,
     dangerousAudit: false,
     tournamentChanging: false,
-    rationale:
-      "Best-effort releases host control, then clears local admin and host cookies without changing tournament state.",
+    rationale: "Clears only the admin session; persistent host ownership remains recoverable.",
   },
   {
     serverAction: "expireAdminSessionAction",
@@ -63,7 +62,7 @@ export const ADMIN_ACTION_POLICIES = [
     dangerousAudit: false,
     tournamentChanging: false,
     rationale:
-      "Best-effort inactivity cleanup releases host control before clearing expired admin cookies.",
+      "Clears only the inactive admin session; it never expires or releases persistent host ownership.",
   },
   {
     serverAction: "refreshAdminSessionAction",
@@ -110,19 +109,7 @@ export const ADMIN_ACTION_POLICIES = [
     },
   },
   {
-    serverAction: "refreshHostLockAction",
-    classification: "read-only or sensitive disclosure action",
-    requiresAdminSession: false,
-    requiresActiveHost: false,
-    requiresPasswordReentry: false,
-    requiresAuditReason: false,
-    audited: false,
-    dangerousAudit: false,
-    tournamentChanging: false,
-    rationale: "Heartbeat-only lock maintenance; frequent enough that audit rows would be noise.",
-  },
-  {
-    serverAction: "releaseHostControlAction",
+    serverAction: "restoreHostControlAction",
     classification: "read-only or sensitive disclosure action",
     requiresAdminSession: true,
     requiresActiveHost: false,
@@ -131,7 +118,34 @@ export const ADMIN_ACTION_POLICIES = [
     audited: true,
     dangerousAudit: false,
     tournamentChanging: false,
-    rationale: "Releases or no-ops host control and records the outcome.",
+    rationale:
+      "Rebinds the persistent owner only after verified same-session or signed same-device recovery proof.",
+  },
+  {
+    serverAction: "refreshHostLockAction",
+    classification: "read-only or sensitive disclosure action",
+    requiresAdminSession: true,
+    requiresActiveHost: true,
+    requiresPasswordReentry: false,
+    requiresAuditReason: false,
+    audited: false,
+    dangerousAudit: false,
+    tournamentChanging: false,
+    rationale:
+      "Requires the verified active session and host credential; heartbeat is health-only and frequent enough that audit rows would be noise.",
+  },
+  {
+    serverAction: "releaseHostControlAction",
+    classification: "read-only or sensitive disclosure action",
+    requiresAdminSession: true,
+    requiresActiveHost: true,
+    requiresPasswordReentry: false,
+    requiresAuditReason: false,
+    audited: true,
+    dangerousAudit: false,
+    tournamentChanging: false,
+    rationale:
+      "Credential-matched explicit release ends ownership and records exactly one successful outcome; stale or missing ownership returns an error.",
   },
   {
     serverAction: "addPlayerAction",

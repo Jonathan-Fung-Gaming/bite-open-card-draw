@@ -13,6 +13,8 @@ type ServerEnv = {
 type EnvRecord = {
   NODE_ENV?: string;
   VERCEL_ENV?: string;
+  NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT?: string;
+  NEXT_PUBLIC_E2E_DISABLE_HOST_HEARTBEAT?: string;
   TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL?: string;
 };
 
@@ -21,13 +23,18 @@ export function isProductionDeploymentEnv(env: EnvRecord = process.env) {
 }
 
 export function assertProductionTestFlagsDisabled(env: EnvRecord = process.env) {
-  if (
-    isProductionDeploymentEnv(env) &&
-    env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL === "true"
-  ) {
-    throw new Error(
-      "TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL cannot be enabled in production deployment environments.",
-    );
+  if (!isProductionDeploymentEnv(env)) {
+    return;
+  }
+
+  for (const flag of [
+    "TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL",
+    "NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT",
+    "NEXT_PUBLIC_E2E_DISABLE_HOST_HEARTBEAT",
+  ] as const) {
+    if (env[flag] === "true") {
+      throw new Error(`${flag} cannot be enabled in production deployment environments.`);
+    }
   }
 }
 

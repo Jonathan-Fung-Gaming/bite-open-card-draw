@@ -162,7 +162,11 @@ describe("operational state persistence", () => {
     await restoreFromRepository(recreated, repository);
 
     expect(recreated.rosterStore.listPlayers()).toHaveLength(1);
-    expect(recreated.hostLockStore.getSnapshot("session-a", 1_000).status).toBe("active");
+    expect(
+      recreated.hostLockStore.getSnapshot("session-a", 1_000, {
+        hostToken: "host-token-a",
+      }).status,
+    ).toBe("active");
     expect(recreated.drawStateStore.getActiveDraw(1, 1)?.charts).toHaveLength(7);
     expect(
       recreated.votingWindowStore.getSnapshot({

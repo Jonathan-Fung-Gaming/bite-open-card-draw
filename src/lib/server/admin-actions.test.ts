@@ -37,22 +37,22 @@ describe("admin action production safeguards", () => {
     expect(pageSource).toContain('name="reason"');
   });
 
-  it("audits non-host release-host attempts as no-op outcomes", () => {
+  it("rejects stale release attempts visibly and audits only successful release", () => {
     const actionsSource = readFileSync(
       path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
       "utf8",
     );
 
-    expect(actionsSource).toContain(
-      'action: released ? "host_lock_release" : "host_lock_release_noop"',
-    );
-    expect(actionsSource).toContain(
-      "Ignored release host control request because this session is not the active host.",
-    );
-    expect(actionsSource).toContain("releaseOutcome");
+    const releaseBlock = getActionBlock(actionsSource, "releaseHostControlAction");
+
+    expect(releaseBlock).toContain('action: "host_lock_release"');
+    expect(releaseBlock).not.toContain("host_lock_release_noop");
+    expect(releaseBlock).toContain("This session and credential are not the active host.");
+    expect(releaseBlock).toContain("redirectWithError");
+    expect(releaseBlock).toContain("clearHostCredentials");
   });
 
-  it("releases host lock before logout clearing and exposes inactivity cleanup", () => {
+  it("keeps host ownership through logout and inactivity cleanup", () => {
     const actionsSource = readFileSync(
       path.join(process.cwd(), "src/app/coolguy69/actions.ts"),
       "utf8",
@@ -64,13 +64,26 @@ describe("admin action production safeguards", () => {
     const logoutBlock = getActionBlock(actionsSource, "adminLogoutAction");
     const expireBlock = getActionBlock(actionsSource, "expireAdminSessionAction");
 
-    expect(logoutBlock.indexOf("await bestEffortReleaseHostLockForCurrentCookies();")).toBeLessThan(
-      logoutBlock.indexOf("await clearAdminCookies();"),
-    );
-    expect(expireBlock).toContain(
-      "bestEffortReleaseHostLockForCurrentCookies({ allowExpiredSession: true })",
-    );
+    expect(logoutBlock).toContain("await clearAdminCookies();");
+    expect(logoutBlock).not.toContain("release");
+    expect(expireBlock).toContain("await clearAdminCookies();");
+    expect(expireBlock).not.toContain("release");
     expect(inactivitySource).toContain("expireAdminSessionAction");
+  });
+
+  it("does not serialize any session-derived owner identifier into the client heartbeat", () => {
+    const pageSource = readFileSync(path.join(process.cwd(), "src/app/coolguy69/page.tsx"), "utf8");
+    const heartbeatSource = readFileSync(
+      path.join(process.cwd(), "src/app/coolguy69/_components/HostHeartbeat.tsx"),
+      "utf8",
+    );
+
+    expect(pageSource).not.toContain("sessionPrefix");
+    expect(pageSource).not.toContain("ownerSessionPrefix");
+    expect(heartbeatSource).not.toContain("ownerSessionPrefix");
+    expect(heartbeatSource).not.toContain("ownerSessionId");
+    expect(heartbeatSource).toContain('status === "readonly"');
+    expect(heartbeatSource).toContain('"another browser"');
   });
 
   it("persists stage final reveal before public route revalidation", () => {
