@@ -9,7 +9,7 @@ export const e2eTestRouteToken =
   `test-route-${randomBytes(24).toString("hex")}`;
 
 const adminPasswordSalt = randomBytes(16).toString("hex");
-const disposableEventIdPattern = /^(e2e|phase9|load|rehearsal)-[a-z0-9-]+$/i;
+const disposableEventIdPattern = /^(e2e|phase0|phase9|load|rehearsal)-[a-z0-9-]+$/i;
 const e2eProfile = process.env.E2E_PROFILE ?? "legacy";
 const usesHarnessConfig = process.argv.some(
   (arg) => arg.includes("playwright.phase9.config") || arg.includes("playwright.load.config"),
@@ -104,9 +104,16 @@ const hostedSupabaseAnonKey =
 const hostedSupabaseServiceRoleKey =
   process.env.E2E_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 const explicitE2eTournamentEventId = process.env.E2E_TOURNAMENT_EVENT_ID;
+const configuredTournamentEventId = process.env.TOURNAMENT_EVENT_ID;
+const phase0EventIdDiffersFromConfigured =
+  !configuredTournamentEventId || explicitE2eTournamentEventId !== configuredTournamentEventId;
+const phase0EventIdSeparationAttested =
+  process.env.E2E_PHASE0_EVENT_ID_DIFFERS_FROM_CONFIGURED === "true";
+const phase0EventIdSeparationPreviouslyValidated =
+  process.env.E2E_PHASE0_EVENT_ID_SEPARATION_VALIDATED === "true";
 const e2eTournamentEventId =
   explicitE2eTournamentEventId ??
-  (isSupabaseE2e ? undefined : process.env.TOURNAMENT_EVENT_ID ?? `e2e-${e2eProfile}`);
+  (isSupabaseE2e ? undefined : (process.env.TOURNAMENT_EVENT_ID ?? `e2e-${e2eProfile}`));
 const e2ePhase9BallotMode = process.env.E2E_PHASE9_BALLOT_MODE ?? profileDefaults.phase9BallotMode;
 const e2eDisableAdminSessionHeartbeat =
   process.env.NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT ??
@@ -121,9 +128,13 @@ const e2eAllowE2eRoutes =
   process.env.TOURNAMENT_TEST_ALLOW_E2E_ROUTES ?? profileDefaults.allowE2eRoutes;
 const e2eAllowMemoryBackend =
   process.env.TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND ?? profileDefaults.allowMemoryBackend;
+const e2eAllowRehearsalAdminControls =
+  process.env.TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS ?? "false";
+const e2eNextDistDir = process.env.E2E_NEXT_DIST_DIR;
 const e2eAllowLocalPublicUrl =
   process.env.TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL ??
   (isLocalBaseURL(e2eBaseURL) ? "true" : "false");
+const e2ePublicSiteUrl = process.env.E2E_PUBLIC_SITE_URL ?? e2eBaseURL;
 const e2eUseAdminActionsOnly =
   process.env.E2E_USE_ADMIN_ACTIONS_ONLY ?? (e2eProfile === "production-flow" ? "true" : "false");
 const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
@@ -199,8 +210,25 @@ if (isSupabaseE2e) {
 
   if (!disposableEventIdPattern.test(explicitE2eTournamentEventId)) {
     throw new Error(
-      "Supabase Playwright rehearsal event id must start with e2e-, phase9-, load-, or rehearsal-.",
+      "Supabase Playwright rehearsal event id must start with e2e-, phase0-, phase9-, load-, or rehearsal-.",
     );
+  }
+
+  if (
+    explicitE2eTournamentEventId.toLowerCase().startsWith("phase0-") &&
+    (!phase0EventIdSeparationAttested ||
+      (!phase0EventIdDiffersFromConfigured && !phase0EventIdSeparationPreviouslyValidated))
+  ) {
+    throw new Error(
+      "Phase 0 diagnostics require E2E_TOURNAMENT_EVENT_ID to differ from the normally configured TOURNAMENT_EVENT_ID.",
+    );
+  }
+
+  if (
+    explicitE2eTournamentEventId.toLowerCase().startsWith("phase0-") &&
+    phase0EventIdDiffersFromConfigured
+  ) {
+    process.env.E2E_PHASE0_EVENT_ID_SEPARATION_VALIDATED = "true";
   }
 
   if (process.env.E2E_ALLOW_DESTRUCTIVE_RESET !== "true") {
@@ -256,11 +284,12 @@ export const e2eWebServer =
           E2E_PROFILE: e2eProfile,
           ...(e2ePhase9BallotMode ? { E2E_PHASE9_BALLOT_MODE: e2ePhase9BallotMode } : {}),
           E2E_USE_ADMIN_ACTIONS_ONLY: e2eUseAdminActionsOnly,
+          ...(e2eNextDistDir ? { NEXT_DIST_DIR: e2eNextDistDir } : {}),
           NEXT_PUBLIC_E2E_DISABLE_ADMIN_SESSION_HEARTBEAT: e2eDisableAdminSessionHeartbeat,
           NEXT_PUBLIC_E2E_DISABLE_HOST_HEARTBEAT: e2eDisableHostHeartbeat,
           NEXT_PUBLIC_E2E_DISABLE_VOTE_LIVE_POLLING: e2eDisableVoteLivePolling,
           NEXT_PUBLIC_E2E_DISABLE_PUBLIC_REFRESH: e2eDisablePublicRefresh,
-          NEXT_PUBLIC_SITE_URL: e2eBaseURL,
+          NEXT_PUBLIC_SITE_URL: e2ePublicSiteUrl,
           NEXT_PUBLIC_SUPABASE_URL: e2eSupabaseUrl,
           NEXT_PUBLIC_SUPABASE_ANON_KEY: e2eSupabaseAnonKey,
           SUPABASE_SERVICE_ROLE_KEY: e2eSupabaseServiceRoleKey,
@@ -270,8 +299,9 @@ export const e2eWebServer =
           ...(e2eTournamentEventId ? { TOURNAMENT_EVENT_ID: e2eTournamentEventId } : {}),
           TOURNAMENT_TEST_ALLOW_E2E_ROUTES: e2eAllowE2eRoutes,
           TOURNAMENT_TEST_ALLOW_MEMORY_BACKEND: e2eAllowMemoryBackend,
+          TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS: e2eAllowRehearsalAdminControls,
           TOURNAMENT_TEST_ROUTE_TOKEN: e2eTestRouteToken,
           TOURNAMENT_TEST_ALLOW_LOCAL_PUBLIC_URL: e2eAllowLocalPublicUrl,
-          TOURNAMENT_TEST_PUBLIC_SITE_URL: e2eBaseURL,
+          TOURNAMENT_TEST_PUBLIC_SITE_URL: e2ePublicSiteUrl,
         },
       };

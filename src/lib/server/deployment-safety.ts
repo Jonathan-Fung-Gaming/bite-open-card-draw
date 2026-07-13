@@ -2,7 +2,7 @@ import "server-only";
 import { isProductionDeploymentEnv } from "@/lib/server/env";
 import { getTournamentStateBackend, type TournamentStateBackend } from "@/lib/server/persistence";
 
-const DISPOSABLE_REHEARSAL_EVENT_ID = /^(e2e|phase9|load|rehearsal)-[a-z0-9-]+$/i;
+const DISPOSABLE_REHEARSAL_EVENT_ID = /^(e2e|phase0|phase9|load|rehearsal)-[a-z0-9-]+$/i;
 
 export type DeploymentSafetySnapshot = {
   backend: TournamentStateBackend;
@@ -33,7 +33,7 @@ export function getDeploymentSafetySnapshot(): DeploymentSafetySnapshot {
   if (!rehearsalAdminControlsAllowed) {
     rehearsalControlBlockReason =
       explicitRehearsalControls && !disposableEventId
-        ? "Rehearsal reset and seed controls require a disposable event id beginning with e2e-, phase9-, load-, or rehearsal-."
+        ? "Rehearsal reset and seed controls require a disposable event id beginning with e2e-, phase0-, phase9-, load-, or rehearsal-."
         : "Rehearsal reset and seed controls are disabled for event deployments unless explicitly enabled for a disposable rehearsal event.";
   }
 

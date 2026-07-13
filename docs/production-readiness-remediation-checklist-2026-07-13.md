@@ -19,17 +19,17 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 
 ## Phase 0 - Reproduction And Contracts
 
-- [ ] PRR-001 through PRR-013 each have reproduction/source evidence.
-- [ ] Hosted reproduction uses a disposable Supabase event id.
-- [ ] RSC diagnostics contain no usernames, cookies, passwords, tokens, hashes, or secrets.
-- [ ] Roster latency and 30-player workflow baseline recorded.
-- [ ] Stage/phone countdown baseline recorded.
-- [ ] Logo early-frame and layout-shift baseline recorded.
-- [ ] Mobile `/charts`, select, and `/results` geometry baseline recorded.
-- [ ] Phase-specific passing-test contracts are documented.
-- [ ] Default checks remain green.
-- [ ] Phase plan self-reviewed and amended.
-- [ ] Code/diff review completed with findings resolved.
+- [X] PRR-001 through PRR-013 each have reproduction/source evidence.
+- [X] Hosted reproduction uses a disposable Supabase event id.
+- [X] RSC diagnostics contain no usernames, cookies, passwords, tokens, hashes, or secrets.
+- [X] Roster latency and 30-player workflow baseline recorded.
+- [X] Stage/phone countdown baseline recorded.
+- [X] Logo early-frame and layout-shift baseline recorded.
+- [X] Mobile `/charts`, select, and `/results` geometry baseline recorded.
+- [X] Phase-specific passing-test contracts are documented.
+- [X] Default checks remain green.
+- [X] Phase plan self-reviewed and amended.
+- [X] Code/diff review completed with findings resolved.
 - [ ] Phase PR merged.
 - [ ] Post-merge migration step marked not applicable or completed.
 

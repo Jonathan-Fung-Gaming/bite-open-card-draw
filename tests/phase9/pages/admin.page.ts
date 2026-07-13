@@ -468,7 +468,11 @@ export class AdminPage {
   }
 
   private async expectSupabaseRehearsalMode() {
-    await this.expectTextAfterNavigation("Rehearsal mode");
+    await this.visit();
+    await this.openSecondaryPanels();
+    await expect(this.page.getByText("Rehearsal mode", { exact: true }).first()).toBeVisible({
+      timeout: HOSTED_REFRESH_TIMEOUT_MS,
+    });
     await expect
       .poll(
         async () => {
@@ -546,7 +550,10 @@ export class AdminPage {
             .getByText(`Round ${roundNumber} - Set ${setOrder}`, { exact: true })
             .locator("xpath=ancestor::section[1]");
 
-          return refreshedSetSection.getByText(/Draw 1/).isVisible();
+          return refreshedSetSection
+            .getByText(/Draw 1/)
+            .first()
+            .isVisible();
         },
         { timeout: HOSTED_REFRESH_TIMEOUT_MS },
       )
@@ -829,7 +836,7 @@ export class AdminPage {
     }
   }
 
-  private async openSecondaryPanels() {
+  async openSecondaryPanels() {
     await this.openAdminPanel("admin-secondary-panels");
   }
 

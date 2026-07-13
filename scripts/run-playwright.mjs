@@ -38,6 +38,10 @@ function run(command, args, env) {
     throw result.error;
   }
 
+  if (result.signal) {
+    console.error(`[playwright-runner] ${command} exited from signal ${result.signal}.`);
+  }
+
   if (result.status !== 0) {
     const error = new Error(`${command} exited with status ${result.status ?? 1}.`);
     error.exitStatus = result.status ?? 1;
@@ -71,7 +75,7 @@ const PROFILES = new Set([
   "supabase-dev-rehearsal",
   "production-flow",
 ]);
-const DISPOSABLE_EVENT_ID_PATTERN = /^(e2e|phase9|load|rehearsal)-[a-z0-9-]+$/i;
+const DISPOSABLE_EVENT_ID_PATTERN = /^(e2e|phase0|phase9|load|rehearsal)-[a-z0-9-]+$/i;
 
 function optionValue(args, optionName) {
   const prefix = `${optionName}=`;
@@ -166,7 +170,16 @@ function collectSupabaseValidationErrors(config) {
   if (!config.eventId) {
     errors.push("E2E_TOURNAMENT_EVENT_ID must be set for Supabase Playwright rehearsal.");
   } else if (!DISPOSABLE_EVENT_ID_PATTERN.test(config.eventId)) {
-    errors.push("E2E_TOURNAMENT_EVENT_ID must start with e2e-, phase9-, load-, or rehearsal-.");
+    errors.push(
+      "E2E_TOURNAMENT_EVENT_ID must start with e2e-, phase0-, phase9-, load-, or rehearsal-.",
+    );
+  } else if (
+    config.eventId.toLowerCase().startsWith("phase0-") &&
+    !config.phase0EventIdDiffersFromConfigured
+  ) {
+    errors.push(
+      "Phase 0 diagnostics require E2E_TOURNAMENT_EVENT_ID to differ from the normally configured TOURNAMENT_EVENT_ID.",
+    );
   }
 
   if (process.env.E2E_ALLOW_DESTRUCTIVE_RESET !== "true") {
@@ -275,6 +288,10 @@ function failValidation(profile, errors) {
 }
 
 function printEnvironmentSummary(config) {
+  const eventIdLabel = config.eventId?.toLowerCase().startsWith("phase0-")
+    ? "phase0-[generated]"
+    : (config.eventId ?? "(none)");
+
   console.log(
     [
       `[playwright-runner] profile=${config.profile}`,
@@ -282,7 +299,7 @@ function printEnvironmentSummary(config) {
       `serverMode=${config.serverMode}`,
       `baseURL=${config.baseURL}`,
       `publicSiteUrl=${config.publicSiteUrl}`,
-      `eventId=${config.eventId ?? "(none)"}`,
+      `eventId=${eventIdLabel}`,
       `build=${config.skipBuild ? "skipped" : "enabled"}`,
       `adminSessionHeartbeat=${enabledLabel(config.disableAdminSessionHeartbeat)}`,
       `hostHeartbeat=${enabledLabel(config.disableHostHeartbeat)}`,
@@ -315,6 +332,7 @@ const requestedArgs = rawArgs.filter(
 loadEnvConfig(process.cwd());
 const usesLoadConfig = requestedArgs.some((arg) => arg.includes("playwright.load.config"));
 const usesPhase9Config = requestedArgs.some((arg) => arg.includes("playwright.phase9.config"));
+const usesPhase0Config = requestedArgs.some((arg) => arg.includes("playwright.phase0.config"));
 const usesPhase9Full = usesPhase9Config && requestedArgs.some((arg) => arg.includes("@full"));
 const hasPlayerRouteLoadGrep = requestedArgs.some((arg) => arg.includes("@player-route"));
 const hasApiInjectionLoadGrep = requestedArgs.some((arg) => arg.includes("@api-injection"));
@@ -354,6 +372,7 @@ const e2eServerMode = process.env.E2E_SERVER_MODE || defaults.serverMode;
 validateKnownServerMode(e2eServerMode);
 const skipBuild =
   skipBuildArg ||
+  requestedArgs.includes("--list") ||
   process.env.E2E_SKIP_BUILD === "1" ||
   e2eServerMode === "dev" ||
   e2eServerMode === "external";
@@ -386,10 +405,14 @@ const e2eUseAdminActionsOnly =
   process.env.E2E_USE_ADMIN_ACTIONS_ONLY ?? defaults.useAdminActionsOnly;
 const e2eAllowRehearsalAdminControls =
   process.env.TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS ??
-  (requestedProfile === "production-flow" || requestedProfile === "supabase-dev-rehearsal"
+  (usesPhase0Config ||
+  requestedProfile === "production-flow" ||
+  requestedProfile === "supabase-dev-rehearsal"
     ? "true"
     : "false");
 const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
+const e2eNextDistDir =
+  process.env.E2E_NEXT_DIST_DIR ?? (usesPhase0Config ? ".next-phase0" : undefined);
 const e2ePublicSiteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ??
   (isProductionFlowLocalStart ? "https://event.example.test" : e2eBaseURL);
@@ -399,6 +422,11 @@ const hostedSupabaseAnonKey =
   process.env.E2E_NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const hostedSupabaseServiceRoleKey =
   process.env.E2E_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+const phase0EventIdDiffersFromConfigured = Boolean(
+  e2eTournamentEventId?.toLowerCase().startsWith("phase0-") &&
+  process.env.TOURNAMENT_EVENT_ID &&
+  e2eTournamentEventId !== process.env.TOURNAMENT_EVENT_ID,
+);
 const runConfig = {
   profile: requestedProfile,
   backend: e2eTournamentStateBackend,
@@ -406,6 +434,7 @@ const runConfig = {
   baseURL: e2eBaseURL,
   publicSiteUrl: e2ePublicSiteUrl,
   eventId: e2eTournamentEventId,
+  phase0EventIdDiffersFromConfigured,
   skipBuild,
   disableAdminSessionHeartbeat: e2eDisableAdminSessionHeartbeat,
   disableHostHeartbeat: e2eDisableHostHeartbeat,
@@ -448,6 +477,7 @@ const env = sanitizeEnv({
   E2E_SERVER_MODE: e2eServerMode,
   E2E_TOURNAMENT_STATE_BACKEND: e2eTournamentStateBackend,
   E2E_TOURNAMENT_EVENT_ID: e2eTournamentEventId,
+  E2E_PHASE0_EVENT_ID_DIFFERS_FROM_CONFIGURED: String(runConfig.phase0EventIdDiffersFromConfigured),
   E2E_PHASE9_BALLOT_MODE: e2ePhase9BallotMode,
   E2E_LOAD_PROFILE: e2eLoadProfile,
   E2E_USE_ADMIN_ACTIONS_ONLY: e2eUseAdminActionsOnly,
@@ -468,6 +498,8 @@ const env = sanitizeEnv({
   TOURNAMENT_TEST_PUBLIC_SITE_URL: process.env.TOURNAMENT_TEST_PUBLIC_SITE_URL || e2eBaseURL,
   TOURNAMENT_TEST_ROUTE_TOKEN: e2eTestRouteToken,
   E2E_DEPLOYED_TEST_ROUTE_TOKEN: process.env.E2E_DEPLOYED_TEST_ROUTE_TOKEN,
+  E2E_NEXT_DIST_DIR: e2eNextDistDir,
+  NEXT_DIST_DIR: e2eNextDistDir,
 });
 
 let exitStatus = 0;

@@ -17,6 +17,101 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 0 - Reproduction And Contracts - 2026-07-13
+
+Status: implementation, hosted/memory evidence, default checks, and manual diff review complete;
+ready for the required pull request. PR merge and the post-merge migration-not-applicable closeout
+remain open until the merge workflow completes. Phase 0 changed diagnostics and documentation only;
+it did not change tournament rules, production state behavior, database schema, or migrations.
+
+### Scope And Changed Files
+
+- Added the reviewed Phase 0 plan and two diagnostic timeout/isolation retrospectives under
+  `docs/phase-plans/`.
+- Added `docs/production-readiness-phase-0-prr-contract-report-2026-07-13.md` with reproduction or
+  source evidence, measurable closure criteria, and later-phase test ownership for PRR-001 through
+  PRR-013.
+- Added `playwright.phase0.config.ts`, `tests/phase0/visual-baseline.spec.ts`, and
+  `tests/phase0/hosted-diagnostics.spec.ts` for opt-in visual, transition, timer, RSC, roster, and
+  disposable-hosted baselines.
+- Added `tests/phase0/diagnostic-evidence.ts` and its 32-test safety suite. The writer rejects
+  sensitive keys/values before allowlist filtering and writes only sanitizer-approved JSON.
+- Added `scripts/run-phase0-diagnostics.mjs` and package scripts that generate a fresh `phase0-`
+  event id, require explicit destructive-reset opt-in, redact the id in output, isolate the Next
+  build, and keep evidence outside the default Playwright cleanup root.
+- Extended existing rehearsal/deployment guards to recognize `phase0-` only as an explicitly
+  enabled disposable namespace, forwarded isolated build/public URL settings, and made narrow test
+  page-object fixes found by the diagnostic runs.
+- Updated `.gitignore`, `eslint.config.mjs`, `next.config.mjs`, and `tsconfig.json` for the isolated
+  `.next-phase0` and `phase0-test-results` directories.
+
+### Checks Run
+
+- Prettier check on changed supported files - passed after formatting the Phase 0 report.
+- `npm run lint` - passed. The first run correctly exposed that `.next-phase0` needed an ESLint
+  ignore; that finding was fixed before the passing rerun.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 61 files / 404 tests, including all 32 evidence-safety tests.
+- `npm run build` - passed for the default `.next` output and during isolated hosted Phase 0 runs.
+- `npm run test:e2e` - passed, 6 Playwright tests in 7.1 minutes.
+- Phase 0 memory Chromium - passed, 1 test / 9 route-width samples in 54.3 seconds.
+- Phase 0 memory WebKit - passed, 1 test / 9 route-width samples in 1.2 minutes.
+- Phase 0 hosted direct roster floor - passed, 1 test in 3.9 seconds after build.
+- Phase 0 hosted transition/timer/RSC diagnostic - passed, 1 test in 2.2 minutes after build.
+- `git diff --check` - passed.
+- Secret-like scan - 21 changed/untracked text files and 8 retained sanitized JSON artifacts;
+  zero JWT, Supabase secret, private key, password hash, assigned secret, or sensitive JSON-key
+  matches; no `.env` file changed.
+
+The required `rtk` wrapper crashed and became unavailable during the diagnostic work. Equivalent
+direct commands were used for the final checks; this tooling failure did not change test scope.
+
+### Evidence
+
+- Hosted transition: both draw versions advanced 1 -> 2 on reroll and stayed at version 2 on
+  restart; reveal phases were `set_1_counts`, `set_1_resolved`, `set_2_counts`, `set_2_resolved`,
+  and `final`, followed by `results_revealed`; all 32 captured public responses were 200 and no
+  sanitized page/RSC error was captured.
+- Countdown: stage reported 600 seconds, but the phone header produced no parseable countdown;
+  phone/stage skew remains unestablished and is an explicit Phase 2 defect contract.
+- Hosted admin roster observation: 30 actions yielded 25 confirmations and five timeouts, p50
+  14.46 seconds, p95 28.18 seconds, 120.57 seconds total, and 0.86-second second-admin propagation.
+- Direct database floor: 30/30 mutations, p50 165.03ms, p95 205.20ms, 208.47ms total, and 51.09ms
+  observation through a second client. This isolates the slow admin workflow above the mutation
+  layer.
+- Aged host observation: after aging disposable host/session timestamps by 31 minutes, original
+  control was unavailable and recovery did not succeed, preserving PRR-011 as a Phase 3 defect.
+- Visual evidence: Chromium and WebKit each recorded 9 route-width samples for `/charts`, `/vote`,
+  and `/results` at 320/360/390px; no sample overflowed horizontally, and all logo samples had
+  identical earliest/loaded/settled boxes with zero measured layout shift.
+- Retained artifacts are ignored under `phase0-test-results/`; committed aggregate evidence is in
+  the Phase 0 PRR contract report.
+
+### Manual Diff Review
+
+- Reviewed against `docs/product-spec.md`, the validation checklist, security notes, admin action
+  policy, and phase gates. No tournament rule, draw randomness, result selection, public mutation
+  authority, secret boundary, or database schema changed.
+- Verified hosted destructive writes require explicit opt-in plus a generated namespace distinct
+  from the configured event. Only event-id prefixes and aggregate/allowlisted fields reach evidence.
+- Fixed actionable harness findings: stale/strict admin locators, collapsed rehearsal panel checks,
+  rehearsal environment forwarding, isolated build/output directories, list-only runner behavior,
+  full tiebreak sequencing, and generated-directory lint coverage.
+- Initial concurrent/stale diagnostic processes contaminated shared `.next`/output directories;
+  those runs were rejected. The accepted evidence was rerun serially with isolated paths.
+- No migration exists. Rollback is to revert the diagnostics/report commit; disposable hosted
+  namespaces are never promoted to the real tournament namespace.
+
+### Risks And Assumptions
+
+- Phase 0 records current defects; it intentionally does not remediate PRR-001 through PRR-013.
+- The admin roster and aged-host aggregates came from sanitizer-approved failed-run evidence and
+  are committed in the report; retained passing artifacts cover the direct floor and transitions.
+- The visual sample found no logo shift on the measured routes, so Phase 5 must still cover every
+  shared-logo consumer and cold/cache loading condition before closing PRR-003.
+- The transition run captured no RSC failure, which does not prove atomicity or mounted-ballot
+  freshness; the Phase 1 contracts remain required.
+
 ## Vote, Results, And Chart Filtering Follow-Up Phase 6 - Short Cut And Full Song Filtering - 2026-07-09
 
 Status: complete for local source, unit, build, memory-dev browser evidence, and regenerated ignored

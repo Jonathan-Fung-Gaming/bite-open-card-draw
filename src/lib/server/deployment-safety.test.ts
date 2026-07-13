@@ -52,7 +52,7 @@ describe("deployment safety policy", () => {
   it("allows explicit disposable Supabase rehearsal events", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("TOURNAMENT_STATE_BACKEND", "supabase");
-    vi.stubEnv("TOURNAMENT_EVENT_ID", "rehearsal-2026-07-02");
+    vi.stubEnv("TOURNAMENT_EVENT_ID", "phase0-2026-07-13");
     vi.stubEnv("TOURNAMENT_ALLOW_REHEARSAL_ADMIN_CONTROLS", "true");
 
     expect(getDeploymentSafetySnapshot().rehearsalAdminControlsAllowed).toBe(true);
@@ -67,7 +67,7 @@ describe("deployment safety policy", () => {
     expect(getDeploymentSafetySnapshot()).toMatchObject({
       rehearsalAdminControlsAllowed: false,
       rehearsalControlBlockReason:
-        "Rehearsal reset and seed controls require a disposable event id beginning with e2e-, phase9-, load-, or rehearsal-.",
+        "Rehearsal reset and seed controls require a disposable event id beginning with e2e-, phase0-, phase9-, load-, or rehearsal-.",
     });
   });
 });
