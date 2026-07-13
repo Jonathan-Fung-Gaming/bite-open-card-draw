@@ -19,10 +19,13 @@ status text when there is a conflict.
 
 ## Production Readiness Remediation Phase 0 - Reproduction And Contracts - 2026-07-13
 
-Status: implementation, hosted/memory evidence, default checks, and manual diff review complete;
-ready for the required pull request. PR merge and the post-merge migration-not-applicable closeout
-remain open until the merge workflow completes. Phase 0 changed diagnostics and documentation only;
-it did not change tournament rules, production state behavior, database schema, or migrations.
+Status: complete. Phase 0 implementation, hosted/memory evidence, default checks, manual diff review,
+and checklist evidence are merged in
+[PR #99](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/99). Local `main` was
+synchronized to merge commit `a10e10fa7e9e198d13e833d0f71b1004ae9a19c5`. Phase 0 changed
+diagnostics and documentation only; it did not change tournament rules, production state behavior,
+database schema, or migrations. The post-merge Supabase migration push/parity/database-lint step is
+not applicable.
 
 ### Scope And Changed Files
 
