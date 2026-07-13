@@ -4,11 +4,16 @@ import type { DrawnChartSummary } from "@/lib/draw/draw-engine";
 import { ChartArtImage } from "./ChartArtImage";
 
 type StageDrawCardProps = {
+  animateReveal?: boolean;
   chart?: DrawnChartSummary;
   variant?: "standard" | "featured";
 };
 
-export function StageDrawCard({ chart, variant = "standard" }: StageDrawCardProps) {
+export function StageDrawCard({
+  animateReveal = true,
+  chart,
+  variant = "standard",
+}: StageDrawCardProps) {
   const featured = variant === "featured";
 
   return (
@@ -18,8 +23,10 @@ export function StageDrawCard({ chart, variant = "standard" }: StageDrawCardProp
         featured
           ? "min-h-[min(58vh,34rem)]"
           : "min-h-[clamp(5.625rem,12.5vh,9.25rem)] 2xl:min-h-44",
-        chart && "stage-card-revealed border-ember-300/45",
+        chart && "border-ember-300/45",
+        chart && animateReveal && "stage-card-revealed",
       )}
+      data-animate-reveal={chart && animateReveal ? "true" : "false"}
       data-chart-image-path={chart?.localImagePath ?? FALLBACK_CHART_IMAGE_PATH}
       data-has-chart={chart ? "true" : "false"}
       data-testid="stage-chart-card"

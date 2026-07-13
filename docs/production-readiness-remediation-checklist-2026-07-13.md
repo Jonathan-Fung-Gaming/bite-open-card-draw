@@ -77,35 +77,35 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 
 ### PRR-009 - Stage Card Reveal Recovery
 
-- [ ] Voting-open reload shows all 14 charts immediately.
-- [ ] Paused/final-warning/extension reload shows all 14 charts immediately.
-- [ ] Cleared session storage does not replay the slow reveal after voting begins.
-- [ ] Brand-new stage tab does not replay the slow reveal after voting begins.
-- [ ] Result states continue to show result/holding UI.
-- [ ] Pre-vote reload resumes canonical reveal progress.
-- [ ] Set 1 then Set 2 reveal order remains correct.
+- [x] Voting-open reload shows all 14 charts immediately.
+- [x] Paused/final-warning/extension reload shows all 14 charts immediately.
+- [x] Cleared session storage does not replay the slow reveal after voting begins.
+- [x] Brand-new stage tab does not replay the slow reveal after voting begins.
+- [x] Result states continue to show result/holding UI.
+- [x] Pre-vote reload resumes canonical reveal progress.
+- [x] Set 1 then Set 2 reveal order remains correct.
 
 ### PRR-010 - Stable Countdown
 
-- [ ] Stage and phone use one shared authoritative countdown model.
-- [ ] Same-revision server samples do not reset the monotonic anchor.
-- [ ] Same-revision display never increases.
-- [ ] Timer does not visibly accelerate, decelerate, stutter, or jump.
-- [ ] Pause freezes exactly.
-- [ ] Resume/reopen/final-warning/extension require a newer authoritative revision.
-- [ ] Official one-minute extension is labelled.
-- [ ] Device wall-clock skew does not affect the timer.
-- [ ] Background/resume and out-of-order response tests pass.
-- [ ] Stage/phone skew remains within one second.
-- [ ] Visual ticks do not write to the database.
+- [x] Stage and phone use one shared authoritative countdown model.
+- [x] Same-revision server samples do not reset the monotonic anchor.
+- [x] Same-revision display never increases.
+- [x] Timer does not visibly accelerate, decelerate, stutter, or jump.
+- [x] Pause freezes exactly.
+- [x] Resume/reopen/final-warning/extension require a newer authoritative revision.
+- [x] Official one-minute extension is labelled.
+- [x] Device wall-clock skew does not affect the timer.
+- [x] Background/resume and out-of-order response tests pass.
+- [x] Stage/phone skew remains within one second.
+- [x] Visual ticks do not write to the database.
 
 ### Phase Gate
 
-- [ ] Phase plan self-reviewed and amended.
-- [ ] Lint, typecheck, unit, build, relevant e2e, timer, and transition checks pass.
-- [ ] All Phase 1 tiebreak/transition tests rerun successfully.
-- [ ] Code/diff review completed with findings resolved.
-- [ ] Checklist/phase-status evidence recorded.
+- [x] Phase plan self-reviewed and amended.
+- [x] Lint, typecheck, unit, build, relevant e2e, timer, and transition checks pass.
+- [x] All Phase 1 tiebreak/transition tests rerun successfully.
+- [x] Code/diff review completed with findings resolved.
+- [x] Checklist/phase-status evidence recorded.
 - [ ] Phase PR merged.
 - [ ] Post-merge migration step marked not applicable or completed and verified.
 

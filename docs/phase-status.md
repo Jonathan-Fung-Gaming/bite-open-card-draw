@@ -17,6 +17,102 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 2 - Stage Reveal And Countdown - 2026-07-14
+
+Status: implementation, local evidence, complete-diff review, and all applicable pre-merge phase
+gates are complete on `agent/phase-2-stage-countdown`. The required pull-request merge and explicit
+post-merge migration non-applicability confirmation remain open and are intentionally unchecked in
+the active remediation checklist until they occur.
+
+### Scope And Changed Files
+
+- Added the reviewed Phase 2 plan under `docs/phase-plans/` and amended it after implementation and
+  delegated review findings.
+- Replaced session-storage reveal reconstruction with canonical draw timestamps in
+  `src/app/stage/StageDrawRows.tsx`, `src/components/StageSetPanel.tsx`, and
+  `src/lib/stage/stage-view.ts`. Voting-open, paused, final-warning, and extension views now render
+  all 14 drawn cards immediately; result-mode guards remain unchanged and dominant.
+- Limited entrance animation to the genuinely entering pre-vote card, suppressed animation replay
+  on hard reload, and limited stage refresh deferral to the short active transition.
+- Added the pure authoritative countdown model and local client hook under `src/lib/vote/` and
+  `src/lib/client/`, then adopted it on stage and phone through `CountdownTimer`, `VoteLiveShell`,
+  and `BallotFlow`.
+- Added an official one-minute extension label, immediate trusted-sample rendering to prevent a
+  transient `00:00`, and synchronous chart-image failure recovery for errors that precede React
+  hydration.
+- Added `playwright.phase2.config.ts`, three focused Phase 2 browser scenarios, a loopback/memory
+  locked runner profile with isolated `.next-phase2`, and a token-gated memory-only final-warning /
+  extension fixture that is unavailable in production and Supabase-backed runs.
+
+### Checks Run
+
+- Prettier on all changed supported files - passed.
+- `npm run lint` - passed after excluding generated `.next-phase2` output.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 69 files / 487 tests.
+- `npm run build` - passed.
+- `npm run test:phase2:memory` - passed, 3/3 browser scenarios in 1.1 minutes.
+- `npm run test:phase1:memory` - passed, 5/5 transition/tiebreak scenarios in 2.2 minutes.
+- `npm run test:e2e` - passed, 6/6 desktop Chromium, mobile Chromium, mobile WebKit, and visual
+  evidence scenarios in 5.7 minutes.
+- Phase 2 negative runner validation - passed; a non-loopback `E2E_BASE_URL` was rejected before a
+  browser or server started, and a conflicting `E2E_NEXT_DIST_DIR` override was rejected before it
+  could reuse shared build output.
+- `git diff --check`, secret-like diff scan, test-route safety review, and no-migration diff check -
+  passed.
+- `npx supabase db lint --local` was attempted as the phase plan's conditional schema regression
+  check, but Docker Desktop's Linux engine was unavailable. Phase 2 changes no schema, SQL,
+  persistence contract, or migration, so database lint is not an applicable phase gate.
+
+### Evidence
+
+- Pre-vote browser evidence opened the stage before either draw, observed `--:--` transition to
+  `10:00` with no transient `00:00`, preserved Set 1-before-Set 2 ordering, resumed at a
+  nondecreasing canonical card count after reload, and found zero replayed entrance animations on
+  the hard-reloaded page.
+- Voting-era browser evidence counted 14 real cards and zero placeholders after open, pause,
+  cleared storage, hard reload, brand-new context, final warning, and official extension. Every row
+  reported complete with no active reveal transition.
+- Repeated stage and phone samples stayed within one second, never increased, decreased five to
+  seven seconds across six one-second samples, and retained the same public generation during
+  local ticks and same-revision polling.
+- A phone with `Date.now()` skewed six hours remained aligned with stage. A true Chromium frozen /
+  active lifecycle interval caught up by the elapsed background time, pause remained exactly
+  frozen, and resume required a newer generation before counting down again.
+- Pure model tests cover lower/out-of-order revisions, same-revision lifecycle/deadline rejection,
+  exact pause, resume, reopen, final warning, extension, background jumps, device wall-clock
+  independence, and stage/phone equality. A source-boundary test forbids server, persistence,
+  Supabase, fetch, or router dependencies in the visual-tick hook.
+
+### Diff Review And Resolved Findings
+
+- Delegated stage, countdown, and gate audits identified the session-storage reveal restart,
+  same-revision timer re-anchoring, missing Phase 2 browser evidence, hard-reload animation replay,
+  runner output collisions, weak background/timing assertions, and lack of browser final-warning /
+  extension evidence. Each finding was resolved and the affected checks rerun.
+- A final post-gate runner review found that an ambient `E2E_NEXT_DIST_DIR` could bypass Phase 2's
+  isolated output. The profile now rejects any conflicting override and always selects
+  `.next-phase2`.
+- Final UI review found a transient trusted-sample `00:00`; the stage timer now renders the new
+  authoritative sample immediately while the hook accepts its revision.
+- The default visual gate exposed a pre-hydration image-error race after all 14 cards began
+  rendering immediately. The shared image component now checks broken mounted images synchronously
+  through its ref and retains event/decode recovery; the isolated visual test and complete default
+  E2E suite both passed afterward.
+- Manual review found no tournament-rule, result/tiebreak authority, browser randomness, secret
+  exposure, persistence-write, data-loss, or migration regression. Result/holding selection and
+  all Phase 1 transition/tiebreak guards remained intact.
+
+### Risks And Assumptions
+
+- The countdown is a visual projection only. The browser displays zero while awaiting a newer
+  authoritative lifecycle generation and never closes, extends, pauses, resumes, or writes voting
+  state.
+- The Phase 2 lifecycle fixture is test infrastructure, not an operator API: production,
+  Supabase-backed, wrong-event, non-rehearsal, missing-token, and wrong-token requests fail closed.
+- No Supabase migration is applicable. Rollback is an application revert with no database ordering
+  window or data rollback.
+
 ## Production Readiness Remediation Phase 1 - Atomic State And Freshness - 2026-07-13
 
 Status: complete. Phase 1 implementation and evidence merged in

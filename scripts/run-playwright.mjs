@@ -110,6 +110,7 @@ const PROFILES = new Set([
   "phase1-supabase",
   "phase1-supabase-cache-zero",
   "phase1-supabase-cache-max",
+  "phase2-memory",
   "supabase-dev-rehearsal",
   "production-flow",
 ]);
@@ -133,7 +134,7 @@ function isLocalUrl(value) {
 }
 
 function profileDefaults(profile, context) {
-  if (profile === "phase1-memory") {
+  if (profile === "phase1-memory" || profile === "phase2-memory") {
     return {
       backend: "memory",
       serverMode: "dev",
@@ -382,6 +383,28 @@ function collectProductionFlowValidationErrors(config) {
   return [...errors, ...collectSupabaseValidationErrors(config)];
 }
 
+function collectPhase2MemoryValidationErrors(config) {
+  const errors = [];
+
+  if (config.backend !== "memory") {
+    errors.push(`backend must be memory, got ${config.backend}.`);
+  }
+
+  if (config.serverMode !== "dev") {
+    errors.push(`serverMode must be dev, got ${config.serverMode}.`);
+  }
+
+  if (!isLocalUrl(config.baseURL)) {
+    errors.push("Phase 2 memory evidence requires a local E2E_BASE_URL.");
+  }
+
+  if (!isLocalUrl(config.publicSiteUrl)) {
+    errors.push("Phase 2 memory evidence requires a local NEXT_PUBLIC_SITE_URL.");
+  }
+
+  return errors;
+}
+
 function failValidation(profile, errors) {
   if (errors.length === 0) {
     return;
@@ -474,18 +497,21 @@ const defaults = profileDefaults(requestedProfile, {
 const requestedBackendOverride = process.env.E2E_TOURNAMENT_STATE_BACKEND?.trim();
 
 if (
-  requestedProfile === "phase1-memory" &&
+  (requestedProfile === "phase1-memory" || requestedProfile === "phase2-memory") &&
   requestedBackendOverride &&
   requestedBackendOverride !== "memory"
 ) {
   console.error(
-    "[playwright-runner] phase1-memory is locked to the memory backend; remove E2E_TOURNAMENT_STATE_BACKEND.",
+    `[playwright-runner] ${requestedProfile} is locked to the memory backend; remove E2E_TOURNAMENT_STATE_BACKEND.`,
   );
   process.exit(1);
 }
 
-const e2eTournamentStateBackend =
-  requestedProfile === "phase1-memory" ? "memory" : (requestedBackendOverride ?? defaults.backend);
+const memoryLockedProfile =
+  requestedProfile === "phase1-memory" || requestedProfile === "phase2-memory";
+const e2eTournamentStateBackend = memoryLockedProfile
+  ? "memory"
+  : (requestedBackendOverride ?? defaults.backend);
 const e2ePort = process.env.E2E_PORT || (await findOpenPort());
 const e2eBaseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${e2ePort}`;
 const e2eTestRouteToken =
@@ -554,15 +580,33 @@ const e2eAllowRehearsalAdminControls =
   (usesPhase0Config ||
   requestedProfile === "production-flow" ||
   requestedProfile === "supabase-dev-rehearsal" ||
-  requestedProfile.startsWith("phase1-")
+  requestedProfile.startsWith("phase1-") ||
+  requestedProfile === "phase2-memory"
     ? "true"
     : "false");
 const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
+const requestedNextDistDirOverride = process.env.E2E_NEXT_DIST_DIR?.trim();
+
+if (
+  requestedProfile === "phase2-memory" &&
+  requestedNextDistDirOverride &&
+  requestedNextDistDirOverride !== ".next-phase2"
+) {
+  console.error(
+    "[playwright-runner] phase2-memory is locked to .next-phase2; remove E2E_NEXT_DIST_DIR.",
+  );
+  process.exit(1);
+}
+
 const e2eNextDistDir =
-  process.env.E2E_NEXT_DIST_DIR ?? (usesPhase0Config ? ".next-phase0" : undefined);
+  requestedProfile === "phase2-memory"
+    ? ".next-phase2"
+    : (requestedNextDistDirOverride ?? (usesPhase0Config ? ".next-phase0" : undefined));
 const e2ePublicSiteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (isProductionFlowLocalStart ? "https://event.example.test" : e2eBaseURL);
+  requestedProfile === "phase2-memory"
+    ? e2eBaseURL
+    : (process.env.NEXT_PUBLIC_SITE_URL ??
+      (isProductionFlowLocalStart ? "https://event.example.test" : e2eBaseURL));
 const hostedSupabaseUrl =
   process.env.E2E_NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const hostedSupabaseAnonKey =
@@ -607,6 +651,8 @@ printEnvironmentSummary(runConfig);
 
 if (requestedProfile === "production-flow") {
   failValidation(requestedProfile, collectProductionFlowValidationErrors(runConfig));
+} else if (requestedProfile === "phase2-memory") {
+  failValidation(requestedProfile, collectPhase2MemoryValidationErrors(runConfig));
 } else if (requestedProfile.startsWith("phase1-supabase")) {
   failValidation(requestedProfile, collectPhase1SupabaseValidationErrors(runConfig));
 } else if (e2eTournamentStateBackend === "supabase") {

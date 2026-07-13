@@ -35,7 +35,7 @@ function stageStatus(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean) {
     case "final_30_seconds":
       return "Final 30 seconds";
     case "extension_1_minute":
-      return "One-minute extension";
+      return "Official one-minute extension";
     case "voting_paused":
       return "Voting paused";
     case "voting_closed":
@@ -64,7 +64,7 @@ function stageTimerCaption(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean
   }
 
   if (snapshot.status === "extension_1_minute") {
-    return `${turnout}. ${bans}. Turnout was below 75%, so the one-time extension is active.`;
+    return `${turnout}. ${bans}. Turnout was below 75%, so the official one-minute extension is active.`;
   }
 
   if (snapshot.status === "final_30_seconds") {
@@ -166,6 +166,14 @@ export default async function StagePage() {
   });
   const useResultMode =
     freshness.publicStateResultMode || stageShouldUseResultMode(snapshot.status, Boolean(result));
+  const countdownSample = {
+    roundNumber,
+    revision: freshness.publicStateGeneration,
+    status: snapshot.status,
+    deadline: snapshot.closesAt,
+    serverNowMs,
+    remainingMs: snapshot.remainingMs,
+  };
 
   if (useResultMode) {
     if (!result) {
@@ -279,7 +287,12 @@ export default async function StagePage() {
 
   return (
     <StageResultPhaseGuard freshness={freshness}>
-      <StageAutoRefresh intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS} jitterMs={0} leading />
+      <StageAutoRefresh
+        deferDuringStageDrawReveal
+        intervalMs={STAGE_LIVE_REFRESH_INTERVAL_MS}
+        jitterMs={0}
+        leading
+      />
       <main className="min-h-screen">
         <RoundHeader
           title={`Round ${view.roundNumber} Draw`}
@@ -294,15 +307,18 @@ export default async function StagePage() {
             <CountdownTimer
               label={view.bothSetsDrawn ? "Voting Window" : "Draw Status"}
               minutes={view.bothSetsDrawn ? formatVotingTime(snapshot.remainingMs) : "--:--"}
-              targetTime={snapshot.canSubmit ? snapshot.closesAt : null}
-              serverNowMs={serverNowMs}
-              paused={snapshot.status === "voting_paused"}
+              sample={view.bothSetsDrawn ? countdownSample : null}
               caption={stageTimerCaption(snapshot, view.bothSetsDrawn)}
               compact
             />
             <QRPanel compact />
           </div>
-          <StageDrawRows sets={view.sets} serverNowMs={serverNowMs} />
+          <StageDrawRows
+            publicStateGeneration={freshness.publicStateGeneration}
+            sets={view.sets}
+            serverNowMs={serverNowMs}
+            votingStatus={snapshot.status}
+          />
         </section>
       </main>
     </StageResultPhaseGuard>

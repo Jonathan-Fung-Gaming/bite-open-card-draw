@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DrawRecord } from "@/lib/draw/draw-state";
-import { STAGE_CHART_REVEAL_INTERVAL_MS } from "@/lib/stage/stage-view";
+import { getStageVisibleCardCount, STAGE_CHART_REVEAL_INTERVAL_MS } from "@/lib/stage/stage-view";
 import type { RoundSetDefinition } from "@/lib/tournament";
 import { StageDrawCard } from "./StageDrawCard";
 
@@ -15,64 +15,43 @@ type StageSetPanelProps = {
   serverNowMs?: number;
 };
 
-function visibleCardCount(
-  draw: DrawRecord | null,
-  revealStartsAt: string | null | undefined,
-  nowMs: number,
-) {
-  if (!draw) {
-    return 0;
-  }
-
-  if (revealStartsAt === undefined) {
-    return draw.charts.length;
-  }
-
-  if (revealStartsAt === null) {
-    return 0;
-  }
-
-  const elapsedMs = nowMs - Date.parse(revealStartsAt);
-
-  if (elapsedMs < 0) {
-    return 0;
-  }
-
-  return Math.min(draw.charts.length, Math.floor(elapsedMs / STAGE_CHART_REVEAL_INTERVAL_MS) + 1);
-}
-
-function cardRevealAnimationActive(
+function activeCardRevealIndex(
   draw: DrawRecord | null,
   revealStartsAt: string | null | undefined,
   nowMs: number,
 ) {
   if (!draw || !revealStartsAt) {
-    return false;
+    return null;
   }
 
   const elapsedMs = nowMs - Date.parse(revealStartsAt);
 
-  if (elapsedMs < 0) {
-    return false;
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
+    return null;
   }
 
   const activeRevealIndex = Math.floor(elapsedMs / STAGE_CHART_REVEAL_INTERVAL_MS);
 
   if (activeRevealIndex >= draw.charts.length) {
-    return false;
+    return null;
   }
 
-  return (
-    elapsedMs - activeRevealIndex * STAGE_CHART_REVEAL_INTERVAL_MS <=
+  return elapsedMs - activeRevealIndex * STAGE_CHART_REVEAL_INTERVAL_MS <=
     STAGE_CHART_REVEAL_ANIMATION_GUARD_MS
-  );
+    ? activeRevealIndex
+    : null;
 }
 
 export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageSetPanelProps) {
   const drawId = draw?.id ?? null;
+  const drawIdentity = draw ? `${draw.id}:${draw.version}` : null;
   const [nowMs, setNowMs] = useState(serverNowMs ?? Date.now());
-  const revealedCount = visibleCardCount(draw, revealStartsAt, nowMs);
-  const revealAnimationActive = cardRevealAnimationActive(draw, revealStartsAt, nowMs);
+  const revealedCount = getStageVisibleCardCount(draw?.charts.length ?? 0, revealStartsAt, nowMs);
+  const canonicalActiveRevealIndex = activeCardRevealIndex(draw, revealStartsAt, nowMs);
+  const previousRevealRef = useRef({ drawIdentity, revealedCount });
+  const [enteringCardIndex, setEnteringCardIndex] = useState<number | null>(null);
+  const revealAnimationActive =
+    enteringCardIndex !== null && enteringCardIndex === canonicalActiveRevealIndex;
   const cards = Array.from({ length: set.drawCount }, (_, index) =>
     draw && revealedCount > index ? (draw.charts[index] ?? null) : null,
   );
@@ -101,6 +80,22 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
     return () => window.clearInterval(intervalId);
   }, [drawId, revealStartsAt, serverNowMs]);
 
+  useEffect(() => {
+    const previous = previousRevealRef.current;
+    const drawChanged = previous.drawIdentity !== drawIdentity;
+    const revealedMoreCards = revealedCount > previous.revealedCount;
+    const newlyEnteringCard = canonicalActiveRevealIndex === revealedCount - 1;
+
+    setEnteringCardIndex((current) => {
+      if ((drawChanged || revealedMoreCards) && newlyEnteringCard) {
+        return canonicalActiveRevealIndex;
+      }
+
+      return current === canonicalActiveRevealIndex ? current : null;
+    });
+    previousRevealRef.current = { drawIdentity, revealedCount };
+  }, [canonicalActiveRevealIndex, drawIdentity, revealedCount]);
+
   return (
     <section
       className="metal-panel rounded-lg p-1.5 2xl:p-4"
@@ -126,6 +121,7 @@ export function StageSetPanel({ set, draw, revealStartsAt, serverNowMs }: StageS
         {cards.map((chart, index) => (
           <StageDrawCard
             key={`stage-${set.roundNumber}-${set.setOrder}-${index}`}
+            animateReveal={revealAnimationActive && enteringCardIndex === index}
             chart={chart ?? undefined}
           />
         ))}

@@ -28,7 +28,7 @@ function activeTiebreakRevealIsRunning() {
 
 function activeStageDrawRevealIsRunning() {
   return Boolean(
-    document.querySelector('[data-testid="stage-set-row"][data-reveal-complete="false"]'),
+    document.querySelector('[data-testid="stage-set-row"][data-reveal-transition-active="true"]'),
   );
 }
 

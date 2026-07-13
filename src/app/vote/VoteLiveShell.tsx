@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { TournamentLogo } from "@/components";
+import { useAuthoritativeCountdown } from "@/lib/client/use-authoritative-countdown";
 import { formatVotingTime } from "@/lib/vote/voting-window";
 import { BallotFlow, type VoteLiveState } from "./BallotFlow";
 import type { BallotFlowProps } from "./BallotFlow";
@@ -15,7 +16,7 @@ function VoteDenseHeader({
   status,
   title,
 }: {
-  meta?: string;
+  meta?: ReactNode;
   status: string;
   title: string;
 }) {
@@ -44,6 +45,7 @@ export function VoteLiveShell({ title, ...ballotProps }: VoteLiveShellProps) {
     closesAt: ballotProps.closesAt,
     eligibleCount: ballotProps.eligibleCount,
     remainingMs: ballotProps.remainingMs,
+    revision: ballotProps.publicStateGeneration,
     serverNowMs: ballotProps.serverNowMs,
     status: ballotProps.status,
     statusLabel: ballotProps.statusLabel,
@@ -51,43 +53,46 @@ export function VoteLiveShell({ title, ...ballotProps }: VoteLiveShellProps) {
     timerText: ballotProps.timerText,
     turnoutText: ballotProps.turnoutText,
   });
-  const [visualNowMs, setVisualNowMs] = useState(ballotProps.serverNowMs);
 
   const handleLiveStateChange = useCallback((state: VoteLiveState) => {
     setLiveState(state);
   }, []);
 
-  useEffect(() => {
-    const baseNowMs = liveState.serverNowMs;
-    const basePerformanceMs = window.performance.now();
-    const updateNow = () => setVisualNowMs(baseNowMs + window.performance.now() - basePerformanceMs);
-
-    updateNow();
-
-    if (!liveState.canSubmit || !liveState.closesAt) {
-      return undefined;
-    }
-
-    const intervalId = window.setInterval(updateNow, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [liveState.canSubmit, liveState.closesAt, liveState.serverNowMs]);
-
-  const targetMs = liveState.closesAt ? Date.parse(liveState.closesAt) : NaN;
-  const timerText =
-    liveState.canSubmit && Number.isFinite(targetMs)
-      ? formatVotingTime(targetMs - visualNowMs)
-      : liveState.timerText;
+  const countdown = useAuthoritativeCountdown({
+    roundNumber: ballotProps.roundNumber,
+    revision: liveState.revision,
+    status: liveState.status,
+    deadline: liveState.closesAt,
+    serverNowMs: liveState.serverNowMs,
+    remainingMs: liveState.remainingMs,
+  });
+  const timerText = formatVotingTime(countdown.remainingMs);
 
   return (
     <>
       <VoteDenseHeader
         title={title}
         status={`${liveState.statusLabel} - Round ${ballotProps.roundNumber}`}
-        meta={`${timerText} | ${liveState.submittedCount}/${liveState.eligibleCount} ballots`}
+        meta={
+          <>
+            <span
+              data-countdown-decision={countdown.lastSampleDecision ?? "pending"}
+              data-countdown-revision={countdown.acceptedRevision ?? "none"}
+              data-countdown-status={countdown.acceptedStatus ?? "none"}
+              data-testid="phone-countdown-display"
+            >
+              {timerText}
+            </span>{" "}
+            | {liveState.submittedCount}/{liveState.eligibleCount} ballots
+          </>
+        }
       />
       <section className="mx-auto max-w-4xl px-3 py-3 sm:px-5 sm:py-5">
-        <BallotFlow {...ballotProps} onLiveStateChange={handleLiveStateChange} />
+        <BallotFlow
+          {...ballotProps}
+          onLiveStateChange={handleLiveStateChange}
+          visualTimerText={timerText}
+        />
       </section>
     </>
   );

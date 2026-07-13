@@ -1,16 +1,15 @@
 "use client";
 
 import clsx from "clsx";
-import { useEffect, useState } from "react";
+import { useAuthoritativeCountdown } from "@/lib/client/use-authoritative-countdown";
+import type { AuthoritativeCountdownSample } from "@/lib/vote/authoritative-countdown";
 import { formatVotingTime } from "@/lib/vote/voting-window";
 
 type CountdownTimerProps = {
   label: string;
   minutes?: string;
   caption?: string;
-  targetTime?: string | null;
-  serverNowMs?: number;
-  paused?: boolean;
+  sample?: AuthoritativeCountdownSample | null;
   compact?: boolean;
 };
 
@@ -18,31 +17,27 @@ export function CountdownTimer({
   label,
   minutes,
   caption,
-  targetTime,
-  serverNowMs,
-  paused = false,
+  sample = null,
   compact = false,
 }: CountdownTimerProps) {
-  const [nowMs, setNowMs] = useState(() => serverNowMs ?? Date.now());
-
-  useEffect(() => {
-    if (!targetTime || paused) {
-      return undefined;
-    }
-
-    const baseNowMs = serverNowMs ?? Date.now();
-    const basePerformanceMs = window.performance.now();
-    const updateNow = () => setNowMs(baseNowMs + window.performance.now() - basePerformanceMs);
-    const intervalId = window.setInterval(updateNow, 1000);
-
-    updateNow();
-
-    return () => window.clearInterval(intervalId);
-  }, [paused, serverNowMs, targetTime]);
-
-  const targetMs = targetTime ? Date.parse(targetTime) : null;
-  const display =
-    targetMs === null || paused ? (minutes ?? "--:--") : formatVotingTime(targetMs - nowMs);
+  const countdown = useAuthoritativeCountdown(sample);
+  const shouldRenderIncomingSample = Boolean(
+    sample &&
+    (countdown.acceptedRoundNumber === null ||
+      countdown.acceptedRoundNumber !== sample.roundNumber ||
+      countdown.acceptedRevision === null ||
+      sample.revision > countdown.acceptedRevision),
+  );
+  const displayedRemainingMs = shouldRenderIncomingSample
+    ? (sample?.remainingMs ?? 0)
+    : countdown.remainingMs;
+  const displayedRevision = shouldRenderIncomingSample
+    ? (sample?.revision ?? null)
+    : countdown.acceptedRevision;
+  const displayedStatus = shouldRenderIncomingSample
+    ? (sample?.status ?? null)
+    : countdown.acceptedStatus;
+  const display = sample ? formatVotingTime(displayedRemainingMs) : (minutes ?? "--:--");
 
   return (
     <div
@@ -50,6 +45,8 @@ export function CountdownTimer({
         "metal-panel rounded-lg",
         compact ? "flex min-h-[10rem] flex-col justify-between px-4 py-3" : "px-5 py-4",
       )}
+      data-countdown-revision={displayedRevision ?? "none"}
+      data-countdown-status={displayedStatus ?? "none"}
       data-testid="stage-countdown"
     >
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">{label}</p>

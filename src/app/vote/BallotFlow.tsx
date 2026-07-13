@@ -45,6 +45,7 @@ export type BallotFlowProps = {
   turnoutText: string;
   canSubmit: boolean;
   onLiveStateChange?: (state: VoteLiveState) => void;
+  visualTimerText?: string;
 };
 
 export type VoteLiveState = {
@@ -52,6 +53,7 @@ export type VoteLiveState = {
   closesAt: string | null;
   eligibleCount: number;
   remainingMs: number;
+  revision: number;
   serverNowMs: number;
   status: VotingRoundStatus;
   statusLabel: string;
@@ -435,6 +437,7 @@ export function BallotFlow({
   turnoutText,
   canSubmit: initialCanSubmit,
   onLiveStateChange,
+  visualTimerText,
 }: BallotFlowProps) {
   const router = useRouter();
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
@@ -725,6 +728,7 @@ export function BallotFlow({
       closesAt,
       eligibleCount,
       remainingMs,
+      revision: publicStateGeneration,
       serverNowMs,
       status,
       statusLabel,
@@ -737,6 +741,7 @@ export function BallotFlow({
     eligibleCount,
     initialCanSubmit,
     onLiveStateChange,
+    publicStateGeneration,
     remainingMs,
     serverNowMs,
     status,
@@ -901,6 +906,7 @@ export function BallotFlow({
           closesAt: state.closesAt,
           eligibleCount: state.eligibleCount,
           remainingMs: state.remainingMs,
+          revision: state.generation,
           serverNowMs: Date.parse(state.serverNow),
           status: state.status,
           statusLabel: state.statusLabel,
@@ -1225,7 +1231,12 @@ export function BallotFlow({
             </p>
             <p className="mt-1 text-sm text-metal-300">{liveTurnoutText}</p>
           </div>
-          <p className="font-mono text-3xl font-black tabular-nums text-white">{liveTimerText}</p>
+          <p
+            className="font-mono text-3xl font-black tabular-nums text-white"
+            data-testid="phone-ballot-countdown-display"
+          >
+            {visualTimerText ?? liveTimerText}
+          </p>
         </div>
         {!liveCanSubmit ? (
           <p className="mb-4 rounded border border-ember-300/30 bg-ember-900/20 p-3 text-sm font-bold text-ember-300">

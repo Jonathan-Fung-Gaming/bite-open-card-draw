@@ -4,6 +4,7 @@ import {
   ONE_MINUTE_MS,
   TEN_MINUTES_MS,
   VotingWindowStore,
+  formatVotingStatusLabel,
   formatVotingTime,
 } from "./voting-window";
 
@@ -35,6 +36,10 @@ describe("voting window store", () => {
     expect(formatVotingTime(9 * 60 * 1000 + 55 * 1000)).toBe("09:55");
     expect(formatVotingTime(TEN_MINUTES_MS)).toBe("10:00");
     expect(formatVotingTime(0)).toBe("00:00");
+  });
+
+  it("labels the rule-driven extension as an official state change", () => {
+    expect(formatVotingStatusLabel("extension_1_minute")).toBe("Official one-minute extension");
   });
 
   it("opens one 10-minute window from server time after both sets are drawn", () => {
