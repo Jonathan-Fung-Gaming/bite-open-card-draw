@@ -1,10 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import {
-  resolveHostLockPersistence,
-  type HostLockRecord,
-  type HostLockStoreSnapshot,
-} from "@/lib/admin/host-lock";
+import type { HostLockStoreSnapshot } from "@/lib/admin/host-lock";
 import { deterministicUuid } from "@/lib/charts/normalize";
 import { loadRuntimeCharts } from "@/lib/charts/runtime-catalog";
 import type { NormalizedChart } from "@/lib/charts/types";
@@ -19,7 +15,6 @@ import {
 import { mergeOperationalStateSnapshots } from "@/lib/persistence/merge";
 import type {
   OperationalStateRepository,
-  PersistHostLockInput,
   PersistMergedStateInput,
 } from "@/lib/persistence/repository";
 import type { ResultRevealPhase, ResultSetSnapshot } from "@/lib/results/result-engine";
@@ -72,7 +67,7 @@ type NormalizedTableClient<TTable extends TableName> = {
   }>;
   upsert(
     rows: TableInsert<TTable>[] | TableInsert<TTable>,
-    options?: { onConflict?: string },
+    options?: { ignoreDuplicates?: boolean; onConflict?: string },
   ): Promise<{
     error: SupabaseError | null;
   }>;
@@ -139,7 +134,7 @@ const EVENT_SELECT_COLUMNS: Partial<Record<TableName, string>> = {
     "id,round_set_id,draw_version,eligible_pool_count,eligible_chart_ids,excluded_chart_keys_snapshot,selected_song_keys_snapshot,same_round_blocked_song_keys_snapshot,created_at,superseded_at,reason",
   event_runtime_state: "current_round,rehearsal_mode",
   host_locks:
-    "owner_session_id,admin_session_id,host_token_hash,acquired_at,heartbeat_at,expires_at",
+    "owner_session_id,admin_session_id,host_token_hash,acquired_at,heartbeat_at,expires_at,released_at",
   players:
     "id,startgg_username,startgg_username_normalized,active,has_tournament_history,created_at,updated_at",
   result_rows:
@@ -176,10 +171,6 @@ function asEligiblePlayers(value: Json | null | undefined): EligiblePlayerSnapsh
           startggUsername: entry.startggUsername as string,
         }))
     : [];
-}
-
-function isoFromMs(value: number) {
-  return new Date(value).toISOString();
 }
 
 function msFromIso(value: string) {
@@ -381,12 +372,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     });
   }
 
-  async persistHostLock(input: PersistHostLockInput): Promise<HostLockStoreSnapshot> {
-    return this.withEventPersistenceLock(async () => {
-      return this.persistHostLockSnapshot(input.baseline, input.current);
-    });
-  }
-
   async persistVotingState(input: PersistMergedStateInput): Promise<OperationalStateSnapshot> {
     return this.withEventPersistenceLock(async () => {
       const latest = await this.loadUnlocked();
@@ -581,6 +566,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     const hasRuntimeRows =
       runtimeState.length > 0 ||
       players.length > 0 ||
+      adminActions.length > 0 ||
       draws.length > 0 ||
       ballots.length > 0 ||
       resultSnapshots.length > 0 ||
@@ -843,7 +829,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.saveBallotInvalidations(snapshot),
       this.savePresence(snapshot),
       this.saveDeviceBindings(snapshot),
-      this.saveHostLock(snapshot),
     ]);
 
     await this.savePublicStateGenerations(snapshot);
@@ -885,7 +870,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.saveRoundPlayerEligibility(snapshot),
       this.saveAdminActions(snapshot),
       this.savePresence(snapshot),
-      this.persistHostLockSnapshot(input.baseline?.hostLock ?? null, snapshot.hostLock),
     ]);
   }
 
@@ -904,7 +888,6 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
       this.upsertTiebreaks(snapshot, { skipNullWinnerRevealStartedAt: true }),
       this.saveAdminActions(snapshot),
       this.savePresence(snapshot),
-      this.persistHostLockSnapshot(input.baseline?.hostLock ?? null, snapshot.hostLock),
     ]);
   }
 
@@ -1042,7 +1025,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
   private async upsertMany<TTable extends TableName>(
     table: TTable,
     rows: TableInsert<TTable>[],
-    options?: { onConflict?: string },
+    options?: { ignoreDuplicates?: boolean; onConflict?: string },
   ) {
     if (rows.length === 0) {
       return;
@@ -1153,6 +1136,9 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
   }
 
   private async saveAdminActions(snapshot: OperationalStateSnapshot) {
+    // Audit rows are immutable evidence. In particular, lifecycle RPCs persist
+    // richer transaction metadata than the generic operational snapshot can
+    // reconstruct, so a later unrelated save must never rewrite an existing id.
     await this.upsertMany(
       "admin_actions",
       snapshot.audit.records.map((record) => ({
@@ -1172,7 +1158,7 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
           sessionId: record.sessionId,
         } as Json,
       })),
-      { onConflict: "id" },
+      { ignoreDuplicates: true, onConflict: "id" },
     );
   }
 
@@ -1543,66 +1529,17 @@ export class NormalizedOperationalStateRepository implements OperationalStateRep
     const row = rows[0];
 
     return {
-      lock: row
-        ? {
-            ownerSessionId: row.owner_session_id ?? row.admin_session_id ?? "",
-            hostTokenHash: row.host_token_hash,
-            acquiredAt: msFromIso(row.acquired_at),
-            heartbeatAt: msFromIso(row.heartbeat_at),
-            expiresAt: msFromIso(row.expires_at),
-          }
-        : null,
+      lock:
+        row && row.released_at === null
+          ? {
+              ownerSessionId: row.owner_session_id ?? row.admin_session_id ?? "",
+              hostTokenHash: row.host_token_hash,
+              acquiredAt: msFromIso(row.acquired_at),
+              heartbeatAt: msFromIso(row.heartbeat_at),
+              expiresAt: msFromIso(row.expires_at),
+            }
+          : null,
     };
-  }
-
-  private async persistHostLockSnapshot(
-    baseline: HostLockStoreSnapshot | null,
-    current: HostLockStoreSnapshot,
-  ) {
-    const latest = this.hostLockSnapshotFromRows(await this.selectEventRows("host_locks"));
-    const decision = resolveHostLockPersistence({
-      baseline,
-      current,
-      latest,
-      now: Date.parse(this.now()),
-    });
-
-    if (decision.action === "delete") {
-      await this.deleteEventRows("host_locks");
-    }
-
-    if (decision.action === "write") {
-      await this.upsertHostLockRecord(decision.lock);
-    }
-
-    return decision.snapshot;
-  }
-
-  private async upsertHostLockRecord(lock: HostLockRecord) {
-    await this.upsertOne(
-      "host_locks",
-      {
-        event_id: this.eventId,
-        lock_name: "tournament-host",
-        admin_session_id: isUuid(lock.ownerSessionId) ? lock.ownerSessionId : null,
-        owner_session_id: lock.ownerSessionId,
-        host_token_hash: lock.hostTokenHash,
-        acquired_at: isoFromMs(lock.acquiredAt),
-        heartbeat_at: isoFromMs(lock.heartbeatAt),
-        expires_at: isoFromMs(lock.expiresAt),
-      },
-      { onConflict: "event_id,lock_name" },
-    );
-  }
-
-  private async saveHostLock(snapshot: OperationalStateSnapshot) {
-    const lock = snapshot.hostLock.lock;
-
-    if (!lock) {
-      return;
-    }
-
-    await this.upsertHostLockRecord(lock);
   }
 
   private buildDrawHistory(

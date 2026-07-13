@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import {
-  HOST_LOCK_TTL_MS,
+  HOST_LOCK_COMPATIBILITY_EXPIRES_AT,
   HostLockStore,
   resolveHostLockPersistence,
   type HostLockStoreSnapshot,
@@ -19,6 +19,7 @@ import { closeVotingForRound, openVotingForRound } from "./flows/voting-window.f
 import { getSupabaseE2eConfig } from "./fixtures/supabase-state";
 
 const ROUND_NUMBER = 1;
+const HOST_LOCK_EVIDENCE_ADMIN_SESSION_TTL_MS = 60 * 60_000;
 const CONCURRENT_PLAYERS = [
   "Rehearsal Player 01",
   "Rehearsal Player 02",
@@ -224,7 +225,7 @@ async function upsertHostLockEvidenceAdminSessions(
       .from<{ id: string }>("admin_sessions")
       .upsert({
         event_id: eventId,
-        expires_at: new Date(baseMs + 2 * HOST_LOCK_TTL_MS).toISOString(),
+        expires_at: new Date(baseMs + HOST_LOCK_EVIDENCE_ADMIN_SESSION_TTL_MS).toISOString(),
         id: sessionId,
         last_seen_at: new Date(baseMs).toISOString(),
         revoked_at: null,
@@ -379,14 +380,14 @@ async function expectSupabaseHostLockInvariants(service: SupabaseTestClient, eve
     expect(persistedAcquired.persisted.lock?.hostTokenHash).toBe(
       acquiredSnapshot.lock?.hostTokenHash,
     );
-    expect((persistedAcquired.persisted.lock?.expiresAt ?? 0) - baseMs).toBe(HOST_LOCK_TTL_MS);
+    expect(persistedAcquired.persisted.lock?.expiresAt).toBe(HOST_LOCK_COMPATIBILITY_EXPIRES_AT);
 
     const nonOwnerStore = new HostLockStore();
 
     nonOwnerStore.importSnapshot(persistedAcquired.persisted);
     expect(nonOwnerStore.getSnapshot(sessionB, baseMs + 1).status).toBe("readonly");
     expect(() => nonOwnerStore.acquire(sessionB, tokenB, baseMs + 1)).toThrow(
-      "Active host lock is still unexpired",
+      "A host owner already exists",
     );
 
     expect(storeA.refresh(sessionA, tokenA, baseMs + 15_000)).toBe(true);
@@ -401,34 +402,42 @@ async function expectSupabaseHostLockInvariants(service: SupabaseTestClient, eve
     expect(persistedRefreshed.decision.outcome).toBe("refresh");
     expect(persistedRefreshed.persisted.lock?.ownerSessionId).toBe(sessionA);
     expect(persistedRefreshed.persisted.lock?.heartbeatAt).toBe(baseMs + 15_000);
-    expect(persistedRefreshed.persisted.lock?.expiresAt).toBe(baseMs + 15_000 + HOST_LOCK_TTL_MS);
+    expect(persistedRefreshed.persisted.lock?.expiresAt).toBe(HOST_LOCK_COMPATIBILITY_EXPIRES_AT);
 
-    const expiredStore = new HostLockStore();
-    const expiredAcquireAt = (persistedRefreshed.persisted.lock?.expiresAt ?? baseMs) + 1;
+    const agedStore = new HostLockStore();
+    const agedTakeoverAt = baseMs + 31 * 60_000;
+    const agedLock = persistedRefreshed.persisted.lock;
 
-    expiredStore.importSnapshot(persistedRefreshed.persisted);
-    const afterExpiryAcquire = expiredStore.acquire(sessionB, tokenB, expiredAcquireAt);
-    const expiredAcquireSnapshot = expiredStore.exportSnapshot();
-    const persistedExpiredAcquire = await persistProductionHostLockDecision(service, {
+    agedStore.importSnapshot({
+      lock: agedLock ? { ...agedLock, expiresAt: baseMs - 1 } : null,
+    });
+    expect(agedStore.getSnapshot(sessionB, agedTakeoverAt).status).toBe("readonly");
+    expect(() => agedStore.acquire(sessionB, tokenB, agedTakeoverAt)).toThrow(
+      "A host owner already exists",
+    );
+
+    const agedTakeover = agedStore.acquire(sessionB, tokenB, agedTakeoverAt, { force: true });
+    const agedTakeoverSnapshot = agedStore.exportSnapshot();
+    const persistedAgedTakeover = await persistProductionHostLockDecision(service, {
       baseline: persistedRefreshed.persisted,
-      current: expiredAcquireSnapshot,
+      current: agedTakeoverSnapshot,
       eventId,
-      now: expiredAcquireAt,
+      now: agedTakeoverAt,
     });
 
-    expect(afterExpiryAcquire.takeover).toBe(false);
-    expect(afterExpiryAcquire.snapshot.status).toBe("active");
-    expect(persistedExpiredAcquire.decision.outcome).toBe("takeover");
-    expect(persistedExpiredAcquire.persisted.lock?.ownerSessionId).toBe(sessionB);
+    expect(agedTakeover.takeover).toBe(true);
+    expect(agedTakeover.snapshot.status).toBe("active");
+    expect(persistedAgedTakeover.decision.outcome).toBe("takeover");
+    expect(persistedAgedTakeover.persisted.lock?.ownerSessionId).toBe(sessionB);
 
     const forcedStore = new HostLockStore();
-    const forcedAt = expiredAcquireAt + 1_000;
+    const forcedAt = agedTakeoverAt + 1_000;
 
-    forcedStore.importSnapshot(persistedExpiredAcquire.persisted);
+    forcedStore.importSnapshot(persistedAgedTakeover.persisted);
     const forcedTakeover = forcedStore.acquire(sessionC, tokenC, forcedAt, { force: true });
     const forcedTakeoverSnapshot = forcedStore.exportSnapshot();
     const persistedForcedTakeover = await persistProductionHostLockDecision(service, {
-      baseline: persistedExpiredAcquire.persisted,
+      baseline: persistedAgedTakeover.persisted,
       current: forcedTakeoverSnapshot,
       eventId,
       now: forcedAt,

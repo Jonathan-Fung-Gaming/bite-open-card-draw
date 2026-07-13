@@ -9,7 +9,7 @@ export const e2eTestRouteToken =
   `test-route-${randomBytes(24).toString("hex")}`;
 
 const adminPasswordSalt = randomBytes(16).toString("hex");
-const disposableEventIdPattern = /^(e2e|phase0|phase9|load|rehearsal)-[a-z0-9-]+$/i;
+const disposableEventIdPattern = /^(e2e|phase0|phase3|phase9|load|rehearsal)-[a-z0-9-]+$/i;
 const e2eProfile = process.env.E2E_PROFILE ?? "legacy";
 const usesHarnessConfig = process.argv.some(
   (arg) => arg.includes("playwright.phase9.config") || arg.includes("playwright.load.config"),
@@ -17,7 +17,7 @@ const usesHarnessConfig = process.argv.some(
 const usesPhase9Full = process.argv.some((arg) => arg.includes("@full"));
 
 function getProfileDefaults() {
-  if (e2eProfile === "memory-dev-smoke") {
+  if (e2eProfile === "memory-dev-smoke" || e2eProfile === "phase3-memory") {
     return {
       backend: "memory",
       serverMode: "dev",
@@ -42,6 +42,20 @@ function getProfileDefaults() {
       allowE2eRoutes: "true",
       allowMemoryBackend: "false",
       phase9BallotMode: "ui",
+    };
+  }
+
+  if (e2eProfile === "phase3-supabase") {
+    return {
+      backend: "supabase",
+      serverMode: "dev",
+      disableAdminSessionHeartbeat: "true",
+      disableHostHeartbeat: "true",
+      disableVoteLivePolling: "true",
+      disablePublicRefresh: "false",
+      allowE2eRoutes: "false",
+      allowMemoryBackend: "false",
+      phase9BallotMode: undefined,
     };
   }
 
@@ -210,7 +224,7 @@ if (isSupabaseE2e) {
 
   if (!disposableEventIdPattern.test(explicitE2eTournamentEventId)) {
     throw new Error(
-      "Supabase Playwright rehearsal event id must start with e2e-, phase0-, phase9-, load-, or rehearsal-.",
+      "Supabase Playwright rehearsal event id must start with e2e-, phase0-, phase3-, phase9-, load-, or rehearsal-.",
     );
   }
 

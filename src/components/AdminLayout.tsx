@@ -32,6 +32,18 @@ export function AdminLayout({ children, hostStatus = "inactive" }: AdminLayoutPr
             </p>
           </section>
         ) : null}
+        {hostStatus === "recoverable" ? (
+          <section className="rounded-lg border border-amber-300/40 bg-amber-950/25 p-4 text-sm text-amber-100">
+            <p className="font-bold uppercase tracking-[0.14em] text-white">
+              Host credential restore required
+            </p>
+            <p className="mt-2">
+              This secured browser can restore the persistent host owner after reauthentication or
+              credential rotation. Tournament-changing controls remain disabled until Restore
+              succeeds.
+            </p>
+          </section>
+        ) : null}
         {children}
       </div>
     </main>

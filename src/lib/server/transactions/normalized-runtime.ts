@@ -3,12 +3,10 @@ import { z } from "zod";
 import type { Database, Json } from "@/lib/db/database.types";
 import { getTournamentEventId } from "@/lib/server/env";
 import {
-  acquireHostLockInputSchema,
   closeVotingWindowInputSchema,
   drawRoundSetInputSchema,
   manualBallotOverrideInputSchema,
   overrideResultInputSchema,
-  releaseHostLockInputSchema,
   submitBallotInputSchema,
 } from "@/lib/server/mutation-contracts";
 import { invalidateTournamentReadCaches } from "@/lib/server/public-hydration-cache";
@@ -38,7 +36,7 @@ type TransactionDependencies = {
 const uuidSchema = z.string().uuid();
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 const publicGenerationSchema = z.number().int().nonnegative();
-const hostTokenHashSchema = z.string().regex(/^[0-9a-f]{64}$/i);
+const hostTokenHashSchema = z.string().regex(/^[0-9a-f]{64}$/);
 
 const PHASE1_CAPABILITY_GATED_MUTATIONS = new Set<NormalizedTransactionalMutationName>([
   "submitBallot",
@@ -173,7 +171,42 @@ const normalizedResetRoundInputSchema = normalizedAdminTransitionSchema.extend({
 
 const normalizedCloseVotingWindowInputSchema = closeVotingWindowInputSchema.extend({
   adminSessionId: uuidSchema,
+  hostTokenHash: hostTokenHashSchema,
 });
+
+const normalizedHostLockCredentialSchema = z.object({
+  requestId: uuidSchema,
+  adminSessionId: uuidSchema,
+  hostTokenHash: hostTokenHashSchema,
+});
+
+const normalizedAcquireHostLockInputSchema = normalizedHostLockCredentialSchema
+  .extend({
+    mode: z.enum(["take", "restore", "force"]),
+    expectedHostTokenHash: hostTokenHashSchema.nullable().optional(),
+    recoveryOwnerSessionId: z.string().trim().min(1).nullable().optional(),
+    reason: z.string().trim().min(1).nullable().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.mode === "force" && !value.reason) {
+      context.addIssue({
+        code: "custom",
+        message: "Forced host takeover requires an audit reason.",
+        path: ["reason"],
+      });
+    }
+
+    if (value.mode === "restore" && !value.expectedHostTokenHash) {
+      context.addIssue({
+        code: "custom",
+        message: "Restore requires the expected active host credential hash.",
+        path: ["expectedHostTokenHash"],
+      });
+    }
+  });
+
+const normalizedHeartbeatHostLockInputSchema = normalizedHostLockCredentialSchema;
+const normalizedReleaseHostLockInputSchema = normalizedHostLockCredentialSchema;
 
 const adminSessionCreateInputSchema = z.object({
   sessionTokenHash: z.string().trim().min(16),
@@ -208,13 +241,13 @@ export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   rerollFullRound: normalizedRerollFullRoundSchema,
   advanceResultReveal: normalizedAdvanceResultRevealSchema,
   markResultsRevealed: normalizedMarkResultsRevealedSchema,
+  acquireHostLock: normalizedAcquireHostLockInputSchema,
+  refreshHostLock: normalizedHeartbeatHostLockInputSchema,
+  releaseHostLock: normalizedReleaseHostLockInputSchema,
 } as const;
 
 export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   touchActiveVoterPresence: activeVoterPresenceInputSchema,
-  acquireHostLock: acquireHostLockInputSchema,
-  refreshHostLock: acquireHostLockInputSchema,
-  releaseHostLock: releaseHostLockInputSchema,
   drawRoundSet: drawRoundSetInputSchema,
   postVoteRerollInvalidation: postVoteRerollInvalidationInputSchema,
   overrideResult: overrideResultInputSchema,
@@ -252,13 +285,13 @@ export const NORMALIZED_RUNTIME_RPC_NAMES = {
   rerollFullRound: "normalized_reroll_full_round",
   advanceResultReveal: "normalized_advance_result_reveal",
   markResultsRevealed: "normalized_mark_results_revealed",
+  acquireHostLock: "normalized_acquire_host_lock",
+  refreshHostLock: "normalized_heartbeat_host_lock",
+  releaseHostLock: "normalized_release_host_lock",
 } as const satisfies Record<NormalizedTransactionalMutationName, NormalizedRuntimeRpcName>;
 
 export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
   touchActiveVoterPresence: "normalized_touch_voter_presence",
-  acquireHostLock: "normalized_acquire_host_lock",
-  refreshHostLock: "normalized_heartbeat_host_lock",
-  releaseHostLock: "normalized_release_host_lock",
   drawRoundSet: "normalized_draw_round_set",
   postVoteRerollInvalidation: "normalized_invalidate_post_vote_reroll_ballots",
   overrideResult: "normalized_override_result",

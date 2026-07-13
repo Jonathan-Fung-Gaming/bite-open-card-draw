@@ -16,6 +16,13 @@ function snapshotWithHostLock(
   const stores = createAdminStateStores();
 
   if (ownerSessionId) {
+    if (options.force) {
+      stores.hostLockStore.acquire(
+        "previous-owner-session",
+        "previous-owner-token",
+        acquiredAt - 1,
+      );
+    }
     stores.hostLockStore.acquire(ownerSessionId, `${ownerSessionId}-token`, acquiredAt, options);
   }
 
@@ -161,6 +168,20 @@ describe("operational state merge", () => {
     const latest = snapshotWithHostLock(null, 2_000);
 
     const merged = mergeOperationalStateSnapshots({ baseline, current, latest });
+
+    expect(merged.hostLock.lock?.ownerSessionId).toBe("session-a");
+  });
+
+  it("keeps the first persisted normal acquisition when another stale request also saw no lock", () => {
+    const baseline = snapshotWithHostLock(null, 0);
+    const staleSecondTake = snapshotWithHostLock("session-b", 2_000);
+    const firstPersistedTake = snapshotWithHostLock("session-a", 1_000);
+
+    const merged = mergeOperationalStateSnapshots({
+      baseline,
+      current: staleSecondTake,
+      latest: firstPersistedTake,
+    });
 
     expect(merged.hostLock.lock?.ownerSessionId).toBe("session-a");
   });

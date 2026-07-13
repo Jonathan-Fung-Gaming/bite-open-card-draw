@@ -56,13 +56,13 @@ const implementedMutationNames: NormalizedTransactionalMutationName[] = [
   "rerollFullRound",
   "advanceResultReveal",
   "markResultsRevealed",
+  "acquireHostLock",
+  "refreshHostLock",
+  "releaseHostLock",
 ];
 
 const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
   "touchActiveVoterPresence",
-  "acquireHostLock",
-  "refreshHostLock",
-  "releaseHostLock",
   "drawRoundSet",
   "postVoteRerollInvalidation",
   "overrideResult",
@@ -92,6 +92,16 @@ function readPhase1Migration() {
     path.join(
       process.cwd(),
       "supabase/migrations/20260713020000_phase1_atomic_reroll_reveal_public_state.sql",
+    ),
+    "utf8",
+  );
+}
+
+function readPhase3Migration() {
+  return readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20260714010000_phase3_non_expiring_host_recovery.sql",
     ),
     "utf8",
   );
@@ -297,6 +307,90 @@ describe("normalized runtime transactional mutations", () => {
     ]);
   });
 
+  it("validates and executes the implemented Phase 3 host lifecycle RPCs", async () => {
+    const calls: RpcCall[] = [];
+    const supabase = createMockRpcClient(calls, {
+      data: {
+        outcome: "refreshed",
+        ownerSessionId: uuidB,
+        heartbeatAt: "2026-07-14T00:00:00.000Z",
+        expiresAt: "9999-12-31T23:59:59.999Z",
+        rows_changed: 1,
+      },
+      error: null,
+    });
+
+    await executeNormalizedTransactionalMutation(
+      "acquireHostLock",
+      {
+        requestId: uuidA,
+        mode: "restore",
+        adminSessionId: uuidB,
+        hostTokenHash: "a".repeat(64),
+        expectedHostTokenHash: "b".repeat(64),
+        recoveryOwnerSessionId: uuidC,
+      },
+      { eventId: "event-a", supabase },
+    );
+    await executeNormalizedTransactionalMutation(
+      "refreshHostLock",
+      {
+        requestId: uuidA,
+        adminSessionId: uuidB,
+        hostTokenHash: "a".repeat(64),
+      },
+      { eventId: "event-a", supabase },
+    );
+    await executeNormalizedTransactionalMutation(
+      "releaseHostLock",
+      {
+        requestId: uuidA,
+        adminSessionId: uuidB,
+        hostTokenHash: "a".repeat(64),
+      },
+      { eventId: "event-a", supabase },
+    );
+
+    expect(calls).toEqual([
+      {
+        functionName: "normalized_acquire_host_lock",
+        args: {
+          p_event_id: "event-a",
+          p_payload: {
+            requestId: uuidA,
+            mode: "restore",
+            adminSessionId: uuidB,
+            hostTokenHash: "a".repeat(64),
+            expectedHostTokenHash: "b".repeat(64),
+            recoveryOwnerSessionId: uuidC,
+          },
+        },
+      },
+      {
+        functionName: "normalized_heartbeat_host_lock",
+        args: {
+          p_event_id: "event-a",
+          p_payload: {
+            requestId: uuidA,
+            adminSessionId: uuidB,
+            hostTokenHash: "a".repeat(64),
+          },
+        },
+      },
+      {
+        functionName: "normalized_release_host_lock",
+        args: {
+          p_event_id: "event-a",
+          p_payload: {
+            requestId: uuidA,
+            adminSessionId: uuidB,
+            hostTokenHash: "a".repeat(64),
+          },
+        },
+      },
+    ]);
+  });
+
   it("executes pause and resume with Phase 1 host and generation context", async () => {
     const calls: RpcCall[] = [];
     const supabase = createMockRpcClient(calls);
@@ -380,6 +474,7 @@ describe("normalized runtime transactional mutations", () => {
       {
         roundNumber: 1,
         adminSessionId: uuidB,
+        hostTokenHash: "a".repeat(64),
       },
       {
         eventId: "event-a",
@@ -630,6 +725,62 @@ describe("normalized runtime transactional mutations", () => {
     expect(resetFunction).toContain("delete from public.draws");
     expect(resetFunction).not.toContain("delete from public.admin_actions");
     expect(resetFunction).not.toContain("delete from public.players");
+  });
+
+  it("implements the Phase 3 host lifecycle atomically without expiry-based authority", () => {
+    const migration = readPhase3Migration();
+    const acquire = latestRpcDefinition(migration, "normalized_acquire_host_lock");
+    const heartbeat = latestRpcDefinition(migration, "normalized_heartbeat_host_lock");
+    const release = latestRpcDefinition(migration, "normalized_release_host_lock");
+    const close = latestRpcDefinition(migration, "normalized_close_voting_window");
+
+    for (const definition of [acquire, heartbeat, release]) {
+      expect(definition).not.toBe("");
+      expect(definition).toContain("pg_advisory_xact_lock");
+      expect(definition).toContain("hostTokenHash");
+      expect(definition).not.toContain("normalized_runtime_transaction_disabled");
+      expect(definition).not.toMatch(/host_lock\.expires_at\s*>\s*v_now/);
+    }
+
+    expect(acquire).toContain("for update");
+    expect(acquire).toContain("admin_sessions");
+    expect(acquire).toContain("v_mode not in ('take', 'restore', 'force')");
+    expect(acquire).toContain("reason is required for forced host takeover");
+    expect(acquire).toContain("v_expected_host_token_hash");
+    expect(acquire).toContain("Recovery proof is stale for the active host credential");
+    expect(acquire).toContain("v_lock.acquired_at + interval '1 microsecond'");
+    expect(acquire).toContain("acquired_at = v_next_acquired_at");
+    expect(acquire).toContain("insert into public.admin_actions");
+    expect(acquire).toContain("'dangerous', v_dangerous");
+    expect(heartbeat).toContain("normalized_assert_phase1_host");
+    expect(heartbeat).not.toContain("insert into public.admin_actions");
+    expect(release).toContain("normalized_assert_phase1_host");
+    expect(release).toContain("admin_sessions");
+    expect(release).toContain("delete from public.host_locks");
+    expect(release).toContain("insert into public.admin_actions");
+    expect(close).toContain("v_host_token_hash");
+    expect(close).toContain("normalized_assert_phase1_host");
+    expect(close).not.toMatch(/host_lock\.expires_at\s*>/);
+
+    for (const rpcName of [
+      "normalized_acquire_host_lock",
+      "normalized_heartbeat_host_lock",
+      "normalized_release_host_lock",
+      "normalized_close_voting_window",
+    ]) {
+      expect(migration).toMatch(
+        new RegExp(
+          `revoke all on function public\\.${rpcName}\\(text, jsonb\\)[\\s\\S]*?from public, anon, authenticated, service_role`,
+          "i",
+        ),
+      );
+      expect(migration).toMatch(
+        new RegExp(
+          `grant execute on function public\\.${rpcName}\\(text, jsonb\\) to service_role`,
+          "i",
+        ),
+      );
+    }
   });
 
   it("keeps every Phase 1 administrative wrapper host-verified, generation-checked, and idempotent", () => {

@@ -2,6 +2,7 @@ import {
   cloneOperationalStateSnapshot,
   type OperationalStateSnapshot,
 } from "@/lib/persistence/operational-state";
+import { resolveHostLockPersistence } from "@/lib/admin/host-lock";
 import type { RoundResultSnapshot } from "@/lib/results/result-engine";
 import { resultRevealPhaseRank } from "@/lib/results/reveal-phase-order";
 import {
@@ -210,27 +211,7 @@ function resolveHostLock(
   current: OperationalStateSnapshot["hostLock"],
   latest: OperationalStateSnapshot["hostLock"],
 ) {
-  if (!changed(baseline, current)) {
-    return latest;
-  }
-
-  if (!changed(baseline, latest)) {
-    return current;
-  }
-
-  if (!current.lock) {
-    return latest;
-  }
-
-  if (!latest.lock) {
-    return current;
-  }
-
-  if (current.lock.ownerSessionId !== latest.lock.ownerSessionId) {
-    return current.lock.acquiredAt >= latest.lock.acquiredAt ? current : latest;
-  }
-
-  return current.lock.heartbeatAt >= latest.lock.heartbeatAt ? current : latest;
+  return resolveHostLockPersistence({ baseline, current, latest }).snapshot;
 }
 
 export function mergeOperationalStateSnapshots({

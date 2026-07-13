@@ -1,14 +1,20 @@
 import { createHash, randomUUID } from "node:crypto";
 
-export const HOST_LOCK_TTL_MS = 30 * 60_000;
+export const HOST_LOCK_COMPATIBILITY_EXPIRES_AT = Date.parse("9999-12-31T23:59:59.999Z");
 
-export type HostLockStatus = "inactive" | "active" | "readonly";
+export type HostLockStatus = "inactive" | "active" | "recoverable" | "readonly";
 
 export type HostLockSnapshot = {
   status: HostLockStatus;
   ownerSessionId: string | null;
   heartbeatAt: number | null;
   expiresAt: number | null;
+};
+
+export type HostLockSnapshotOptions = {
+  hostToken?: string | null;
+  recoveryHostTokenHash?: string | null;
+  recoveryOwnerSessionId?: string | null;
 };
 
 export type HostLockRecord = {
@@ -31,36 +37,54 @@ export type HostLockReleaseResult = {
   snapshot: HostLockSnapshot;
 };
 
+export type HostLockRestoreOutcome = "restored" | "no_active_lock" | "not_recoverable";
+
+export type HostLockRestoreResult = {
+  restored: boolean;
+  outcome: HostLockRestoreOutcome;
+  snapshot: HostLockSnapshot;
+};
+
 export type HostLockPersistenceOutcome =
   | "unchanged"
   | "acquire"
   | "takeover"
+  | "restore"
   | "refresh"
   | "release"
-  | "clear_expired"
   | "stale_acquire"
+  | "stale_takeover"
+  | "stale_restore"
   | "stale_heartbeat"
   | "stale_release";
 
 export type HostLockPersistenceDecision =
   | {
       action: "write";
-      outcome: "acquire" | "takeover" | "refresh";
+      outcome: "acquire" | "takeover" | "restore" | "refresh";
       lock: HostLockRecord;
       snapshot: HostLockStoreSnapshot;
     }
   | {
       action: "delete";
-      outcome: "release" | "clear_expired";
+      outcome: "release";
       lock: null;
       snapshot: HostLockStoreSnapshot;
     }
   | {
       action: "noop";
-      outcome: "unchanged" | "stale_acquire" | "stale_heartbeat" | "stale_release";
+      outcome:
+        | "unchanged"
+        | "stale_acquire"
+        | "stale_takeover"
+        | "stale_restore"
+        | "stale_heartbeat"
+        | "stale_release";
       lock: HostLockRecord | null;
       snapshot: HostLockStoreSnapshot;
     };
+
+type HostLockMutation = "acquire" | "takeover" | "restore" | "refresh";
 
 export function hashHostToken(hostToken: string) {
   return createHash("sha256").update(hostToken).digest("hex");
@@ -85,10 +109,6 @@ function changed(
   return stableJson(baseline ?? { lock: null }) !== stableJson(current ?? { lock: null });
 }
 
-function activeLock(lock: HostLockRecord | null | undefined, now: number) {
-  return lock && lock.expiresAt > now ? lock : null;
-}
-
 function sameHostIdentity(
   left: HostLockRecord | null | undefined,
   right: HostLockRecord | null | undefined,
@@ -108,47 +128,82 @@ function sameLockAcquisition(
   return sameHostIdentity(left, right) && left?.acquiredAt === right?.acquiredAt;
 }
 
+function mutationFromLocks(
+  baselineLock: HostLockRecord | null,
+  currentLock: HostLockRecord,
+): HostLockMutation {
+  if (!baselineLock) {
+    return "acquire";
+  }
+
+  if (sameLockAcquisition(baselineLock, currentLock)) {
+    return "refresh";
+  }
+
+  if (baselineLock.acquiredAt === currentLock.acquiredAt) {
+    return "restore";
+  }
+
+  return "takeover";
+}
+
+function compareAcquisitions(left: HostLockRecord, right: HostLockRecord) {
+  if (left.acquiredAt !== right.acquiredAt) {
+    return left.acquiredAt - right.acquiredAt;
+  }
+
+  const leftIdentity = `${left.ownerSessionId}\u0000${left.hostTokenHash}`;
+  const rightIdentity = `${right.ownerSessionId}\u0000${right.hostTokenHash}`;
+
+  return leftIdentity === rightIdentity ? 0 : leftIdentity > rightIdentity ? 1 : -1;
+}
+
+function writeDecision(
+  outcome: Extract<HostLockMutation, "acquire" | "takeover" | "restore" | "refresh">,
+  lock: HostLockRecord,
+): HostLockPersistenceDecision {
+  return {
+    action: "write",
+    outcome,
+    lock: { ...lock },
+    snapshot: snapshotFromLock(lock),
+  };
+}
+
+function noopDecision(
+  outcome: Extract<HostLockPersistenceOutcome, `stale_${string}` | "unchanged">,
+  lock: HostLockRecord | null,
+): HostLockPersistenceDecision {
+  return {
+    action: "noop",
+    outcome,
+    lock: cloneLock(lock),
+    snapshot: snapshotFromLock(lock),
+  };
+}
+
 export function resolveHostLockPersistence(input: {
   baseline: HostLockStoreSnapshot | null;
   current: HostLockStoreSnapshot;
   latest: HostLockStoreSnapshot | null;
   now?: number;
 }): HostLockPersistenceDecision {
-  const now = input.now ?? Date.now();
   const baseline = input.baseline ?? { lock: null };
   const latest = input.latest ?? { lock: null };
   const baselineLock = baseline.lock;
   const currentLock = input.current.lock;
   const latestLock = latest.lock;
-  const activeLatestLock = activeLock(latestLock, now);
 
   if (!changed(baseline, input.current)) {
-    return {
-      action: "noop",
-      outcome: "unchanged",
-      lock: cloneLock(latestLock),
-      snapshot: snapshotFromLock(latestLock),
-    };
+    return noopDecision("unchanged", latestLock);
   }
 
   if (!currentLock) {
-    if (!activeLatestLock) {
-      return latestLock
-        ? {
-            action: "delete",
-            outcome: "clear_expired",
-            lock: null,
-            snapshot: snapshotFromLock(null),
-          }
-        : {
-            action: "noop",
-            outcome: "unchanged",
-            lock: null,
-            snapshot: snapshotFromLock(null),
-          };
+    if (!latestLock) {
+      return noopDecision("unchanged", null);
     }
 
-    if (sameHostIdentity(baselineLock, activeLatestLock)) {
+    if (sameLockAcquisition(baselineLock, latestLock)) {
       return {
         action: "delete",
         outcome: "release",
@@ -157,60 +212,63 @@ export function resolveHostLockPersistence(input: {
       };
     }
 
-    return {
-      action: "noop",
-      outcome: "stale_release",
-      lock: cloneLock(latestLock),
-      snapshot: snapshotFromLock(latestLock),
-    };
+    return noopDecision("stale_release", latestLock);
   }
 
-  if (!activeLatestLock) {
-    return {
-      action: "write",
-      outcome: baselineLock ? "takeover" : "acquire",
-      lock: { ...currentLock },
-      snapshot: snapshotFromLock(currentLock),
-    };
-  }
+  const mutation = mutationFromLocks(baselineLock, currentLock);
 
-  if (sameLockAcquisition(currentLock, activeLatestLock)) {
-    if (currentLock.heartbeatAt >= activeLatestLock.heartbeatAt) {
-      return {
-        action: "write",
-        outcome: "refresh",
-        lock: { ...currentLock },
-        snapshot: snapshotFromLock(currentLock),
-      };
+  if (mutation === "acquire") {
+    if (!latestLock) {
+      return writeDecision("acquire", currentLock);
     }
 
-    return {
-      action: "noop",
-      outcome: "stale_heartbeat",
-      lock: cloneLock(latestLock),
-      snapshot: snapshotFromLock(latestLock),
-    };
+    if (sameLockAcquisition(currentLock, latestLock)) {
+      return noopDecision("unchanged", latestLock);
+    }
+
+    return noopDecision("stale_acquire", latestLock);
   }
 
-  if (currentLock.acquiredAt >= activeLatestLock.acquiredAt) {
-    return {
-      action: "write",
-      outcome: "takeover",
-      lock: { ...currentLock },
-      snapshot: snapshotFromLock(currentLock),
-    };
+  if (mutation === "refresh") {
+    if (!latestLock || !sameLockAcquisition(currentLock, latestLock)) {
+      return noopDecision("stale_heartbeat", latestLock);
+    }
+
+    if (currentLock.heartbeatAt <= latestLock.heartbeatAt) {
+      return noopDecision(
+        stableJson(currentLock) === stableJson(latestLock) ? "unchanged" : "stale_heartbeat",
+        latestLock,
+      );
+    }
+
+    return writeDecision("refresh", currentLock);
   }
 
-  return {
-    action: "noop",
-    outcome:
-      sameLockAcquisition(currentLock, baselineLock) ||
-      sameHostIdentity(currentLock, activeLatestLock)
-        ? "stale_heartbeat"
-        : "stale_acquire",
-    lock: cloneLock(latestLock),
-    snapshot: snapshotFromLock(latestLock),
-  };
+  if (mutation === "restore") {
+    if (latestLock && sameLockAcquisition(currentLock, latestLock)) {
+      return noopDecision("unchanged", latestLock);
+    }
+
+    if (!latestLock || !sameLockAcquisition(baselineLock, latestLock)) {
+      return noopDecision("stale_restore", latestLock);
+    }
+
+    return writeDecision("restore", {
+      ...currentLock,
+      heartbeatAt: Math.max(currentLock.heartbeatAt, latestLock.heartbeatAt),
+      expiresAt: HOST_LOCK_COMPATIBILITY_EXPIRES_AT,
+    });
+  }
+
+  if (!latestLock || compareAcquisitions(currentLock, latestLock) > 0) {
+    return writeDecision("takeover", currentLock);
+  }
+
+  if (sameLockAcquisition(currentLock, latestLock)) {
+    return noopDecision("unchanged", latestLock);
+  }
+
+  return noopDecision("stale_takeover", latestLock);
 }
 
 export function createHostToken() {
@@ -220,8 +278,14 @@ export function createHostToken() {
 export class HostLockStore {
   private lock: HostLockRecord | null = null;
 
-  getSnapshot(sessionId: string | null, now = Date.now()): HostLockSnapshot {
-    if (!this.lock || this.lock.expiresAt <= now) {
+  getSnapshot(
+    sessionId: string | null,
+    now = Date.now(),
+    options: HostLockSnapshotOptions = {},
+  ): HostLockSnapshot {
+    void now;
+
+    if (!this.lock) {
       return {
         status: "inactive",
         ownerSessionId: null,
@@ -230,8 +294,25 @@ export class HostLockStore {
       };
     }
 
+    const sessionOwnsLock = Boolean(sessionId && this.lock.ownerSessionId === sessionId);
+    const hostTokenMatches = Boolean(
+      sessionOwnsLock &&
+      options.hostToken &&
+      this.lock.hostTokenHash === hashHostToken(options.hostToken),
+    );
+    const recoveryOwnerMatches = Boolean(
+      sessionId &&
+      options.recoveryOwnerSessionId &&
+      options.recoveryHostTokenHash &&
+      this.lock.ownerSessionId === options.recoveryOwnerSessionId &&
+      this.lock.hostTokenHash === options.recoveryHostTokenHash,
+    );
     return {
-      status: this.lock.ownerSessionId === sessionId ? "active" : "readonly",
+      status: hostTokenMatches
+        ? "active"
+        : sessionOwnsLock || recoveryOwnerMatches
+          ? "recoverable"
+          : "readonly",
       ownerSessionId: this.lock.ownerSessionId,
       heartbeatAt: this.lock.heartbeatAt,
       expiresAt: this.lock.expiresAt,
@@ -244,32 +325,95 @@ export class HostLockStore {
     now = Date.now(),
     options: { force?: boolean } = {},
   ) {
-    const existing = this.getSnapshot(sessionId, now);
+    const existingLock = this.lock;
 
-    if (existing.status === "readonly" && !options.force) {
-      throw new Error("Active host lock is still unexpired. Use explicit force takeover.");
+    if (options.force && !existingLock) {
+      throw new Error(
+        "There is no active host ownership to force-take. Use normal Take Host Control.",
+      );
     }
 
+    if (options.force && existingLock?.ownerSessionId === sessionId) {
+      throw new Error("The current owner must use Restore instead of forced takeover.");
+    }
+
+    if (existingLock && !options.force) {
+      throw new Error("A host owner already exists. Use explicit force takeover.");
+    }
+
+    const acquiredAt =
+      existingLock && options.force ? Math.max(now, existingLock.acquiredAt + 1) : now;
     const lock: HostLockRecord = {
       ownerSessionId: sessionId,
       hostTokenHash: hashHostToken(hostToken),
-      acquiredAt: now,
-      heartbeatAt: now,
-      expiresAt: now + HOST_LOCK_TTL_MS,
+      acquiredAt,
+      heartbeatAt: acquiredAt,
+      expiresAt: HOST_LOCK_COMPATIBILITY_EXPIRES_AT,
     };
 
     this.lock = lock;
 
     return {
-      takeover: existing.status === "readonly",
-      snapshot: this.getSnapshot(sessionId, now),
+      takeover: Boolean(existingLock),
+      snapshot: this.getSnapshot(sessionId, now, { hostToken }),
+    };
+  }
+
+  restore(
+    sessionId: string,
+    newHostToken: string,
+    now = Date.now(),
+    options: Pick<HostLockSnapshotOptions, "recoveryOwnerSessionId"> & {
+      expectedHostTokenHash: string;
+    },
+  ): HostLockRestoreResult {
+    if (!this.lock) {
+      return {
+        restored: false,
+        outcome: "no_active_lock",
+        snapshot: this.getSnapshot(sessionId, now),
+      };
+    }
+
+    const mayRestore =
+      this.lock.ownerSessionId === sessionId ||
+      (Boolean(options.recoveryOwnerSessionId) &&
+        this.lock.ownerSessionId === options.recoveryOwnerSessionId);
+
+    if (!mayRestore) {
+      return {
+        restored: false,
+        outcome: "not_recoverable",
+        snapshot: this.getSnapshot(sessionId, now, options),
+      };
+    }
+
+    if (options.expectedHostTokenHash !== this.lock.hostTokenHash) {
+      return {
+        restored: false,
+        outcome: "not_recoverable",
+        snapshot: this.getSnapshot(sessionId, now, options),
+      };
+    }
+
+    this.lock = {
+      ...this.lock,
+      ownerSessionId: sessionId,
+      hostTokenHash: hashHostToken(newHostToken),
+      heartbeatAt: now,
+      expiresAt: HOST_LOCK_COMPATIBILITY_EXPIRES_AT,
+    };
+
+    return {
+      restored: true,
+      outcome: "restored",
+      snapshot: this.getSnapshot(sessionId, now, { hostToken: newHostToken }),
     };
   }
 
   refresh(sessionId: string, hostToken: string, now = Date.now()) {
     if (
       !this.lock ||
-      this.lock.expiresAt <= now ||
       this.lock.ownerSessionId !== sessionId ||
       this.lock.hostTokenHash !== hashHostToken(hostToken)
     ) {
@@ -279,18 +423,18 @@ export class HostLockStore {
     this.lock = {
       ...this.lock,
       heartbeatAt: now,
-      expiresAt: now + HOST_LOCK_TTL_MS,
+      expiresAt: HOST_LOCK_COMPATIBILITY_EXPIRES_AT,
     };
 
     return true;
   }
 
   release(sessionId: string, hostToken: string, now = Date.now()): HostLockReleaseResult {
-    if (!this.lock || this.lock.expiresAt <= now) {
+    if (!this.lock) {
       return {
         released: false,
         outcome: "no_active_lock",
-        snapshot: this.getSnapshot(sessionId, now),
+        snapshot: this.getSnapshot(sessionId, now, { hostToken }),
       };
     }
 
@@ -302,14 +446,14 @@ export class HostLockStore {
       return {
         released: true,
         outcome: "released",
-        snapshot: this.getSnapshot(sessionId, now),
+        snapshot: this.getSnapshot(sessionId, now, { hostToken }),
       };
     }
 
     return {
       released: false,
       outcome: "not_active_host",
-      snapshot: this.getSnapshot(sessionId, now),
+      snapshot: this.getSnapshot(sessionId, now, { hostToken }),
     };
   }
 

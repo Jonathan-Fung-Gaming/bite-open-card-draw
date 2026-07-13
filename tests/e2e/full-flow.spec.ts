@@ -1609,7 +1609,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(page.getByRole("heading", { name: "Host Console" })).toBeVisible();
   await expectOxaniumFontLoaded(page);
   await expect(page.getByTestId("admin-host-lock-context")).toContainText("No active host");
-  await expect(page.getByTestId("host-heartbeat-confidence")).toContainText("No active heartbeat");
+  await expect(page.getByTestId("host-heartbeat-confidence")).toContainText("No active owner");
   await clickAdminActionAndWait(page, page.getByRole("button", { name: "Take Host Control" }));
   await expect(hostRunButton(page, "Release")).toBeEnabled({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
   await expect(page).toHaveTitle("Host Console | Pump It Up Open Stage");
@@ -1621,9 +1621,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(rosterPanel.getByText("Status", { exact: true })).toHaveCount(0);
   await expect(rosterPanel.getByText("Active", { exact: true })).toBeVisible();
   expect(await visualTop(rosterPanel)).toBeLessThan(await visualTop(supportPanels));
-  await expect(page.getByTestId("admin-secondary-panels").getByTestId("admin-roster-panel")).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByTestId("admin-secondary-panels").getByTestId("admin-roster-panel"),
+  ).toHaveCount(0);
   await expectAdminPanelOpenStatePersists(page, "admin-secondary-panels");
   const readonlyContext = await browser.newContext({
     acceptDownloads: true,
@@ -1641,7 +1641,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
     "Password required",
   );
   await expect(readonlyPage.getByTestId("host-heartbeat-confidence")).toContainText(
-    "Read-only until takeover",
+    "Another admin browser owns the lock",
   );
   const readonlyForceDetails = readonlyPage.getByTestId("admin-force-host-takeover-panel");
 
@@ -2299,7 +2299,9 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   });
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Release"));
-  await expect(hostRunButton(page, "Release")).toBeDisabled();
+  await expect(page.getByText("Host control released.")).toBeVisible();
+  await expect(hostRunButton(page, "Release")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Take Host Control" })).toBeVisible();
 });
 
 test("unsaved vote draft survives pause and resume reloads", async ({ page }, testInfo) => {
@@ -2488,5 +2490,7 @@ test("stage tiebreak wheel hides the winner until the ten-second reveal complete
   });
 
   await clickAdminActionAndWait(page, hostRunButton(page, "Release"));
-  await expect(hostRunButton(page, "Release")).toBeDisabled();
+  await expect(page.getByText("Host control released.")).toBeVisible();
+  await expect(hostRunButton(page, "Release")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Take Host Control" })).toBeVisible();
 });

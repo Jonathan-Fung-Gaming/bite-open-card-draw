@@ -85,7 +85,7 @@ const REHEARSAL_PLAYER_NAMES = Array.from(
 );
 
 const DISPOSABLE_EVENT_ID_PATTERN = /^(e2e|phase0|phase9|load|rehearsal)-[a-z0-9-]+$/i;
-const SUPABASE_E2E_HOST_LOCK_TTL_MS = 30 * 60_000;
+const SUPABASE_E2E_HOST_LOCK_COMPATIBILITY_EXPIRY = "9999-12-31T23:59:59.999Z";
 const SUPABASE_READ_RETRY_DELAYS_MS = [750, 2_000, 5_000] as const;
 const SUPABASE_READ_RETRY_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504, 522, 524]);
 const SUPABASE_SAFE_READ_METHODS = new Set(["GET", "HEAD"]);
@@ -306,7 +306,7 @@ export async function installSupabaseHostLock(sessionId: string, hostToken: stri
   }
 
   const now = await getSupabaseDatabaseTime(config);
-  const expiresAt = new Date(now.getTime() + SUPABASE_E2E_HOST_LOCK_TTL_MS);
+  const expiresAt = new Date(SUPABASE_E2E_HOST_LOCK_COMPATIBILITY_EXPIRY);
   const supabase = createSupabaseServiceClient(config);
   const { error } = await supabase.from("host_locks").upsert(
     {

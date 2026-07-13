@@ -27,6 +27,7 @@ class FakeAdminSessionSupabaseClient {
 
         return { error: null };
       },
+      update: (row: Partial<AdminSessionInsert>) => this.createUpdateBuilder(row),
       upsert: async (row: AdminSessionInsert) => {
         const nextRow = this.toRow(row);
         const index = this.rows.findIndex((candidate) => candidate.id === nextRow.id);
@@ -42,9 +43,56 @@ class FakeAdminSessionSupabaseClient {
     };
   }
 
+  private createUpdateBuilder(
+    update: Partial<AdminSessionInsert>,
+    filters: Array<
+      | { kind: "eq"; column: string; value: string }
+      | { kind: "gt"; column: string; value: string }
+      | { kind: "is"; column: string; value: null }
+    > = [],
+  ) {
+    const builder = {
+      eq: (column: string, value: string) =>
+        this.createUpdateBuilder(update, [...filters, { kind: "eq", column, value }]),
+      gt: (column: string, value: string) =>
+        this.createUpdateBuilder(update, [...filters, { kind: "gt", column, value }]),
+      is: (column: string, value: null) =>
+        this.createUpdateBuilder(update, [...filters, { kind: "is", column, value }]),
+      select: () => builder,
+      maybeSingle: async () => {
+        const index = this.rows.findIndex((row) =>
+          filters.every((filter) => {
+            const current = row[filter.column as keyof AdminSessionRow];
+
+            if (filter.kind === "eq") {
+              return current === filter.value;
+            }
+
+            if (filter.kind === "gt") {
+              return typeof current === "string" && current > filter.value;
+            }
+
+            return current === filter.value;
+          }),
+        );
+
+        if (index < 0) {
+          return { data: null, error: null };
+        }
+
+        this.rows[index] = this.toRow({ ...this.rows[index], ...update });
+
+        return { data: this.rows[index] ?? null, error: null };
+      },
+    };
+
+    return builder;
+  }
+
   private createSelectBuilder(filters: Array<[string, string]> = []) {
     return {
-      eq: (column: string, value: string) => this.createSelectBuilder([...filters, [column, value]]),
+      eq: (column: string, value: string) =>
+        this.createSelectBuilder([...filters, [column, value]]),
       maybeSingle: async () => ({
         data:
           this.rows.find((row) =>
@@ -137,11 +185,7 @@ describe("normalized admin session store", () => {
       store.validate(refreshed.payload, refreshed.token, Date.parse("2026-06-29T00:05:01.000Z")),
     ).resolves.toBe(true);
 
-    await store.revoke(
-      refreshed.payload,
-      refreshed.token,
-      Date.parse("2026-06-29T00:06:00.000Z"),
-    );
+    await store.revoke(refreshed.payload, refreshed.token, Date.parse("2026-06-29T00:06:00.000Z"));
 
     await expect(
       store.validate(refreshed.payload, refreshed.token, Date.parse("2026-06-29T00:06:01.000Z")),
@@ -149,6 +193,21 @@ describe("normalized admin session store", () => {
     await expect(
       store.validate(session.payload, session.token, Date.parse("2026-06-29T00:06:01.000Z")),
     ).resolves.toBe(false);
+    expect(supabase.rows[0]?.revoked_at).toBe("2026-06-29T00:06:00.000Z");
+
+    await expect(
+      store.touch({
+        currentSession: refreshed.payload,
+        currentToken: refreshed.token,
+        refreshedSession: createAdminSessionToken(
+          "secret",
+          Date.parse("2026-06-29T00:07:00.000Z"),
+          refreshed.payload.sessionId,
+        ).payload,
+        refreshedToken: refreshed.token,
+        now: Date.parse("2026-06-29T00:07:00.000Z"),
+      }),
+    ).rejects.toThrow("Admin session required");
     expect(supabase.rows[0]?.revoked_at).toBe("2026-06-29T00:06:00.000Z");
   });
 });

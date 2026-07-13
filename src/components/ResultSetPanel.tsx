@@ -412,7 +412,7 @@ export function ResultSetPanel({
                   </p>
                   <h3
                     className={clsx(
-                      "mt-1 line-clamp-2 font-black uppercase leading-tight text-white",
+                      "mt-1 line-clamp-2 break-words font-black uppercase leading-tight text-white",
                       stageMode ? "text-2xl leading-tight" : "text-xl",
                     )}
                     data-testid="result-row-title"

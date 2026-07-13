@@ -5,9 +5,14 @@ import {
   ADMIN_SESSION_TTL_SECONDS,
   type AdminSessionPayload,
   createAdminSessionToken,
+  createHostRecoveryToken,
+  HOST_RECOVERY_COOKIE,
+  HOST_RECOVERY_TTL_SECONDS,
   HOST_TOKEN_COOKIE,
   verifyAdminSessionToken,
+  verifyHostRecoveryToken,
 } from "@/lib/admin/session";
+import { hashHostToken } from "@/lib/admin/host-lock";
 import { verifyAdminPassword } from "@/lib/admin/password";
 import { ADMIN_PASSWORD_MAX_LENGTH, assertMaxStringLength } from "@/lib/server/input-limits";
 import { assertRateLimit } from "@/lib/server/rate-limit";
@@ -16,6 +21,7 @@ import {
   shouldUseNormalizedAdminSessions,
 } from "@/lib/server/admin-session-store";
 import { assertProductionTestFlagsDisabled, isProductionDeploymentEnv } from "@/lib/server/env";
+import { getTournamentEventId } from "@/lib/server/env";
 
 function getOptionalEnv(name: keyof NodeJS.ProcessEnv) {
   return process.env[name] || null;
@@ -141,14 +147,17 @@ export async function refreshAdminSessionCookie(session?: AdminSessionPayload) {
 
   const cookieStore = await cookies();
   const currentToken = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-  const currentSession =
-    session ?? verifyAdminSessionToken(currentToken, sessionSecret);
+  const currentSession = session ?? verifyAdminSessionToken(currentToken, sessionSecret);
 
   if (!currentSession || !currentToken) {
     throw new Error("Admin session required.");
   }
 
-  const refreshedSession = createAdminSessionToken(sessionSecret, Date.now(), currentSession.sessionId);
+  const refreshedSession = createAdminSessionToken(
+    sessionSecret,
+    Date.now(),
+    currentSession.sessionId,
+  );
 
   if (shouldUseNormalizedAdminSessions()) {
     await createNormalizedAdminSessionStore().touch({
@@ -175,13 +184,12 @@ export async function clearAdminCookies() {
   }
 
   cookieStore.delete(ADMIN_SESSION_COOKIE);
-  cookieStore.delete(HOST_TOKEN_COOKIE);
 }
 
 export async function setHostTokenCookie(hostToken: string) {
   const cookieStore = await cookies();
 
-  cookieStore.set(HOST_TOKEN_COOKIE, hostToken, getCookieOptions());
+  cookieStore.set(HOST_TOKEN_COOKIE, hostToken, getCookieOptions(HOST_RECOVERY_TTL_SECONDS));
 }
 
 export async function getHostTokenCookie() {
@@ -191,9 +199,60 @@ export async function getHostTokenCookie() {
 }
 
 export async function clearHostTokenCookie() {
+  await clearHostCredentials();
+}
+
+export async function setHostCredentials(hostToken: string, ownerSessionId: string) {
+  const sessionSecret = getOptionalEnv("SESSION_SECRET");
+
+  if (!sessionSecret) {
+    throw new Error("Admin auth is not configured.");
+  }
+
+  const cookieStore = await cookies();
+  const recovery = createHostRecoveryToken(
+    sessionSecret,
+    getTournamentEventId(),
+    ownerSessionId,
+    hashHostToken(hostToken),
+  );
+
+  cookieStore.set(HOST_TOKEN_COOKIE, hostToken, getCookieOptions(HOST_RECOVERY_TTL_SECONDS));
+  cookieStore.set(
+    HOST_RECOVERY_COOKIE,
+    recovery.token,
+    getCookieOptions(HOST_RECOVERY_TTL_SECONDS),
+  );
+}
+
+export async function getVerifiedHostRecoveryProof() {
+  const sessionSecret = getOptionalEnv("SESSION_SECRET");
+
+  if (!sessionSecret) {
+    return null;
+  }
+
+  const cookieStore = await cookies();
+  const recovery = verifyHostRecoveryToken(
+    cookieStore.get(HOST_RECOVERY_COOKIE)?.value,
+    sessionSecret,
+    getTournamentEventId(),
+  );
+
+  return recovery;
+}
+
+export async function clearHostRecoveryCookie() {
+  const cookieStore = await cookies();
+
+  cookieStore.delete(HOST_RECOVERY_COOKIE);
+}
+
+export async function clearHostCredentials() {
   const cookieStore = await cookies();
 
   cookieStore.delete(HOST_TOKEN_COOKIE);
+  cookieStore.delete(HOST_RECOVERY_COOKIE);
 }
 
 export async function verifyDangerousActionPassword(password: string) {

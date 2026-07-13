@@ -3,20 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { refreshHostLockAction } from "../actions";
+import { ADMIN_SESSION_REFRESHED_EVENT } from "./AdminSessionHeartbeat";
 
 type HostHeartbeatProps = {
-  expiresAt: number | null;
   heartbeatAt: number | null;
-  ownerSessionId: string | null;
   serverNowMs: number;
-  status: "inactive" | "active" | "readonly";
+  status: "inactive" | "active" | "recoverable" | "readonly";
 };
 
-const HOST_LOCK_TTL_MS = 30 * 60_000;
-
-function sessionPrefix(sessionId: string | null) {
-  return sessionId ? sessionId.slice(0, 8) : "none";
-}
+const HEARTBEAT_STALE_AFTER_MS = 15_000;
 
 function formatSeconds(ms: number | null) {
   if (ms === null) {
@@ -28,40 +23,42 @@ function formatSeconds(ms: number | null) {
   return `${seconds}s`;
 }
 
-function statusCopy(status: HostHeartbeatProps["status"], failed: boolean) {
+function statusCopy(
+  status: HostHeartbeatProps["status"],
+  failed: boolean,
+  heartbeatAgeMs: number | null,
+) {
   if (failed) {
-    return "Heartbeat check failed; refreshing";
+    return "Heartbeat check failed; ownership retained";
   }
 
   switch (status) {
     case "active":
-      return "Heartbeat OK";
+      return heartbeatAgeMs !== null && heartbeatAgeMs > HEARTBEAT_STALE_AFTER_MS
+        ? "Heartbeat missing; ownership retained"
+        : "Heartbeat healthy";
+    case "recoverable":
+      return "Restore required";
     case "readonly":
-      return "Read-only until takeover";
+      return heartbeatAgeMs !== null && heartbeatAgeMs > HEARTBEAT_STALE_AFTER_MS
+        ? "Heartbeat missing; owner retained"
+        : "Owner heartbeat observed";
     default:
-      return "No active heartbeat";
+      return "No active owner";
   }
 }
 
-export function HostHeartbeat({
-  expiresAt,
-  heartbeatAt,
-  ownerSessionId,
-  serverNowMs,
-  status,
-}: HostHeartbeatProps) {
+export function HostHeartbeat({ heartbeatAt, serverNowMs, status }: HostHeartbeatProps) {
   const router = useRouter();
   const [nowMs, setNowMs] = useState(serverNowMs);
   const [lastHeartbeatAt, setLastHeartbeatAt] = useState(heartbeatAt);
-  const [lockExpiresAt, setLockExpiresAt] = useState(expiresAt);
   const [failed, setFailed] = useState(false);
   const active = status === "active";
 
   useEffect(() => {
     setLastHeartbeatAt(heartbeatAt);
-    setLockExpiresAt(expiresAt);
     setFailed(false);
-  }, [expiresAt, heartbeatAt, status]);
+  }, [heartbeatAt, status]);
 
   useEffect(() => {
     const baseNowMs = serverNowMs;
@@ -80,18 +77,20 @@ export function HostHeartbeat({
 
     const interval = window.setInterval(() => {
       void refreshHostLockAction()
-        .then((refreshed) => {
-          if (!refreshed) {
+        .then((result) => {
+          if (!result.ok) {
             setFailed(true);
             router.refresh();
             return;
           }
 
-          const confirmedAt = Date.now();
-
-          setLastHeartbeatAt(confirmedAt);
-          setLockExpiresAt(confirmedAt + HOST_LOCK_TTL_MS);
+          setLastHeartbeatAt(result.heartbeatAt);
           setFailed(false);
+          window.dispatchEvent(
+            new CustomEvent(ADMIN_SESSION_REFRESHED_EVENT, {
+              detail: { expiresAt: result.sessionExpiresAt },
+            }),
+          );
         })
         .catch(() => {
           setFailed(true);
@@ -103,7 +102,6 @@ export function HostHeartbeat({
   }, [active, router]);
 
   const heartbeatAgeMs = lastHeartbeatAt === null ? null : nowMs - lastHeartbeatAt;
-  const expiresInMs = lockExpiresAt === null ? null : lockExpiresAt - nowMs;
 
   return (
     <div
@@ -115,31 +113,39 @@ export function HostHeartbeat({
           Heartbeat confidence
         </p>
         <p className="rounded border border-metal-700 bg-black/35 px-2 py-1 text-xs font-bold uppercase text-metal-300">
-          {statusCopy(status, failed)}
+          {statusCopy(status, failed, heartbeatAgeMs)}
         </p>
       </div>
       <dl className="mt-3 grid gap-2 sm:grid-cols-3">
         <div className="min-w-0">
-          <dt className="text-xs uppercase tracking-[0.14em] text-metal-400">Owner session</dt>
-          <dd className="mt-1 break-all font-mono text-white">{sessionPrefix(ownerSessionId)}</dd>
+          <dt className="text-xs uppercase tracking-[0.14em] text-metal-400">Owner</dt>
+          <dd className="mt-1 break-words text-white">
+            {status === "inactive"
+              ? "none"
+              : status === "readonly"
+                ? "another browser"
+                : "this browser"}
+          </dd>
         </div>
         <div className="min-w-0">
           <dt className="text-xs uppercase tracking-[0.14em] text-metal-400">Last heartbeat</dt>
           <dd className="mt-1 font-mono text-white">{formatSeconds(heartbeatAgeMs)} ago</dd>
         </div>
         <div className="min-w-0">
-          <dt className="text-xs uppercase tracking-[0.14em] text-metal-400">Takeover window</dt>
+          <dt className="text-xs uppercase tracking-[0.14em] text-metal-400">Ownership</dt>
           <dd className="mt-1 font-mono text-white">
-            {status === "inactive" ? "available now" : `in ${formatSeconds(expiresInMs)}`}
+            {status === "inactive" ? "unowned" : "retained until release or force"}
           </dd>
         </div>
       </dl>
       <p className="mt-3 break-words text-xs text-metal-300">
         {active
-          ? "This browser sends a heartbeat every 5 seconds. If it stops, other admin browsers can take over when the lock expires."
-          : status === "readonly"
-            ? "Another admin browser owns the lock. Force takeover needs the admin password and an audit reason until the heartbeat expires."
-            : "No browser currently owns host control. Take host control before running tournament actions."}
+          ? "This verified host sends a health heartbeat every 5 seconds and renews its admin session. A missed heartbeat never releases ownership."
+          : status === "recoverable"
+            ? "Ownership is retained, but this browser must rotate its host credential with Restore before tournament controls are enabled."
+            : status === "readonly"
+              ? "Another admin browser owns the lock. Force takeover always needs the shared password, a warning confirmation, and an audit reason."
+              : "No browser currently owns host control. Take host control before running tournament actions."}
       </p>
     </div>
   );

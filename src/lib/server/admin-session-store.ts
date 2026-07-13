@@ -21,11 +21,23 @@ type AdminSessionSelectBuilder = {
   }>;
 };
 
+type AdminSessionUpdateBuilder = {
+  eq(column: string, value: string): AdminSessionUpdateBuilder;
+  gt(column: string, value: string): AdminSessionUpdateBuilder;
+  is(column: string, value: null): AdminSessionUpdateBuilder;
+  select(columns: string): AdminSessionUpdateBuilder;
+  maybeSingle(): Promise<{
+    data: AdminSessionRow | null;
+    error: SupabaseError | null;
+  }>;
+};
+
 type AdminSessionTableClient = {
   select(columns: string): AdminSessionSelectBuilder;
   insert(row: AdminSessionInsert): Promise<{
     error: SupabaseError | null;
   }>;
+  update(row: Partial<AdminSessionInsert>): AdminSessionUpdateBuilder;
   upsert(row: AdminSessionInsert): Promise<{
     error: SupabaseError | null;
   }>;
@@ -125,29 +137,32 @@ export class NormalizedAdminSessionStore {
     refreshedToken: string;
     now?: number;
   }) {
-    const row =
-      (await this.findByToken(input.currentToken)) ??
-      (tokenCarriesSessionId(input.currentToken, input.currentSession.sessionId)
-        ? await this.findBySessionId(input.currentSession.sessionId)
-        : null);
     const now = input.now ?? Date.now();
 
-    if (!row || row.id !== input.currentSession.sessionId || !isSessionActive(row, now)) {
+    if (!tokenCarriesSessionId(input.currentToken, input.currentSession.sessionId)) {
       throw new Error("Admin session required.");
     }
 
-    const { error } = await this.supabase.from("admin_sessions").upsert({
-      id: row.id,
-      event_id: this.eventId,
-      session_token_hash: hashAdminSessionToken(input.refreshedToken),
-      created_at: row.created_at,
-      last_seen_at: isoFromMs(now),
-      expires_at: isoFromMs(input.refreshedSession.expiresAt),
-      revoked_at: null,
-    });
+    const { data, error } = await this.supabase
+      .from("admin_sessions")
+      .update({
+        session_token_hash: hashAdminSessionToken(input.refreshedToken),
+        last_seen_at: isoFromMs(now),
+        expires_at: isoFromMs(input.refreshedSession.expiresAt),
+      })
+      .eq("event_id", this.eventId)
+      .eq("id", input.currentSession.sessionId)
+      .is("revoked_at", null)
+      .gt("expires_at", isoFromMs(now))
+      .select("*")
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Could not refresh normalized admin session: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error("Admin session required.");
     }
   }
 
@@ -162,15 +177,17 @@ export class NormalizedAdminSessionStore {
       return;
     }
 
-    const { error } = await this.supabase.from("admin_sessions").upsert({
-      id: row.id,
-      event_id: this.eventId,
-      session_token_hash: row.session_token_hash,
-      created_at: row.created_at,
-      last_seen_at: isoFromMs(now),
-      expires_at: row.expires_at,
-      revoked_at: isoFromMs(now),
-    });
+    const { error } = await this.supabase
+      .from("admin_sessions")
+      .update({
+        last_seen_at: isoFromMs(now),
+        revoked_at: isoFromMs(now),
+      })
+      .eq("event_id", this.eventId)
+      .eq("id", row.id)
+      .is("revoked_at", null)
+      .select("*")
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Could not revoke normalized admin session: ${error.message}`);
@@ -208,6 +225,8 @@ export class NormalizedAdminSessionStore {
   }
 }
 
-export function createNormalizedAdminSessionStore(dependencies: NormalizedAdminSessionStoreDependencies = {}) {
+export function createNormalizedAdminSessionStore(
+  dependencies: NormalizedAdminSessionStoreDependencies = {},
+) {
   return new NormalizedAdminSessionStore(dependencies);
 }

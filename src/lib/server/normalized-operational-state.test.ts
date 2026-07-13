@@ -44,7 +44,10 @@ class FakeNormalizedSupabaseClient {
 
         return { error: null };
       },
-      upsert: async (input: StoredRow[] | StoredRow, options?: { onConflict?: string }) => {
+      upsert: async (
+        input: StoredRow[] | StoredRow,
+        options?: { ignoreDuplicates?: boolean; onConflict?: string },
+      ) => {
         this.operations.push({ operation: "upsert", table });
         const rows = Array.isArray(input) ? input : [input];
         const existing = this.rows.get(table) ?? [];
@@ -66,7 +69,9 @@ class FakeNormalizedSupabaseClient {
           );
 
           if (index >= 0) {
-            existing[index] = row;
+            if (!options?.ignoreDuplicates) {
+              existing[index] = row;
+            }
           } else {
             existing.push(row);
           }
@@ -299,6 +304,69 @@ describe("normalized operational state repository", () => {
       generation: 7,
       transitionKind: "reroll_one_chart",
       activeDraws: [],
+    });
+  });
+
+  it("hydrates an audit-only event so a committed host release clears stale process state", async () => {
+    const eventId = "phase3-release-hydration-test";
+    const sessionId = "00000000-0000-4000-8000-000000000001";
+    const rpc = vi.fn(async () => ({
+      data: {
+        eventId,
+        databaseTime: "2026-07-14T00:00:00.000Z",
+        eventRuntimeState: [],
+        players: [],
+        chartExclusions: [],
+        adminActions: [
+          {
+            id: "00000000-0000-4000-8000-000000000002",
+            event_id: eventId,
+            admin_session_id: sessionId,
+            mutation_request_id: "00000000-0000-4000-8000-000000000003",
+            action_type: "host_lock_release",
+            action_summary: "Released host control.",
+            reason: null,
+            requires_password_reentry: false,
+            created_at: "2026-07-14T00:00:00.000Z",
+            metadata: {
+              dangerous: false,
+              tournamentChanging: false,
+              sessionId,
+              metadata: {},
+            },
+          },
+        ],
+        draws: [],
+        drawnCharts: [],
+        votingWindows: [],
+        roundPlayerEligibility: [],
+        activeVoterPresence: [],
+        voterDeviceBindings: [],
+        ballots: [],
+        ballotChoices: [],
+        ballotRevisions: [],
+        ballotInvalidations: [],
+        resultSnapshots: [],
+        resultRows: [],
+        tiebreaks: [],
+        hostLocks: [],
+        publicStateGenerations: [],
+      },
+      error: null,
+    }));
+    const repository = new NormalizedOperationalStateRepository({
+      eventId,
+      supabase: {
+        rpc,
+        from: vi.fn(() => {
+          throw new Error("coherent audit-only reads must not use table fallbacks");
+        }),
+      } as unknown as NormalizedOperationalSupabaseClient,
+    });
+
+    await expect(repository.load()).resolves.toMatchObject({
+      audit: { records: [{ action: "host_lock_release" }] },
+      hostLock: { lock: null },
     });
   });
 
@@ -706,160 +774,15 @@ describe("normalized operational state repository", () => {
     expect(released?.ballot.phoneStatus[0]?.status.phase).toBe("revealed");
   });
 
-  it("persists passive host heartbeats without rewriting unrelated runtime tables", async () => {
-    const supabase = new FakeNormalizedSupabaseClient();
-    const repository = new NormalizedOperationalStateRepository({
-      eventId: "host-heartbeat-test",
-      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
-      now: () => "2026-06-30T00:00:00.000Z",
-    });
-    const stores = createAdminStateStores();
+  it("keeps normalized host ownership single-writer through lifecycle RPCs", () => {
+    const repository: import("@/lib/persistence/repository").OperationalStateRepository =
+      new NormalizedOperationalStateRepository({
+        eventId: "host-single-writer-test",
+        supabase:
+          new FakeNormalizedSupabaseClient() as unknown as NormalizedOperationalSupabaseClient,
+      });
 
-    stores.rosterStore.createOrUpdatePlayer({
-      startggUsername: "Alpha",
-      active: true,
-      now: "2026-06-30T00:00:00.000Z",
-    });
-    await repository.save(createOperationalStateSnapshot(stores, "2026-06-30T00:00:00.000Z"));
-
-    supabase.touchedTables.length = 0;
-    supabase.rpcCalls.length = 0;
-    stores.hostLockStore.acquire("session-a", "host-token-a", 0);
-
-    await repository.persistHostLock({
-      baseline: null,
-      current: stores.hostLockStore.exportSnapshot(),
-    });
-
-    expect(supabase.touchedTables).toEqual(["host_locks", "host_locks"]);
-    expect(supabase.rows.get("players")).toHaveLength(1);
-    expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
-      owner_session_id: "session-a",
-    });
-    expect(supabase.rpcCalls.map((call) => call.functionName)).toEqual([
-      "normalized_acquire_event_persistence_lock",
-      "normalized_release_event_persistence_lock",
-    ]);
-  });
-
-  it("persists host lock release so another admin can acquire without force", async () => {
-    const supabase = new FakeNormalizedSupabaseClient();
-    const repository = new NormalizedOperationalStateRepository({
-      eventId: "host-release-test",
-      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
-      now: () => "2026-06-30T00:00:00.000Z",
-    });
-    const stores = createAdminStateStores();
-
-    stores.hostLockStore.acquire("session-a", "host-token-a", 0);
-    await repository.persistHostLock({
-      baseline: null,
-      current: stores.hostLockStore.exportSnapshot(),
-    });
-
-    const releaseBaseline = stores.hostLockStore.exportSnapshot();
-    expect(stores.hostLockStore.release("session-a", "host-token-a", 1_000)).toMatchObject({
-      released: true,
-      outcome: "released",
-    });
-
-    await repository.persistHostLock({
-      baseline: releaseBaseline,
-      current: stores.hostLockStore.exportSnapshot(),
-    });
-
-    expect(supabase.rows.get("host_locks")).toHaveLength(0);
-
-    const acquireBaseline = stores.hostLockStore.exportSnapshot();
-    stores.hostLockStore.acquire("session-b", "host-token-b", 1_001);
-    await repository.persistHostLock({
-      baseline: acquireBaseline,
-      current: stores.hostLockStore.exportSnapshot(),
-    });
-
-    expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
-      owner_session_id: "session-b",
-    });
-  });
-
-  it("does not let a stale persisted heartbeat overwrite a newer Supabase host takeover", async () => {
-    const supabase = new FakeNormalizedSupabaseClient();
-    const repository = new NormalizedOperationalStateRepository({
-      eventId: "host-heartbeat-cas-test",
-      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
-      now: () => "1970-01-01T00:00:02.001Z",
-    });
-    const originalStore = createAdminStateStores();
-
-    originalStore.hostLockStore.acquire("session-a", "host-token-a", 1000);
-    const baseline = originalStore.hostLockStore.exportSnapshot();
-    await repository.persistHostLock({ baseline: null, current: baseline });
-
-    const staleHeartbeatStore = createAdminStateStores();
-    const takeoverStore = createAdminStateStores();
-
-    staleHeartbeatStore.hostLockStore.importSnapshot(baseline);
-    takeoverStore.hostLockStore.importSnapshot(baseline);
-
-    expect(staleHeartbeatStore.hostLockStore.refresh("session-a", "host-token-a", 1500)).toBe(true);
-    takeoverStore.hostLockStore.acquire("session-b", "host-token-b", 2000, { force: true });
-
-    await repository.persistHostLock({
-      baseline,
-      current: takeoverStore.hostLockStore.exportSnapshot(),
-    });
-    await repository.persistHostLock({
-      baseline,
-      current: staleHeartbeatStore.hostLockStore.exportSnapshot(),
-    });
-
-    expect(supabase.rows.get("host_locks")).toHaveLength(1);
-    expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
-      owner_session_id: "session-b",
-      heartbeat_at: "1970-01-01T00:00:02.000Z",
-    });
-  });
-
-  it("does not let a stale persisted release clear a newer Supabase host takeover", async () => {
-    const supabase = new FakeNormalizedSupabaseClient();
-    const repository = new NormalizedOperationalStateRepository({
-      eventId: "host-release-cas-test",
-      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
-      now: () => "1970-01-01T00:00:02.001Z",
-    });
-    const originalStore = createAdminStateStores();
-
-    originalStore.hostLockStore.acquire("session-a", "host-token-a", 1000);
-    const baseline = originalStore.hostLockStore.exportSnapshot();
-    await repository.persistHostLock({ baseline: null, current: baseline });
-
-    const staleReleaseStore = createAdminStateStores();
-    const takeoverStore = createAdminStateStores();
-
-    staleReleaseStore.hostLockStore.importSnapshot(baseline);
-    takeoverStore.hostLockStore.importSnapshot(baseline);
-
-    expect(
-      staleReleaseStore.hostLockStore.release("session-a", "host-token-a", 1500),
-    ).toMatchObject({
-      released: true,
-    });
-    takeoverStore.hostLockStore.acquire("session-b", "host-token-b", 2000, { force: true });
-
-    await repository.persistHostLock({
-      baseline,
-      current: takeoverStore.hostLockStore.exportSnapshot(),
-    });
-    await repository.persistHostLock({
-      baseline,
-      current: staleReleaseStore.hostLockStore.exportSnapshot(),
-    });
-
-    expect(supabase.rows.get("host_locks")).toHaveLength(1);
-    expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
-      owner_session_id: "session-b",
-      heartbeat_at: "1970-01-01T00:00:02.000Z",
-    });
+    expect(repository.persistHostLock).toBeUndefined();
   });
 
   it("keeps existing host locks when a full event save has no host-lock delta", async () => {
@@ -869,14 +792,22 @@ describe("normalized operational state repository", () => {
       supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
       now: () => "2026-06-30T00:00:00.000Z",
     });
-    const hostStores = createAdminStateStores();
     const unrelatedStores = createAdminStateStores();
 
-    hostStores.hostLockStore.acquire("session-a", "host-token-a", 0);
-    await repository.persistHostLock({
-      baseline: null,
-      current: hostStores.hostLockStore.exportSnapshot(),
-    });
+    supabase.rows.set("host_locks", [
+      {
+        id: "00000000-0000-4000-8000-000000000091",
+        event_id: "host-lock-full-save-test",
+        lock_name: "tournament-host",
+        admin_session_id: null,
+        owner_session_id: "session-a",
+        host_token_hash: "a".repeat(64),
+        acquired_at: "2026-06-30T00:00:00.000Z",
+        heartbeat_at: "2026-06-30T00:00:00.000Z",
+        expires_at: "9999-12-31T23:59:59.999Z",
+        released_at: null,
+      },
+    ]);
 
     unrelatedStores.rosterStore.createOrUpdatePlayer({
       startggUsername: "Alpha",
@@ -899,6 +830,59 @@ describe("normalized operational state repository", () => {
     expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
       owner_session_id: "session-a",
     });
+  });
+
+  it("preserves RPC host lifecycle audit metadata across unrelated generic persistence", async () => {
+    const eventId = "host-audit-immutability-test";
+    const supabase = new FakeNormalizedSupabaseClient();
+    const repository = new NormalizedOperationalStateRepository({
+      eventId,
+      supabase: supabase as unknown as NormalizedOperationalSupabaseClient,
+      now: () => "2026-07-14T00:01:00.000Z",
+    });
+    const rpcAuditRow = {
+      id: "00000000-0000-4000-8000-000000000092",
+      event_id: eventId,
+      admin_session_id: "00000000-0000-4000-8000-000000000093",
+      mutation_request_id: "00000000-0000-4000-8000-000000000094",
+      action_type: "host_lock_takeover",
+      action_summary: "Forced takeover of the active host lock.",
+      reason: "Original host device is unavailable.",
+      requires_password_reentry: true,
+      created_at: "2026-07-14T00:00:00.000Z",
+      metadata: {
+        requestId: "00000000-0000-4000-8000-000000000094",
+        mode: "force",
+        outcome: "forced_takeover",
+        previousOwnerSessionId: "00000000-0000-4000-8000-000000000095",
+        ownerSessionId: "00000000-0000-4000-8000-000000000093",
+        dangerous: true,
+        tournamentChanging: false,
+        source: "normalized_acquire_host_lock",
+      },
+    } satisfies StoredRow;
+
+    supabase.rows.set("event_runtime_state", [
+      {
+        event_id: eventId,
+        current_round: 1,
+        rehearsal_mode: false,
+        updated_at: "2026-07-14T00:00:00.000Z",
+      },
+    ]);
+    supabase.rows.set("admin_actions", [structuredClone(rpcAuditRow)]);
+
+    const hydrated = await repository.load();
+
+    expect(hydrated).not.toBeNull();
+    await repository.save(hydrated!);
+
+    expect(
+      supabase.operations.some(
+        (operation) => operation.operation === "upsert" && operation.table === "admin_actions",
+      ),
+    ).toBe(true);
+    expect(supabase.rows.get("admin_actions")).toEqual([rpcAuditRow]);
   });
 
   it("persists public voting changes without rewriting unrelated event tables", async () => {
@@ -994,7 +978,7 @@ describe("normalized operational state repository", () => {
     });
   });
 
-  it("persists admin voting controls with audit and host lock without rewriting draw tables", async () => {
+  it("persists admin voting controls and audit without rewriting host or draw tables", async () => {
     const supabase = new FakeNormalizedSupabaseClient();
     const repository = new NormalizedOperationalStateRepository({
       eventId: "voting-admin-partial-test",
@@ -1048,6 +1032,19 @@ describe("normalized operational state repository", () => {
     stores.hostLockStore.acquire("session-a", "host-token-a", 0);
 
     await repository.save(createOperationalStateSnapshot(stores, "2026-06-30T00:00:00.000Z"));
+    supabase.rows.set("host_locks", [
+      {
+        event_id: "voting-admin-partial-test",
+        lock_name: "tournament-host",
+        owner_session_id: "session-a",
+        admin_session_id: null,
+        host_token_hash: "a".repeat(64),
+        acquired_at: "1970-01-01T00:00:00.000Z",
+        heartbeat_at: "1970-01-01T00:00:00.000Z",
+        expires_at: "9999-12-31T23:59:59.999Z",
+        released_at: null,
+      },
+    ]);
 
     supabase.touchedTables.length = 0;
     const votingAdminState = await repository.loadVotingAdminState();
@@ -1093,9 +1090,9 @@ describe("normalized operational state repository", () => {
       supabase.operations
         .filter((operation) => operation.operation === "select")
         .map((operation) => operation.table),
-    ).toEqual(["host_locks"]);
+    ).toEqual([]);
     expect(writeTables).toContain("admin_actions");
-    expect(writeTables).toContain("host_locks");
+    expect(writeTables).not.toContain("host_locks");
     expect(writeTables).toContain("voting_windows");
     expect(deletedTables).not.toContain("admin_actions");
     expect(writeTables).not.toContain("charts");
@@ -1116,7 +1113,7 @@ describe("normalized operational state repository", () => {
     });
     expect(supabase.rows.get("host_locks")?.[0]).toMatchObject({
       owner_session_id: "session-a",
-      heartbeat_at: "1970-01-01T00:00:01.000Z",
+      heartbeat_at: "1970-01-01T00:00:00.000Z",
     });
   });
 
@@ -1199,7 +1196,7 @@ describe("normalized operational state repository", () => {
       supabase.operations
         .filter((operation) => operation.operation === "select")
         .map((operation) => operation.table),
-    ).toEqual(["result_snapshots", "host_locks"]);
+    ).toEqual(["result_snapshots"]);
     expect(supabase.rpcCalls.map((call) => call.functionName)).toEqual([
       "normalized_acquire_event_persistence_lock",
       "normalized_release_event_persistence_lock",
@@ -1207,7 +1204,7 @@ describe("normalized operational state repository", () => {
     expect(writeTables).toContain("result_snapshots");
     expect(writeTables).toContain("voting_windows");
     expect(writeTables).toContain("admin_actions");
-    expect(writeTables).toContain("host_locks");
+    expect(writeTables).not.toContain("host_locks");
     expect(deletedTables).not.toContain("admin_actions");
     expect(writeTables).not.toContain("ballots");
     expect(writeTables).not.toContain("ballot_choices");
