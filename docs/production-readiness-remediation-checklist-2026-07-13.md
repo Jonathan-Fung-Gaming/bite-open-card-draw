@@ -133,8 +133,8 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 - [x] Lint, typecheck, unit, build, host e2e, and two-session tests pass.
 - [x] Security and code/diff review completed with findings resolved.
 - [x] Checklist/phase-status evidence recorded.
-- [ ] Phase PR merged.
-- [ ] Post-merge migration step marked not applicable or completed and verified.
+- [x] Phase PR merged.
+- [x] Post-merge migration step marked not applicable or completed and verified.
 
 ## Phase 4 - Roster Administration
 
