@@ -480,21 +480,23 @@ Secret scan result: pending the final changed-file/artifact scan in the Run Ledg
 
 ## Phase 0 Run Ledger
 
-| Evidence group                        | Command/result                                                                         | Status          |
-| ------------------------------------- | -------------------------------------------------------------------------------------- | --------------- |
-| Evidence sanitization                 | `npm run test`; focused file contributed 32/32 passing tests                           | Pass            |
-| Memory visual/geometry diagnostics    | Chromium 54.3s; WebKit 1.2m; 9 samples each                                            | Pass            |
-| Hosted transition/timing diagnostics  | generated disposable event; 5 reveal phases; 32 public 200s; no captured errors; 2.2m  | Pass            |
-| Hosted direct roster floor            | generated disposable event; 30/30; p50 165.03ms; p95 205.20ms; total 208.47ms          | Pass            |
-| Hosted admin roster/aging observation | 25/30; 5 timeouts; p50 14.46s; p95 28.18s; aged control/recovery false                 | Measured defect |
-| Relevant default e2e                  | `npm run test:e2e`; 6/6 passing in 7.1m                                                | Pass            |
-| Formatting                            | Prettier check on changed supported files                                              | Pass            |
-| Lint                                  | `npm run lint`; generated `.next-phase0` ignore added after first diagnostic finding   | Pass            |
-| Typecheck                             | `npm run typecheck`                                                                    | Pass            |
-| Unit suite                            | `npm run test`; 61 files / 404 tests                                                   | Pass            |
-| Build                                 | `npm run build`; default and isolated Phase 0 production builds                        | Pass            |
-| Diff whitespace                       | `git diff --check`                                                                     | Pass            |
-| Secret-like source/artifact scan      | 21 changed/untracked files and 8 retained JSON artifacts; all defined pattern counts 0 | Pass            |
+| Evidence group                        | Command/result                                                                                      | Status          |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------- |
+| Evidence sanitization                 | `npm run test`; focused file contributed 32/32 passing tests                                        | Pass            |
+| Memory visual/geometry diagnostics    | Chromium 54.3s; WebKit 1.2m; 9 samples each                                                         | Pass            |
+| Hosted transition/timing diagnostics  | generated disposable event; 5 reveal phases; 32 public 200s; no captured errors; 2.2m               | Pass            |
+| Hosted direct roster floor            | generated disposable event; 30/30; p50 165.03ms; p95 205.20ms; total 208.47ms                       | Pass            |
+| Hosted admin roster/aging observation | 25/30; 5 timeouts; p50 14.46s; p95 28.18s; aged control/recovery false                              | Measured defect |
+| Relevant default e2e                  | `npm run test:e2e`; 6/6 passing in 7.1m                                                             | Pass            |
+| Formatting                            | Prettier check on changed supported files                                                           | Pass            |
+| Lint                                  | `npm run lint`; generated `.next-phase0` ignore added after first diagnostic finding                | Pass            |
+| Typecheck                             | `npm run typecheck`                                                                                 | Pass            |
+| Unit suite                            | `npm run test`; 61 files / 404 tests                                                                | Pass            |
+| Build                                 | `npm run build`; default and isolated Phase 0 production builds                                     | Pass            |
+| Diff whitespace                       | `git diff --check`                                                                                  | Pass            |
+| Secret-like source/artifact scan      | 21 changed/untracked files and 8 retained JSON artifacts; all defined pattern counts 0              | Pass            |
+| Phase merge                           | [PR #99](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/99); Quality Gates passed | Complete        |
+| Post-merge migrations                 | No migration in Phase 0; push/parity/database lint                                                  | Not applicable  |
 
 The project-required `rtk` wrapper crashed and was unavailable after the early diagnostic runs, so
 the equivalent direct commands were used and are recorded above. No environment file was changed
@@ -504,6 +506,6 @@ or added.
 
 This report supplies a reproduction or deterministic trace and an explicit later-test contract for
 all 13 PRR items. It does **not** close PRR-001 through PRR-013 themselves. Phase 0 checklist rows
-for hosted safety, sanitization, timing, geometry, default checks, and review are supported by the
-dated evidence above. PR merge and post-merge migration-not-applicable rows remain open until their
-workflow evidence exists.
+for hosted safety, sanitization, timing, geometry, default checks, review, merge, and migration
+disposition are supported by the dated evidence above. Phase 0 does not close the later remediation
+requirements themselves.

@@ -30,8 +30,8 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 - [X] Default checks remain green.
 - [X] Phase plan self-reviewed and amended.
 - [X] Code/diff review completed with findings resolved.
-- [ ] Phase PR merged.
-- [ ] Post-merge migration step marked not applicable or completed.
+- [X] Phase PR merged.
+- [X] Post-merge migration step marked not applicable or completed.
 
 ## Phase 1 - Atomic State And Freshness
 
