@@ -5,6 +5,7 @@ import { ChartArtImage } from "./ChartArtImage";
 type ChartCardVisualProps = {
   artist: string;
   badge?: ReactNode;
+  compact?: boolean;
   imagePath: string;
   imageTestId?: string;
   name: string;
@@ -15,6 +16,7 @@ type ChartCardVisualProps = {
 export function ChartCardVisual({
   artist,
   badge,
+  compact = false,
   imagePath,
   imageTestId,
   name,
@@ -22,10 +24,18 @@ export function ChartCardVisual({
   variant,
 }: ChartCardVisualProps) {
   const viewOnly = variant === "view-only";
+  const compactViewOnly = viewOnly && compact;
 
   return (
     <div
-      className={clsx("relative h-full", viewOnly ? "min-h-36 md:min-h-0" : "min-h-24 sm:min-h-56")}
+      className={clsx(
+        "relative h-full",
+        viewOnly
+          ? compactViewOnly
+            ? "min-h-[82px] sm:min-h-36 md:min-h-0"
+            : "min-h-36 md:min-h-0"
+          : "min-h-24 sm:min-h-56",
+      )}
     >
       <div
         className={clsx(
@@ -57,7 +67,9 @@ export function ChartCardVisual({
         className={clsx(
           "relative flex flex-col p-2",
           viewOnly
-            ? "min-h-36 justify-end md:min-h-28 md:p-3"
+            ? compactViewOnly
+              ? "min-h-[82px] justify-end p-1.5 sm:min-h-36 sm:p-2 md:min-h-28 md:p-3"
+              : "min-h-36 justify-end md:min-h-28 md:p-3"
             : "min-h-24 justify-between sm:min-h-56 sm:p-3",
         )}
       >
@@ -70,13 +82,23 @@ export function ChartCardVisual({
           {viewOnly ? (
             <>
               <h3
-                className="block break-words text-xs font-black uppercase leading-tight text-white line-clamp-3 sm:text-base md:text-lg md:line-clamp-none"
+                className={clsx(
+                  "block break-words font-black uppercase text-white md:text-lg md:line-clamp-none",
+                  compactViewOnly
+                    ? "text-[10px] leading-[1.05] line-clamp-2 sm:text-xs"
+                    : "text-xs leading-tight line-clamp-3 sm:text-base",
+                )}
                 data-testid="chart-card-title"
               >
                 {name}
               </h3>
               <p
-                className="mt-1 block break-words text-xs font-semibold text-metal-300 line-clamp-2 sm:text-sm md:line-clamp-none"
+                className={clsx(
+                  "block break-words font-semibold text-metal-300 md:line-clamp-none",
+                  compactViewOnly
+                    ? "mt-0.5 text-[9px] leading-tight line-clamp-1 sm:text-xs"
+                    : "mt-1 text-xs line-clamp-2 sm:text-sm",
+                )}
                 data-testid="chart-card-artist"
               >
                 {artist}

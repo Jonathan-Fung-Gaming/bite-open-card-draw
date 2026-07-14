@@ -49,7 +49,7 @@ export function ResultsBanCountDisclosure({ resultId, sets }: ResultsBanCountDis
         <span>Show Ban Counts</span>
         <span aria-hidden="true" className="text-lg leading-none">
           <span className="group-open:hidden">+</span>
-          <span className="hidden group-open:inline">−</span>
+          <span className="hidden group-open:inline">-</span>
         </span>
       </summary>
       <div className="border-t border-ember-300/15 p-3">

@@ -3,8 +3,8 @@ import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawnChartSummary } from "@/lib/draw/draw-engine";
 import type { RoundResultSnapshot } from "@/lib/results/result-engine";
 import { ChartArtImage } from "./ChartArtImage";
+import { MobilePublicResultSummary } from "./MobilePublicResultSummary";
 import { PublicResultRows } from "./PublicResultRows";
-import { ResultsBanCountDisclosure } from "./ResultsBanCountDisclosure";
 
 type PublicResultSummaryProps = {
   compactMobileResults?: boolean;
@@ -92,34 +92,24 @@ export function PublicResultSummary({
   result,
   selectedCardTestId = "stage-chart-card",
 }: PublicResultSummaryProps) {
+  if (compactMobileResults) {
+    return <MobilePublicResultSummary result={result} selectedCardTestId={selectedCardTestId} />;
+  }
+
   return (
-    <div
-      className={clsx("grid", compactMobileResults ? "gap-2 md:gap-5" : "gap-5")}
-      data-compact-mobile-results={compactMobileResults ? "true" : "false"}
-    >
-      <div
-        className={clsx(
-          "grid",
-          compactMobileResults ? "grid-cols-2 gap-2 md:gap-4" : "gap-4 md:grid-cols-2",
-        )}
-        data-testid={compactMobileResults ? "results-winner-grid" : undefined}
-      >
+    <div className="grid gap-5" data-compact-mobile-results="false">
+      <div className="grid gap-4 md:grid-cols-2">
         {result.sets.map((set, index) => (
           <SelectedChartCard
             key={set.roundSetId}
             chart={set.selectedChart}
-            compactMobile={compactMobileResults}
+            compactMobile={false}
             index={index + 1}
             testId={selectedCardTestId}
           />
         ))}
       </div>
-      {compactMobileResults ? (
-        <ResultsBanCountDisclosure resultId={result.id} sets={result.sets} />
-      ) : null}
-      <section
-        className={clsx("metal-panel rounded-lg p-5", compactMobileResults && "hidden md:block")}
-      >
+      <section className="metal-panel rounded-lg p-5">
         <h2 className="text-4xl font-black uppercase text-white">Ban counts</h2>
         <div className="mt-4 grid gap-3">
           {result.sets.map((set) => (
