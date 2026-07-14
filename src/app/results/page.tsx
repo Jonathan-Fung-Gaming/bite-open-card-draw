@@ -151,9 +151,7 @@ export default async function ResultsPage() {
         <ResultsAutoRefresh />
         <RoundHeader
           title={`ROUND ${roundNumber} FINAL CHARTS`}
-          status={
-            routeState.showPreviousRoundResult ? "Previous round results" : "Results revealed"
-          }
+          status={routeState.showPreviousRoundResult ? "Previous round results" : undefined}
         />
         <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
           {routeState.showPreviousRoundResult ? (

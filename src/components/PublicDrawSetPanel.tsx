@@ -1,5 +1,5 @@
 import type { PublicChartsDraw, PublicChartsSetDefinition } from "@/lib/charts/public-chart-view";
-import { ChartArtImage } from "./ChartArtImage";
+import { ChartCardVisual } from "./ChartCardVisual";
 
 type PublicDrawSetPanelProps = {
   set: PublicChartsSetDefinition;
@@ -22,7 +22,7 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
             Round {set.roundNumber} - {set.displayLabel}
           </h2>
         </div>
-        <p className="text-sm text-metal-300">{draw ? "Charts ready" : "Awaiting host draw"}</p>
+        {!draw ? <p className="text-sm text-metal-300">Awaiting host draw</p> : null}
       </div>
       {draw ? (
         <div className="public-chart-grid" data-testid="public-chart-card-row">
@@ -34,29 +34,12 @@ export function PublicDrawSetPanel({ set, draw }: PublicDrawSetPanelProps) {
                 data-chart-image-path={chart.imagePath}
                 data-testid="stage-chart-card"
               >
-                <div className="relative aspect-[16/9] overflow-hidden border-b border-ember-300/15 bg-black/35">
-                  <ChartArtImage
-                    src={chart.imagePath}
-                    loading="eager"
-                    className="h-full w-full object-contain opacity-95"
-                  />
-                </div>
-                <div className="flex min-h-28 flex-col justify-end p-3">
-                  <div>
-                    <h3
-                      className="break-words text-base font-black uppercase leading-tight text-white sm:text-lg"
-                      data-testid="chart-card-title"
-                    >
-                      {chart.name}
-                    </h3>
-                    <p
-                      className="mt-1 break-words text-sm text-metal-300"
-                      data-testid="chart-card-artist"
-                    >
-                      {chart.artist}
-                    </p>
-                  </div>
-                </div>
+                <ChartCardVisual
+                  artist={chart.artist}
+                  imagePath={chart.imagePath}
+                  name={chart.name}
+                  variant="view-only"
+                />
               </article>
             );
           })}

@@ -42,21 +42,21 @@ behavior. Archived documents are historical evidence only.
 
 ## Issue Register
 
-| ID | PDF item | Summary | Planned phase |
-| --- | --- | --- | ---: |
-| PRR-001 | 1.1 | Two-column roster with inline username editing | 4 |
-| PRR-002 | 1.2 | Near-instant roster changes and connected-client propagation | 4 |
-| PRR-003 | 2.1 | Logo must not stretch during initial load | 5 |
-| PRR-004 | 2.2 | Remove redundant explanatory text | 5 |
-| PRR-005 | 3.1 | Remove Previous/Next chart-set buttons | 5 |
-| PRR-006 | 3.2 | Mobile `/charts` redesign | 5 |
-| PRR-007 | 4.1 | Mobile username dropdown-arrow alignment | 5 |
-| PRR-008 | 4.2 | Reroll and voting restart freshness/RSC failure | 1 |
-| PRR-009 | 5.1 | Do not replay slow card reveal after voting begins | 2 |
-| PRR-010 | 6.1 | Smooth authoritative countdown on all devices | 2 |
-| PRR-011 | 7.1 | Non-expiring host and truthful recovery controls | 3 |
-| PRR-012 | 8.1 | No timer/card fallback around tiebreak or final confirmation | 1 |
-| PRR-013 | 9.1 | Complete mobile results view fits a phone screen | 6 |
+| ID      | PDF item | Summary                                                      | Planned phase |
+| ------- | -------- | ------------------------------------------------------------ | ------------: |
+| PRR-001 | 1.1      | Two-column roster with inline username editing               |             4 |
+| PRR-002 | 1.2      | Near-instant roster changes and connected-client propagation |             4 |
+| PRR-003 | 2.1      | Logo must not stretch during initial load                    |             5 |
+| PRR-004 | 2.2      | Remove redundant explanatory text                            |             5 |
+| PRR-005 | 3.1      | Remove Previous/Next chart-set buttons                       |             5 |
+| PRR-006 | 3.2      | Mobile `/charts` redesign                                    |             5 |
+| PRR-007 | 4.1      | Mobile username dropdown-arrow alignment                     |             5 |
+| PRR-008 | 4.2      | Reroll and voting restart freshness/RSC failure              |             1 |
+| PRR-009 | 5.1      | Do not replay slow card reveal after voting begins           |             2 |
+| PRR-010 | 6.1      | Smooth authoritative countdown on all devices                |             2 |
+| PRR-011 | 7.1      | Non-expiring host and truthful recovery controls             |             3 |
+| PRR-012 | 8.1      | No timer/card fallback around tiebreak or final confirmation |             1 |
+| PRR-013 | 9.1      | Complete mobile results view fits a phone screen             |             6 |
 
 ## Mandatory Per-Phase Execution Loop
 
@@ -312,7 +312,11 @@ regressions.
 - Remove exact Stage text `One window covers both sets.` while preserving turnout and ban totals.
 - Remove `/charts` descriptor `Chart display` and make optional header status consume no empty space.
 - Create a before/after copy inventory. Review duplicate `Full ban counts`/`Ban counts`, `Charts
-  ready` beside visible cards, and repeated final-result descriptors.
+ready` beside visible cards, and repeated final-result descriptors.
+- During a valid authoritative rune-wheel spin, show no visible status text in the wheel center.
+  Preserve the useful authoritative-timing waiting message before a valid spin and the committed
+  winner name after reveal. This presentation change must not alter winner authority, duration,
+  slot population, or fallback behavior.
 - Preserve identity, no-bans, previous-round, reveal-holding, view-only, host recovery, dangerous
   action, and error-recovery copy.
 - Remove only Previous/Next Chart Set buttons. Retain the two set tabs required for view-only
@@ -329,6 +333,8 @@ regressions.
 - Early-frame hard reload evidence shows no logo stretching or logo layout shift on every required
   route.
 - Mandatory removed text is absent; protected safety/identity copy remains.
+- Mid-spin evidence shows a visually blank rune-wheel center with no winner leakage, while waiting,
+  revealed-winner, 10-second timing, backend authority, slot, and fallback behavior remain correct.
 - Previous/Next buttons are absent and tabs still work before/after hydration.
 - Mobile `/charts` cards visually overlay metadata and art but cannot affect ballot state.
 - Centered seventh card, partial-draw behavior, and desktop presentation remain correct.

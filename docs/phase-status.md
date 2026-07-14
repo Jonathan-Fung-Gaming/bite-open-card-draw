@@ -17,6 +17,94 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 5 - Branding, Copy, Charts, And Mobile Selector - 2026-07-14
+
+Status: implementation and the complete pre-merge gate are ready. The phase remains open until its
+pull request is green and merged, the clean merged `main` tree passes the same Phase 5 gate, and the
+no-migration closeout is recorded.
+
+### Scope And Changed Files
+
+- Added the reviewed Phase 5 plan under `docs/phase-plans/` and added the owner's requirement for a
+  visually blank rune-wheel center during a valid authoritative spin to the active parent plan and
+  checklist.
+- Added intrinsic 512x339 dimensions to the shared optimized tournament logo while preserving the
+  existing asset, alt text, priority behavior, responsive sizes, object containment, and shadow.
+- Removed only the reviewed redundant Stage, chart, result, and active-spin copy. Protected
+  identity, no-bans, previous-round, reveal-holding, view-only, host-recovery, danger, error, invalid
+  timing, and revealed-winner copy remains.
+- Removed the redundant mobile Previous/Next controls while retaining both tabs, partial-draw
+  behavior, URL fragments, hydration behavior, and server-visible no-JavaScript panels.
+- Added one shared passive/ballot chart visual. Mobile `/charts` uses over-art metadata in a
+  two-column noninteractive article grid with its seventh card centered; desktop keeps the prior
+  image-over-metadata layout, and voting retains the outer button as the only interactive owner.
+- Added an opt-in compact `/charts` mobile header and a native username-select wrapper with a fixed,
+  aria-hidden, pointer-events-free chevron, reserved long-name space, visible focus, disabled state,
+  and 44px minimum target.
+- Added focused component/copy/select regressions, updated assertions for intentionally removed
+  copy, and added an independently seeded Phase 5 Playwright configuration/profile for desktop
+  Chromium, mobile Chromium, and mobile WebKit.
+
+### Pre-Merge Checks And Evidence
+
+- Prettier checks on changed source, config, tests, checklist, and phase-plan files passed;
+  `git diff --check` and runner syntax validation passed.
+- `npm run lint`, `npm run typecheck`, and `npm run test` passed; unit coverage is 81 files / 563
+  tests.
+- `npm run build` passed with the optimized Next.js 15.5.19 production build.
+- `npm run test:phase5:memory:list` listed the intended 12 project/test combinations. The final
+  combined run passed all six applicable scenarios with six intentional cross-project skips in
+  149.9 seconds.
+- Hard-reload evidence covered `/stage`, `/room`, `/vote`, `/charts`, `/results`, unauthenticated
+  `/coolguy69`, and authenticated admin. It verified the optimized asset request, intrinsic markup,
+  object containment, cached/uncached geometry stability, priority behavior, and no logo-attributed
+  layout shift. Static tests cover Stage loading/error consumers separately.
+- Chromium and WebKit evidence covered 320, 360, and 390 pixel widths, the compact row header,
+  two-column passive cards, exact centered seventh-card geometry, no overflow, tabs before/after
+  hydration, JavaScript-disabled panels, and partial-draw fallback.
+- Native-select evidence covered a 100-character username, fixed 16px chevron inset, reserved text
+  padding, focus ring, keyboard changes, click-through, disabled identity lock, and 44px minimum
+  height in both Chromium and WebKit.
+- Mid-spin evidence showed the 12-slot authoritative wheel with a visually blank center and no
+  winner-marked slot, then the backend-committed winner after the 10-second reveal. Existing timing,
+  rotation, invalid-timing, fallback, and public-result regressions remain green.
+- The focused suite initially found only test-harness issues: a loading/final consumer was compared
+  as one logo element, an authenticated route could replace its DOM between bounding-box reads, and
+  a navigation assertion raced a WebKit fragment. Final-state markers, retained complete geometry
+  samples, and an isolated vote page resolved those issues; the clean combined rerun passed.
+- Scope/safety scans reported zero Supabase migration changes, zero tracked environment changes,
+  and zero secret-like additions. The comprehensive tournament smoke is intentionally deferred to
+  Phase 7 by the active parent plan.
+
+### Complete Diff Review And Resolved Findings
+
+- The required single-agent review covered the complete diff against the product spec, validation
+  checklist, and Phase 5 plan. The earlier delegated audits were supplemental only.
+- Review found the compact header still inherited `flex-col` and could render vertically because
+  Tailwind class order, not `clsx` argument order, decides the winner. Direction classes are now
+  mutually exclusive; browser evidence asserts a sub-100px header with the heading right of the
+  compact upper-left logo.
+- Review found the shared ballot variant rendered `h3`/`p` flow content inside an outer button.
+  Ballot metadata now uses phrasing `span` elements, while passive chart articles retain semantic
+  headings and paragraphs. A focused render regression protects that boundary.
+- A broad formatter invocation normalized unrelated Windows working-tree files. All 196
+  formatter-only tracked changes were restored from the known-clean pre-command state; the final
+  status contains only the explicit Phase 5 file set. Subsequent formatting commands were scoped to
+  intentional files.
+- Review found no tournament-rule, ballot-authority, result/tiebreak authority, browser-randomness,
+  privacy, secret, server-mutation, stale-state, data-loss, accessibility, desktop, or mobile
+  regression after the fixes and final gate.
+
+### Migration, Rollout, Risks, And Assumptions
+
+- This phase is UI/test-only and contains no schema or data migration. It adds no server mutation,
+  dependency, external write, secret, or production-environment change.
+- Rollback is the Phase 5 application commit revert; no database rollback is applicable. The shared
+  passive visual is presentation-only, and the voting button remains responsible for all
+  handlers, `aria-pressed`, and disabled behavior.
+- The phase is not complete yet: PR merge, synchronized-main post-merge gate, merged-diff migration
+  absence verification, and closeout evidence remain required.
+
 ## Production Readiness Remediation Phase 4 - Fast Two-Column Roster - 2026-07-14
 
 Status: complete. Phase 4 merged in

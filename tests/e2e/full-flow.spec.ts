@@ -1366,7 +1366,7 @@ async function expectOpenPublicPagesShowFinal({
   await expect(resultsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
-  await expect(votePage.getByText("Full ban counts")).toBeVisible({
+  await expect(votePage.getByRole("heading", { name: "Ban counts" })).toBeVisible({
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
@@ -1730,7 +1730,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
       .nth(0)
       .getByText(/Revealing [0-7] \/ 7|Charts ready/),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
-  await expect(chartsPage.getByText("Charts ready").first()).toBeVisible({
+  await expect(chartsPage.getByTestId("stage-chart-card")).toHaveCount(7, {
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
   await expect(chartsPage.getByTestId("view-only-status")).toContainText("One chart set drawn");
@@ -1757,7 +1757,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
       .nth(0)
       .getByText(/Revealing [0-7] \/ 7|Charts ready/),
   ).toBeVisible({ timeout: HOSTED_REFRESH_TIMEOUT_MS });
-  await expect(chartsPage.getByText("Charts ready").first()).toBeVisible({
+  await expect(chartsPage.getByTestId("stage-chart-card")).toHaveCount(7, {
     timeout: HOSTED_REFRESH_TIMEOUT_MS,
   });
 
@@ -2146,11 +2146,15 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await chartsPage.reload({ waitUntil: "domcontentloaded" });
   await expect(chartsPage.getByRole("heading", { name: "ROUND 1 FINAL CHARTS" })).toBeVisible();
   await expectFinalBanCountDetailsRemainOpenAfterWait(chartsPage);
-  await expect(phonePage.getByText("Full ban counts")).toBeVisible({ timeout: 7000 });
+  await expect(phonePage.getByRole("heading", { name: "Ban counts" })).toBeVisible({
+    timeout: 7000,
+  });
   await expectRenderedRealBackgroundImage(phonePage.getByTestId("phone-final-chart-card").first());
   await expectFinalBanCountDetailsRemainOpenAfterWait(phonePage);
   await phonePage.reload({ waitUntil: "domcontentloaded" });
-  await expect(phonePage.getByText("Full ban counts")).toBeVisible({ timeout: 7000 });
+  await expect(phonePage.getByRole("heading", { name: "Ban counts" })).toBeVisible({
+    timeout: 7000,
+  });
   await expectFinalBanCountDetailsRemainOpenAfterWait(phonePage);
 
   await goto(page, "/stage");
@@ -2187,7 +2191,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expectFinalBanCountDetailsRemainOpenAfterWait(page);
 
   await goto(page, "/vote");
-  await expect(page.getByText("Full ban counts")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ban counts" })).toBeVisible();
   await expectDifficultyComparableToTitle(
     page.getByTestId("phone-final-chart-card"),
     "phone final",

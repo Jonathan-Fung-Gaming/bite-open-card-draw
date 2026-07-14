@@ -30,7 +30,7 @@ export class ResultsPage {
             .count()
             .catch(() => 0);
           const fullCountsVisible = await this.page
-            .getByText("Full ban counts", { exact: true })
+            .getByRole("heading", { name: "Ban counts" })
             .isVisible()
             .catch(() => false);
 

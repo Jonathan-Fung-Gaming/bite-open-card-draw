@@ -277,9 +277,9 @@ test("mobile routes cover room, charts, vote, and pre-reveal results", async ({
     await expect(phase4EvidencePage.getByTestId("view-only-status")).toContainText(
       "no votes recorded",
     );
-    await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(0)).toContainText(
-      "Charts ready",
-    );
+    await expect(
+      phase4EvidencePage.getByTestId("stage-set-row").nth(0).getByTestId("stage-chart-card"),
+    ).toHaveCount(7);
     await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(0)).toBeVisible();
     await expect(phase4EvidencePage.getByTestId("stage-set-row").nth(1)).toBeHidden();
     await expect(phase4EvidencePage.getByRole("tab", { name: /View Set 2/ })).toHaveAttribute(

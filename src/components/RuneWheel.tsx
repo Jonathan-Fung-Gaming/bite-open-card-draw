@@ -162,9 +162,7 @@ export function RuneWheel({
                 <span className="text-ember-300">{winner?.name ?? winnerChartId}</span>
               ) : !revealTimingValid ? (
                 "Waiting for authoritative reveal timing."
-              ) : (
-                "Tiebreak selector is spinning."
-              )}
+              ) : null}
             </p>
           </div>
         </div>

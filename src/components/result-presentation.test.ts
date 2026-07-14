@@ -153,8 +153,10 @@ describe("result presentation", () => {
 
     expect(panelHtml.match(/data-tied-for-fewest="true"/g)).toHaveLength(2);
     expect(publicHtml.indexOf('data-testid="stage-chart-card"')).toBeLessThan(
-      publicHtml.indexOf("Full ban counts"),
+      publicHtml.indexOf(">Ban counts</h2>"),
     );
+    expect(panelHtml).not.toContain("Full ban counts");
+    expect(publicHtml).not.toContain("Full ban counts");
     expect(
       publicHtml.match(/data-testid="result-least-ban-label"/g)?.length,
     ).toBeGreaterThanOrEqual(2);
@@ -238,7 +240,7 @@ describe("result presentation", () => {
     expect(html).toContain("Selected Chart");
   });
 
-  it("uses audience-safe text while the rune wheel is spinning", () => {
+  it("leaves the rune wheel center visually blank while authoritative spinning is active", () => {
     const revealStartedAt = "2026-07-08T00:00:00.000Z";
     const html = renderToStaticMarkup(
       createElement(RuneWheel, {
@@ -251,7 +253,8 @@ describe("result presentation", () => {
       }),
     );
 
-    expect(html).toContain("Tiebreak selector is spinning.");
+    expect(html).not.toContain("Tiebreak selector is spinning.");
+    expect(html).toMatch(/data-testid="rune-wheel-status"[^>]*><\/p>/);
     expect(html).not.toContain("sealed chart");
   });
 

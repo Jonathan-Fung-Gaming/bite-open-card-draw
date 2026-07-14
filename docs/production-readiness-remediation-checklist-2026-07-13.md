@@ -188,55 +188,58 @@ operator-run manual end-of-plan smoke test during Phase 7 instead.
 
 ### PRR-003 - Logo Loading
 
-- [ ] Shared logo has intrinsic initial-HTML aspect protection.
-- [ ] No intermediate stretched frame on hard reload.
-- [ ] No logo-associated layout shift.
-- [ ] All required route/admin/loading/error consumers tested.
-- [ ] Optimized asset, alt text, priority behavior, and intended sizing preserved.
+- [X] Shared logo has intrinsic initial-HTML aspect protection.
+- [X] No intermediate stretched frame on hard reload.
+- [X] No logo-associated layout shift.
+- [X] All required route/admin/loading/error consumers tested.
+- [X] Optimized asset, alt text, priority behavior, and intended sizing preserved.
 
 ### PRR-004 - Redundant Copy
 
-- [ ] `One window covers both sets.` removed from Stage.
-- [ ] `Chart display` removed from `/charts`.
-- [ ] Before/after copy inventory reviewed.
-- [ ] Duplicate result/chart-ready descriptors removed where confirmed redundant.
-- [ ] Identity/no-bans/previous-round/reveal/view-only/host/danger/error safety copy preserved.
+- [X] `One window covers both sets.` removed from Stage.
+- [X] `Chart display` removed from `/charts`.
+- [X] Before/after copy inventory reviewed.
+- [X] Duplicate result/chart-ready descriptors removed where confirmed redundant.
+- [X] Rune-wheel center has no visible text during a valid authoritative spin.
+- [X] Authoritative-timing waiting copy and post-reveal winner copy remain correct.
+- [X] Tiebreak duration, backend authority, slot population, and fallback regressions pass.
+- [X] Identity/no-bans/previous-round/reveal/view-only/host/danger/error safety copy preserved.
 
 ### PRR-005 - Chart Navigation Buttons
 
-- [ ] Previous Chart Set button absent.
-- [ ] Next Chart Set button absent.
-- [ ] Both required set tabs remain.
-- [ ] Tabs work before and after hydration.
-- [ ] Partial-draw disabled/fallback behavior remains correct.
+- [X] Previous Chart Set button absent.
+- [X] Next Chart Set button absent.
+- [X] Both required set tabs remain.
+- [X] Tabs work before and after hydration.
+- [X] Partial-draw disabled/fallback behavior remains correct.
 
 ### PRR-006 - Mobile View Charts
 
-- [ ] Smaller mobile logo.
-- [ ] `Pump It Up Open Stage` and `Drawn Charts` appear near upper-left.
-- [ ] Mobile heading sizes are appropriate.
-- [ ] Cards visually match voting image/gradient/metadata treatment.
-- [ ] Chart information overlaps the image.
-- [ ] Cards remain noninteractive articles with no vote state or focusability.
-- [ ] Centered seventh card preserved.
-- [ ] Server-visible pre-hydration panels preserved.
-- [ ] Desktop presentation remains stable except intentional copy changes.
+- [X] Smaller mobile logo.
+- [X] `Pump It Up Open Stage` and `Drawn Charts` appear near upper-left.
+- [X] Mobile heading sizes are appropriate.
+- [X] Cards visually match voting image/gradient/metadata treatment.
+- [X] Chart information overlaps the image.
+- [X] Cards remain noninteractive articles with no vote state or focusability.
+- [X] Centered seventh card preserved.
+- [X] Server-visible pre-hydration panels preserved.
+- [X] Desktop presentation remains stable except intentional copy changes.
 
 ### PRR-007 - Dropdown Arrow
 
-- [ ] Native select and exact label preserved.
-- [ ] Custom chevron remains inside select with stable right inset.
-- [ ] Chevron is aria-hidden and pointer-events-free.
-- [ ] Long username does not overlap chevron.
-- [ ] Chromium/WebKit, focus, disabled, keyboard, and 44px target tests pass.
+- [X] Native select and exact label preserved.
+- [X] Custom chevron remains inside select with stable right inset.
+- [X] Chevron is aria-hidden and pointer-events-free.
+- [X] Long username does not overlap chevron.
+- [X] Chromium/WebKit, focus, disabled, keyboard, and 44px target tests pass.
 
 ### Phase Gate
 
-- [ ] No horizontal overflow at 320/360/390 pixels.
-- [ ] Phase plan self-reviewed and amended.
-- [ ] Lint, typecheck, unit, build, Chromium/WebKit e2e, visual, and accessibility checks pass.
-- [ ] UX/UI and code/diff review completed with findings resolved.
-- [ ] Checklist/phase-status evidence recorded.
+- [X] No horizontal overflow at 320/360/390 pixels.
+- [X] Phase plan self-reviewed and amended.
+- [X] Lint, typecheck, unit, build, Chromium/WebKit e2e, visual, and accessibility checks pass.
+- [X] UX/UI and code/diff review completed with findings resolved.
+- [X] Checklist/phase-status evidence recorded.
 - [ ] Phase PR merged.
 - [ ] Post-merge migration step marked not applicable or completed and verified.
 

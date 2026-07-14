@@ -102,15 +102,12 @@ export default async function ChartsPage() {
       <PublicRouteFreshnessGuard freshness={freshness} testId="charts-route-freshness-guard">
         <main className="min-h-screen">
           <ChartsAutoRefresh />
-          <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} status="Final results" />
+          <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} mobileCompact />
           <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
             <div className="metal-panel rounded-lg p-4" data-testid="view-only-status">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
                 View charts only - no votes recorded
               </p>
-              <h2 className="mt-1 text-xl font-black uppercase text-white">
-                Final charts revealed
-              </h2>
               <p className="mt-2 text-sm text-metal-300">Selected charts are shown first.</p>
             </div>
             <PublicResultSummary result={result} />
@@ -126,7 +123,7 @@ export default async function ChartsPage() {
     <PublicRouteFreshnessGuard freshness={freshness} testId="charts-route-freshness-guard">
       <main className="min-h-screen">
         <ChartsAutoRefresh />
-        <RoundHeader title="Drawn Charts" status="Chart display" />
+        <RoundHeader title="Drawn Charts" mobileCompact />
         <ChartsSetNavigator
           sets={toPublicChartsSetViews(view.sets)}
           status={chartsStatus(snapshot, snapshot.drawnSetCount)}

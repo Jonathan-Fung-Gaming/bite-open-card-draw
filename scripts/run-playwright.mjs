@@ -115,6 +115,7 @@ const PROFILES = new Set([
   "phase3-supabase",
   "phase4-memory",
   "phase4-supabase",
+  "phase5-memory",
   "supabase-dev-rehearsal",
   "production-flow",
 ]);
@@ -143,7 +144,8 @@ function profileDefaults(profile, context) {
     profile === "phase1-memory" ||
     profile === "phase2-memory" ||
     profile === "phase3-memory" ||
-    profile === "phase4-memory"
+    profile === "phase4-memory" ||
+    profile === "phase5-memory"
   ) {
     return {
       backend: "memory",
@@ -151,7 +153,7 @@ function profileDefaults(profile, context) {
       disableAdminSessionHeartbeat: "true",
       disableHostHeartbeat: "true",
       disableVoteLivePolling: "false",
-      disablePublicRefresh: "false",
+      disablePublicRefresh: profile === "phase5-memory" ? "true" : "false",
       allowE2eRoutes: "true",
       allowMemoryBackend: "true",
       phase9BallotMode: undefined,
@@ -612,7 +614,8 @@ if (
   (requestedProfile === "phase1-memory" ||
     requestedProfile === "phase2-memory" ||
     requestedProfile === "phase3-memory" ||
-    requestedProfile === "phase4-memory") &&
+    requestedProfile === "phase4-memory" ||
+    requestedProfile === "phase5-memory") &&
   requestedBackendOverride &&
   requestedBackendOverride !== "memory"
 ) {
@@ -626,7 +629,8 @@ const memoryLockedProfile =
   requestedProfile === "phase1-memory" ||
   requestedProfile === "phase2-memory" ||
   requestedProfile === "phase3-memory" ||
-  requestedProfile === "phase4-memory";
+  requestedProfile === "phase4-memory" ||
+  requestedProfile === "phase5-memory";
 const e2eTournamentStateBackend = memoryLockedProfile
   ? "memory"
   : (requestedBackendOverride ?? defaults.backend);
@@ -701,7 +705,8 @@ const e2eAllowRehearsalAdminControls =
   requestedProfile.startsWith("phase1-") ||
   requestedProfile === "phase2-memory" ||
   requestedProfile.startsWith("phase3-") ||
-  requestedProfile.startsWith("phase4-")
+  requestedProfile.startsWith("phase4-") ||
+  requestedProfile.startsWith("phase5-")
     ? "true"
     : "false");
 const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
@@ -725,7 +730,8 @@ const e2eNextDistDir =
 const e2ePublicSiteUrl =
   requestedProfile === "phase2-memory" ||
   requestedProfile.startsWith("phase3-") ||
-  requestedProfile.startsWith("phase4-")
+  requestedProfile.startsWith("phase4-") ||
+  requestedProfile.startsWith("phase5-")
     ? e2eBaseURL
     : (process.env.NEXT_PUBLIC_SITE_URL ??
       (isProductionFlowLocalStart ? "https://event.example.test" : e2eBaseURL));
