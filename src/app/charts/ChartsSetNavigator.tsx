@@ -30,7 +30,6 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
   const boundedActiveIndex = activeIndexIsAvailable
     ? Math.min(Math.max(activeIndex, 0), maxActiveIndex)
     : fallbackActiveIndex;
-  const activeSet = sets[boundedActiveIndex];
 
   useEffect(() => {
     const storedIndex = Number(window.sessionStorage.getItem(ACTIVE_SET_STORAGE_KEY));
@@ -130,25 +129,6 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
             <PublicDrawSetPanel set={set} draw={draw} />
           </div>
         ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 md:hidden">
-        <button
-          className="rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300 disabled:opacity-40"
-          disabled={!hydrated || boundedActiveIndex === 0}
-          onClick={() => setActiveIndex((current) => Math.max(0, current - 1))}
-          type="button"
-        >
-          Previous chart set
-        </button>
-        <button
-          className="rounded border border-metal-700 px-4 py-3 font-bold uppercase text-metal-300 disabled:opacity-40"
-          disabled={!hydrated || !activeSet || boundedActiveIndex === sets.length - 1}
-          onClick={() => setActiveIndex((current) => Math.min(sets.length - 1, current + 1))}
-          type="button"
-        >
-          Next chart set
-        </button>
       </div>
     </section>
   );

@@ -253,7 +253,7 @@ export async function expectPublicFinalReveal(
     publicPages.charts.page.getByRole("heading", { name: `ROUND ${roundNumber} FINAL CHARTS` }),
   ).toBeVisible();
   await expect(publicPages.charts.page.getByTestId("stage-chart-card")).toHaveCount(2);
-  await expect(publicPages.charts.page.getByText("Full ban counts", { exact: true })).toBeVisible();
+  await expect(publicPages.charts.page.getByRole("heading", { name: "Ban counts" })).toBeVisible();
 
   await publicPages.results.expectFinalCharts(roundNumber);
 
@@ -262,7 +262,7 @@ export async function expectPublicFinalReveal(
     publicPages.vote.page.getByRole("heading", { name: `Round ${roundNumber} Final Charts` }),
   ).toBeVisible();
   await expect(publicPages.vote.page.getByTestId("phone-final-chart-card")).toHaveCount(2);
-  await expect(publicPages.vote.page.getByText("Full ban counts", { exact: true })).toBeVisible();
+  await expect(publicPages.vote.page.getByRole("heading", { name: "Ban counts" })).toBeVisible();
 
   await expectRoomRoutePrivacy(publicPages.room);
 }

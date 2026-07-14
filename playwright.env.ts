@@ -20,7 +20,8 @@ function getProfileDefaults() {
   if (
     e2eProfile === "memory-dev-smoke" ||
     e2eProfile === "phase3-memory" ||
-    e2eProfile === "phase4-memory"
+    e2eProfile === "phase4-memory" ||
+    e2eProfile === "phase5-memory"
   ) {
     return {
       backend: "memory",
@@ -28,7 +29,7 @@ function getProfileDefaults() {
       disableAdminSessionHeartbeat: "true",
       disableHostHeartbeat: "true",
       disableVoteLivePolling: "true",
-      disablePublicRefresh: "false",
+      disablePublicRefresh: e2eProfile === "phase5-memory" ? "true" : "false",
       allowE2eRoutes: "true",
       allowMemoryBackend: "true",
       phase9BallotMode: undefined,

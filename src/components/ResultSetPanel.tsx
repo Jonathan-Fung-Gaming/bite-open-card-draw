@@ -307,7 +307,7 @@ export function ResultSetPanel({
 
   return (
     <section className={clsx("metal-panel rounded-lg", stageMode ? "p-5" : "p-4")}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <div>
           <p
             className={clsx(
@@ -326,14 +326,6 @@ export function ResultSetPanel({
             Ban Counts
           </h2>
         </div>
-        <p
-          className={clsx(
-            "rounded border border-metal-700 bg-black/25 font-bold uppercase text-metal-300",
-            stageMode ? "px-4 py-2 text-xl" : "px-3 py-2 text-sm",
-          )}
-        >
-          {stageMode ? "Ban counts" : "Full ban counts"}
-        </p>
       </div>
       <div
         className={clsx(

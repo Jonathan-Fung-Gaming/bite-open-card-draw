@@ -1,6 +1,7 @@
 export { AdminLayout } from "./AdminLayout";
 export { ChartArtImage } from "./ChartArtImage";
 export { ChartCard } from "./ChartCard";
+export { ChartCardVisual } from "./ChartCardVisual";
 export { CountdownTimer } from "./CountdownTimer";
 export { DangerousActionDialog } from "./DangerousActionDialog";
 export { HostLockBadge } from "./HostLockBadge";

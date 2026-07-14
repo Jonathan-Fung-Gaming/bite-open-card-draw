@@ -350,9 +350,7 @@ test("PFR-023 browser tiebreak evidence keeps winner sealed until reveal complet
       Array.from({ length: 12 }, (_, index) => index * 30),
     );
     expect(slotOrientations.every((slot) => slot.bottomFacesCenter)).toBe(true);
-    await expect(stageRawPage.getByTestId("rune-wheel-status")).toHaveText(
-      "Tiebreak selector is spinning.",
-    );
+    await expect(stageRawPage.getByTestId("rune-wheel-status")).toHaveText("");
     await expect(stageRawPage.getByTestId("result-selected-label")).toHaveCount(0, {
       timeout: 500,
     });

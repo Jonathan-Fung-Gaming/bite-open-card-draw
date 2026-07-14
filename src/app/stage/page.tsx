@@ -71,7 +71,7 @@ function stageTimerCaption(snapshot: VotingRoundSnapshot, bothSetsDrawn: boolean
     return `${turnout}. ${bans}. All eligible players submitted; final changes are open.`;
   }
 
-  return `${turnout}. ${bans}. One window covers both sets.`;
+  return `${turnout}. ${bans}.`;
 }
 
 function revealLabel(phase: string) {
@@ -194,11 +194,7 @@ export default async function StagePage() {
             jitterMs={STAGE_LIVE_REFRESH_JITTER_MS}
           />
           <main className="min-h-screen">
-            <RoundHeader
-              title={`ROUND ${roundNumber} FINAL CHARTS`}
-              status="Final charts selected"
-              compact
-            />
+            <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} compact />
             <section className="px-5 py-5 lg:px-8">
               <div
                 className="grid min-h-[calc(100vh-220px)] gap-6 md:grid-cols-2"

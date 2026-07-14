@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
-import { ChartArtImage } from "@/components";
+import { ChartArtImage, ChartCardVisual } from "@/components";
 import { FALLBACK_CHART_IMAGE_PATH } from "@/lib/charts/image-paths";
 import type { DrawRecord } from "@/lib/draw/draw-state";
 import type { BallotSetChoice, PublicBallotLookup, PublicEditableBallot } from "@/lib/vote/ballot";
@@ -28,6 +28,7 @@ import {
   getVoteLiveStateAction,
   submitRoundBallotAction,
 } from "./actions";
+import { UsernameSelectField } from "./UsernameSelectField";
 
 export type BallotFlowProps = {
   closesAt: string | null;
@@ -1266,20 +1267,11 @@ export function BallotFlow({
             {changesUnavailableCopy}
           </p>
         ) : null}
-        <label
-          className="text-sm font-bold uppercase tracking-[0.16em] text-ember-300"
-          htmlFor="startgg-username"
-        >
-          Select your start.gg username
-        </label>
-        <select
-          id="startgg-username"
-          className="mt-3 w-full rounded border border-metal-700 bg-black/35 px-3 py-3 text-white"
+        <UsernameSelectField
           disabled={!hydrated || deviceIdentityLocked}
+          players={players}
           value={selectedPlayerId}
-          onChange={(event) => {
-            const playerId = event.target.value;
-
+          onChange={(playerId) => {
             lookupRequestRef.current += 1;
             setSelectedPlayerId(playerId);
             setConfirmed(false);
@@ -1299,14 +1291,7 @@ export function BallotFlow({
               setLookupPending(false);
             }
           }}
-        >
-          <option value="">Choose username</option>
-          {players.map((player) => (
-            <option key={player.id} value={player.id}>
-              {player.startggUsername}
-            </option>
-          ))}
-        </select>
+        />
         {deviceIdentityLocked && selectedPlayer ? (
           <p
             className="mt-3 rounded border border-metal-700 bg-black/25 p-3 text-sm font-bold text-metal-300"
@@ -1699,15 +1684,14 @@ export function BallotFlow({
               disabled={ballotControlsDisabled}
               type="button"
             >
-              <ChartArtImage
-                src={imagePath}
-                className="absolute inset-0 h-full w-full object-cover opacity-90"
-                testId="ballot-chart-image"
-              />
-              <span className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/10" />
-              {selected ? <span className="absolute inset-0 border-2 border-red-500/90" /> : null}
-              <span className="relative flex min-h-24 flex-col justify-between p-2 sm:min-h-56 sm:p-3">
-                <span className="flex items-start justify-end gap-1 text-[10px] font-bold uppercase text-ember-300 sm:gap-2 sm:text-xs">
+              <ChartCardVisual
+                artist={chart.artist}
+                imagePath={imagePath}
+                imageTestId="ballot-chart-image"
+                name={chart.name}
+                selected={selected}
+                variant="ballot"
+                badge={
                   <span
                     className={clsx(
                       "rounded border px-1 py-0.5 font-black sm:px-1.5",
@@ -1719,16 +1703,8 @@ export function BallotFlow({
                   >
                     {selected ? "Ban selected" : "Tap to ban"}
                   </span>
-                </span>
-                <span>
-                  <span className="block break-words text-[11px] font-black uppercase leading-tight text-white line-clamp-2 sm:text-base sm:line-clamp-3">
-                    {chart.name}
-                  </span>
-                  <span className="mt-1 block break-words text-[10px] font-semibold text-metal-300 line-clamp-1 sm:text-sm sm:line-clamp-2">
-                    {chart.artist}
-                  </span>
-                </span>
-              </span>
+                }
+              />
             </button>
           );
         })}
