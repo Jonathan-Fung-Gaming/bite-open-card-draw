@@ -29,12 +29,20 @@ export class ResultsPage {
             .getByTestId("stage-chart-card")
             .count()
             .catch(() => 0);
-          const fullCountsVisible = await this.page
+          const desktopCountsVisible = await this.page
             .getByRole("heading", { name: "Ban counts" })
             .isVisible()
             .catch(() => false);
+          const mobileCountsVisible = await this.page
+            .getByText("Show Ban Counts", { exact: true })
+            .isVisible()
+            .catch(() => false);
 
-          return headingVisible && selectedCardCount === 2 && fullCountsVisible;
+          return (
+            headingVisible &&
+            selectedCardCount === 2 &&
+            (desktopCountsVisible || mobileCountsVisible)
+          );
         },
         { timeout: HOSTED_REFRESH_TIMEOUT_MS },
       )

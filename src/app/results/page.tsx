@@ -150,10 +150,11 @@ export default async function ResultsPage() {
       <main className="min-h-screen">
         <ResultsAutoRefresh />
         <RoundHeader
+          mobileCompact
           title={`ROUND ${roundNumber} FINAL CHARTS`}
           status={routeState.showPreviousRoundResult ? "Previous round results" : undefined}
         />
-        <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
+        <section className="mx-auto grid max-w-7xl gap-3 px-3 py-3 md:gap-5 md:px-5 md:py-5">
           {routeState.showPreviousRoundResult ? (
             <div
               className="metal-panel rounded-lg border border-ember-300/30 p-4 text-center"
@@ -170,7 +171,7 @@ export default async function ResultsPage() {
               </p>
             </div>
           ) : null}
-          <PublicResultSummary result={result} />
+          <PublicResultSummary compactMobileResults result={result} />
         </section>
       </main>
     </PublicRouteFreshnessGuard>

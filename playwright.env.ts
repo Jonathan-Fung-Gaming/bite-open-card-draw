@@ -17,6 +17,20 @@ const usesHarnessConfig = process.argv.some(
 const usesPhase9Full = process.argv.some((arg) => arg.includes("@full"));
 
 function getProfileDefaults() {
+  if (e2eProfile === "phase6-memory") {
+    return {
+      backend: "memory",
+      serverMode: "dev",
+      disableAdminSessionHeartbeat: "true",
+      disableHostHeartbeat: "true",
+      disableVoteLivePolling: "false",
+      disablePublicRefresh: "false",
+      allowE2eRoutes: "true",
+      allowMemoryBackend: "true",
+      phase9BallotMode: undefined,
+    };
+  }
+
   if (
     e2eProfile === "memory-dev-smoke" ||
     e2eProfile === "phase3-memory" ||
