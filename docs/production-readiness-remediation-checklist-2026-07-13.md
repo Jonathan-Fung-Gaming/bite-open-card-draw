@@ -5,6 +5,10 @@ Companion plan: `docs/production-readiness-remediation-plan-2026-07-13.md`.
 Do not check an item by intent alone. Closure requires code/evidence, all applicable phase gates,
 self-review, merged PR evidence, and post-merge migration verification when applicable.
 
+Beginning with Phase 5, phase gates use targeted browser/e2e coverage only. Do not repeat the
+comprehensive default/full-tournament Playwright suite for each future phase. Record one
+operator-run manual end-of-plan smoke test during Phase 7 instead.
+
 ## Authoritative Decisions
 
 - [x] Tiebreak duration is locked at 10 seconds.
@@ -177,8 +181,8 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 - [x] Lint, typecheck, unit, build, e2e, hosted Supabase, and performance checks pass.
 - [x] Logic/security/UX/UI diff review completed with findings resolved.
 - [x] Checklist/phase-status evidence recorded.
-- [ ] Phase PR merged.
-- [ ] Supabase migrations pushed after merge and verified when present.
+- [x] Phase PR merged.
+- [x] Supabase migrations pushed after merge and verified when present.
 
 ## Phase 5 - Branding, Copy, Charts, And Select
 
@@ -270,7 +274,9 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 - [ ] Typecheck passes.
 - [ ] Full unit suite passes.
 - [ ] Build passes.
-- [ ] Default e2e passes.
+- [ ] Targeted automated browser evidence from the applicable remediation phases passes.
+- [ ] Operator-run manual end-of-plan smoke test is completed and recorded; a comprehensive
+      automated Playwright end-to-end run is not required.
 - [ ] Hosted Supabase transition/concurrency suite passes.
 - [ ] Mobile Chromium and WebKit evidence passes.
 - [ ] Logo early-frame evidence passes.

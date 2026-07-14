@@ -19,10 +19,25 @@ status text when there is a conflict.
 
 ## Production Readiness Remediation Phase 4 - Fast Two-Column Roster - 2026-07-14
 
-Status: implementation and the complete pre-merge phase gate are complete. The intentional diff is
-ready for pull request and CI. Phase 4 remains open until that pull request is merged, the linked
-production target is reverified, migration `20260714020000` is pushed after deployment, local/remote
-migration parity and database lint pass, and the required post-merge hosted rehearsals pass.
+Status: complete. Phase 4 merged in
+[PR #107](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/107) as `b763c78`
+after the required Quality Gates check passed. The linked production target was reverified,
+migration `20260714020000` was pushed, exact local/remote migration parity passed, and linked
+database lint reported no schema errors. Per the tournament owner's 2026-07-14 direction, the
+comprehensive four-round rehearsal is deferred to the manual Phase 7 end-of-plan smoke and is not a
+Phase 4 closeout gate.
+
+### Post-Merge Closeout Evidence
+
+- GitHub Quality Gates passed for PR #107 before merge; the merged commit is `b763c78`.
+- `npx supabase migration list --linked` showed exact local/remote parity through
+  `20260714020000`, and `npx supabase db lint --linked --level error --fail-on error` returned no
+  schema errors.
+- A clean merged-tree closeout rerun passed lint, typecheck, all 78 unit-test files / 554 tests, the
+  optimized production build, and the targeted Phase 4 desktop/Pixel 5 memory suite (2 passed, 2
+  intentional cross-project skips).
+- The comprehensive four-round automation is not counted as Phase 4 evidence. The owner will record
+  the 48 -> 36 -> 24 -> 12 tournament smoke manually during Phase 7 closeout.
 
 ### Scope And Changed Files
 
@@ -136,9 +151,10 @@ migration parity and database lint pass, and the required post-merge hosted rehe
   tournament controls remain compatible.
 - The migration is additive. Rollback keeps it applied and deploys a forward application patch; it
   must not delete roster generations, players, audits, or eligibility rows.
-- The final post-merge production-flow run must start Round 1 with 48 active voting players, remove
-  exactly 12 before each later round, and verify 36, 24, and 12. Phase 4 is not complete until that
-  evidence and a fresh post-merge disposable-preview Phase 4 run pass.
+- The final manual Phase 7 smoke must start Round 1 with 48 active voting players, remove exactly 12
+  before each later round, and verify 36, 24, and 12. The tournament owner explicitly deferred this
+  comprehensive rehearsal from the Phase 4 gate on 2026-07-14; targeted Phase 4 browser, hosted,
+  performance, propagation, eligibility, and migration evidence remains complete.
 - This phase changes no round, chart-set, seven-chart draw, 10-minute window, two-ban, least-ban,
   server-tiebreak, final-reveal, identity-confirmation, or dangerous-action rule.
 
