@@ -523,6 +523,7 @@ test("@phase6 mobile final results fit and remain accessible in Chromium and Web
           const numericCounts = counts.map((text) => Number.parseInt(text, 10));
 
           expect(numericCounts).toEqual([...numericCounts].sort((left, right) => left - right));
+          expect(numericCounts).toContain(0);
         }
         await expect(details.getByTestId("result-selected-label")).toHaveCount(2);
         await expect(details).not.toContainText("%");
@@ -546,6 +547,9 @@ test("@phase6 mobile final results fit and remain accessible in Chromium and Web
       ).toBeVisible();
       await resultsPage.evaluate(() => window.scrollTo(0, 0));
       await settleVisuals(resultsPage);
+      if (viewportIndex === 0) {
+        await expect(await visibleMobileDisclosure(resultsPage)).toHaveAttribute("open", "");
+      }
       const stress = await stressWrappedNames(resultsPage);
 
       expect(stress.titleText).toEqual([LONG_UNBROKEN_TITLE, LONG_UNBROKEN_TITLE]);

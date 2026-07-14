@@ -168,9 +168,9 @@ and 390x844 in Chromium and WebKit.
 7. Assert the visible disclosure is a native details/summary pair, has accessible name
    `Show Ban Counts`, is at least 44px high, receives keyboard focus, toggles with Enter/Space and
    touch/click, and exposes two labelled seven-row ordered lists when open.
-8. Open the disclosure, wait longer than the 1,000ms results auto-refresh interval with refresh
+8. Open the disclosure, observe the next completed results-router refresh with the 1,000ms refresh
    enabled, and assert it remains open. Also confirm the persisted state is scoped to the current
-   result id.
+   result id and restores after a hard reload.
 9. Expanded, assert no percentages, 14 total rows, both selected markers, nondecreasing ban counts
    within each list, no horizontal overflow/zoom, normal vertical scrolling, and reachability of the
    final row.
@@ -261,8 +261,8 @@ following gaps were found and resolved in this plan before implementation:
 2. The parent plan says "accepted minimum" without a number. The Phase 0/existing readability
    contract is now locked at 12px for title, artist, and difficulty evidence.
 3. A Phase 5 profile would disable public refresh and create false disclosure-persistence evidence.
-   The Phase 6 profile must explicitly keep automatic refresh enabled and observe more than one
-   1,000ms interval.
+   The Phase 6 profile must explicitly keep automatic refresh enabled, observe a completed refresh
+   before interaction, and observe the next completed refresh after opening the disclosure.
 4. The previous-round notice is allowed to add height. The plan now separates its safety/containment
    test from normal current-round final fold-fit evidence.
 5. Shared-component edits could regress `/vote`, `/charts`, or desktop results. The variant is now
