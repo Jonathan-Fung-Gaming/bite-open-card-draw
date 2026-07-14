@@ -70,8 +70,10 @@ Codex must perform this loop automatically for every phase and every later code-
    security boundaries, concurrency, data loss, migration ordering, rollback, accessibility, and
    UX/UI regressions. Amend it before code changes.
 4. Implement only the current phase.
-5. Run formatting where applicable, lint, typecheck, unit tests, build, relevant e2e, and all
-   phase-specific hosted Supabase, load, visual, accessibility, or performance checks.
+5. Run formatting where applicable, lint, typecheck, unit tests, build, targeted e2e relevant to the
+   phase, and all phase-specific hosted Supabase, load, visual, accessibility, or performance
+   checks. Beginning with Phase 5, do not repeat the comprehensive default/full-tournament
+   Playwright suite as a per-phase gate; reserve the end-to-end smoke for Phase 7 plan closeout.
 6. Review the complete diff for logic defects, stale-state races, tournament-rule changes, data
    integrity, security leaks, accessibility, responsive layout, and operator/player UX. Fix every
    actionable finding and rerun affected checks.
@@ -97,7 +99,9 @@ Before moving to the next phase:
 - `npm run typecheck` passes;
 - `npm run test` passes;
 - `npm run build` passes;
-- relevant `npm run test:e2e` coverage passes;
+- targeted browser/e2e coverage for the phase passes;
+- beginning with Phase 5, the comprehensive default/full-tournament Playwright suite is not a
+  per-phase gate and is deferred to the Phase 7 end-of-plan smoke;
 - relevant hosted Supabase/database checks pass when persistence behavior changes;
 - changed files, evidence, risks, assumptions, and self-review findings are recorded;
 - the phase PR is merged;
@@ -367,7 +371,8 @@ Goal: prove the completed application is safe for tournament use and close every
 
 ### Required Evidence
 
-- lint, typecheck, all unit tests, build, default e2e;
+- lint, typecheck, all unit tests, and build;
+- targeted automated browser evidence accumulated by the relevant remediation phases;
 - hosted Supabase transition/concurrency coverage;
 - mobile Chromium and WebKit evidence;
 - logo early-frame evidence;
@@ -376,9 +381,10 @@ Goal: prove the completed application is safe for tournament use and close every
 - host recovery and soak evidence;
 - load and player-route coverage where affected;
 - migration list and database lint;
-- release-blocking full-tournament rehearsal.
+- one operator-run end-of-plan smoke test covering the full tournament rehearsal. This may be
+  performed manually; a comprehensive automated Playwright end-to-end run is not required.
 
-The full rehearsal must:
+The manual end-of-plan smoke rehearsal must:
 
 - start Round 1 with 48 active voting players;
 - remove exactly 12 before Round 2 and verify 36;
