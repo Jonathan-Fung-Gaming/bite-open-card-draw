@@ -275,7 +275,7 @@ Goal: make the roster fast, directly editable, and safe under rapid tournament-f
   usernames, ballots, secrets, or service credentials.
 - Keep phones on normal/light polling; refresh player state on a newer roster generation.
 - Preserve current-round eligibility snapshots. Routine changes affect future rounds only.
-- Render exactly two roster columns: Username and Active/inactive control.
+- Render exactly two roster columns: Username and Active Control.
 - Username displays as text until double-click, touch activation, or Enter/F2 starts in-cell editing.
 - Enter saves, Escape cancels, focus is restored predictably, and Save/Cancel remain inside the
   username cell without recreating an Edit column.

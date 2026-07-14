@@ -53,7 +53,7 @@ export function StageDrawCard({
           <h3
             className={clsx(
               "line-clamp-2 break-words font-black uppercase leading-tight text-white",
-              featured ? "text-4xl xl:text-5xl" : "text-sm lg:text-base 2xl:text-lg",
+              featured ? "text-[44px]" : "text-sm lg:text-base 2xl:text-lg",
             )}
             data-testid="stage-chart-title"
           >

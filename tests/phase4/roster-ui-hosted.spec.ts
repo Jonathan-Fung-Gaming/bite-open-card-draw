@@ -28,11 +28,10 @@ test("@phase4-hosted rapid roster changes confirm and propagate within targets",
 
     const table = page.getByTestId("admin-roster-table");
 
-    await expect(table.getByRole("columnheader")).toHaveText([
-      "Username",
-      "Active/inactive control",
-    ]);
+    await expect(table.getByRole("columnheader")).toHaveText(["Username", "Active Control"]);
     await expect(table.getByRole("columnheader")).toHaveCount(2);
+    await expect(table.getByText("Active", { exact: true })).toHaveCount(0);
+    await expect(table.getByText("Inactive", { exact: true })).toHaveCount(0);
     await expect(table.locator('input[name="startggUsername"]')).toHaveCount(0);
 
     const lockedRow = page.getByTestId("admin-roster-row").filter({ hasText: "Phase4 Player 48" });

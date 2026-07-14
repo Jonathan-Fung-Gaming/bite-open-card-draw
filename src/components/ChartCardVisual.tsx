@@ -76,7 +76,7 @@ export function ChartCardVisual({
                 {name}
               </h3>
               <p
-                className="mt-1 block break-words text-[10px] font-semibold text-metal-300 line-clamp-2 sm:text-sm md:line-clamp-none"
+                className="mt-1 block break-words text-xs font-semibold text-metal-300 line-clamp-2 sm:text-sm md:line-clamp-none"
                 data-testid="chart-card-artist"
               >
                 {artist}

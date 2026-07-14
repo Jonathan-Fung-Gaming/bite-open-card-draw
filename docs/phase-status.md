@@ -17,6 +17,71 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Roster Active Control UI Follow-Up - 2026-07-15
+
+Status: validated locally and ready for PR merge. No Supabase migration is applicable.
+
+### Scope
+
+- Renamed the roster action column to `Active Control`.
+- Removed the visible `Active` / `Inactive` status label from the control column.
+- Restored username color state in the roster: active usernames render green and inactive usernames
+  render red. The `Mark Inactive` / `Reactivate` action text remains as the non-color state cue.
+- Updated current production-readiness roster wording to the new `Active Control` header.
+- Repaired two default-suite visual blockers exposed during validation: view-only `/charts` artist
+  metadata now uses the existing 12px mobile minimum, and featured final-stage chart titles use the
+  existing 44px projector minimum to avoid unnecessary third-line wrapping with the synthetic long
+  title.
+
+### Changed Files
+
+- Added `docs/phase-plans/roster-active-control-ui-follow-up-2026-07-15.md`.
+- Added `docs/roster-active-control-ui-follow-up-checklist-2026-07-15.md`.
+- Updated `src/app/coolguy69/_components/AdminRosterPanel.tsx`.
+- Updated `src/components/ChartCardVisual.tsx`.
+- Updated `src/components/StageDrawCard.tsx`.
+- Updated `tests/e2e/full-flow.spec.ts`.
+- Updated `tests/phase4/roster-ui-memory.spec.ts`.
+- Updated `tests/phase4/roster-ui-hosted.spec.ts`.
+- Updated `docs/production-readiness-remediation-plan-2026-07-13.md`.
+- Updated `docs/production-readiness-remediation-checklist-2026-07-13.md`.
+
+### Checks Run
+
+- `npx prettier --write ...` - passed for changed code, tests, and follow-up docs.
+- `npm run lint` - passed after final changes.
+- `npm run typecheck` - passed after final changes.
+- `npm run test` - passed after final changes, 82 files / 566 tests.
+- `npm run build` - passed after final changes with Next.js 15.5.19.
+- `npm run test:phase4:memory` - passed after final changes, two applicable roster UI tests and
+  two intentional cross-project skips.
+- `npm run test:e2e -- tests/e2e/mobile-routes.spec.ts --grep "mobile routes"` - passed after the
+  mobile metadata fix in Chromium and WebKit.
+- `npm run test:e2e` - passed after final changes, all six default Playwright tests.
+- `git diff --check` - passed; Git reported line-ending normalization warnings only.
+- Secret-pattern scan over changed source/test/follow-up files found only an existing test
+  `process.env` reference in `tests/e2e/full-flow.spec.ts`.
+
+### Review
+
+- Manual review compared the diff against `docs/product-spec.md`, `docs/security-notes.md`, the
+  active remediation plan/checklist, and the follow-up plan.
+- No tournament rules, voting windows, draw selection, tiebreak authority, result ordering,
+  current-round eligibility snapshots, roster mutations, active-host checks, dangerous actions,
+  database schema, or secrets boundary changed.
+- The roster still has exactly two visible columns and uses row `data-active`, action labels, and
+  active counts as non-color state evidence.
+- The mobile `/charts` and final-stage title changes are presentation-only repairs for existing
+  browser contracts exposed by required validation.
+
+### Risks And Assumptions
+
+- Hosted Supabase roster/performance tests were not rerun because this follow-up does not change
+  roster persistence, RPCs, transactions, migrations, or invalidation behavior.
+- The default e2e server still logs the expected duplicate-device rejection during the smoke flow,
+  but the suite passes and the rejection is not introduced by this change.
+- Rollback is a normal application revert; no data or schema rollback is required.
+
 ## Production Readiness Remediation Phase 6 - Mobile Results - 2026-07-14
 
 Status: complete. Phase 6 implementation merged in

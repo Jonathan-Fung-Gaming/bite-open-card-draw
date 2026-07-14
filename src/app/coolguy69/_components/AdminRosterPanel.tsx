@@ -32,6 +32,10 @@ type AdminRosterPanelProps = {
 const NEUTRAL_ROSTER_BUTTON_CLASS =
   "rounded border border-metal-700 px-3 py-2 text-xs font-bold uppercase text-metal-300 hover:border-ember-300/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-40";
 
+function usernameStateClass(active: boolean) {
+  return active ? "text-green-200" : "text-red-300";
+}
+
 function normalizeUsername(value: string) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
@@ -290,7 +294,7 @@ export function AdminRosterPanel({
                 Username
               </th>
               <th className="px-3 py-3" scope="col">
-                Active/inactive control
+                Active Control
               </th>
             </tr>
           </thead>
@@ -376,7 +380,7 @@ export function AdminRosterPanel({
                         data-testid="admin-roster-username-locked"
                       >
                         <p
-                          className="font-semibold text-white [overflow-wrap:anywhere]"
+                          className={`font-semibold ${usernameStateClass(player.active)} [overflow-wrap:anywhere]`}
                           data-testid="admin-roster-username"
                         >
                           {player.startggUsername}
@@ -398,7 +402,7 @@ export function AdminRosterPanel({
                           }
                         }}
                         aria-label={`Edit username ${player.startggUsername}`}
-                        className="block min-h-11 max-w-full cursor-text touch-manipulation text-left font-semibold text-white [overflow-wrap:anywhere] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ember-300"
+                        className={`block min-h-11 max-w-full cursor-text touch-manipulation text-left font-semibold ${usernameStateClass(player.active)} [overflow-wrap:anywhere] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ember-300`}
                         data-testid="admin-roster-username"
                         type="button"
                         onDoubleClick={() => beginEditing(player)}
@@ -409,7 +413,7 @@ export function AdminRosterPanel({
                       </button>
                     ) : (
                       <p
-                        className="font-semibold text-white [overflow-wrap:anywhere]"
+                        className={`font-semibold ${usernameStateClass(player.active)} [overflow-wrap:anywhere]`}
                         data-testid="admin-roster-username"
                       >
                         {player.startggUsername}
@@ -417,9 +421,6 @@ export function AdminRosterPanel({
                     )}
                   </td>
                   <td className="min-w-0 px-3 py-3">
-                    <p className="mb-1 text-xs font-semibold text-metal-300">
-                      {player.active ? "Active" : "Inactive"}
-                    </p>
                     <button
                       aria-busy={pending ? "true" : undefined}
                       aria-label={`${player.active ? "Mark inactive" : "Reactivate"} ${player.startggUsername}`}
