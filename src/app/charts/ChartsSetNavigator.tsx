@@ -3,22 +3,27 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { PublicDrawSetPanel } from "@/components";
-import type { PublicChartsSetView } from "@/lib/charts/public-chart-view";
+import {
+  filterPublicChartsDrawForReveal,
+  type PublicChartsSetView,
+} from "@/lib/charts/public-chart-view";
 
 type ChartsSetNavigatorProps = {
+  serverNowMs: number;
   sets: PublicChartsSetView[];
-  status: {
-    label: string;
-    detail: string;
-    timerText?: string | null;
-  };
+  showAllDrawCards: boolean;
 };
 
 const ACTIVE_SET_STORAGE_KEY = "bite-open-card-draw:view-only-active-set";
 
-export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
+export function ChartsSetNavigator({
+  serverNowMs,
+  sets,
+  showAllDrawCards,
+}: ChartsSetNavigatorProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hydrated, setHydrated] = useState(false);
+  const [nowMs, setNowMs] = useState(serverNowMs);
   const maxActiveIndex = Math.max(sets.length - 1, 0);
   const drawnIndexes = sets.flatMap(({ draw }, index) => (draw ? [index] : []));
   const partiallyDrawn = drawnIndexes.length > 0 && drawnIndexes.length < sets.length;
@@ -49,6 +54,29 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
   }, [fallbackActiveIndex, maxActiveIndex, partiallyDrawn, sets]);
 
   useEffect(() => {
+    setNowMs(serverNowMs);
+
+    if (showAllDrawCards) {
+      return undefined;
+    }
+
+    const hasActiveReveal = sets.some(
+      ({ draw, revealStartsAt }) => draw && revealStartsAt && revealStartsAt.length > 0,
+    );
+
+    if (!hasActiveReveal) {
+      return undefined;
+    }
+
+    const basePerformanceMs = window.performance.now();
+    const intervalId = window.setInterval(() => {
+      setNowMs(serverNowMs + window.performance.now() - basePerformanceMs);
+    }, 250);
+
+    return () => window.clearInterval(intervalId);
+  }, [serverNowMs, sets, showAllDrawCards]);
+
+  useEffect(() => {
     if (!hydrated) {
       return;
     }
@@ -57,24 +85,7 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
   }, [boundedActiveIndex, hydrated]);
 
   return (
-    <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
-      <div className="metal-panel rounded-lg p-4" data-testid="view-only-status">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-              View charts only - no votes recorded
-            </p>
-            <h2 className="mt-1 text-xl font-black uppercase text-white">{status.label}</h2>
-          </div>
-          {status.timerText ? (
-            <p className="font-mono text-3xl font-black tabular-nums text-white">
-              {status.timerText}
-            </p>
-          ) : null}
-        </div>
-        <p className="mt-2 text-sm text-metal-300">{status.detail}</p>
-      </div>
-
+    <section className="mx-auto grid max-w-7xl gap-2 px-2 py-2 md:gap-5 md:px-5 md:py-5">
       <div
         className="grid grid-cols-2 gap-2 md:hidden"
         role="tablist"
@@ -84,19 +95,20 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
           const tabAvailable = !partiallyDrawn || Boolean(draw);
 
           return (
-            <a
+            <button
+              type="button"
               key={set.displayLabel}
               aria-controls={`view-only-set-${set.setOrder}`}
               aria-disabled={tabAvailable ? undefined : "true"}
               aria-selected={boundedActiveIndex === index}
               className={clsx(
-                "rounded border px-3 py-3 text-sm font-black uppercase",
+                "min-h-9 rounded border px-2 py-2 text-xs font-black uppercase leading-none whitespace-nowrap",
                 boundedActiveIndex === index
                   ? "border-ember-300 bg-ember-900/35 text-white"
                   : "border-metal-700 bg-black/25 text-metal-300",
                 !tabAvailable && "opacity-55",
               )}
-              href={tabAvailable ? `#view-only-set-${set.setOrder}` : "#"}
+              disabled={!tabAvailable}
               onClick={(event) => {
                 if (!tabAvailable) {
                   event.preventDefault();
@@ -108,27 +120,48 @@ export function ChartsSetNavigator({ sets, status }: ChartsSetNavigatorProps) {
               }}
               role="tab"
             >
-              View Set {set.setOrder}
-              <span className="block font-mono text-xs">{set.displayLabel}</span>
-            </a>
+              VIEW SET {set.setOrder} ({set.displayLabel})
+            </button>
           );
         })}
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        {sets.map(({ set, draw }, index) => (
-          <div
-            key={set.displayLabel}
-            className={clsx(
-              !hydrated || index === boundedActiveIndex ? "block" : "hidden",
-              "md:block",
-            )}
-            id={`view-only-set-${set.setOrder}`}
-            role="tabpanel"
-          >
-            <PublicDrawSetPanel set={set} draw={draw} />
-          </div>
-        ))}
+      <div className="grid gap-2 md:grid-cols-2 md:gap-5">
+        {sets.map((setView, index) => {
+          const { set } = setView;
+          const visibleDraw = filterPublicChartsDrawForReveal(setView, {
+            nowMs,
+            showAllCharts: showAllDrawCards,
+          });
+          const visibleCount = visibleDraw?.charts.length ?? 0;
+          const revealStatus =
+            setView.draw && !showAllDrawCards
+              ? setView.revealStartsAt === null
+                ? "Queued for reveal"
+                : setView.revealStartsAt !== undefined && visibleCount < set.drawCount
+                  ? `Revealing ${visibleCount} / ${set.drawCount}`
+                  : null
+              : null;
+
+          return (
+            <div
+              key={set.displayLabel}
+              className={clsx(
+                !hydrated || index === boundedActiveIndex ? "block" : "hidden",
+                "md:block",
+              )}
+              id={`view-only-set-${set.setOrder}`}
+              role="tabpanel"
+            >
+              <PublicDrawSetPanel
+                compactMobile
+                draw={visibleDraw}
+                revealStatus={revealStatus}
+                set={set}
+              />
+            </div>
+          );
+        })}
       </div>
     </section>
   );

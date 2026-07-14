@@ -5741,3 +5741,83 @@ Status: complete for local memory validation, production build, and full Playwri
 - The new Supabase migration must be applied before relying on device binding in a hosted Supabase
   event namespace. Local automated coverage validates the SQL contract and memory behavior; no
   destructive Supabase-dev run was authorized or required for this focused remediation.
+
+## Mobile Charts And Results Follow-Up - 2026-07-15
+
+Status: implemented locally and awaiting user screenshot approval before commit/PR finalization.
+
+### Scope
+
+- Removed redundant view-only informational panels from `/charts`.
+- Replaced mobile `/charts` hash-link tabs with non-navigating one-line tab buttons.
+- Added stage-timed `/charts` reveal filtering so unrevealed chart title/artist metadata does not
+  leak before stage timing reaches that card, while voting-era states still show all drawn cards.
+- Added a `/results`-only compact mobile result presentation with image-toggled, set-specific ban
+  counts.
+- Left `/stage` result rendering and desktop result details on their existing presentation paths.
+
+### Changed Files
+
+- Added the implementation plan and checklist:
+  `docs/phase-plans/mobile-charts-results-follow-up-2026-07-15.md`,
+  `docs/mobile-charts-results-follow-up-checklist-2026-07-15.md`.
+- Updated `/charts` routing and rendering in `src/app/charts/page.tsx`,
+  `src/app/charts/ChartsSetNavigator.tsx`, `src/lib/charts/public-chart-view.ts`,
+  `src/components/PublicDrawSetPanel.tsx`, `src/components/ChartCardVisual.tsx`, and
+  `src/app/globals.css`.
+- Updated `/results` compact rendering in `src/components/PublicResultSummary.tsx` and added
+  `src/components/MobilePublicResultSummary.tsx`.
+- Added the collapsed-state mobile `/results` prompt:
+  `CLICK A CHART TO VIEW BAN COUNTS`.
+- Preserved the legacy `src/components/ResultsBanCountDisclosure.tsx` implementation for unused
+  compatibility.
+- Added dedicated verification in `src/components/mobile-charts-results-follow-up.test.tsx`,
+  `playwright.mobile-charts-results-follow-up.config.ts`, and
+  `tests/mobile-charts-results-follow-up/`.
+
+### Checks Run
+
+- `npx vitest run src/components/mobile-charts-results-follow-up.test.tsx` - passed, 4 tests.
+- `node scripts/run-playwright.mjs --profile=phase6-memory test --config=playwright.mobile-charts-results-follow-up.config.ts`
+  - passed, 2 dedicated Playwright tests.
+- `$env:E2E_PROFILE='phase6-memory'; npx playwright test --config=playwright.mobile-charts-results-follow-up.config.ts`
+  - passed, 2 dedicated Playwright tests, used to generate stable screenshot artifacts after the
+    wrapper left a stale lock.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run build` - passed.
+- `git diff --check` - passed with line-ending warnings only.
+
+Existing/default unit suites, existing/default e2e suites, and the full-tournament Playwright
+rehearsal were not run for this book of work, per user request.
+
+### Screenshot Evidence
+
+- `/charts` mobile 390px Set 2:
+  `test-results/mobile-charts-results-ui---0eff3-p-reveal-tab-scroll-and-fit-mobile-charts-results-follow-up-chromium/charts-mobile-390-set-2.png`.
+- `/results` mobile 390px collapsed:
+  `test-results/mobile-charts-results-ui---bb0a9-ure-fit-and-stage-isolation-mobile-charts-results-follow-up-chromium/results-mobile-390-collapsed.png`.
+- `/results` mobile 390px Set 1 expanded:
+  `test-results/mobile-charts-results-ui---bb0a9-ure-fit-and-stage-isolation-mobile-charts-results-follow-up-chromium/results-mobile-390-set-1-expanded.png`.
+
+### Review Findings
+
+- Fixed a type-safety regression by keeping `PublicChartsSetDefinition` narrowed to the relevant
+  `RoundSetDefinition` fields.
+- Kept desktop result presentation unchanged; the new prompt and expanded ban panel remain
+  mobile-only.
+- Confirmed the new mobile result rows omit repeated difficulty, selected/least-ban labels, bars,
+  and percentages.
+- Removed the compact `/results` winner-card ordinal labels such as `01` and `02`.
+- Confirmed the collapsed mobile `/results` prompt appears as a one-line box and disappears while a
+  chart is expanded.
+- Confirmed no Supabase migrations are applicable.
+
+### Risks And Assumptions
+
+- The new `/charts` behavior uses the existing stage reveal clock helper rather than a separate
+  phone-only reveal rule.
+- The new `/results` mobile disclosure starts collapsed on each route render and intentionally does
+  not persist open state across refresh.
+- Commit, PR, merge, and any post-merge synchronization are deferred until user approval of the
+  screenshot evidence.

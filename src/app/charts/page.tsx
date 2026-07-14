@@ -6,12 +6,7 @@ import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydratePublicTournamentState } from "@/lib/server/persistence";
 import { advanceVotingTimerIfDue, getVotingRoundSnapshot } from "@/lib/server/voting-round";
-import { buildStageRoundView } from "@/lib/stage/stage-view";
-import {
-  formatVotingStatusLabel,
-  formatVotingTime,
-  type VotingRoundSnapshot,
-} from "@/lib/vote/voting-window";
+import { buildStageRoundView, stageShouldShowAllDrawCards } from "@/lib/stage/stage-view";
 import { toPublicChartsSetViews } from "@/lib/charts/public-chart-view";
 import { shouldShowFinalPhoneResults } from "@/lib/vote/phone-view";
 import { ChartsAutoRefresh } from "./ChartsAutoRefresh";
@@ -22,62 +17,6 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "View Charts",
 };
-
-function chartsStatus(snapshot: VotingRoundSnapshot, drawnSetCount: number) {
-  if (drawnSetCount === 0) {
-    return {
-      label: "Awaiting first chart set",
-      detail: "Chart sets will appear here as they are drawn.",
-      timerText: null,
-    };
-  }
-
-  if (drawnSetCount === 1) {
-    return {
-      label: "One chart set drawn",
-      detail: "One chart set is visible. The second set appears after the next draw.",
-      timerText: null,
-    };
-  }
-
-  if (
-    snapshot.status === "voting_open" ||
-    snapshot.status === "final_30_seconds" ||
-    snapshot.status === "extension_1_minute"
-  ) {
-    return {
-      label: formatVotingStatusLabel(snapshot.status),
-      detail: "Use the tabs to inspect either set while voting is open.",
-      timerText: formatVotingTime(snapshot.remainingMs),
-    };
-  }
-
-  if (snapshot.status === "ready_to_vote") {
-    return {
-      label: formatVotingStatusLabel(snapshot.status),
-      detail: "Both chart sets are drawn. Voting has not opened yet.",
-      timerText: null,
-    };
-  }
-
-  if (
-    snapshot.status === "voting_closed" ||
-    snapshot.status === "results_computed" ||
-    snapshot.status === "results_revealing"
-  ) {
-    return {
-      label: "Results being revealed",
-      detail: "Voting is closed. Results are being revealed on stage.",
-      timerText: null,
-    };
-  }
-
-  return {
-    label: formatVotingStatusLabel(snapshot.status),
-    detail: "Use the tabs to inspect the current chart sets.",
-    timerText: snapshot.canSubmit ? formatVotingTime(snapshot.remainingMs) : null,
-  };
-}
 
 export default async function ChartsPage() {
   await hydratePublicTournamentState();
@@ -104,12 +43,6 @@ export default async function ChartsPage() {
           <ChartsAutoRefresh />
           <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} mobileCompact />
           <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
-            <div className="metal-panel rounded-lg p-4" data-testid="view-only-status">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember-300">
-                View charts only - no votes recorded
-              </p>
-              <p className="mt-2 text-sm text-metal-300">Selected charts are shown first.</p>
-            </div>
             <PublicResultSummary result={result} />
           </section>
         </main>
@@ -126,7 +59,8 @@ export default async function ChartsPage() {
         <RoundHeader title="Drawn Charts" mobileCompact />
         <ChartsSetNavigator
           sets={toPublicChartsSetViews(view.sets)}
-          status={chartsStatus(snapshot, snapshot.drawnSetCount)}
+          serverNowMs={nowMs}
+          showAllDrawCards={stageShouldShowAllDrawCards(snapshot.status)}
         />
       </main>
     </PublicRouteFreshnessGuard>
