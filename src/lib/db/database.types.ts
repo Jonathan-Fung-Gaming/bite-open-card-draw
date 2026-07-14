@@ -54,6 +54,20 @@ export type Database = {
           updated_at?: Timestamp;
         }
       >;
+      event_invalidation_generations: TableDefinition<
+        {
+          event_id: string;
+          scope: string;
+          version: number;
+          updated_at: Timestamp;
+        },
+        {
+          event_id: string;
+          scope: string;
+          version?: number;
+          updated_at?: Timestamp;
+        }
+      >;
       public_state_generations: TableDefinition<
         {
           event_id: string;
@@ -707,6 +721,12 @@ export type Database = {
         Args: { p_event_id: string };
         Returns: Json;
       };
+      normalized_read_roster_version: {
+        Args: { p_event_id: string };
+        Returns: Json;
+      };
+      normalized_rename_roster_player: NormalizedRuntimeRpc;
+      normalized_set_roster_player_active_states: NormalizedRuntimeRpc;
       normalized_override_result: NormalizedRuntimeRpc;
       normalized_reset_round: NormalizedRuntimeRpc;
       normalized_create_admin_session: NormalizedRuntimeRpc;

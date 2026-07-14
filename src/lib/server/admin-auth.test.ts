@@ -15,6 +15,7 @@ import {
   createAdminSessionCookie,
   getAdminSessionFromCookies,
   getVerifiedHostRecoveryProof,
+  requireAdminSessionForDatabaseValidatedMutation,
   setHostCredentials,
   setHostTokenCookie,
 } from "./admin-auth";
@@ -143,6 +144,19 @@ describe("admin auth cookie security", () => {
     nextHeaders.cookieStore.get.mockReturnValue({ value: session.token });
 
     await expect(getAdminSessionFromCookies()).resolves.toBeNull();
+  });
+
+  it("reads a signed session for a database-validated mutation without rotating the cookie", async () => {
+    vi.stubEnv("SESSION_SECRET", "phase-1-session-secret");
+    const session = createAdminSessionToken("phase-1-session-secret", Date.now());
+    nextHeaders.cookieStore.get.mockImplementation((name: string) =>
+      name === ADMIN_SESSION_COOKIE ? { value: session.token } : undefined,
+    );
+
+    await expect(requireAdminSessionForDatabaseValidatedMutation()).resolves.toEqual(
+      session.payload,
+    );
+    expect(nextHeaders.cookieStore.set).not.toHaveBeenCalled();
   });
 
   it("reads only valid signed host recovery owner bindings", async () => {

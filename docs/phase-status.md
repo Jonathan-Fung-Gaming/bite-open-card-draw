@@ -17,6 +17,131 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 4 - Fast Two-Column Roster - 2026-07-14
+
+Status: implementation and the complete pre-merge phase gate are complete. The intentional diff is
+ready for pull request and CI. Phase 4 remains open until that pull request is merged, the linked
+production target is reverified, migration `20260714020000` is pushed after deployment, local/remote
+migration parity and database lint pass, and the required post-merge hosted rehearsals pass.
+
+### Scope And Changed Files
+
+- Added the reviewed/amended Phase 4 plan under `docs/phase-plans/`, including transaction,
+  propagation, migration-order, rollback, performance, security, and 28 implementation/review
+  amendments.
+- Added targeted memory and service-role-only Supabase rename/status paths with desired-state
+  batches, expected version/timestamps, request-id replay, active-host verification inside the
+  write transaction, one exact audit, and one monotonic roster generation.
+- Added migration `20260714020000_phase4_targeted_roster_transactions.sql`, the sanitized
+  browser-readable invalidation table, Realtime publication, roster-version read RPC, and roster
+  version in the public generation key. Routine roster RPCs do not write eligibility or broad event
+  state.
+- Replaced permanent three-column roster forms with an exact two-column client table, inline
+  mouse/touch/keyboard rename, history explanations, neutral text-state controls, optimistic active
+  count/rows, serialized rapid batches, canonical reconciliation, and row-scoped accessible errors.
+- Added the bounded same-origin JSON mutation/snapshot route, strict transport schemas, fixed safe
+  error mapping, stable version/rows/version snapshot reads, local-version self-refresh suppression,
+  authenticated standby snapshot propagation, and Supabase-only browser invalidation polling.
+- Added roster generation to ordinary phone polling without phone Realtime, preserved the slower
+  five-second admin full-route safety refresh, and delayed activity-triggered session refresh by
+  2.5 seconds so it does not contend with the first latency-sensitive roster click.
+- Added Phase 4 memory/hosted Playwright profiles, guarded runner, deterministic hosted chart
+  fixtures, RPC atomicity/idempotency/concurrency evidence, exact browser performance timing, and
+  updated default/Phase 9 attrition helpers.
+
+### Checks Run
+
+- Prettier on every changed supported file and `git diff --check` - passed.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run test` - passed, 78 files / 554 tests.
+- `npm run build` - passed; the production-flow validator also completed an independent clean
+  production build.
+- `npm run test:phase4:memory` - passed, desktop and Pixel 5 scenarios 2/2 with two intentional
+  cross-project skips in 23.0 seconds. One earlier run correctly rejected a duplicate reactivation
+  but used stale raw-error copy in its assertion; the assertion was updated to the fixed safe copy
+  and the clean rerun passed.
+- Final disposable no-data, non-persistent Supabase preview - migration push passed, exact 25/25
+  migration parity through `20260714020000` passed, database lint returned no errors, positive test
+  listing found the intended RPC/UI cases, and hosted evidence passed 2/2 with two intentional
+  mobile-project skips. The preview was deleted.
+- Final hosted performance: five safe batches changed 30 players in 2,139.1 ms; confirmation samples
+  were 812.6, 192.9, 185.0, 537.5, and 164.3 ms; p50 was 192.9 ms, p95 was 812.6 ms, and second-admin
+  propagation was 868.3 ms.
+- Hosted runner negative checks - passed for missing destructive opt-in, missing explicit
+  non-production-project attestation, and configured-event collision.
+- `npm run test:e2e` - passed, 6/6 desktop Chromium, mobile Chromium, mobile WebKit, tiebreak, and
+  projector/visual scenarios in 6.0 minutes.
+- `npm run test:e2e:production-flow:validate` - passed 1/1 after a clean production build and proved
+  production-flow E2E routes remain disabled.
+- `npm run supabase:migration:list` - linked production is in exact parity through
+  `20260714010000`; only the intentional Phase 4 migration remains local before merge.
+- `npx supabase db lint --linked --level error --fail-on error` - passed with no schema errors.
+- `npx supabase db push --linked --dry-run` - passed and would apply only
+  `20260714020000_phase4_targeted_roster_transactions.sql`; no production write occurred.
+- Client/static secret scans, invalidation-payload source assertions, tracked environment review,
+  hosted cleanup review, and the complete single-agent manual diff review - passed.
+
+### Evidence
+
+- Hosted UI evidence rendered exactly `Username` and `Active/inactive control`, no at-rest rename
+  input or Edit column, and the complete non-editable history explanation.
+- Browser timing proved status rows and the active count changed by the next animation frame. Rapid
+  clicks remained enabled, coalesced into five hosted batches, and produced exactly 18 active
+  players, five status audits, and roster version 5 after 30 changes.
+- Standby admin propagation received only the sanitized event/scope/version signal, then loaded a
+  protected canonical snapshot. Anonymous reads saw only invalidation metadata, could not read
+  player usernames, and could not execute roster mutations.
+- RPC evidence rejected empty and duplicate renames, history-locked rename, a missing member in an
+  all-or-none batch, stale versions, request-id payload reuse, and one of two racing version-2
+  writers. Exact replay returned the original response without another audit or generation.
+- Round 1 eligibility remained exactly 48 after 30 routine deactivations. Opening Round 2 produced
+  eligibility exactly equal to the 18 still-active players. The updated Phase 9 helper still clicks
+  exactly 12 named active rows per later round and the full post-merge production rehearsal remains
+  the release-blocking proof of 48, 36, 24, and 12.
+
+### Diff Review And Resolved Findings
+
+- Several delegated implementation/SQL/diagnostic subtasks were combined with the required complete
+  single-agent manual review against the product spec, validation checklist, and security notes.
+- Review moved legacy event-lease acquire/release inside each roster RPC after the first hosted
+  topology measured separate network lock calls at 3.83 seconds p95. The final one-RPC path passed
+  at 812.6 ms p95 while remaining serialized against broad add/import persistence.
+- Review removed Next server-action/RSC payloads from the confirmation path, stopped the primary
+  admin from refreshing its own confirmed generation, replaced full standby RSC propagation with a
+  protected lightweight snapshot, and used exact in-page timing instead of test-runner polling.
+- Review found a snapshot consistency race. The route now brackets player reads with two version
+  reads, retries a changing generation three times, and fails safely instead of labeling stale rows
+  with a newer generation; focused regressions cover stabilization and retry exhaustion.
+- Review found valid failure envelopes could relay arbitrary database text. Both action and route
+  boundaries now map known conflicts and the explicit pre-migration state to fixed messages and
+  collapse unknown RPC/relation/constraint details to a generic error.
+- Review found memory mode could otherwise poll an accidentally configured Supabase project. The
+  browser listener is backend-gated, and the snapshot route reads only the selected backend; focused
+  coverage proves memory snapshots never construct a service-role Supabase client.
+- Review retained session security without a second latency-path normalized-session network call:
+  the signed unexpired cookie is checked locally only for these RPC-backed mutations, while the same
+  database transaction verifies session revocation/expiry and the exact active host credential.
+- Review found no remaining tournament-rule, eligibility-snapshot, result/tiebreak authority,
+  browser-randomness, lost-update, stale-state, secret-exposure, accessibility, data-loss, or
+  migration-order regression.
+
+### Migration, Rollout, Risks, And Assumptions
+
+- The linked target was read-only verified as the existing `bite-open-card-draw` project; no target
+  was guessed and no credentials were printed. Production still intentionally lacks only the Phase
+  4 migration before merge.
+- The application fails closed before migration with a fixed migration-in-progress roster message;
+  it never falls back to broad persistence or split player/audit/version writes. Reads and unrelated
+  tournament controls remain compatible.
+- The migration is additive. Rollback keeps it applied and deploys a forward application patch; it
+  must not delete roster generations, players, audits, or eligibility rows.
+- The final post-merge production-flow run must start Round 1 with 48 active voting players, remove
+  exactly 12 before each later round, and verify 36, 24, and 12. Phase 4 is not complete until that
+  evidence and a fresh post-merge disposable-preview Phase 4 run pass.
+- This phase changes no round, chart-set, seven-chart draw, 10-minute window, two-ban, least-ban,
+  server-tiebreak, final-reveal, identity-confirmation, or dangerous-action rule.
+
 ## Production Readiness Remediation Phase 3 - Non-Expiring Host - 2026-07-14
 
 Status: complete. Phase 3 implementation and evidence merged in

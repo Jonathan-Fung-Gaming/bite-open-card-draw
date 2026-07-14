@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHostToken, hashHostToken } from "@/lib/admin/host-lock";
 import { buildAdminLiveCountRows } from "@/lib/admin/live-counts";
+import { normalizeStartggUsername, type RosterPlayer } from "@/lib/admin/roster";
 import type { AdminSessionPayload } from "@/lib/admin/session";
 import {
   createOperationalDebugSnapshotExport,
@@ -44,7 +45,12 @@ import {
   withPersistedResultAdminState,
   persistResultAdminState,
   persistTournamentState,
+  advanceMemoryRosterVersion,
+  getMemoryRosterMutationResult,
+  getMemoryRosterVersion,
+  setMemoryRosterMutationResult,
   withPersistedHostLockState,
+  withPersistedRosterState,
   withPersistedTournamentState,
   withPersistedVotingAdminState,
 } from "@/lib/server/persistence";
@@ -87,6 +93,7 @@ import {
   getVerifiedHostRecoveryProof,
   refreshAdminSessionCookie,
   requireAdminSession,
+  requireAdminSessionForDatabaseValidatedMutation,
   setHostCredentials,
   verifyDangerousActionPassword,
 } from "@/lib/server/admin-auth";
@@ -98,9 +105,18 @@ import {
 import {
   durationMinutesInputSchema,
   overrideResultTargetInputSchema,
+  rosterActiveStatusBatchInputSchema,
+  rosterUsernameEditInputSchema,
   roundNumberInputSchema,
   setOrderInputSchema,
 } from "@/lib/server/mutation-contracts";
+import { safeRosterMutationMessage } from "@/lib/server/roster-mutation-errors";
+import {
+  asRosterPlayer,
+  readRosterInvalidationGeneration,
+  renameNormalizedRosterPlayer,
+  setNormalizedRosterPlayerActiveStates,
+} from "@/lib/server/normalized-roster";
 import {
   assertNormalizedTransactionalMutationImplemented,
   type NormalizedRuntimeMutationName,
@@ -793,47 +809,429 @@ export async function bulkImportPlayersAction(formData: FormData) {
   revalidatePath("/coolguy69");
 }
 
-export async function setPlayerActiveStatusAction(formData: FormData) {
-  const session = await requireActiveHost();
+export type RosterMutationActionResult =
+  | {
+      activeCount: number;
+      ok: true;
+      players: RosterPlayer[];
+      requestId: string;
+      version: number;
+    }
+  | {
+      message: string;
+      ok: false;
+      players: RosterPlayer[];
+      requestId: string;
+      retryable: boolean;
+      version: number;
+    };
 
-  try {
-    const player = adminState.rosterStore.setPlayerActiveStatus(
-      getString(formData, "playerId"),
-      getString(formData, "active") === "true",
-    );
-    audit(session, {
-      action: "roster_active_status_update",
-      summary: `${player.active ? "Reactivated" : "Marked inactive"} player ${player.startggUsername}.`,
-      affectedRecords: [{ type: "player", id: player.id }],
-      metadata: { active: player.active },
-    });
-  } catch (error) {
-    redirectWithError(error instanceof Error ? error.message : "Could not update player.");
-  }
+export type SetPlayerActiveStatusActionInput = {
+  changes: Array<{
+    active: boolean;
+    expectedUpdatedAt: string;
+    playerId: string;
+  }>;
+  expectedVersion: number;
+  requestId: string;
+};
 
-  await persistTournamentState();
-  revalidatePath("/coolguy69");
+export type EditPlayerUsernameActionInput = {
+  expectedUpdatedAt: string;
+  expectedVersion: number;
+  playerId: string;
+  requestId: string;
+  startggUsername: string;
+};
+
+class RosterMutationConflictError extends Error {}
+
+function rosterPlayersById(playerIds: readonly string[]) {
+  const uniquePlayerIds = new Set(playerIds);
+
+  return adminState.rosterStore.listPlayers().filter((player) => uniquePlayerIds.has(player.id));
 }
 
-export async function editPlayerUsernameAction(formData: FormData) {
-  const session = await requireActiveHost();
+function isRetryableRosterMutationError(error: unknown) {
+  return (
+    error instanceof RosterMutationConflictError ||
+    (error instanceof Error && /version|stale|conflict|updated since/i.test(error.message))
+  );
+}
 
-  try {
-    const player = adminState.rosterStore.createOrUpdatePlayer({
-      playerId: getString(formData, "playerId"),
-      startggUsername: getString(formData, "startggUsername", STARTGG_USERNAME_MAX_LENGTH),
-    });
-    audit(session, {
-      action: "roster_username_edit",
-      summary: `Edited start.gg username to ${player.startggUsername}.`,
-      affectedRecords: [{ type: "player", id: player.id }],
-    });
-  } catch (error) {
-    redirectWithError(error instanceof Error ? error.message : "Could not edit start.gg username.");
+async function rosterFailureResult(input: {
+  error: unknown;
+  fallback: string;
+  playerIds: readonly string[];
+  requestId: string;
+  version: number;
+}): Promise<RosterMutationActionResult> {
+  let version = input.version;
+
+  if (getTournamentStateBackend() === "supabase") {
+    try {
+      version = (await readRosterInvalidationGeneration()).version;
+    } catch {
+      // A failed generation read must not turn a rejected mutation into an apparent success.
+    }
   }
 
-  await persistTournamentState();
-  revalidatePath("/coolguy69");
+  return {
+    message: safeRosterMutationMessage(input.error, input.fallback),
+    ok: false,
+    players: getTournamentStateBackend() === "memory" ? rosterPlayersById(input.playerIds) : [],
+    requestId: input.requestId,
+    retryable: isRetryableRosterMutationError(input.error),
+    version,
+  };
+}
+
+function assertMemoryRosterVersion(expectedVersion: number) {
+  const version = getMemoryRosterVersion();
+
+  if (version !== expectedVersion) {
+    throw new RosterMutationConflictError(
+      `Roster version changed from ${expectedVersion} to ${version}. Refresh and try again.`,
+    );
+  }
+}
+
+async function requireActiveHostInsideRosterWrite(
+  session: AdminSessionPayload,
+  hostToken: string | null,
+) {
+  const nowMs = await getAuthoritativeNowMs();
+
+  if (!hostToken || !adminState.hostLockStore.refresh(session.sessionId, hostToken, nowMs)) {
+    throw new Error("Host control is required for this action.");
+  }
+
+  return nowMs;
+}
+
+export async function setPlayerActiveStatusAction(
+  unsafeInput: SetPlayerActiveStatusActionInput,
+): Promise<RosterMutationActionResult> {
+  const backend = getTournamentStateBackend();
+  const session =
+    backend === "supabase"
+      ? await requireAdminSessionForDatabaseValidatedMutation()
+      : await requireAdminSession();
+  const hostToken = await getHostTokenCookie();
+  const requestId = unsafeInput?.requestId ?? randomUUID();
+  let input: SetPlayerActiveStatusActionInput;
+
+  try {
+    input = rosterActiveStatusBatchInputSchema.parse(unsafeInput);
+  } catch (error) {
+    return rosterFailureResult({
+      error,
+      fallback: "Could not update the roster.",
+      playerIds: unsafeInput?.changes?.map((change) => change.playerId) ?? [],
+      requestId,
+      version: Number.isSafeInteger(unsafeInput?.expectedVersion) ? unsafeInput.expectedVersion : 0,
+    });
+  }
+
+  if (backend === "supabase") {
+    try {
+      if (!hostToken) {
+        throw new Error("Host control is required for this action.");
+      }
+
+      const result = await setNormalizedRosterPlayerActiveStates({
+        ...input,
+        adminSessionId: session.sessionId,
+        hostTokenHash: hashHostToken(hostToken),
+      });
+
+      return {
+        activeCount: result.activeCount,
+        ok: true,
+        players: result.players.map(asRosterPlayer),
+        requestId: result.requestId,
+        version: result.version,
+      };
+    } catch (error) {
+      return rosterFailureResult({
+        error,
+        fallback: "Could not update the roster.",
+        playerIds: input.changes.map((change) => change.playerId),
+        requestId: input.requestId,
+        version: input.expectedVersion,
+      });
+    }
+  }
+
+  try {
+    const fingerprint = JSON.stringify({
+      input,
+      mutation: "setRosterPlayerActiveStates",
+    });
+
+    return await withPersistedRosterState(async () => {
+      const nowMs = await requireActiveHostInsideRosterWrite(session, hostToken);
+      const replay = getMemoryRosterMutationResult<RosterMutationActionResult>(
+        input.requestId,
+        fingerprint,
+      );
+
+      if (replay) {
+        return { persist: false, value: replay };
+      }
+
+      assertMemoryRosterVersion(input.expectedVersion);
+
+      const uniquePlayerIds = new Set(input.changes.map((change) => change.playerId));
+
+      if (uniquePlayerIds.size !== input.changes.length) {
+        throw new Error("Each roster batch may change a player only once.");
+      }
+
+      for (const change of input.changes) {
+        const player = adminState.rosterStore.getPlayer(change.playerId);
+
+        if (!player) {
+          throw new Error("Player not found.");
+        }
+
+        if (player.updatedAt !== change.expectedUpdatedAt) {
+          throw new RosterMutationConflictError(
+            `${player.startggUsername} was updated since this roster was loaded. Refresh and try again.`,
+          );
+        }
+      }
+
+      const desiredActive = new Map(
+        input.changes.map((change) => [change.playerId, change.active]),
+      );
+      const activeUsernameOwners = new Map<string, string>();
+
+      for (const player of adminState.rosterStore.listPlayers()) {
+        const active = desiredActive.get(player.id) ?? player.active;
+
+        if (!active) {
+          continue;
+        }
+
+        const existingOwner = activeUsernameOwners.get(player.normalizedUsername);
+
+        if (existingOwner && existingOwner !== player.id) {
+          throw new Error(`Active start.gg username already exists: ${player.startggUsername}`);
+        }
+
+        activeUsernameOwners.set(player.normalizedUsername, player.id);
+      }
+
+      const changedPlayerIds = input.changes
+        .filter(
+          (change) => adminState.rosterStore.getPlayer(change.playerId)?.active !== change.active,
+        )
+        .map((change) => change.playerId);
+      const now = new Date(nowMs).toISOString();
+
+      for (const change of input.changes.filter((candidate) => !candidate.active)) {
+        if (changedPlayerIds.includes(change.playerId)) {
+          adminState.rosterStore.setPlayerActiveStatus(change.playerId, false, now);
+        }
+      }
+
+      for (const change of input.changes.filter((candidate) => candidate.active)) {
+        if (changedPlayerIds.includes(change.playerId)) {
+          adminState.rosterStore.setPlayerActiveStatus(change.playerId, true, now);
+        }
+      }
+
+      const version =
+        changedPlayerIds.length > 0 ? advanceMemoryRosterVersion() : input.expectedVersion;
+      const players = input.changes.map((change) => {
+        const player = adminState.rosterStore.getPlayer(change.playerId);
+
+        if (!player) {
+          throw new Error("Player not found.");
+        }
+
+        return player;
+      });
+
+      audit(session, {
+        action: "roster_active_status_update",
+        summary:
+          changedPlayerIds.length === 0
+            ? `Confirmed active status for ${players.length} roster ${players.length === 1 ? "player" : "players"}.`
+            : `Updated active status for ${changedPlayerIds.length} roster ${changedPlayerIds.length === 1 ? "player" : "players"}.`,
+        affectedRecords: changedPlayerIds.map((playerId) => ({ type: "player", id: playerId })),
+        metadata: {
+          activeCount: adminState.rosterStore.getActivePlayerCount(),
+          changedPlayerIds,
+          expectedVersion: input.expectedVersion,
+          requestId: input.requestId,
+          version,
+        },
+        tournamentChanging: changedPlayerIds.length > 0,
+      });
+
+      const result: RosterMutationActionResult = {
+        activeCount: adminState.rosterStore.getActivePlayerCount(),
+        ok: true,
+        players,
+        requestId: input.requestId,
+        version,
+      };
+      setMemoryRosterMutationResult(input.requestId, fingerprint, result);
+
+      return { persist: true, value: result };
+    });
+  } catch (error) {
+    return rosterFailureResult({
+      error,
+      fallback: "Could not update the roster.",
+      playerIds: input.changes.map((change) => change.playerId),
+      requestId: input.requestId,
+      version: getMemoryRosterVersion(),
+    });
+  }
+}
+
+export async function editPlayerUsernameAction(
+  unsafeInput: EditPlayerUsernameActionInput,
+): Promise<RosterMutationActionResult> {
+  const backend = getTournamentStateBackend();
+  const session =
+    backend === "supabase"
+      ? await requireAdminSessionForDatabaseValidatedMutation()
+      : await requireAdminSession();
+  const hostToken = await getHostTokenCookie();
+  const requestId = unsafeInput?.requestId ?? randomUUID();
+  let input: EditPlayerUsernameActionInput;
+
+  try {
+    assertMaxStringLength(
+      unsafeInput?.startggUsername ?? "",
+      "startggUsername",
+      STARTGG_USERNAME_MAX_LENGTH,
+    );
+    input = rosterUsernameEditInputSchema.parse(unsafeInput);
+  } catch (error) {
+    return rosterFailureResult({
+      error,
+      fallback: "Could not edit start.gg username.",
+      playerIds: unsafeInput?.playerId ? [unsafeInput.playerId] : [],
+      requestId,
+      version: Number.isSafeInteger(unsafeInput?.expectedVersion) ? unsafeInput.expectedVersion : 0,
+    });
+  }
+
+  if (backend === "supabase") {
+    try {
+      if (!hostToken) {
+        throw new Error("Host control is required for this action.");
+      }
+
+      const result = await renameNormalizedRosterPlayer({
+        ...input,
+        adminSessionId: session.sessionId,
+        hostTokenHash: hashHostToken(hostToken),
+        startggUsernameNormalized: normalizeStartggUsername(input.startggUsername),
+      });
+
+      return {
+        activeCount: result.activeCount,
+        ok: true,
+        players: [asRosterPlayer(result.player)],
+        requestId: result.requestId,
+        version: result.version,
+      };
+    } catch (error) {
+      return rosterFailureResult({
+        error,
+        fallback: "Could not edit start.gg username.",
+        playerIds: [input.playerId],
+        requestId: input.requestId,
+        version: input.expectedVersion,
+      });
+    }
+  }
+
+  try {
+    const fingerprint = JSON.stringify({ input, mutation: "renameRosterPlayer" });
+
+    return await withPersistedRosterState(async () => {
+      const nowMs = await requireActiveHostInsideRosterWrite(session, hostToken);
+      const replay = getMemoryRosterMutationResult<RosterMutationActionResult>(
+        input.requestId,
+        fingerprint,
+      );
+
+      if (replay) {
+        return { persist: false, value: replay };
+      }
+
+      assertMemoryRosterVersion(input.expectedVersion);
+      const player = adminState.rosterStore.getPlayer(input.playerId);
+
+      if (!player) {
+        throw new Error("Player not found.");
+      }
+
+      if (player.updatedAt !== input.expectedUpdatedAt) {
+        throw new RosterMutationConflictError(
+          `${player.startggUsername} was updated since this roster was loaded. Refresh and try again.`,
+        );
+      }
+
+      const startggUsername = input.startggUsername.trim();
+      const changed = player.startggUsername !== startggUsername;
+
+      if (changed && player.hasTournamentHistory) {
+        throw new Error("Cannot edit a start.gg username after tournament history exists.");
+      }
+
+      const updated = changed
+        ? adminState.rosterStore.createOrUpdatePlayer({
+            playerId: player.id,
+            startggUsername,
+            now: new Date(nowMs).toISOString(),
+          })
+        : player;
+      const version = changed ? advanceMemoryRosterVersion() : input.expectedVersion;
+
+      audit(session, {
+        action: "roster_username_edit",
+        summary: changed
+          ? `Edited start.gg username from ${player.startggUsername} to ${updated.startggUsername}.`
+          : `Confirmed start.gg username ${updated.startggUsername}.`,
+        affectedRecords: [{ type: "player", id: updated.id }],
+        metadata: {
+          changed,
+          expectedVersion: input.expectedVersion,
+          previousStartggUsername: player.startggUsername,
+          requestId: input.requestId,
+          version,
+        },
+        tournamentChanging: changed,
+      });
+
+      const result: RosterMutationActionResult = {
+        activeCount: adminState.rosterStore.getActivePlayerCount(),
+        ok: true,
+        players: [updated],
+        requestId: input.requestId,
+        version,
+      };
+      setMemoryRosterMutationResult(input.requestId, fingerprint, result);
+
+      return { persist: true, value: result };
+    });
+  } catch (error) {
+    return rosterFailureResult({
+      error,
+      fallback: "Could not edit start.gg username.",
+      playerIds: [input.playerId],
+      requestId: input.requestId,
+      version: getMemoryRosterVersion(),
+    });
+  }
 }
 
 export async function updateChartExclusionAction(formData: FormData) {

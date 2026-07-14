@@ -106,6 +106,24 @@ export async function requireAdminSession() {
   return refreshAdminSessionCookie(session);
 }
 
+/**
+ * Verifies the signed, unexpired admin cookie without rotating it or performing
+ * a separate normalized-session lookup. Use only when the immediately invoked
+ * database transaction revalidates that session's revocation and expiry before
+ * it mutates state.
+ */
+export async function requireAdminSessionForDatabaseValidatedMutation() {
+  const session = await getAdminSessionFromCookiesInternal({
+    validateNormalizedSession: false,
+  });
+
+  if (!session) {
+    throw new Error("Admin session required.");
+  }
+
+  return session;
+}
+
 export async function createAdminSessionCookie(password: string) {
   assertMaxStringLength(password, "Admin password", ADMIN_PASSWORD_MAX_LENGTH);
   await assertRateLimit({
