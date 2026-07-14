@@ -19,10 +19,34 @@ status text when there is a conflict.
 
 ## Production Readiness Remediation Phase 6 - Mobile Results - 2026-07-14
 
-Status: implementation and the complete pre-merge gate are complete on
-`agent/phase-6-mobile-results`. The focused feature PR, required checks, merge, synchronized-main
-rerun, migration-absence verification, and closeout documentation PR remain pending. Accordingly,
-the final two Phase 6 gate rows remain unchecked.
+Status: complete. Phase 6 implementation merged in
+[PR #111](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/111) as `c11cf96`, and the
+strengthened refresh/reload evidence merged in
+[PR #112](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/112) as `aafdd34` after
+both required Quality Gates passed. Synchronized `main` passed the complete Phase 6 gate, and the
+merged range was verified to contain no Supabase migration or post-merge database action.
+
+### Post-Merge Closeout Evidence
+
+- GitHub Quality Gates passed for PR #111 in 1 minute 25 seconds and PR #112 in 1 minute 27 seconds.
+  GitHub reported both PRs clean and mergeable with no review, inline, or general comments before
+  merge.
+- The original checkout fast-forwarded through both merges to `aafdd34`, matching `origin/main`
+  without local divergence.
+- Scoped Prettier and `git diff --check` passed. The clean merged tree passed lint, typecheck, all 82
+  unit-test files / 566 tests, and the optimized Next.js 15.5.19 production build.
+- `npm run test:phase6:memory:list` reported the intended six project/test combinations. The
+  merged-main Chromium run passed both applicable desktop/mobile tests with two intentional
+  cross-project skips in 1.6 minutes; the WebKit run passed its applicable mobile test with one
+  intentional skip in 1.5 minutes.
+- The merged browser evidence reverified exact 320x568, 360x640, and 390x844 mobile contracts,
+  1280/1440 desktop geometry, readable wrapped content, decoded artwork, zero overflow/zoom, the
+  44px native disclosure, keyboard/touch/AT operation, both complete ordered seven-row lists with
+  zero-ban rows, and open state across the next router refresh and a hard reload.
+- `git diff --name-only 77bc191..aafdd34 -- supabase/migrations` returned no files, so migration
+  target verification, push, parity, and database lint are correctly not applicable to Phase 6.
+- The comprehensive four-round tournament smoke remains intentionally deferred to the manual Phase
+  7 end-of-plan gate by the active parent plan.
 
 ### Scope And Changed Files
 
@@ -66,10 +90,10 @@ the final two Phase 6 gate rows remain unchecked.
   417.5625px. All remain within their visual viewports at scrollY 0 with scale 1 and zero horizontal
   overflow. Titles were 14px and artists 12px with no clamp, ellipsis, or measured clipping.
 - Browser evidence also verified decoded artwork, one accessible native disclosure, Enter/Space,
-  touch, two complete expanded lists, two selected markers, no percentages, session-scoped state
-  across observed `_rsc` refresh, reachable final rows with ordinary scrolling, and the intact
-  previous-round notice. Viewport-only normal/stress screenshots were visually inspected at the
-  smallest and widest WebKit contracts.
+  touch, two complete expanded lists with zero-ban rows, two selected markers, no percentages,
+  session-scoped state across an observed `_rsc` refresh and hard reload, reachable final rows with
+  ordinary scrolling, and the intact previous-round notice. Viewport-only normal/stress screenshots
+  were visually inspected at the smallest and widest WebKit contracts.
 - A synthetic live-owner lock contention check returned the expected guarded failure before
   Playwright startup. No comprehensive four-round rehearsal was run; the active parent plan defers
   that evidence to the Phase 7 manual end-of-plan gate.
@@ -100,15 +124,17 @@ the final two Phase 6 gate rows remain unchecked.
 ### Migration, Rollback, Risks, And Assumptions
 
 - This phase changes client presentation and test infrastructure only. It adds no server mutation,
-  dependency, environment file, or Supabase migration. Post-merge migration target verification,
-  push, parity, and database lint are expected to be not applicable after the merged range is
-  inspected.
+  dependency, environment file, or Supabase migration. The merged range inspection was empty for
+  `supabase/migrations`, so migration target verification, push, parity, and database lint are not
+  applicable.
 - The result id used in session storage is already public final-result state; the stored value is
   only `open` or `closed`. Browser storage never participates in winner/count authority.
 - Expanded counts intentionally use normal page scrolling. No body-height lock, overflow lock, or
   reduced-motion control was added.
 - Rollback is a forward revert of the Phase 6 application/test commit. No data or schema rollback is
   needed or permitted.
+- Phase 6 is complete: both PRs merged, the synchronized-main post-merge gate passed, and merged-diff
+  migration absence was verified and recorded.
 
 ## Production Readiness Remediation Phase 5 - Branding, Copy, Charts, And Mobile Selector - 2026-07-14
 
