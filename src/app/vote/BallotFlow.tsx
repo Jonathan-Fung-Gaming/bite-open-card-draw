@@ -36,6 +36,7 @@ export type BallotFlowProps = {
   roundNumber: 1 | 2 | 3 | 4;
   players: EligiblePlayerSnapshot[];
   publicStateGeneration: number;
+  rosterGeneration: number;
   draws: DrawRecord[];
   serverNowMs: number;
   statusLabel: string;
@@ -427,6 +428,7 @@ export function BallotFlow({
   roundNumber,
   players,
   publicStateGeneration,
+  rosterGeneration,
   draws,
   serverNowMs,
   statusLabel,
@@ -485,6 +487,10 @@ export function BallotFlow({
   });
   const refreshRequestedRef = useRef(false);
   const routeRefreshAttemptRef = useRef<{
+    attemptedAtMs: number;
+    targetGeneration: number;
+  } | null>(null);
+  const rosterRefreshAttemptRef = useRef<{
     attemptedAtMs: number;
     targetGeneration: number;
   } | null>(null);
@@ -870,6 +876,22 @@ export function BallotFlow({
           requestSequence,
         };
 
+        if (
+          state.rosterGeneration > rosterGeneration &&
+          shouldRequestVoteRouteRefresh({
+            lastAttempt: rosterRefreshAttemptRef.current,
+            nowMs: Date.now(),
+            retryAfterMs: VOTE_LIVE_POLL_INTERVAL_MS,
+            targetGeneration: state.rosterGeneration,
+          })
+        ) {
+          rosterRefreshAttemptRef.current = {
+            attemptedAtMs: Date.now(),
+            targetGeneration: state.rosterGeneration,
+          };
+          router.refresh();
+        }
+
         const renderedGeneration = {
           generation: publicStateGeneration,
           activeDraws: activeDrawGenerationFromDraws(draws),
@@ -984,6 +1006,7 @@ export function BallotFlow({
     players.length,
     publicStateGeneration,
     requestRouteRefresh,
+    rosterGeneration,
     roundNumber,
     router,
     selectedPlayerId,

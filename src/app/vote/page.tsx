@@ -5,6 +5,7 @@ import { buildPublicRouteFreshness } from "@/lib/server/public-route-freshness";
 import { adminState } from "@/lib/server/admin-state";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { hydratePublicTournamentState } from "@/lib/server/persistence";
+import { readRosterInvalidationGeneration } from "@/lib/server/normalized-roster";
 import {
   advanceVotingTimerIfDue,
   getRoundDrawRecords,
@@ -65,6 +66,8 @@ export default async function VotePage() {
   const result = adminState.resultStore.getRoundResult(roundNumber);
   const publicStateGeneration =
     adminState.publicStateGenerationStore.getRound(roundNumber).generation;
+  const rosterGeneration = (await readRosterInvalidationGeneration({ allowLegacyFallback: true }))
+    .version;
   const freshness = buildPublicRouteFreshness({
     currentRound: roundNumber,
     result,
@@ -186,6 +189,7 @@ export default async function VotePage() {
           eligibleCount={snapshot.eligibleCount}
           players={snapshot.eligiblePlayers}
           publicStateGeneration={publicStateGeneration}
+          rosterGeneration={rosterGeneration}
           remainingMs={snapshot.remainingMs}
           roundNumber={roundNumber}
           serverNowMs={nowMs}

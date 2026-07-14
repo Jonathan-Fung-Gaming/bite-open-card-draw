@@ -7,6 +7,8 @@ import {
   drawRoundSetInputSchema,
   manualBallotOverrideInputSchema,
   overrideResultInputSchema,
+  rosterActiveStatusBatchInputSchema,
+  rosterUsernameEditInputSchema,
   submitBallotInputSchema,
 } from "@/lib/server/mutation-contracts";
 import { invalidateTournamentReadCaches } from "@/lib/server/public-hydration-cache";
@@ -15,6 +17,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/server/supabase";
 type NormalizedRuntimeRpcName = keyof Database["public"]["Functions"];
 
 type RpcError = {
+  code?: string;
   message: string;
 };
 
@@ -51,6 +54,11 @@ const PHASE1_CAPABILITY_GATED_MUTATIONS = new Set<NormalizedTransactionalMutatio
   "rerollFullRound",
   "advanceResultReveal",
   "markResultsRevealed",
+]);
+
+const PHASE4_CAPABILITY_GATED_MUTATIONS = new Set<NormalizedTransactionalMutationName>([
+  "renameRosterPlayer",
+  "setRosterPlayerActiveStates",
 ]);
 
 const normalizedAdminTransitionSchema = z.object({
@@ -208,6 +216,17 @@ const normalizedAcquireHostLockInputSchema = normalizedHostLockCredentialSchema
 const normalizedHeartbeatHostLockInputSchema = normalizedHostLockCredentialSchema;
 const normalizedReleaseHostLockInputSchema = normalizedHostLockCredentialSchema;
 
+const normalizedRenameRosterPlayerInputSchema = rosterUsernameEditInputSchema.extend({
+  adminSessionId: uuidSchema,
+  hostTokenHash: hostTokenHashSchema,
+  startggUsernameNormalized: z.string().trim().min(1),
+});
+
+const normalizedSetRosterPlayerActiveStatesInputSchema = rosterActiveStatusBatchInputSchema.extend({
+  adminSessionId: uuidSchema,
+  hostTokenHash: hostTokenHashSchema,
+});
+
 const adminSessionCreateInputSchema = z.object({
   sessionTokenHash: z.string().trim().min(16),
   expiresAt: isoDateTimeSchema,
@@ -244,6 +263,8 @@ export const NORMALIZED_TRANSACTIONAL_MUTATION_SCHEMAS = {
   acquireHostLock: normalizedAcquireHostLockInputSchema,
   refreshHostLock: normalizedHeartbeatHostLockInputSchema,
   releaseHostLock: normalizedReleaseHostLockInputSchema,
+  renameRosterPlayer: normalizedRenameRosterPlayerInputSchema,
+  setRosterPlayerActiveStates: normalizedSetRosterPlayerActiveStatesInputSchema,
 } as const;
 
 export const NORMALIZED_BLOCKED_TRANSACTIONAL_MUTATION_SCHEMAS = {
@@ -288,6 +309,8 @@ export const NORMALIZED_RUNTIME_RPC_NAMES = {
   acquireHostLock: "normalized_acquire_host_lock",
   refreshHostLock: "normalized_heartbeat_host_lock",
   releaseHostLock: "normalized_release_host_lock",
+  renameRosterPlayer: "normalized_rename_roster_player",
+  setRosterPlayerActiveStates: "normalized_set_roster_player_active_states",
 } as const satisfies Record<NormalizedTransactionalMutationName, NormalizedRuntimeRpcName>;
 
 export const NORMALIZED_BLOCKED_RUNTIME_RPC_NAMES = {
@@ -428,6 +451,16 @@ export async function executeNormalizedTransactionalMutation<
   });
 
   if (error) {
+    if (
+      PHASE4_CAPABILITY_GATED_MUTATIONS.has(name) &&
+      (error.code === "PGRST202" ||
+        /could not find the function|function .* does not exist|schema cache/i.test(error.message))
+    ) {
+      throw new Error(
+        `Normalized runtime mutation ${name} is unavailable until the Phase 4 database migration is applied: ${error.message}`,
+      );
+    }
+
     throw new Error(`Normalized runtime mutation ${name} failed: ${error.message}`);
   }
 

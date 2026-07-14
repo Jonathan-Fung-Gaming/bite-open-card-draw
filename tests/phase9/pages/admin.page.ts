@@ -293,10 +293,9 @@ export class AdminPage {
   async markPlayersInactive(names: readonly string[]) {
     await this.loginAndTakeHost();
     await this.openSecondaryPanels();
+    const pendingNames: string[] = [];
 
     for (const name of names) {
-      await this.visit();
-      await this.openSecondaryPanels();
       const row = this.rosterRow(name);
 
       await expect(row).toHaveCount(1, { timeout: HOSTED_REFRESH_TIMEOUT_MS });
@@ -305,22 +304,40 @@ export class AdminPage {
         continue;
       }
 
-      await clickServerAction(this.page, row.getByRole("button", { name: "Mark Inactive" }), 0, {
-        requireServerActionResponse: true,
-        responseTimeoutMs: 60_000,
-        submitForm: true,
-      });
-
-      await expect
-        .poll(
-          async () => {
-            await this.visit();
-            return this.rosterRow(name).getAttribute("data-active");
-          },
-          { timeout: HOSTED_REFRESH_TIMEOUT_MS },
-        )
-        .toBe("false");
+      pendingNames.push(name);
     }
+
+    await this.page.evaluate((playerNames) => {
+      const rows = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-testid='admin-roster-row']"),
+      );
+
+      for (const name of playerNames) {
+        const row = rows.find((candidate) => candidate.dataset.playerUsername === name);
+        const button = row?.querySelector<HTMLButtonElement>(
+          `button[aria-label=${JSON.stringify(`Mark inactive ${name}`)}]`,
+        );
+
+        button?.click();
+      }
+    }, pendingNames);
+
+    await expect
+      .poll(
+        async () =>
+          Promise.all(
+            pendingNames.map(async (name) => {
+              const row = this.rosterRow(name);
+
+              return {
+                active: await row.getAttribute("data-active"),
+                pending: await row.getAttribute("data-pending"),
+              };
+            }),
+          ),
+        { timeout: HOSTED_REFRESH_TIMEOUT_MS },
+      )
+      .toEqual(pendingNames.map(() => ({ active: "false", pending: "false" })));
   }
 
   async bulkImportPlayers(names: readonly string[]) {

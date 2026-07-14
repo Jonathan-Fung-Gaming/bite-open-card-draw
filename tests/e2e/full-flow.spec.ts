@@ -1619,7 +1619,12 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await expect(rosterPanel).toBeVisible();
   await expect(rosterPanel.getByText("Status", { exact: true })).toHaveCount(0);
-  await expect(rosterPanel.getByText("Active", { exact: true })).toBeVisible();
+  await expect(rosterPanel.getByRole("columnheader")).toHaveText([
+    "Username",
+    "Active/inactive control",
+  ]);
+  await expect(rosterPanel.getByRole("columnheader")).toHaveCount(2);
+  await expect(rosterPanel.getByText("Edit", { exact: true })).toHaveCount(0);
   expect(await visualTop(rosterPanel)).toBeLessThan(await visualTop(supportPanels));
   await expect(
     page.getByTestId("admin-secondary-panels").getByTestId("admin-roster-panel"),
@@ -1663,26 +1668,31 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
       .getByTestId("admin-roster-row")
       .filter({ hasText: "Alpha" })
       .getByTestId("admin-roster-username"),
-  ).toHaveClass(/text-green-400/);
+  ).not.toHaveClass(/text-(?:green|red)-/);
+  await expect(
+    page
+      .getByTestId("admin-roster-row")
+      .filter({ hasText: "Alpha" })
+      .getByText("Active", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByTestId("admin-roster-row").filter({ hasText: PHASE5_LONG_USERNAME }),
   ).toBeVisible();
-  await clickAdminActionAndWait(
-    page,
-    page
-      .getByTestId("admin-roster-row")
-      .filter({ hasText: PHASE5_LONG_USERNAME })
-      .getByRole("button", { name: "Mark Inactive" }),
-  );
+  const longRosterRow = page
+    .getByTestId("admin-roster-row")
+    .filter({ hasText: PHASE5_LONG_USERNAME });
+
+  await longRosterRow
+    .getByRole("button", { name: `Mark inactive ${PHASE5_LONG_USERNAME}` })
+    .click();
+  await expect(longRosterRow).toHaveAttribute("data-pending", "false");
   await expect(
     page.getByTestId("admin-roster-row").filter({ hasText: PHASE5_LONG_USERNAME }),
   ).toHaveAttribute("data-active", "false");
+  await expect(longRosterRow.getByText("Inactive", { exact: true })).toBeVisible();
   await expect(
-    page
-      .getByTestId("admin-roster-row")
-      .filter({ hasText: PHASE5_LONG_USERNAME })
-      .getByTestId("admin-roster-username"),
-  ).toHaveClass(/text-red-400/);
+    longRosterRow.getByRole("button", { name: `Reactivate ${PHASE5_LONG_USERNAME}` }),
+  ).toHaveClass(/border-metal-700/);
 
   const chartEligibility = page
     .getByText("Chart Eligibility", { exact: true })

@@ -1,12 +1,7 @@
 import { z } from "zod";
 
 export const uuidSchema = z.string().uuid();
-export const roundNumberSchema = z.union([
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-  z.literal(4),
-]);
+export const roundNumberSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
 export const setOrderSchema = z.union([z.literal(1), z.literal(2)]);
 const passwordSchema = z.string().min(1);
 const reasonSchema = z.string().trim().min(1);
@@ -87,6 +82,32 @@ export const setPlayerActiveStatusInputSchema = z.object({
   playerId: uuidSchema,
   active: z.boolean(),
   reason: reasonSchema.optional(),
+});
+
+const rosterVersionSchema = z.number().int().nonnegative();
+const rosterExpectedUpdatedAtSchema = z.string().datetime({ offset: true });
+
+export const rosterActiveStatusBatchInputSchema = z.object({
+  requestId: uuidSchema,
+  expectedVersion: rosterVersionSchema,
+  changes: z
+    .array(
+      z.object({
+        playerId: uuidSchema,
+        active: z.boolean(),
+        expectedUpdatedAt: rosterExpectedUpdatedAtSchema,
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+export const rosterUsernameEditInputSchema = z.object({
+  requestId: uuidSchema,
+  expectedVersion: rosterVersionSchema,
+  playerId: uuidSchema,
+  startggUsername: z.string().trim().min(1),
+  expectedUpdatedAt: rosterExpectedUpdatedAtSchema,
 });
 
 export const addPlayerToCurrentRoundEligibilityInputSchema = z.object({

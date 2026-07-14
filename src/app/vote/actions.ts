@@ -13,6 +13,7 @@ import { assertRateLimit } from "@/lib/server/rate-limit";
 import { submitNormalizedPlayerBallot } from "@/lib/server/normalized-ballots";
 import { claimNormalizedVoterPresence } from "@/lib/server/normalized-voter-presence";
 import { advancePublicStateGeneration } from "@/lib/server/public-state-projection";
+import { readRosterInvalidationGeneration } from "@/lib/server/normalized-roster";
 import {
   advanceVotingTimerIfDue,
   getRoundDrawRecords,
@@ -89,6 +90,8 @@ export async function getVoteLiveStateAction(
   const result = adminState.resultStore.getRoundResult(roundNumber);
   const draws = getRoundDrawRecords(roundNumber);
   const generation = adminState.publicStateGenerationStore.getRound(roundNumber).generation;
+  const rosterGeneration = (await readRosterInvalidationGeneration({ allowLegacyFallback: true }))
+    .version;
 
   return {
     status: snapshot.status,
@@ -106,6 +109,7 @@ export async function getVoteLiveStateAction(
       : null,
     resultPhase: result?.revealPhase ?? null,
     generation,
+    rosterGeneration,
     activeDraws: activeDrawGenerationFromDraws(draws),
   };
 }

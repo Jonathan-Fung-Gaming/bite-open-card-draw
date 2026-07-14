@@ -13,7 +13,8 @@ import {
 } from "@/lib/server/admin-auth";
 import { getAuthoritativeNowMs } from "@/lib/server/authoritative-clock";
 import { getDeploymentSafetySnapshot } from "@/lib/server/deployment-safety";
-import { hydrateTournamentState } from "@/lib/server/persistence";
+import { getTournamentStateBackend, hydrateTournamentState } from "@/lib/server/persistence";
+import { readRosterInvalidationGeneration } from "@/lib/server/normalized-roster";
 import {
   advanceVotingTimerIfDue,
   getRoundDrawRecords,
@@ -664,6 +665,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     recoveryOwnerSessionId: recoveryProof?.ownerSessionId,
   });
   const players = adminState.rosterStore.listPlayers();
+  const rosterInvalidation = await readRosterInvalidationGeneration({
+    allowLegacyFallback: true,
+  });
   const inactivePlayers = players.filter((player) => !player.active);
   const activeCount = adminState.rosterStore.getActivePlayerCount();
   const canControl = hostSnapshot.status === "active";
@@ -726,7 +730,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   return (
     <AdminLayout hostStatus={hostSnapshot.status}>
-      <AdminLiveRefresh />
+      <AdminLiveRefresh
+        eventScope={rosterInvalidation.eventScope}
+        initialRosterVersion={rosterInvalidation.version}
+        useSupabaseRosterInvalidation={getTournamentStateBackend() === "supabase"}
+      />
       <AdminSessionHeartbeat />
       <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_440px] 2xl:grid-cols-[minmax(0,1fr)_520px]">
         <div className="flex min-w-0 flex-col gap-5">
@@ -1722,7 +1730,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
         </div>
         <aside className="grid min-w-0 content-start gap-5">
-          <AdminRosterPanel activeCount={activeCount} canControl={canControl} players={players} />
+          <AdminRosterPanel
+            activeCount={activeCount}
+            canControl={canControl}
+            initialVersion={rosterInvalidation.version}
+            players={players}
+          />
           <AdminCollapsiblePanel
             eyebrow="Operator Support"
             id="admin-support-panels"

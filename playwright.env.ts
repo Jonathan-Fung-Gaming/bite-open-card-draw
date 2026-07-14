@@ -9,7 +9,7 @@ export const e2eTestRouteToken =
   `test-route-${randomBytes(24).toString("hex")}`;
 
 const adminPasswordSalt = randomBytes(16).toString("hex");
-const disposableEventIdPattern = /^(e2e|phase0|phase3|phase9|load|rehearsal)-[a-z0-9-]+$/i;
+const disposableEventIdPattern = /^(e2e|phase0|phase3|phase4|phase9|load|rehearsal)-[a-z0-9-]+$/i;
 const e2eProfile = process.env.E2E_PROFILE ?? "legacy";
 const usesHarnessConfig = process.argv.some(
   (arg) => arg.includes("playwright.phase9.config") || arg.includes("playwright.load.config"),
@@ -17,7 +17,11 @@ const usesHarnessConfig = process.argv.some(
 const usesPhase9Full = process.argv.some((arg) => arg.includes("@full"));
 
 function getProfileDefaults() {
-  if (e2eProfile === "memory-dev-smoke" || e2eProfile === "phase3-memory") {
+  if (
+    e2eProfile === "memory-dev-smoke" ||
+    e2eProfile === "phase3-memory" ||
+    e2eProfile === "phase4-memory"
+  ) {
     return {
       backend: "memory",
       serverMode: "dev",
@@ -45,7 +49,7 @@ function getProfileDefaults() {
     };
   }
 
-  if (e2eProfile === "phase3-supabase") {
+  if (e2eProfile === "phase3-supabase" || e2eProfile === "phase4-supabase") {
     return {
       backend: "supabase",
       serverMode: "dev",
@@ -224,7 +228,7 @@ if (isSupabaseE2e) {
 
   if (!disposableEventIdPattern.test(explicitE2eTournamentEventId)) {
     throw new Error(
-      "Supabase Playwright rehearsal event id must start with e2e-, phase0-, phase3-, phase9-, load-, or rehearsal-.",
+      "Supabase Playwright rehearsal event id must start with e2e-, phase0-, phase3-, phase4-, phase9-, load-, or rehearsal-.",
     );
   }
 

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { refreshAdminSessionAction } from "../actions";
 
 const ADMIN_SESSION_REFRESH_DEBOUNCE_MS = 60_000;
+const ADMIN_SESSION_REFRESH_AFTER_ACTIVITY_MS = 2500;
 const ADMIN_ACTIVITY_EVENTS = ["pointerdown", "keydown", "submit"] as const;
 export const ADMIN_SESSION_REFRESHED_EVENT = "admin-session-refreshed";
 
@@ -15,27 +16,35 @@ export function AdminSessionHeartbeat() {
       return;
     }
 
+    let refreshTimer: number | null = null;
+
     const refreshAfterActivity = () => {
       const now = Date.now();
 
-      if (now - lastRefreshAt.current < ADMIN_SESSION_REFRESH_DEBOUNCE_MS) {
+      if (
+        refreshTimer !== null ||
+        now - lastRefreshAt.current < ADMIN_SESSION_REFRESH_DEBOUNCE_MS
+      ) {
         return;
       }
 
-      lastRefreshAt.current = now;
-      void refreshAdminSessionAction()
-        .then((result) => {
-          if (!result?.expiresAt) {
-            return;
-          }
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        lastRefreshAt.current = Date.now();
+        void refreshAdminSessionAction()
+          .then((result) => {
+            if (!result?.expiresAt) {
+              return;
+            }
 
-          window.dispatchEvent(
-            new CustomEvent(ADMIN_SESSION_REFRESHED_EVENT, {
-              detail: { expiresAt: result.expiresAt },
-            }),
-          );
-        })
-        .catch(() => undefined);
+            window.dispatchEvent(
+              new CustomEvent(ADMIN_SESSION_REFRESHED_EVENT, {
+                detail: { expiresAt: result.expiresAt },
+              }),
+            );
+          })
+          .catch(() => undefined);
+      }, ADMIN_SESSION_REFRESH_AFTER_ACTIVITY_MS);
     };
 
     for (const eventName of ADMIN_ACTIVITY_EVENTS) {
@@ -43,6 +52,10 @@ export function AdminSessionHeartbeat() {
     }
 
     return () => {
+      if (refreshTimer !== null) {
+        window.clearTimeout(refreshTimer);
+      }
+
       for (const eventName of ADMIN_ACTIVITY_EVENTS) {
         window.removeEventListener(eventName, refreshAfterActivity);
       }

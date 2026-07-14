@@ -140,43 +140,43 @@ self-review, merged PR evidence, and post-merge migration verification when appl
 
 ### PRR-001 - Inline Two-Column Roster
 
-- [ ] Exactly two visible columns: Username and Active/inactive control.
-- [ ] Separate Edit column removed.
-- [ ] Permanent username inputs removed.
-- [ ] Double-click starts in-cell username editing.
-- [ ] Touch and Enter/F2 alternatives start editing.
-- [ ] Enter saves and Escape cancels.
-- [ ] Focus behavior is predictable after save/cancel/error.
-- [ ] Empty and duplicate active usernames are rejected.
-- [ ] History-locked names remain non-editable with explanation.
-- [ ] Status button uses the neutral current Save Name styling.
-- [ ] Active state is communicated by text, not color alone.
-- [ ] Long-name and narrow-layout containment remains correct.
+- [x] Exactly two visible columns: Username and Active/inactive control.
+- [x] Separate Edit column removed.
+- [x] Permanent username inputs removed.
+- [x] Double-click starts in-cell username editing.
+- [x] Touch and Enter/F2 alternatives start editing.
+- [x] Enter saves and Escape cancels.
+- [x] Focus behavior is predictable after save/cancel/error.
+- [x] Empty and duplicate active usernames are rejected.
+- [x] History-locked names remain non-editable with explanation.
+- [x] Status button uses the neutral current Save Name styling.
+- [x] Active state is communicated by text, not color alone.
+- [x] Long-name and narrow-layout containment remains correct.
 
 ### PRR-002 - Fast And Propagated Roster Changes
 
-- [ ] Routine rename/status actions avoid full event persistence.
-- [ ] Targeted transaction updates only affected player/audit/version data.
-- [ ] Rapid consecutive row clicks remain usable and batch safely.
-- [ ] Optimistic row/count response occurs within one animation frame.
-- [ ] Hosted p95 confirmation is at or under one second.
-- [ ] Second-admin propagation is at or under two seconds.
-- [ ] Thirty rapid status changes commit in seconds, not minutes.
-- [ ] Canonical count and audit rows are exact.
-- [ ] Concurrent/out-of-order responses cause no lost update.
-- [ ] Failed row rolls back with accessible feedback.
-- [ ] Dirty inline edit survives remote refresh.
-- [ ] No sensitive roster payload is exposed through invalidation signalling.
-- [ ] Open-round eligibility snapshot is unchanged.
-- [ ] Next round uses updated active roster.
-- [ ] 48 -> 36 -> 24 -> 12 helper still removes exactly 12 each time.
+- [x] Routine rename/status actions avoid full event persistence.
+- [x] Targeted transaction updates only affected player/audit/version data.
+- [x] Rapid consecutive row clicks remain usable and batch safely.
+- [x] Optimistic row/count response occurs within one animation frame.
+- [x] Hosted p95 confirmation is at or under one second.
+- [x] Second-admin propagation is at or under two seconds.
+- [x] Thirty rapid status changes commit in seconds, not minutes.
+- [x] Canonical count and audit rows are exact.
+- [x] Concurrent/out-of-order responses cause no lost update.
+- [x] Failed row rolls back with accessible feedback.
+- [x] Dirty inline edit survives remote refresh.
+- [x] No sensitive roster payload is exposed through invalidation signalling.
+- [x] Open-round eligibility snapshot is unchanged.
+- [x] Next round uses updated active roster.
+- [x] 48 -> 36 -> 24 -> 12 helper still removes exactly 12 each time.
 
 ### Phase Gate
 
-- [ ] Phase plan self-reviewed and amended.
-- [ ] Lint, typecheck, unit, build, e2e, hosted Supabase, and performance checks pass.
-- [ ] Logic/security/UX/UI diff review completed with findings resolved.
-- [ ] Checklist/phase-status evidence recorded.
+- [x] Phase plan self-reviewed and amended.
+- [x] Lint, typecheck, unit, build, e2e, hosted Supabase, and performance checks pass.
+- [x] Logic/security/UX/UI diff review completed with findings resolved.
+- [x] Checklist/phase-status evidence recorded.
 - [ ] Phase PR merged.
 - [ ] Supabase migrations pushed after merge and verified when present.
 

@@ -59,6 +59,8 @@ const implementedMutationNames: NormalizedTransactionalMutationName[] = [
   "acquireHostLock",
   "refreshHostLock",
   "releaseHostLock",
+  "renameRosterPlayer",
+  "setRosterPlayerActiveStates",
 ];
 
 const blockedMutationNames: NormalizedBlockedTransactionalMutationName[] = [
@@ -147,7 +149,7 @@ function latestRowChangingRpcDefinition(migrations: string, rpcName: string) {
 
 function createMockRpcClient(
   calls: RpcCall[],
-  response: { data: Json | null; error: { message: string } | null } = {
+  response: { data: Json | null; error: { code?: string; message: string } | null } = {
     data: { committed: true, rows_changed: 1 },
     error: null,
   },
@@ -588,6 +590,35 @@ describe("normalized runtime transactional mutations", () => {
         args: { p_event_id: "event-a" },
       },
     ]);
+  });
+
+  it("reports the required Phase 4 migration when a targeted roster RPC is absent", async () => {
+    await expect(
+      executeNormalizedTransactionalMutation(
+        "renameRosterPlayer",
+        {
+          requestId: uuidA,
+          adminSessionId: uuidB,
+          hostTokenHash: "a".repeat(64),
+          expectedVersion: 0,
+          playerId: uuidC,
+          expectedUpdatedAt: "2026-07-14T00:00:00.000Z",
+          startggUsername: "Updated Player",
+          startggUsernameNormalized: "updated player",
+        },
+        {
+          eventId: "event-a",
+          supabase: createMockRpcClient([], {
+            data: null,
+            error: {
+              code: "PGRST202",
+              message:
+                "Could not find the function public.normalized_rename_roster_player in the schema cache",
+            },
+          }),
+        },
+      ),
+    ).rejects.toThrow(/unavailable until the Phase 4 database migration is applied/);
   });
 
   it("rejects placeholder commit acknowledgements that do not prove rows changed", async () => {

@@ -15,6 +15,10 @@ export type PersistMergedStateInput = {
   current: OperationalStateSnapshot;
 };
 
+export type PersistRosterStateInput = {
+  current: OperationalStateSnapshot;
+};
+
 export type OperationalStateRepository = {
   load(): Promise<OperationalStateSnapshot | null>;
   readPublicGenerationKey?(): Promise<string>;
@@ -26,6 +30,7 @@ export type OperationalStateRepository = {
   persistVotingState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
   persistVotingAdminState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
   persistResultAdminState?(input: PersistMergedStateInput): Promise<OperationalStateSnapshot>;
+  persistRosterState?(input: PersistRosterStateInput): Promise<OperationalStateSnapshot>;
 };
 
 export class MemoryOperationalStateRepository implements OperationalStateRepository {
@@ -68,6 +73,18 @@ export class MemoryOperationalStateRepository implements OperationalStateReposit
 
   async persistResultAdminState(input: PersistMergedStateInput) {
     return this.persistMerged(input);
+  }
+
+  async persistRosterState(input: PersistRosterStateInput) {
+    const current = cloneOperationalStateSnapshot(input.current);
+    const latest = (await this.load()) ?? cloneOperationalStateSnapshot(input.current);
+
+    latest.savedAt = current.savedAt;
+    latest.audit = current.audit;
+    latest.roster.players = current.roster.players;
+    await this.save(latest);
+
+    return cloneOperationalStateSnapshot(latest);
   }
 
   clear() {

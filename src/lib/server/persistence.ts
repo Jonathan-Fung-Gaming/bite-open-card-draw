@@ -24,6 +24,13 @@ export type TournamentStateBackend = "memory" | "supabase";
 const globalForPersistence = globalThis as typeof globalThis & {
   biteOpenMemoryOperationalStateRepository?: MemoryOperationalStateRepository;
   biteOpenPersistenceWriteQueue?: Promise<void>;
+  biteOpenMemoryRosterMutationState?: Map<
+    string,
+    {
+      results: Map<string, { fingerprint: string; result: unknown }>;
+      version: number;
+    }
+  >;
 };
 
 const hydrationBaselines = new WeakMap<AdminStateStores, OperationalStateSnapshot | null>();
@@ -66,6 +73,64 @@ function getMemoryRepository() {
     (globalForPersistence.biteOpenMemoryOperationalStateRepository =
       new MemoryOperationalStateRepository())
   );
+}
+
+function getMemoryRosterMutationState(eventId = getTournamentEventId()) {
+  const states =
+    globalForPersistence.biteOpenMemoryRosterMutationState ??
+    (globalForPersistence.biteOpenMemoryRosterMutationState = new Map());
+  const existing = states.get(eventId);
+
+  if (existing) {
+    return existing;
+  }
+
+  const created: {
+    results: Map<string, { fingerprint: string; result: unknown }>;
+    version: number;
+  } = { results: new Map(), version: 0 };
+  states.set(eventId, created);
+
+  return created;
+}
+
+export function getMemoryRosterVersion(eventId = getTournamentEventId()) {
+  return getMemoryRosterMutationState(eventId).version;
+}
+
+export function advanceMemoryRosterVersion(eventId = getTournamentEventId()) {
+  const state = getMemoryRosterMutationState(eventId);
+
+  state.version += 1;
+
+  return state.version;
+}
+
+export function getMemoryRosterMutationResult<T>(
+  requestId: string,
+  fingerprint: string,
+  eventId = getTournamentEventId(),
+) {
+  const entry = getMemoryRosterMutationState(eventId).results.get(requestId);
+
+  if (!entry) {
+    return undefined;
+  }
+
+  if (entry.fingerprint !== fingerprint) {
+    throw new Error("requestId has already been used with a different roster mutation payload.");
+  }
+
+  return entry.result as T;
+}
+
+export function setMemoryRosterMutationResult<T>(
+  requestId: string,
+  fingerprint: string,
+  result: T,
+  eventId = getTournamentEventId(),
+) {
+  getMemoryRosterMutationState(eventId).results.set(requestId, { fingerprint, result });
 }
 
 export function getTournamentStateBackend(): TournamentStateBackend {
@@ -193,6 +258,23 @@ async function persistResultAdminStateUnlocked(
 
   restoreOperationalStateSnapshot(stores, merged);
   hydrationBaselines.set(stores, cloneOperationalStateSnapshot(merged));
+  invalidateTournamentReadCaches();
+}
+
+async function persistRosterStateUnlocked(
+  stores: AdminStateStores,
+  repository: OperationalStateRepository,
+) {
+  if (!repository.persistRosterState) {
+    throw new Error("Targeted roster persistence is unavailable for this backend.");
+  }
+
+  const persisted = await repository.persistRosterState({
+    current: createOperationalStateSnapshot(stores),
+  });
+
+  restoreOperationalStateSnapshot(stores, persisted);
+  hydrationBaselines.set(stores, cloneOperationalStateSnapshot(persisted));
   invalidateTournamentReadCaches();
 }
 
@@ -413,6 +495,44 @@ export async function withPersistedHostLockState<T>(
       return result;
     } catch (error) {
       restoreOperationalStateSnapshot(stores, rollbackSnapshot);
+
+      throw error;
+    }
+  });
+}
+
+export async function withPersistedRosterState<T>(
+  callback: () => { persist: boolean; value: T } | Promise<{ persist: boolean; value: T }>,
+  stores: AdminStateStores = adminState,
+  repository = getOperationalStateRepository(),
+) {
+  return withPersistenceWriteQueue(async () => {
+    await hydrateTournamentState(stores, repository);
+    const rollbackSnapshot = createOperationalStateSnapshot(stores);
+    const eventId = getTournamentEventId();
+    const rosterMutationState = getMemoryRosterMutationState(eventId);
+    const rollbackRosterMutationState: {
+      results: Map<string, { fingerprint: string; result: unknown }>;
+      version: number;
+    } = {
+      results: new Map(rosterMutationState.results),
+      version: rosterMutationState.version,
+    };
+
+    try {
+      const result = await callback();
+
+      if (result.persist) {
+        await persistRosterStateUnlocked(stores, repository);
+      }
+
+      return result.value;
+    } catch (error) {
+      restoreOperationalStateSnapshot(stores, rollbackSnapshot);
+      globalForPersistence.biteOpenMemoryRosterMutationState?.set(
+        eventId,
+        rollbackRosterMutationState,
+      );
 
       throw error;
     }
