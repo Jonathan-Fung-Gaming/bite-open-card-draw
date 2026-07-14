@@ -1,6 +1,9 @@
 import { spawn, spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import net from "node:net";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
 import nextEnv from "@next/env";
 
 const { loadEnvConfig } = nextEnv;
@@ -41,6 +44,53 @@ function terminateChildProcessTree(child) {
   } catch {
     child.kill("SIGTERM");
   }
+}
+
+function processIsAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code !== "ESRCH";
+  }
+}
+
+async function acquirePhase6RunLock() {
+  const workspaceHash = createHash("sha256").update(process.cwd()).digest("hex").slice(0, 12);
+  const lockDirectory = join(tmpdir(), `bite-open-card-draw-phase6-${workspaceHash}.lock`);
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await mkdir(lockDirectory);
+      await writeFile(join(lockDirectory, "owner-pid"), String(process.pid), "utf8");
+      return lockDirectory;
+    } catch (error) {
+      if (error?.code !== "EEXIST") {
+        throw error;
+      }
+
+      const ownerPid = Number.parseInt(
+        await readFile(join(lockDirectory, "owner-pid"), "utf8").catch(() => ""),
+        10,
+      );
+      const lockAgeMs = Date.now() - (await stat(lockDirectory)).mtimeMs;
+
+      if (Number.isInteger(ownerPid) && ownerPid > 0 && processIsAlive(ownerPid)) {
+        throw new Error(
+          `[playwright-runner] phase6-memory is already running in this workspace (pid ${ownerPid}).`,
+        );
+      }
+      if (!Number.isInteger(ownerPid) && lockAgeMs < 60_000) {
+        throw new Error(
+          "[playwright-runner] phase6-memory is already acquiring its workspace lock.",
+        );
+      }
+
+      await rm(lockDirectory, { force: true, recursive: true });
+    }
+  }
+
+  throw new Error("[playwright-runner] could not acquire the phase6-memory workspace lock.");
 }
 
 function run(command, args, env) {
@@ -116,6 +166,7 @@ const PROFILES = new Set([
   "phase4-memory",
   "phase4-supabase",
   "phase5-memory",
+  "phase6-memory",
   "supabase-dev-rehearsal",
   "production-flow",
 ]);
@@ -140,6 +191,22 @@ function isLocalUrl(value) {
 }
 
 function profileDefaults(profile, context) {
+  if (profile === "phase6-memory") {
+    return {
+      backend: "memory",
+      serverMode: "dev",
+      disableAdminSessionHeartbeat: "true",
+      disableHostHeartbeat: "true",
+      disableVoteLivePolling: "false",
+      disablePublicRefresh: "false",
+      allowE2eRoutes: "true",
+      allowMemoryBackend: "true",
+      phase9BallotMode: undefined,
+      publicReadCacheMs: "1000",
+      useAdminActionsOnly: "false",
+    };
+  }
+
   if (
     profile === "phase1-memory" ||
     profile === "phase2-memory" ||
@@ -519,6 +586,36 @@ function collectPhase2MemoryValidationErrors(config) {
   return errors;
 }
 
+function collectPhase6MemoryValidationErrors(config) {
+  const errors = [];
+
+  if (config.backend !== "memory") {
+    errors.push(`backend must be memory, got ${config.backend}.`);
+  }
+
+  if (config.serverMode !== "dev") {
+    errors.push(`serverMode must be dev, got ${config.serverMode}.`);
+  }
+
+  if (!isLocalUrl(config.baseURL)) {
+    errors.push("Phase 6 memory evidence requires a local E2E_BASE_URL.");
+  }
+
+  if (!isLocalUrl(config.publicSiteUrl)) {
+    errors.push("Phase 6 memory evidence requires a local NEXT_PUBLIC_SITE_URL.");
+  }
+
+  if (config.disablePublicRefresh === "true") {
+    errors.push("Phase 6 memory evidence requires public route refresh to remain enabled.");
+  }
+
+  if (config.allowRehearsalAdminControls !== "true") {
+    errors.push("Phase 6 memory evidence requires guarded rehearsal admin controls.");
+  }
+
+  return errors;
+}
+
 function failValidation(profile, errors) {
   if (errors.length === 0) {
     return;
@@ -615,7 +712,8 @@ if (
     requestedProfile === "phase2-memory" ||
     requestedProfile === "phase3-memory" ||
     requestedProfile === "phase4-memory" ||
-    requestedProfile === "phase5-memory") &&
+    requestedProfile === "phase5-memory" ||
+    requestedProfile === "phase6-memory") &&
   requestedBackendOverride &&
   requestedBackendOverride !== "memory"
 ) {
@@ -630,7 +728,8 @@ const memoryLockedProfile =
   requestedProfile === "phase2-memory" ||
   requestedProfile === "phase3-memory" ||
   requestedProfile === "phase4-memory" ||
-  requestedProfile === "phase5-memory";
+  requestedProfile === "phase5-memory" ||
+  requestedProfile === "phase6-memory";
 const e2eTournamentStateBackend = memoryLockedProfile
   ? "memory"
   : (requestedBackendOverride ?? defaults.backend);
@@ -706,32 +805,42 @@ const e2eAllowRehearsalAdminControls =
   requestedProfile === "phase2-memory" ||
   requestedProfile.startsWith("phase3-") ||
   requestedProfile.startsWith("phase4-") ||
-  requestedProfile.startsWith("phase5-")
+  requestedProfile.startsWith("phase5-") ||
+  requestedProfile.startsWith("phase6-")
     ? "true"
     : "false");
 const e2eDeployedCommit = process.env.E2E_DEPLOYED_COMMIT_SHA;
 const requestedNextDistDirOverride = process.env.E2E_NEXT_DIST_DIR?.trim();
+const lockedNextDistDir = requestedProfile === "phase2-memory" ? ".next-phase2" : undefined;
+
+if (requestedProfile === "phase6-memory" && requestedNextDistDirOverride) {
+  console.error(
+    "[playwright-runner] phase6-memory uses a freshly cleared .next cache; remove E2E_NEXT_DIST_DIR.",
+  );
+  process.exit(1);
+}
 
 if (
-  requestedProfile === "phase2-memory" &&
+  lockedNextDistDir &&
   requestedNextDistDirOverride &&
-  requestedNextDistDirOverride !== ".next-phase2"
+  requestedNextDistDirOverride !== lockedNextDistDir
 ) {
   console.error(
-    "[playwright-runner] phase2-memory is locked to .next-phase2; remove E2E_NEXT_DIST_DIR.",
+    `[playwright-runner] ${requestedProfile} is locked to ${lockedNextDistDir}; remove E2E_NEXT_DIST_DIR.`,
   );
   process.exit(1);
 }
 
 const e2eNextDistDir =
-  requestedProfile === "phase2-memory"
-    ? ".next-phase2"
-    : (requestedNextDistDirOverride ?? (usesPhase0Config ? ".next-phase0" : undefined));
+  lockedNextDistDir ??
+  requestedNextDistDirOverride ??
+  (usesPhase0Config ? ".next-phase0" : undefined);
 const e2ePublicSiteUrl =
   requestedProfile === "phase2-memory" ||
   requestedProfile.startsWith("phase3-") ||
   requestedProfile.startsWith("phase4-") ||
-  requestedProfile.startsWith("phase5-")
+  requestedProfile.startsWith("phase5-") ||
+  requestedProfile.startsWith("phase6-")
     ? e2eBaseURL
     : (process.env.NEXT_PUBLIC_SITE_URL ??
       (isProductionFlowLocalStart ? "https://event.example.test" : e2eBaseURL));
@@ -781,6 +890,8 @@ if (requestedProfile === "production-flow") {
   failValidation(requestedProfile, collectProductionFlowValidationErrors(runConfig));
 } else if (requestedProfile === "phase2-memory") {
   failValidation(requestedProfile, collectPhase2MemoryValidationErrors(runConfig));
+} else if (requestedProfile === "phase6-memory") {
+  failValidation(requestedProfile, collectPhase6MemoryValidationErrors(runConfig));
 } else if (requestedProfile.startsWith("phase1-supabase")) {
   failValidation(requestedProfile, collectPhase1SupabaseValidationErrors(runConfig));
 } else if (requestedProfile === "phase3-supabase") {
@@ -793,6 +904,21 @@ if (requestedProfile === "production-flow") {
 
 if (validateEnvOnly) {
   process.exit(0);
+}
+
+const phase6RunLock =
+  requestedProfile === "phase6-memory" && !requestedArgs.includes("--list")
+    ? await acquirePhase6RunLock()
+    : undefined;
+
+if (phase6RunLock) {
+  const phase6NextDirectory = join(process.cwd(), ".next");
+
+  if (relative(process.cwd(), phase6NextDirectory) !== ".next") {
+    throw new Error("[playwright-runner] refused to clear an unexpected Phase 6 cache path.");
+  }
+
+  await rm(phase6NextDirectory, { force: true, recursive: true });
 }
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -850,6 +976,9 @@ try {
     console.warn(
       `[playwright-runner] port ${e2ePort} is still listening after Playwright exit; check for a leftover Next process from this workspace.`,
     );
+  }
+  if (phase6RunLock) {
+    await rm(phase6RunLock, { force: true, recursive: true });
   }
 }
 

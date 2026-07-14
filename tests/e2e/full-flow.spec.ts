@@ -1253,24 +1253,31 @@ async function expectDetailsOpen(details: Locator) {
 }
 
 async function expectFinalBanCountDetailsRemainOpenAfterWait(page: Page, waitMs = 1_500) {
-  const details = page.locator("details", { hasText: "ban counts" });
+  const details = page.locator("details:visible").filter({ hasText: /ban counts/i });
+  const compactResultsDisclosureVisible = await page
+    .getByText("Show Ban Counts", { exact: true })
+    .isVisible()
+    .catch(() => false);
+  const expectedDetailsCount = compactResultsDisclosureVisible ? 1 : 2;
 
-  await expect(details).toHaveCount(2);
+  await expect(details).toHaveCount(expectedDetailsCount);
 
-  for (const index of [0, 1]) {
+  for (let index = 0; index < expectedDetailsCount; index += 1) {
     const detail = details.nth(index);
 
     if (!(await detail.evaluate((element) => (element as HTMLDetailsElement).open))) {
       await detail.locator("summary").click();
     }
     await expectDetailsOpen(detail);
-    await expect(detail.locator("li")).toHaveCount(7);
-    await expect(detail.getByTestId("result-selected-label")).toHaveCount(1);
+    await expect(detail.locator("li")).toHaveCount(compactResultsDisclosureVisible ? 14 : 7);
+    await expect(detail.getByTestId("result-selected-label")).toHaveCount(
+      compactResultsDisclosureVisible ? 2 : 1,
+    );
   }
 
   await page.waitForTimeout(waitMs);
 
-  for (const index of [0, 1]) {
+  for (let index = 0; index < expectedDetailsCount; index += 1) {
     await expectDetailsOpen(details.nth(index));
   }
 }

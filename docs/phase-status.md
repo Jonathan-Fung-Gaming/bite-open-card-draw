@@ -17,6 +17,99 @@ behavior sources during remediation are `docs/product-spec.md` and
 `docs/pump_open_stage_repo_validation_checklist.md`; they override stale execution-plan or phase
 status text when there is a conflict.
 
+## Production Readiness Remediation Phase 6 - Mobile Results - 2026-07-14
+
+Status: implementation and the complete pre-merge gate are complete on
+`agent/phase-6-mobile-results`. The focused feature PR, required checks, merge, synchronized-main
+rerun, migration-absence verification, and closeout documentation PR remain pending. Accordingly,
+the final two Phase 6 gate rows remain unchecked.
+
+### Scope And Changed Files
+
+- Added the reviewed and amended Phase 6 plan at
+  `docs/phase-plans/production-readiness-phase-6-mobile-results-viewport-2026-07-14.md`. Three
+  delegated read-only audits covered requirements, implementation surfaces, and browser evidence;
+  the required final review remained single-agent.
+- Added an opt-in `compactMobileResults` presentation to `PublicResultSummary` and enabled it only
+  from the final `/results` branch. `/charts`, `/vote`, pending-result withholding, result authority,
+  tiebreak behavior, and previous-round selection are unchanged.
+- Added the two-column mobile winner grid, compact `/results` header/container, visible artwork,
+  14px wrapped titles, 12px wrapped artists, and responsive desktop restoration. The existing
+  desktop result-row markup was factored into `PublicResultRows` without changing its default
+  visual contract.
+- Added one native mobile `details` disclosure labelled exactly `Show Ban Counts`. It contains both
+  complete seven-row lists, keeps server-provided least-to-most ordering and zero-ban rows, uses a
+  44px summary target, and stores only the open/closed preference in result-scoped session storage.
+- Added focused static-render regressions, Phase 6 Playwright configuration/profile/scripts, exact
+  phone/desktop geometry checks, long-name stress evidence, keyboard/touch/AT checks, live router
+  refresh persistence, previous-round safety coverage, and compatibility updates to the full-flow
+  helper and Phase 9 results page object.
+- Added a workspace-scoped Phase 6 runner lock and fresh generated `.next` cache preparation. A
+  concurrent runner now fails before touching the cache; dead locks are reclaimed by recorded PID,
+  and an ownerless just-created lock receives a one-minute race-safe grace period.
+
+### Pre-Merge Checks And Evidence
+
+- Scoped Prettier writes, `git diff --check`, `npm run lint`, and `npm run typecheck` passed. The
+  Phase 6 profile list reports the intended six project/test combinations and retains automatic
+  public refresh, live vote polling, guarded rehearsal controls, and a memory-only local backend.
+- `npm run test` passed all 82 unit-test files / 566 tests, including the three new Phase 6 render
+  contracts and existing Phase 5/shared-result regressions.
+- `npm run build` passed with the optimized Next.js 15.5.19 production build.
+- The final post-lock combined Chromium run passed the desktop and mobile projects with no failed
+  tests. Desktop assertions preserved the 145px header, 1,240px winner grid, 612px cards, 16px gap,
+  y=165 placement, and established 48/24/36/24px typography at 1280 and 1440 widths.
+- The final post-lock WebKit run passed with no failed tests. Chromium and WebKit each exercised
+  exact 320x568, 360x640, and 390x844 viewports with isolated device sessions.
+- WebKit normal-state summary bottoms were 332.875px, 326.625px, and 335.0625px respectively;
+  worst-case unbroken-title/CJK-artist stress summary bottoms were 430.375px, 426.625px, and
+  417.5625px. All remain within their visual viewports at scrollY 0 with scale 1 and zero horizontal
+  overflow. Titles were 14px and artists 12px with no clamp, ellipsis, or measured clipping.
+- Browser evidence also verified decoded artwork, one accessible native disclosure, Enter/Space,
+  touch, two complete expanded lists, two selected markers, no percentages, session-scoped state
+  across observed `_rsc` refresh, reachable final rows with ordinary scrolling, and the intact
+  previous-round notice. Viewport-only normal/stress screenshots were visually inspected at the
+  smallest and widest WebKit contracts.
+- A synthetic live-owner lock contention check returned the expected guarded failure before
+  Playwright startup. No comprehensive four-round rehearsal was run; the active parent plan defers
+  that evidence to the Phase 7 manual end-of-plan gate.
+
+### Complete Diff Review And Resolved Findings
+
+- Review compared the complete implementation against `docs/product-spec.md`, the repository
+  validation checklist, Phase 0 PRR-013 evidence, security notes, the parent plan/checklist, and the
+  Phase 6 plan. No tournament rule, result authority, server mutation, browser randomness, secret,
+  privacy, or database boundary changed.
+- Browser stress initially exposed a controlled-native-disclosure race: an RSC reconciliation could
+  write a stale React `open` value over a native keyboard/touch toggle. The disclosure is now
+  uncontrolled, the DOM owns native interaction, `onToggle` persists the preference, and a ref
+  restores it after remount. Final Chromium and WebKit refresh evidence passed.
+- A test synchronization attempt awaited completion of a streamed RSC response and could hang until
+  the test timeout. Evidence now waits for the response event without waiting for the streaming body
+  to finish, then observes the next refresh while the disclosure is open.
+- Reusing one synthetic tab across all three viewport sizes created state-normalization races that
+  do not represent separate physical phones. Each viewport now gets its own page/session and proves
+  the complete fold/readability contract independently.
+- Repeated queued test commands exposed shared Next-cache deletion and compilation races. The final
+  runner uses a pre-start atomic workspace lock, fresh generated cache, custom-dist-dir rejection,
+  stale-PID recovery, and a creation grace period. Contention and final engine reruns passed.
+- Final visual/code review found no unresolved clipping, unreadable type, horizontal overflow,
+  desktop/shared-route drift, stale-state failure, accessibility regression, data-loss risk, or
+  security-boundary violation.
+
+### Migration, Rollback, Risks, And Assumptions
+
+- This phase changes client presentation and test infrastructure only. It adds no server mutation,
+  dependency, environment file, or Supabase migration. Post-merge migration target verification,
+  push, parity, and database lint are expected to be not applicable after the merged range is
+  inspected.
+- The result id used in session storage is already public final-result state; the stored value is
+  only `open` or `closed`. Browser storage never participates in winner/count authority.
+- Expanded counts intentionally use normal page scrolling. No body-height lock, overflow lock, or
+  reduced-motion control was added.
+- Rollback is a forward revert of the Phase 6 application/test commit. No data or schema rollback is
+  needed or permitted.
+
 ## Production Readiness Remediation Phase 5 - Branding, Copy, Charts, And Mobile Selector - 2026-07-14
 
 Status: complete. Phase 5 merged in

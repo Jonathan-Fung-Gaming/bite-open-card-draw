@@ -247,26 +247,26 @@ operator-run manual end-of-plan smoke test during Phase 7 instead.
 
 ### PRR-013 - Results Fit
 
-- [ ] `/results` uses route-only compact mobile presentation.
-- [ ] Both complete winner cards are visible together at scrollY 0.
-- [ ] `Show Ban Counts` is visible and fully within the viewport at scrollY 0.
-- [ ] Text is smaller but readable and at least the accepted minimum size.
-- [ ] Titles/artists wrap without ellipsis or line clamps.
-- [ ] Artwork remains visible.
-- [ ] Disclosure is at least 44px and keyboard/touch/AT operable.
-- [ ] Both complete seven-row result lists are available when expanded.
-- [ ] Disclosure state survives auto-refresh.
-- [ ] No horizontal overflow or zoom is required.
-- [ ] Previous-round safety notice remains intact.
-- [ ] Desktop 1280/1440 geometry and typography remain unchanged.
-- [ ] Mobile Chromium and WebKit pass at 320/360/390 widths.
+- [X] `/results` uses route-only compact mobile presentation.
+- [X] Both complete winner cards are visible together at scrollY 0.
+- [X] `Show Ban Counts` is visible and fully within the viewport at scrollY 0.
+- [X] Text is smaller but readable and at least the accepted minimum size.
+- [X] Titles/artists wrap without ellipsis or line clamps.
+- [X] Artwork remains visible.
+- [X] Disclosure is at least 44px and keyboard/touch/AT operable.
+- [X] Both complete seven-row result lists are available when expanded.
+- [X] Disclosure state survives auto-refresh.
+- [X] No horizontal overflow or zoom is required.
+- [X] Previous-round safety notice remains intact.
+- [X] Desktop 1280/1440 geometry and typography remain unchanged.
+- [X] Mobile Chromium and WebKit pass at 320/360/390 widths.
 
 ### Phase Gate
 
-- [ ] Phase plan self-reviewed and amended.
-- [ ] Lint, typecheck, unit, build, mobile e2e, visual, and accessibility checks pass.
-- [ ] UX/UI and code/diff review completed with findings resolved.
-- [ ] Checklist/phase-status evidence recorded.
+- [X] Phase plan self-reviewed and amended.
+- [X] Lint, typecheck, unit, build, mobile e2e, visual, and accessibility checks pass.
+- [X] UX/UI and code/diff review completed with findings resolved.
+- [X] Checklist/phase-status evidence recorded.
 - [ ] Phase PR merged.
 - [ ] Post-merge migration step marked not applicable or completed and verified.
 
