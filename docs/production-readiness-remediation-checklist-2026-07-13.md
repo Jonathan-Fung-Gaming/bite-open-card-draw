@@ -144,7 +144,7 @@ operator-run manual end-of-plan smoke test during Phase 7 instead.
 
 ### PRR-001 - Inline Two-Column Roster
 
-- [x] Exactly two visible columns: Username and Active/inactive control.
+- [x] Exactly two visible columns: Username and Active Control.
 - [x] Separate Edit column removed.
 - [x] Permanent username inputs removed.
 - [x] Double-click starts in-cell username editing.

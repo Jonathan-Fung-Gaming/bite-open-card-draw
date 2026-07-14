@@ -1626,10 +1626,7 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
 
   await expect(rosterPanel).toBeVisible();
   await expect(rosterPanel.getByText("Status", { exact: true })).toHaveCount(0);
-  await expect(rosterPanel.getByRole("columnheader")).toHaveText([
-    "Username",
-    "Active/inactive control",
-  ]);
+  await expect(rosterPanel.getByRole("columnheader")).toHaveText(["Username", "Active Control"]);
   await expect(rosterPanel.getByRole("columnheader")).toHaveCount(2);
   await expect(rosterPanel.getByText("Edit", { exact: true })).toHaveCount(0);
   expect(await visualTop(rosterPanel)).toBeLessThan(await visualTop(supportPanels));
@@ -1675,13 +1672,8 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
       .getByTestId("admin-roster-row")
       .filter({ hasText: "Alpha" })
       .getByTestId("admin-roster-username"),
-  ).not.toHaveClass(/text-(?:green|red)-/);
-  await expect(
-    page
-      .getByTestId("admin-roster-row")
-      .filter({ hasText: "Alpha" })
-      .getByText("Active", { exact: true }),
-  ).toBeVisible();
+  ).toHaveClass(/text-green-/);
+  await expect(rosterPanel.getByText("Active", { exact: true })).toHaveCount(0);
   await expect(
     page.getByTestId("admin-roster-row").filter({ hasText: PHASE5_LONG_USERNAME }),
   ).toBeVisible();
@@ -1696,7 +1688,8 @@ test("full round smoke flow reaches final reveal and downloads private CSV", asy
   await expect(
     page.getByTestId("admin-roster-row").filter({ hasText: PHASE5_LONG_USERNAME }),
   ).toHaveAttribute("data-active", "false");
-  await expect(longRosterRow.getByText("Inactive", { exact: true })).toBeVisible();
+  await expect(longRosterRow.getByText("Inactive", { exact: true })).toHaveCount(0);
+  await expect(longRosterRow.getByTestId("admin-roster-username")).toHaveClass(/text-red-/);
   await expect(
     longRosterRow.getByRole("button", { name: `Reactivate ${PHASE5_LONG_USERNAME}` }),
   ).toHaveClass(/border-metal-700/);

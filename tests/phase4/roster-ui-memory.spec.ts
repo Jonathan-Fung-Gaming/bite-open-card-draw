@@ -66,8 +66,10 @@ test("@phase4-memory desktop roster is two-column, inline editable, optimistic, 
   const headers = table.getByRole("columnheader");
 
   await expect(headers).toHaveCount(2);
-  await expect(headers).toHaveText(["Username", "Active/inactive control"]);
+  await expect(headers).toHaveText(["Username", "Active Control"]);
   await expect(table.getByText("Edit", { exact: true })).toHaveCount(0);
+  await expect(table.getByText("Active", { exact: true })).toHaveCount(0);
+  await expect(table.getByText("Inactive", { exact: true })).toHaveCount(0);
 
   const alphaRow = rosterRow(page, alpha);
   const alphaTrigger = alphaRow.getByRole("button", { name: `Edit username ${alpha}` });
@@ -124,12 +126,12 @@ test("@phase4-memory desktop roster is two-column, inline editable, optimistic, 
 
   await duplicateInput.fill(correctedAlpha);
   await duplicateInput.press("Enter");
-  const inactiveDuplicateRow = page
-    .getByTestId("admin-roster-row")
-    .filter({ hasText: correctedAlpha })
-    .filter({ has: page.getByText("Inactive", { exact: true }) });
+  const inactiveDuplicateRow = page.locator(
+    `[data-testid="admin-roster-row"][data-player-username=${JSON.stringify(correctedAlpha)}][data-active="false"]`,
+  );
 
   await expect(inactiveDuplicateRow).toBeVisible();
+  await expect(inactiveDuplicateRow.getByTestId("admin-roster-username")).toHaveClass(/text-red-/);
   const rejectedOptimisticState = await page.evaluate(async (username) => {
     const targetRow = Array.from(
       document.querySelectorAll<HTMLElement>("[data-testid='admin-roster-row']"),
@@ -157,10 +159,10 @@ test("@phase4-memory desktop roster is two-column, inline editable, optimistic, 
   const dirtyBravoInput = dirtyBravoRow.getByLabel(`Edit start.gg username for ${bravo}`);
 
   await dirtyBravoInput.fill(`${bravo} Unsaved`);
-  const correctedActiveRow = page
-    .getByTestId("admin-roster-row")
-    .filter({ hasText: correctedAlpha })
-    .filter({ has: page.getByText("Active", { exact: true }) });
+  const correctedActiveRow = page.locator(
+    `[data-testid="admin-roster-row"][data-player-username=${JSON.stringify(correctedAlpha)}][data-active="true"]`,
+  );
+  await expect(correctedActiveRow.getByTestId("admin-roster-username")).toHaveClass(/text-green-/);
   const correctedActivePlayerId = await correctedActiveRow.getAttribute("data-player-id");
 
   if (!correctedActivePlayerId) {
@@ -241,7 +243,10 @@ test("@phase4-memory touch activation keeps the two-column roster contained", as
 
   await row.getByRole("button", { name: `Edit username ${username}` }).tap();
   await expect(row.getByLabel(`Edit start.gg username for ${username}`)).toBeFocused();
-  await expect(page.getByTestId("admin-roster-table").getByRole("columnheader")).toHaveCount(2);
+  const table = page.getByTestId("admin-roster-table");
+
+  await expect(table.getByRole("columnheader")).toHaveText(["Username", "Active Control"]);
+  await expect(table.getByRole("columnheader")).toHaveCount(2);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
