@@ -267,8 +267,8 @@ operator-run manual end-of-plan smoke test during Phase 7 instead.
 - [X] Lint, typecheck, unit, build, mobile e2e, visual, and accessibility checks pass.
 - [X] UX/UI and code/diff review completed with findings resolved.
 - [X] Checklist/phase-status evidence recorded.
-- [ ] Phase PR merged.
-- [ ] Post-merge migration step marked not applicable or completed and verified.
+- [X] Phase PR merged.
+- [X] Post-merge migration step marked not applicable or completed and verified.
 
 ## Phase 7 - Release Closure
 
