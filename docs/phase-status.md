@@ -5821,3 +5821,52 @@ rehearsal were not run for this book of work, per user request.
   not persist open state across refresh.
 - Commit, PR, merge, and any post-merge synchronization are deferred until user approval of the
   screenshot evidence.
+
+## Mobile Results Readability And Charts Parity - 2026-07-16
+
+Status: implemented and verified locally; user approved the screenshots and publication on
+2026-07-16.
+
+### Scope And Changed Files
+
+- Added the scoped plan/checklist in
+  `docs/phase-plans/mobile-results-readability-and-charts-parity-2026-07-16.md`.
+- Increased compact phone result type and removed winner metadata clamps in
+  `src/components/MobilePublicResultSummary.tsx`. Song names use natural word wrapping.
+- Opted the final-results branch of `src/app/charts/page.tsx` into the same compact result component
+  and phone spacing already used by `/results`.
+- Extended focused unit and browser coverage in
+  `src/components/mobile-charts-results-follow-up.test.tsx` and
+  `tests/mobile-charts-results-follow-up/`.
+
+### Checks And Evidence
+
+- `npx vitest run src/components/mobile-charts-results-follow-up.test.tsx` - passed, 5 tests.
+- `node scripts/run-playwright.mjs --profile=phase6-memory test --config=playwright.mobile-charts-results-follow-up.config.ts`
+  - passed, 2 tests covering 320x568, 360x640, and 390x844 result views on both routes.
+- Browser assertions confirmed 12px song titles, 11px artist text, 16px ban counts, natural
+  wrapping, route parity, and no horizontal overflow.
+- `npm run lint` - passed.
+- `npm run typecheck` - passed.
+- `npm run build` - passed.
+- `git diff --check` - passed.
+- Screenshot evidence:
+  - `/results`: `test-results/mobile-charts-results-ui---bb0a9-ure-fit-and-stage-isolation-mobile-charts-results-follow-up-chromium/results-mobile-390-set-1-expanded.png`.
+  - `/charts`: `test-results/mobile-charts-results-ui---bb0a9-ure-fit-and-stage-isolation-mobile-charts-results-follow-up-chromium/charts-mobile-390-results-expanded.png`.
+  - iPhone 13 Safari/WebKit `/results`: `test-results/mobile-charts-results-ui---bb0a9-ure-fit-and-stage-isolation-mobile-charts-results-follow-up-webkit/results-iphone-13-safari-expanded.png`.
+  - iPhone 13 Safari/WebKit `/charts`: `test-results/mobile-charts-results-ui---bb0a9-ure-fit-and-stage-isolation-mobile-charts-results-follow-up-webkit/charts-iphone-13-safari-expanded.png`.
+- `node scripts/run-playwright.mjs --profile=phase6-memory test --config=playwright.mobile-charts-results-follow-up.config.ts --project=mobile-charts-results-follow-up-webkit`
+  - passed, 2 tests using the Playwright iPhone 13 Safari/WebKit device profile; dedicated screenshots
+    use its native 390x664 CSS viewport and 3x device scale.
+
+### Review Findings, Risks, And Assumptions
+
+- Manual review against `docs/product-spec.md` confirmed the selected-chart-first order, final
+  release gate, count-only result details, and view-only behavior remain intact.
+- Both routes reuse one component; no duplicated UI or divergent interaction state was introduced.
+- `/stage`, `/vote`, backend result authority, tiebreak behavior, and all mutation/security paths
+  are unchanged.
+- Exceptional long names can add vertical height and normal page scrolling. Text is not clipped,
+  truncated, or horizontally overflowing.
+- No migration is applicable. The user approved commit, push, PR, and merge after reviewing the
+  Chromium and iPhone Safari/WebKit screenshots.

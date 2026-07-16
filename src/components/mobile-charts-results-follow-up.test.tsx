@@ -205,17 +205,33 @@ describe("mobile charts/results follow-up contracts", () => {
     }
   });
 
-  it("keeps the compact mobile results variant route-only and away from stage rendering", () => {
+  it("shares the compact mobile results variant across public phone routes and away from stage", () => {
     const resultsPage = source("src/app/results/page.tsx");
     const chartsPage = source("src/app/charts/page.tsx");
     const votePage = source("src/app/vote/page.tsx");
     const stagePage = source("src/app/stage/page.tsx");
 
     expect(resultsPage).toContain("<PublicResultSummary compactMobileResults result={result} />");
-    expect(chartsPage).not.toContain("compactMobileResults");
+    expect(chartsPage).toContain("<PublicResultSummary compactMobileResults result={result} />");
     expect(votePage).not.toContain("compactMobileResults");
     expect(stagePage).not.toContain("compactMobileResults");
     expect(stagePage).not.toContain("PublicResultSummary");
     expect(stagePage).toContain('data-testid="stage-final-chart-list"');
+  });
+
+  it("uses readable unclamped mobile result typography for long song names", () => {
+    const component = source("src/components/MobilePublicResultSummary.tsx");
+
+    expect(component).toContain(
+      'className="mt-0.5 break-words text-xs font-black uppercase leading-[1.1] text-white',
+    );
+    expect(component).toContain(
+      'className="break-words text-xs font-black uppercase leading-[1.15] text-white"',
+    );
+    expect(component).toContain(
+      'className="mt-0.5 break-words text-[11px] leading-[1.15] text-metal-300"',
+    );
+    expect(component).not.toContain("line-clamp-");
+    expect(component).not.toContain("truncate");
   });
 });

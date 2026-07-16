@@ -62,7 +62,7 @@ function WinnerCard({ chart, expanded, onToggle, panelId, set, testId }: WinnerC
         <div className="pointer-events-none absolute inset-x-0 bottom-0 p-1.5 md:pointer-events-auto md:static md:flex md:min-h-48 md:flex-col md:justify-between md:p-5">
           <div className="flex items-start justify-between gap-1 font-black uppercase text-ember-300 md:gap-3">
             <span
-              className="text-sm leading-none md:text-5xl md:leading-tight"
+              className="text-base leading-none md:text-5xl md:leading-tight"
               data-testid="selected-chart-difficulty"
             >
               {chart.displayDifficulty}
@@ -70,13 +70,13 @@ function WinnerCard({ chart, expanded, onToggle, panelId, set, testId }: WinnerC
           </div>
           <div>
             <h2
-              className="mt-0.5 break-words text-[10px] font-black uppercase leading-[1.05] text-white line-clamp-2 md:mt-5 md:text-5xl md:leading-tight md:line-clamp-none"
+              className="mt-0.5 break-words text-xs font-black uppercase leading-[1.1] text-white md:mt-5 md:text-5xl md:leading-tight"
               data-testid="selected-chart-title"
             >
               {chart.name}
             </h2>
             <p
-              className="mt-0.5 break-words text-[9px] font-semibold leading-[1.05] text-metal-300 line-clamp-1 md:mt-3 md:text-2xl md:font-normal md:leading-normal md:line-clamp-none"
+              className="mt-0.5 break-words text-[11px] font-semibold leading-[1.1] text-metal-300 md:mt-3 md:text-2xl md:font-normal md:leading-normal"
               data-testid="selected-chart-artist"
             >
               {chart.artist}
@@ -103,7 +103,7 @@ export function MobileResultBanCountPanel({
       data-testid="results-mobile-ban-panel"
       id={panelId}
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2 border-b border-ember-300/20 pb-1 text-[10px] font-black uppercase tracking-[0.12em] text-ember-300">
+      <div className="grid grid-cols-[minmax(0,1fr)_2.5rem] gap-2 border-b border-ember-300/20 pb-1 text-[11px] font-black uppercase tracking-[0.12em] text-ember-300">
         <p>Song</p>
         <p className="text-right">Bans</p>
       </div>
@@ -122,15 +122,15 @@ export function MobileResultBanCountPanel({
             data-testid="results-mobile-ban-row"
           >
             <div className="min-w-0">
-              <p className="break-words text-[10px] font-black uppercase leading-[1.08] text-white">
+              <p className="break-words text-xs font-black uppercase leading-[1.15] text-white">
                 {row.chart.name}
               </p>
-              <p className="mt-0.5 break-words text-[9px] leading-[1.08] text-metal-300">
+              <p className="mt-0.5 break-words text-[11px] leading-[1.15] text-metal-300">
                 {row.chart.artist}
               </p>
             </div>
             <p
-              className="flex items-center justify-end self-stretch font-mono text-sm font-black leading-none text-ember-300"
+              className="flex items-center justify-end self-stretch font-mono text-base font-black leading-none text-ember-300"
               data-testid="results-mobile-ban-count"
             >
               {banLabel(row.banCount)}
@@ -179,7 +179,7 @@ export function MobilePublicResultSummary({
         <MobileResultBanCountPanel panelId={expandedPanelId} set={expandedSet} />
       ) : (
         <div
-          className="rounded-md border border-ember-300/40 bg-black/35 px-2 py-2 text-center text-[9px] font-black uppercase leading-none tracking-[0.08em] text-ember-300 shadow-ember-tight md:hidden"
+          className="rounded-md border border-ember-300/40 bg-black/35 px-2 py-2 text-center text-[10px] font-black uppercase leading-none tracking-[0.08em] text-ember-300 shadow-ember-tight md:hidden"
           data-testid="results-mobile-ban-prompt"
         >
           CLICK A CHART TO VIEW BAN COUNTS

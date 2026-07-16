@@ -20,6 +20,10 @@ export default defineConfig({
         viewport: { height: 844, width: 390 },
       },
     },
+    {
+      name: "mobile-charts-results-follow-up-webkit",
+      use: { ...devices["iPhone 13"] },
+    },
   ],
   webServer: e2eWebServer,
 });
