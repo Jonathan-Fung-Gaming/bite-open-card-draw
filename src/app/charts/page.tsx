@@ -42,8 +42,8 @@ export default async function ChartsPage() {
         <main className="min-h-screen">
           <ChartsAutoRefresh />
           <RoundHeader title={`ROUND ${roundNumber} FINAL CHARTS`} mobileCompact />
-          <section className="mx-auto grid max-w-7xl gap-5 px-5 py-5">
-            <PublicResultSummary result={result} />
+          <section className="mx-auto grid max-w-7xl gap-3 px-3 py-3 md:gap-5 md:px-5 md:py-5">
+            <PublicResultSummary compactMobileResults result={result} />
           </section>
         </main>
       </PublicRouteFreshnessGuard>

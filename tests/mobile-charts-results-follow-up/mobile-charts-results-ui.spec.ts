@@ -6,6 +6,7 @@ import {
   expectCompactBanPanelRows,
   expectImageAndPanelFit,
   expectNoHorizontalOverflow,
+  expectReadableCompactResultType,
   expectTabLabelIsSingleLine,
   expectWinnerMetadataOverlaysImages,
   finishCurrentRoundDrawsAndOpenVoting,
@@ -79,6 +80,7 @@ test("@mobile-charts-results-follow-up /results mobile image disclosure, fit, an
   expect(baseURL).toBeTruthy();
   await prepareFinalRound(adminPage);
   const resultsPage = await adminPage.context().newPage();
+  const chartsPage = await adminPage.context().newPage();
   const stagePage = await adminPage.context().newPage();
 
   try {
@@ -132,6 +134,7 @@ test("@mobile-charts-results-follow-up /results mobile image disclosure, fit, an
 
       await expect(firstExpanded).toHaveCount(1);
       await expectCompactBanPanelRows(firstExpanded, "S16");
+      await expectReadableCompactResultType(resultsPage, firstExpanded);
       await expectImageAndPanelFit(
         resultsPage,
         toggles.nth(0).getByTestId("stage-chart-image"),
@@ -162,12 +165,58 @@ test("@mobile-charts-results-follow-up /results mobile image disclosure, fit, an
 
       await expect(secondExpanded).toHaveCount(1);
       await expectCompactBanPanelRows(secondExpanded, "S17");
+      await expectReadableCompactResultType(resultsPage, secondExpanded);
       await expectImageAndPanelFit(
         resultsPage,
         toggles.nth(1).getByTestId("stage-chart-image"),
         secondExpanded,
       );
       await expectNoHorizontalOverflow(resultsPage);
+
+      await chartsPage.setViewportSize(viewport);
+      await goto(chartsPage, "/charts");
+      await settleVisuals(chartsPage);
+      await expect(chartsPage.getByTestId("mobile-public-result-summary")).toBeVisible();
+      await expectWinnerMetadataOverlaysImages(chartsPage);
+      const chartsToggles = chartsPage.getByTestId("results-mobile-winner-toggle");
+
+      await expect(chartsToggles).toHaveCount(2);
+      await chartsToggles.nth(0).click();
+      const chartsExpanded = chartsPage.locator(
+        '[data-testid="results-mobile-ban-panel"][data-expanded="true"]',
+      );
+
+      await expectCompactBanPanelRows(chartsExpanded, "S16");
+      await expectReadableCompactResultType(chartsPage, chartsExpanded);
+      if (viewport.width === 390) {
+        await chartsPage.screenshot({
+          path: testInfo.outputPath("charts-mobile-390-results-expanded.png"),
+        });
+      }
+    }
+
+    if (testInfo.project.name === "mobile-charts-results-follow-up-webkit") {
+      await resultsPage.setViewportSize({ height: 664, width: 390 });
+      await goto(resultsPage, "/results");
+      await settleVisuals(resultsPage);
+      await resultsPage.getByTestId("results-mobile-winner-toggle").nth(0).click();
+      await expect(
+        resultsPage.locator('[data-testid="results-mobile-ban-panel"][data-expanded="true"]'),
+      ).toBeVisible();
+      await resultsPage.screenshot({
+        path: testInfo.outputPath("results-iphone-13-safari-expanded.png"),
+      });
+
+      await chartsPage.setViewportSize({ height: 664, width: 390 });
+      await goto(chartsPage, "/charts");
+      await settleVisuals(chartsPage);
+      await chartsPage.getByTestId("results-mobile-winner-toggle").nth(0).click();
+      await expect(
+        chartsPage.locator('[data-testid="results-mobile-ban-panel"][data-expanded="true"]'),
+      ).toBeVisible();
+      await chartsPage.screenshot({
+        path: testInfo.outputPath("charts-iphone-13-safari-expanded.png"),
+      });
     }
 
     await stagePage.setViewportSize({ height: 844, width: 390 });
@@ -183,6 +232,7 @@ test("@mobile-charts-results-follow-up /results mobile image disclosure, fit, an
     await expect(stagePage.getByText("Show Ban Counts", { exact: true })).toHaveCount(0);
   } finally {
     await resultsPage.close();
+    await chartsPage.close();
     await stagePage.close();
     await releaseFollowUpHost(adminPage);
   }

@@ -244,6 +244,22 @@ export async function expectCompactBanPanelRows(panel: Locator, expectedDifficul
   }
 }
 
+export async function expectReadableCompactResultType(page: Page, panel: Locator) {
+  const title = panel.getByTestId("results-mobile-ban-row").first().locator("p").nth(0);
+  const artist = panel.getByTestId("results-mobile-ban-row").first().locator("p").nth(1);
+  const count = panel.getByTestId("results-mobile-ban-count").first();
+  const sizes = await Promise.all(
+    [title, artist, count].map((locator) =>
+      locator.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+    ),
+  );
+
+  expect(sizes[0]).toBeGreaterThanOrEqual(12);
+  expect(sizes[1]).toBeGreaterThanOrEqual(11);
+  expect(sizes[2]).toBeGreaterThanOrEqual(16);
+  await expectNoHorizontalOverflow(page);
+}
+
 export async function expectImageAndPanelFit(page: Page, image: Locator, panel: Locator) {
   const imageBox = await image.boundingBox();
   const panelBox = await panel.boundingBox();
