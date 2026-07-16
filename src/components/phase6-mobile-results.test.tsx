@@ -117,7 +117,7 @@ describe("Phase 6 compact mobile results contracts", () => {
     );
   });
 
-  it("opts in only from final /results and preserves protected pending and previous-round copy", () => {
+  it("opts in from public final-result routes and preserves protected results copy", () => {
     const resultsPage = source("src/app/results/page.tsx");
     const chartsPage = source("src/app/charts/page.tsx");
     const votePage = source("src/app/vote/page.tsx");
@@ -126,7 +126,7 @@ describe("Phase 6 compact mobile results contracts", () => {
     expect(resultsPage).toContain("Previous round results");
     expect(resultsPage).toContain("Results are being revealed on stage.");
     expect(resultsPage).toContain("mobileCompact");
-    expect(chartsPage).not.toContain("compactMobileResults");
+    expect(chartsPage).toContain("<PublicResultSummary compactMobileResults result={result} />");
     expect(votePage).not.toContain("compactMobileResults");
   });
 });

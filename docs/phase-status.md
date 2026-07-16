@@ -5864,6 +5864,8 @@ Status: implemented and verified locally; user approved the screenshots and publ
 - Manual review against `docs/product-spec.md` confirmed the selected-chart-first order, final
   release gate, count-only result details, and view-only behavior remain intact.
 - Both routes reuse one component; no duplicated UI or divergent interaction state was introduced.
+- PR CI exposed one stale Phase 6 source-contract assertion that still prohibited the compact result
+  variant on `/charts`. The assertion was updated to require the approved shared public-route UI.
 - `/stage`, `/vote`, backend result authority, tiebreak behavior, and all mutation/security paths
   are unchanged.
 - Exceptional long names can add vertical height and normal page scrolling. Text is not clipped,
