@@ -173,7 +173,10 @@ test("profile edits atomically create an owned mandatory pending goal", async ()
     .not("acknowledged_at", "is", null)
     .is("effective_end_date", null);
   assert.ifError(currentGoals.error);
-  assert.deepEqual(currentGoals.data.map((goal) => goal.id), [proposalId]);
+  assert.deepEqual(
+    currentGoals.data.map((goal) => goal.id),
+    [proposalId],
+  );
 });
 
 test("server-only subscription boundaries preserve ownership and support nullable disable", async () => {
@@ -181,8 +184,14 @@ test("server-only subscription boundaries preserve ownership and support nullabl
   const other = await createReadyUser("push-other");
   const endpoint = `https://push.example.test/${crypto.randomUUID()}`;
 
-  assert.ok((await owner.client.rpc("protein_upsert_push_subscription", upsertArgs(owner.id, endpoint))).error);
-  const inserted = await service.rpc("protein_upsert_push_subscription", upsertArgs(owner.id, endpoint));
+  assert.ok(
+    (await owner.client.rpc("protein_upsert_push_subscription", upsertArgs(owner.id, endpoint)))
+      .error,
+  );
+  const inserted = await service.rpc(
+    "protein_upsert_push_subscription",
+    upsertArgs(owner.id, endpoint),
+  );
   assert.ifError(inserted.error);
   assert.ok(inserted.data);
   const replay = await service.rpc("protein_upsert_push_subscription", {
@@ -191,10 +200,13 @@ test("server-only subscription boundaries preserve ownership and support nullabl
   });
   assert.ifError(replay.error);
   assert.equal(replay.data, inserted.data);
-  assert.ok((await service.rpc("protein_upsert_push_subscription", upsertArgs(other.id, endpoint))).error);
+  assert.ok(
+    (await service.rpc("protein_upsert_push_subscription", upsertArgs(other.id, endpoint))).error,
+  );
   const secondEndpoint = `https://push.example.test/${crypto.randomUUID()}`;
   assert.ifError(
-    (await service.rpc("protein_upsert_push_subscription", upsertArgs(owner.id, secondEndpoint))).error,
+    (await service.rpc("protein_upsert_push_subscription", upsertArgs(owner.id, secondEndpoint)))
+      .error,
   );
 
   const hidden = await owner.client.from("protein_push_subscriptions").select("id");
@@ -226,7 +238,8 @@ test("server-only subscription boundaries preserve ownership and support nullabl
   assert.ifError(removed.error);
   assert.equal(removed.data, true);
   assert.equal(
-    (await service.from("protein_push_subscriptions").select("id").eq("user_id", owner.id)).data.length,
+    (await service.from("protein_push_subscriptions").select("id").eq("user_id", owner.id)).data
+      .length,
     1,
   );
   const stillEnabled = await owner.client
@@ -250,7 +263,8 @@ test("server-only subscription boundaries preserve ownership and support nullabl
   assert.ifError(globalOptOut.error);
   assert.equal(globalOptOut.data, false);
   assert.equal(
-    (await service.from("protein_push_subscriptions").select("id").eq("user_id", owner.id)).data.length,
+    (await service.from("protein_push_subscriptions").select("id").eq("user_id", owner.id)).data
+      .length,
     1,
   );
   const disabled = await owner.client
@@ -268,13 +282,86 @@ test("server-only subscription boundaries preserve ownership and support nullabl
   assert.equal(invalidated.data.status, "invalidated");
 });
 
+test("Gemini consent is owner-scoped, paired, revocable, and versioned", async () => {
+  const owner = await createReadyUser("gemini-consent-owner");
+  const other = await createReadyUser("gemini-consent-other");
+  const consentedAt = "2026-07-24T00:00:00.000Z";
+
+  const accepted = await owner.client.from("protein_preferences").insert({
+    food_ai_consent_version: "gemini-free-photo-v1",
+    food_ai_consented_at: consentedAt,
+    user_id: owner.id,
+  });
+  assert.ifError(accepted.error);
+
+  const visible = await owner.client
+    .from("protein_preferences")
+    .select("food_ai_consent_version,food_ai_consented_at")
+    .single();
+  assert.ifError(visible.error);
+  assert.deepEqual(visible.data, {
+    food_ai_consent_version: "gemini-free-photo-v1",
+    food_ai_consented_at: "2026-07-24T00:00:00+00:00",
+  });
+
+  const hidden = await other.client
+    .from("protein_preferences")
+    .select("food_ai_consent_version")
+    .eq("user_id", owner.id);
+  assert.ifError(hidden.error);
+  assert.deepEqual(hidden.data, []);
+  assert.ok(
+    (
+      await other.client
+        .from("protein_preferences")
+        .update({ food_ai_consent_version: "gemini-free-photo-v2" })
+        .eq("user_id", owner.id)
+        .select("user_id")
+    ).data.length === 0,
+  );
+
+  assert.ok(
+    (
+      await owner.client
+        .from("protein_preferences")
+        .update({ food_ai_consented_at: null })
+        .eq("user_id", owner.id)
+    ).error,
+  );
+  assert.ok(
+    (
+      await owner.client
+        .from("protein_preferences")
+        .update({ food_ai_consent_version: " " })
+        .eq("user_id", owner.id)
+    ).error,
+  );
+
+  const revoked = await owner.client
+    .from("protein_preferences")
+    .update({ food_ai_consent_version: null, food_ai_consented_at: null })
+    .eq("user_id", owner.id);
+  assert.ifError(revoked.error);
+  const cleared = await owner.client
+    .from("protein_preferences")
+    .select("food_ai_consent_version,food_ai_consented_at")
+    .single();
+  assert.ifError(cleared.error);
+  assert.deepEqual(cleared.data, {
+    food_ai_consent_version: null,
+    food_ai_consented_at: null,
+  });
+});
+
 test("14-day reminders are local-calendar correct, deduplicated, and invalidated by a new weight", async () => {
   const user = await createReadyUser(
     "reminder-dst",
     weightRow("placeholder", "2026-03-01T14:00:00.000Z", "2026-03-01", "America/New_York"),
   );
   const endpoint = `https://push.example.test/${crypto.randomUUID()}`;
-  assert.ifError((await service.rpc("protein_upsert_push_subscription", upsertArgs(user.id, endpoint))).error);
+  assert.ifError(
+    (await service.rpc("protein_upsert_push_subscription", upsertArgs(user.id, endpoint))).error,
+  );
 
   const firstJobs = await service
     .from("protein_notification_jobs")
@@ -308,7 +395,8 @@ test("14-day reminders are local-calendar correct, deduplicated, and invalidated
     );
   }
   assert.equal(
-    (await service.from("protein_notification_jobs").select("id").eq("user_id", user.id)).data.length,
+    (await service.from("protein_notification_jobs").select("id").eq("user_id", user.id)).data
+      .length,
     1,
   );
 
@@ -333,7 +421,9 @@ test("14-day reminders are local-calendar correct, deduplicated, and invalidated
 
   const newer = await service
     .from("protein_weight_entries")
-    .insert(weightRow(user.id, "2026-06-01T15:00:00.000Z", "2026-06-01", "America/Los_Angeles", 171))
+    .insert(
+      weightRow(user.id, "2026-06-01T15:00:00.000Z", "2026-06-01", "America/Los_Angeles", 171),
+    )
     .select("id")
     .single();
   assert.ifError(newer.error);
@@ -344,7 +434,12 @@ test("14-day reminders are local-calendar correct, deduplicated, and invalidated
     .order("due_local_date");
   assert.ifError(jobs.error);
   assert.deepEqual(
-    jobs.data.map((job) => [job.source_weight_entry_id, job.due_local_date, job.due_at, job.status]),
+    jobs.data.map((job) => [
+      job.source_weight_entry_id,
+      job.due_local_date,
+      job.due_at,
+      job.status,
+    ]),
     [
       [user.initialWeightId, "2026-03-15", "2026-03-15T16:00:00+00:00", "invalidated"],
       [newer.data.id, "2026-06-15", "2026-06-15T16:00:00+00:00", "pending"],
@@ -356,7 +451,9 @@ test("claiming is concurrent-safe and delivery retry is deduplicated", async () 
   await clearNotificationWork();
   const user = await createReadyUser("claim");
   const endpoint = `https://push.example.test/${crypto.randomUUID()}`;
-  assert.ifError((await service.rpc("protein_upsert_push_subscription", upsertArgs(user.id, endpoint))).error);
+  assert.ifError(
+    (await service.rpc("protein_upsert_push_subscription", upsertArgs(user.id, endpoint))).error,
+  );
   const claimArgs = { p_limit: 25, p_now: "2026-08-01T00:00:00.000Z" };
   const [left, right] = await Promise.all([
     service.rpc("protein_claim_due_notifications", claimArgs),
@@ -417,7 +514,9 @@ test("terminal provider outcomes remove only the invalid endpoint", async () => 
   await clearNotificationWork();
   const user = await createReadyUser("terminal");
   const endpoint = `https://push.example.test/${crypto.randomUUID()}`;
-  assert.ifError((await service.rpc("protein_upsert_push_subscription", upsertArgs(user.id, endpoint))).error);
+  assert.ifError(
+    (await service.rpc("protein_upsert_push_subscription", upsertArgs(user.id, endpoint))).error,
+  );
   const claimed = await service.rpc("protein_claim_due_notifications", {
     p_limit: 1,
     p_now: "2026-08-01T00:00:00.000Z",
@@ -436,7 +535,8 @@ test("terminal provider outcomes remove only the invalid endpoint", async () => 
     { job_status: "completed", retry_at: null, subscription_removed: true },
   ]);
   assert.equal(
-    (await service.from("protein_push_subscriptions").select("id").eq("user_id", user.id)).data.length,
+    (await service.from("protein_push_subscriptions").select("id").eq("user_id", user.id)).data
+      .length,
     0,
   );
 });
@@ -445,7 +545,20 @@ test("recent-password erase removes tracking only and preserves Auth, settings, 
   const user = await createReadyUser("erase");
   const other = await createReadyUser("erase-other");
   const endpoint = `https://push.example.test/${crypto.randomUUID()}`;
-  assert.ifError((await service.rpc("protein_upsert_push_subscription", upsertArgs(user.id, endpoint))).error);
+  assert.ifError(
+    (await service.rpc("protein_upsert_push_subscription", upsertArgs(user.id, endpoint))).error,
+  );
+  assert.ifError(
+    (
+      await user.client
+        .from("protein_preferences")
+        .update({
+          food_ai_consent_version: "gemini-free-photo-v1",
+          food_ai_consented_at: "2026-07-24T00:00:00.000Z",
+        })
+        .eq("user_id", user.id)
+    ).error,
+  );
 
   const evidenceRows = [
     weightRow(user.id, "2026-01-02T12:00:00.000Z", "2026-01-02", "UTC", 169),
@@ -546,12 +659,19 @@ test("recent-password erase removes tracking only and preserves Auth, settings, 
     height_inches: 69,
     onboarding_completed_at: null,
   });
+  const preservedPreferences = await service
+    .from("protein_preferences")
+    .select("food_ai_consent_version,food_ai_consented_at")
+    .eq("user_id", user.id)
+    .single();
+  assert.ifError(preservedPreferences.error);
+  assert.deepEqual(preservedPreferences.data, {
+    food_ai_consent_version: "gemini-free-photo-v1",
+    food_ai_consented_at: "2026-07-24T00:00:00+00:00",
+  });
   assert.equal(
-    (await service.from("protein_preferences").select("user_id").eq("user_id", user.id)).data.length,
-    1,
-  );
-  assert.equal(
-    (await service.from("protein_push_subscriptions").select("id").eq("user_id", user.id)).data.length,
+    (await service.from("protein_push_subscriptions").select("id").eq("user_id", user.id)).data
+      .length,
     1,
   );
   const audit = await service

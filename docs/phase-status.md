@@ -1,5 +1,51 @@
 # Phase Status
 
+## Protein Tracker Gemini Consent Schema - 2026-07-24
+
+Status: implemented, reviewed once, and validated locally on
+`agent/protein-gemini-consent-schema`. PR publication, merge, and linked migration deployment are
+pending.
+
+### Scope
+
+- Add paired, versioned Gemini food-photo consent fields to the existing user-owned
+  `protein_preferences` row.
+- Preserve consent through tracking-data erasure while allowing revocation from Settings.
+- Validate ownership, constraints, revocation, and erase retention through the local Data API.
+
+### Plan And Checklist
+
+- `docs/phase-plans/protein-tracker-gemini-consent-schema-2026-07-24.md`
+- `docs/protein-tracker-gemini-consent-schema-checklist-2026-07-24.md`
+
+### Checks And Evidence
+
+- The complete local Supabase migration history reset successfully with
+  `20260724010000_protein_tracker_gemini_consent.sql` applied last.
+- `npm run test:protein-phase8:local` passed all 7 tests. The focused consent case proves owner
+  insert/read/revoke, cross-user invisibility and update isolation, paired-field and trimmed-version
+  constraints, and exact null revocation. The erase case proves consent metadata survives the
+  existing tracking-data erase transaction.
+- Local database lint passed with no schema errors.
+- Repository lint and typecheck passed.
+- Unit tests passed: 84 files / 579 tests.
+- The optimized Next.js production build passed.
+- `git diff --check` and a secret-pattern scan passed; no secret value is present in the diff.
+
+### Review
+
+- One bounded diff review found no unresolved ownership, RLS, grant, constraint, erase-retention,
+  secret-boundary, or sibling-schema issue.
+- Initial focused runs first encountered a stale local migration head, then two test setup mistakes
+  and timestamp serialization formatting. Resetting the verified local stack and correcting only
+  those test expectations produced the passing evidence above; no schema repair was required.
+
+### Risks And Assumptions
+
+- The consuming application remains responsible for requiring the exact current consent version
+  before each Gemini request.
+- This schema stores only consent metadata; it does not store images, provider output, or API keys.
+
 ## Current Remediation Status
 
 Status: A new production-readiness remediation workstream was planned on 2026-07-13. Its active
