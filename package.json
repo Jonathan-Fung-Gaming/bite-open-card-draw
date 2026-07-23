@@ -62,7 +62,8 @@
     "test:protein-onboarding:local": "node scripts/run-protein-onboarding-tests.mjs",
     "test:protein-phase4:local": "node scripts/run-protein-phase4-tests.mjs",
     "test:protein-phase5:local": "node scripts/run-protein-phase5-tests.mjs",
-    "test:protein-phase6:local": "node scripts/run-protein-phase6-tests.mjs"
+    "test:protein-phase6:local": "node scripts/run-protein-phase6-tests.mjs",
+    "test:protein-phase7:local": "node scripts/run-protein-phase7-tests.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
