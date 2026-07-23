@@ -1,7 +1,7 @@
 # Protein Tracker Gemini consent schema plan
 
 Date: 2026-07-24
-Status: implemented, reviewed, and validated locally; PR and deployment pending
+Status: merged and deployed; linked migration parity and lint verified
 Scope: additive consent fields on the existing user-owned Protein Tracker preferences row
 
 ## Objective
