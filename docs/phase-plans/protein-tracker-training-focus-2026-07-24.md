@@ -1,7 +1,7 @@
 # Protein Tracker training-focus schema plan
 
 Date: 2026-07-24
-Status: implemented, reviewed once, and validated locally; PR and deployment pending
+Status: merged and deployed; linked migration parity and lint verified
 Scope: additive Protein Tracker profile field and versioned goal-calculation RPCs
 
 ## Objective
