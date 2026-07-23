@@ -60,7 +60,8 @@
     "supabase:db:push": "npx supabase db push",
     "supabase:db:lint": "npx supabase db lint",
     "test:protein-onboarding:local": "node scripts/run-protein-onboarding-tests.mjs",
-    "test:protein-phase4:local": "node scripts/run-protein-phase4-tests.mjs"
+    "test:protein-phase4:local": "node scripts/run-protein-phase4-tests.mjs",
+    "test:protein-phase5:local": "node scripts/run-protein-phase5-tests.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
