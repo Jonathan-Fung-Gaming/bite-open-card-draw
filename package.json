@@ -58,7 +58,8 @@
     "supabase:status": "npx supabase status",
     "supabase:migration:list": "npx supabase migration list",
     "supabase:db:push": "npx supabase db push",
-    "supabase:db:lint": "npx supabase db lint"
+    "supabase:db:lint": "npx supabase db lint",
+    "test:protein-onboarding:local": "node scripts/run-protein-onboarding-tests.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
