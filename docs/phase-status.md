@@ -5942,3 +5942,49 @@ Protein Tracker application can be enabled.
   feature disablement instead.
 - Remote migration head/timestamp, exact linked project, push dry-run, post-push parity/lint, and
   hosted tournament smoke checks remain mandatory after merge.
+
+## Protein Tracker Phase 3 Atomic Onboarding RPC - 2026-07-23
+
+Status: implemented, self-reviewed once, and validated locally. Migration deployment remains
+post-merge work owned by the parent Phase 3 workflow.
+
+### Scope And Changed Files
+
+- Added `supabase/migrations/20260723020000_protein_tracker_atomic_onboarding.sql` with one
+  authenticated, fixed-search-path `protein_complete_onboarding` RPC.
+- The function derives ownership from `auth.uid()`, uses the existing per-user advisory lock, and
+  transactionally completes an absent/incomplete profile, inserts the first weight, and creates the
+  pending onboarding goal.
+- Nutrition formulas remain outside SQL. The RPC accepts calculated ranges, generic object-shaped
+  snapshots, and explicit matching policy and eligibility-attestation versions.
+- Caller-generated weight and goal UUIDs provide replay identity. An exact retry returns the same
+  goal without adding rows; a changed retry is rejected.
+- Added the loopback-only runner and four-case Data API integration suite in
+  `scripts/run-protein-onboarding-tests.mjs` and `tests/protein-onboarding.integration.mjs`, plus
+  `npm run test:protein-onboarding:local`.
+- Added the scoped plan and checklist. No tournament object, Auth trigger, policy, table, extension,
+  default privilege, or nutrition formula changed.
+
+### Checks And Evidence
+
+- `npx supabase db reset --local` passed with the new migration applied last.
+- `npm run test:protein-onboarding:local` passed 4/4 tests using real local anonymous and
+  authenticated callers plus service-role verification. The tests cover execute denial, caller
+  ownership, incomplete-profile update, exact replay, conflicting replay, and full transaction
+  rollback after a forced goal-constraint failure.
+- `npx supabase db lint --local` passed with no schema errors.
+- `npm run lint` passed with zero warnings.
+- Linked migration parity was rechecked; only `20260723020000` is pending. Linked database push
+  dry-run confirmed it is the sole migration that would be applied.
+- `git diff --check` passed.
+
+### Review Findings, Risks, And Assumptions
+
+- One bounded diff review found no unresolved ownership, grant, search-path, transactionality,
+  replay, or sibling-isolation defect. A fixture with a Tokyo local-date mismatch and one unused
+  test import were deterministic verification failures and were corrected before the final pass.
+- Existing table constraints and triggers remain authoritative for value ranges, time zones,
+  stable local dates, generic JSON object snapshots, and the one-pending-goal invariant.
+- The client must generate and retain the weight and goal UUIDs across a retry. A different payload
+  or identifiers after completion is intentionally rejected rather than treated as a replay.
+- The consuming application must not invoke the RPC until the migration is merged and deployed.
