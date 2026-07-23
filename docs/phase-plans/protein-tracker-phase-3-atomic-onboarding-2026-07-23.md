@@ -4,6 +4,20 @@ Date: 2026-07-23
 Status: implemented and validated locally
 Scope: one additive authenticated RPC and focused local integration evidence
 
+## Focused v2 security repair
+
+The final Phase 3 review proved that accepting caller-calculated ranges and snapshots allowed an
+authenticated user to persist internally consistent but noncanonical goals. The additive
+`20260723030000` migration therefore revokes authenticated and service-role execution of the
+original RPC and exposes `protein_complete_onboarding_v2` instead. V2 accepts only raw onboarding
+inputs, the eligibility attestation, and caller-generated replay UUIDs. It derives the local date,
+integer month-granular age, metric values, supported BMI, all NASEM 2023 EER coefficients,
+direction ranges, Cut floor, half-up display rounding, protein range, fixed versions, and complete
+snapshots inside the locked transaction.
+
+This is a focused repair of a demonstrated authorization defect. It does not reopen the general
+review or alter tournament behavior.
+
 ## Objective
 
 Provide the canonical shared Supabase transaction boundary needed by Protein Tracker Phase 3. One

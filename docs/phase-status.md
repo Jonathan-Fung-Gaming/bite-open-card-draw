@@ -5988,3 +5988,21 @@ post-merge work owned by the parent Phase 3 workflow.
 - The client must generate and retain the weight and goal UUIDs across a retry. A different payload
   or identifiers after completion is intentionally rejected rather than treated as a replay.
 - The consuming application must not invoke the RPC until the migration is merged and deployed.
+
+### Focused V2 Security Repair
+
+- A final Phase 3 review demonstrated that the original RPC trusted caller-supplied goal ranges and
+  snapshots. Migration `20260723030000_protein_tracker_atomic_onboarding_v2.sql` revokes
+  authenticated and service-role execution of that function and adds a raw-input-only v2.
+- V2 calculates the database-local date/month, month-granular integer age, exact imperial-to-metric
+  conversions, supported BMI `[18.5, 30)`, all 16 NASEM 2023 EER coefficient combinations,
+  direction ranges, raw Cut calorie-floor gate, half-up displayed ranges, and actual-weight
+  `1.2-1.6 g/kg` protein range. It writes fixed `protein-v1` and `adult-v1` versions plus complete
+  normalized input, equation, raw-output, and displayed-output snapshots.
+- The existing ownership, advisory-lock, atomic rollback, and caller-UUID replay boundaries remain
+  intact. Exact raw-input retries return the original row even if database time has advanced;
+  changed retries reject.
+- The affected local reset passed. The focused Data API suite now passes 5/5 tests covering legacy
+  authenticated/service-role denial, anonymous v2 denial, canonical values and snapshots, replay
+  and conflicting replay, incomplete-profile completion, and child-insert rollback.
+- This was the one focused repair for a proven High finding. No second general review was started.
