@@ -2,9 +2,8 @@
 
 ## Protein Tracker Training Focus Schema - 2026-07-24
 
-Status: implemented, reviewed once, and validated locally on
-`agent/implement-protein-schema-20260724`. PR publication, merge, and linked migration deployment
-are pending.
+Status: merged through PR #128 and deployed to the verified linked Supabase project. Migration
+parity and linked database lint passed on 2026-07-24.
 
 ### Scope And Changed Files
 
@@ -29,6 +28,11 @@ are pending.
   owner isolation, profile-change proposals, and preservation of protein-v1 history.
 - Local database lint returned no schema errors. Repository formatting for changed supported file
   types, lint, typecheck, 84 unit-test files / 579 tests, and the optimized production build passed.
+- PR #128 passed its required `Quality Gates` check and merged as `628a346`. The production app's
+  configured Supabase hostname and the linked canonical project both resolved to project ref
+  `gsiyqhkcgegjrvqcqioc` (`bite-open-card-draw`). The push dry run listed only migration
+  `20260724020000`; the migration then applied successfully. Post-push migration parity and linked
+  database lint passed with no schema errors.
 
 ### Review Findings, Risks, And Assumptions
 
