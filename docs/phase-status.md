@@ -5872,3 +5872,73 @@ Status: implemented and verified locally; user approved the screenshots and publ
   truncated, or horizontally overflowing.
 - No migration is applicable. The user approved commit, push, PR, and merge after reviewing the
   Chromium and iPhone Safari/WebKit screenshots.
+
+## Protein Tracker Shared Supabase Schema - 2026-07-23
+
+Status: implemented, independently reviewed, and validated locally. Awaiting schema-owner PR merge,
+post-merge linked migration deployment, and hosted sibling verification before the dependent
+Protein Tracker application can be enabled.
+
+### Scope And Changed Files
+
+- Added the reviewed canonical migration
+  `supabase/migrations/20260723010000_protein_tracker_schema_rls.sql` for all additive
+  Protein Tracker tables, constraints, indexes, fixed-search-path functions, triggers, ownership
+  policies, column grants, server-only boundaries, and the security-invoker daily-totals view.
+- Updated local shared Auth configuration in `supabase/config.toml` for confirmed email/password
+  development, an eight-character minimum password, secure password changes, throttled resend, and
+  exact Protein Tracker callback URLs. These settings are configuration evidence only; hosted
+  project-wide Auth changes remain a separately verified deployment action.
+- Added the phase plan and checklist in
+  `docs/phase-plans/phase-protein-tracker-schema-2026-07-23.md` and
+  `docs/protein-tracker-schema-checklist-2026-07-23.md`.
+- Kept all new database object names under the lowercase `protein_` prefix. No tournament table,
+  function, policy, trigger, index, default privilege, extension, or global Auth signup trigger was
+  changed.
+
+### Checks And Evidence
+
+- The full canonical migration history reset successfully against the local Supabase stack, with
+  `20260723010000_protein_tracker_schema_rls.sql` applied last; local database lint passed.
+- Protein Tracker `npm run test:supabase:local` passed all 18 integration tests with real local
+  anonymous, authenticated-A, authenticated-B, and service-role clients. Evidence covers operation
+  grants, two-user isolation, ownership spoofing, system timestamps, stable local days, constraints,
+  daily totals, goal confirmation concurrency/replay/immutability, sensitive server-only tables,
+  both-order erase races with food/weight inserts and profile onboarding updates, coaching evidence
+  racing with erase and referenced-weight deletion, push/delivery serialization, erase scope, and
+  exact post-migration policy/table/column-grant allowlists. A
+  before/after snapshot proves the destructive harness itself leaves non-Protein catalog/security
+  state, every default ACL, and representative sibling rows unchanged. This is not a
+  pre/post-migration snapshot; additive SQL scope review plus the passing sibling checks are the
+  migration non-regression evidence.
+- Generated local database types in the consuming Protein Tracker repository contain the new tables,
+  view, relationships, and RPCs.
+- Sibling `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` passed.
+- The default memory Playwright baseline was attempted and failed in an unrelated pre-existing stale
+  memory flow. It does not exercise a Protein Tracker route, the new migration, Supabase persistence,
+  or any changed tournament application source, so it is recorded rather than misattributed to this
+  additive schema phase.
+- Compensating rollback rehearsal passed against the verified healthy local
+  `supabase_db_bite-open-card-draw` database. A single transaction explicitly dropped the view,
+  21 triggers, 11 functions, and 10 tables in dependency order without `CASCADE`. Catalog counts
+  for prefixed relations/functions/triggers/policies moved from 43/11/21/14 to 0/0/0/0 inside the
+  transaction. `ROLLBACK` restored the exact 43/11/21/14 baseline.
+
+### Review Findings, Risks, And Assumptions
+
+- Independent SQL review approved the final migration after resolving client-forgeable timestamps
+  and insert columns, absolute notification due-time integrity, durable delivery deduplication,
+  minimum coaching evidence, and strict delivery lifecycle consistency.
+- Goal proposals use user-scoped advisory locks plus row locks; acknowledged periods cannot overlap,
+  confirmed meaning fields cannot be rewritten, and confirmation replay cannot create two current
+  periods.
+- `protein_erase_tracking_data` is service-role-only and deletes tracking/reminder history while
+  retaining the Auth user, profile fields, preferences, push subscription, and non-sensitive
+  security audit. Forced failure remains transactionally rollback-safe.
+- The delivery fingerprint is a server-owned SHA-256 of the subscription endpoint. Phase 8 server
+  code must derive it consistently; SQL validates its stable lowercase-hex shape and dedupe key.
+- The local rollback rehearsal proves dependency order only. Production rollback remains forbidden
+  after user data or a dependent deployment exists; use an additive correction and application
+  feature disablement instead.
+- Remote migration head/timestamp, exact linked project, push dry-run, post-push parity/lint, and
+  hosted tournament smoke checks remain mandatory after merge.
