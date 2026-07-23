@@ -1,10 +1,52 @@
 # Phase Status
 
-## Protein Tracker Gemini Consent Schema - 2026-07-24
+## Protein Tracker Training Focus Schema - 2026-07-24
 
 Status: implemented, reviewed once, and validated locally on
-`agent/protein-gemini-consent-schema`. PR publication, merge, and linked migration deployment are
-pending.
+`agent/implement-protein-schema-20260724`. PR publication, merge, and linked migration deployment
+are pending.
+
+### Scope And Changed Files
+
+- Added `protein_profiles.training_focus` with an existing-row-safe `general` default and a strict
+  `general` / `resistance_training` constraint.
+- Added migration `20260724020000_protein_tracker_training_focus.sql` with a non-public calculation
+  helper plus authenticated `protein_complete_onboarding_v3` and
+  `protein_update_profile_and_propose_goal_v2` RPCs.
+- Kept both existing consumer RPCs executable and preserved every current and historical
+  `protein-v1` goal. New RPCs write `protein-v2` with 1.2-1.6 g/kg for general users and 1.6-2.0
+  g/kg for resistance training; calorie formulas and safety gates are unchanged.
+- Added focused integration coverage and a loopback-only runner, plus the scoped plan and
+  checklist. No tournament behavior or object was changed.
+
+### Checks And Evidence
+
+- The complete local migration history reset successfully with `20260724020000` applied last.
+- All seven Protein Tracker local suites passed: 33 tests covering onboarding, food contracts,
+  trend goals, weight history, notifications/erase/consent, and the new training-focus contract.
+- The new 4-test suite proves legacy default compatibility, all six direction-by-focus
+  combinations, protein-v2 snapshots, invalid/null input rejection, authentication, idempotency,
+  owner isolation, profile-change proposals, and preservation of protein-v1 history.
+- Local database lint returned no schema errors. Repository formatting for changed supported file
+  types, lint, typecheck, 84 unit-test files / 579 tests, and the optimized production build passed.
+
+### Review Findings, Risks, And Assumptions
+
+- One bounded diff/security review found that nullable replay inputs could bypass equality checks
+  through SQL null semantics. The RPCs now reject every missing input before replay lookup; the
+  affected reset, focused tests, lint, and database lint passed after that repair. No second general
+  review was started.
+- The consumer must deploy after this migration and use the new RPC names to select protein-v2.
+  Rollback after protein-v2 use is an app feature disablement plus additive correction, never goal
+  history deletion.
+- The database stores the selected category; the consumer explains resistance training as
+  strength training on at least two days per week.
+
+## Protein Tracker Gemini Consent Schema - 2026-07-24
+
+Status: merged to `main` and deployed through migration
+`20260724010000_protein_tracker_gemini_consent.sql`. Linked migration parity was verified on
+2026-07-24.
 
 ### Scope
 

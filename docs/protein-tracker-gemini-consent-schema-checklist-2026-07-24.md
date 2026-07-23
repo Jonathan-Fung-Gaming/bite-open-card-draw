@@ -8,5 +8,5 @@
 - [x] Prove tracking-data erase preserves consent.
 - [x] Pass local reset, focused integration tests, database lint, lint, typecheck, unit tests, and build.
 - [x] Complete one bounded diff/security review.
-- [ ] Commit, push, open a PR, pass required checks, and merge.
-- [ ] Verify the exact linked Supabase target, push the migration, and verify parity and linked lint.
+- [x] Commit, push, open a PR, pass required checks, and merge.
+- [x] Verify the exact linked Supabase target, push the migration, and verify parity and linked lint.
