@@ -1,0 +1,23 @@
+# Protein Tracker shared-schema checklist
+
+- [x] Canonical migration owner and linked target verified.
+- [x] Local/remote migration parity and linked lint verified before implementation.
+- [ ] Recheck canonical migration head/timestamp immediately before merge and deployment.
+- [x] Review the exact schema contract, lifecycle values, FKs, checks, indexes, immutable columns, and preference authority.
+- [x] Confirm no unreviewed extension is introduced.
+- [x] Add only prefixed Protein Tracker tables, view, functions, triggers, policies, and indexes.
+- [x] Enable RLS and install explicit grants for every new object.
+- [x] Assert table/view/function/sequence grants and RLS policies from the catalog.
+- [x] Prove the full A/B/anonymous/service-role operation matrix through the Data API with real JWTs.
+- [x] Prove goal-confirm concurrency/replay/ownership and erase exact retention plus forced-failure rollback.
+- [x] Prove acknowledged goal intervals cannot overlap and acknowledged meaning fields remain immutable even through service-role writes.
+- [x] Prove time-zone/local-day integrity, range/nonblank checks, stable snapshots, and dedupe keys.
+- [x] Prove the configured seed path, then reset and lint the complete local schema.
+- [x] Pass all 18 local Supabase integration tests, including exact post-migration Protein policy/table/column-grant allowlists, both-order erase races with food/weight inserts and profile onboarding updates, coaching evidence races with erase and referenced-weight deletion, push/delivery serialization, and a before/after snapshot of non-`protein_` catalog/security state, every default ACL, and representative sibling rows to prove test cleanup. Treat additive SQL scope review plus sibling lint/typecheck/unit/build as the migration non-regression evidence; do not represent this as a pre/post-migration snapshot.
+- [x] Rehearse the guarded compensating rollback in a disposable environment: explicit non-`CASCADE` drops reduced 43 relations, 11 functions, 21 triggers, and 14 policies to zero inside a transaction; `ROLLBACK` restored the exact 43/11/21/14 counts.
+- [x] Generate local database types for the consuming application.
+- [x] Run sibling non-regression checks. Lint, typecheck, unit tests, and build pass; the attempted default memory E2E baseline has an unrelated pre-existing stale-flow failure documented in phase status.
+- [x] Complete final SQL/security review and resolve every finding.
+- [ ] Merge the schema PR before the dependent Protein Tracker PR.
+- [ ] Verify linked target, dry-run, push migration, then verify parity and linked lint.
+- [ ] Run hosted sibling smoke/non-regression before enabling the Protein Tracker PR.
