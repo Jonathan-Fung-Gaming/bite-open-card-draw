@@ -80,20 +80,30 @@ after(async () => {
   }
 });
 
-test("default food action supports null and all four values without changing notifications", async () => {
+test("food display preferences remain owner-controlled", async () => {
   const owner = await createUser("preference-owner");
   const stranger = await createUser("preference-stranger");
 
   const inserted = await owner.client
     .from("protein_preferences")
     .insert({ default_food_action: null, notifications_enabled: true, user_id: owner.id })
-    .select("default_food_action,notifications_enabled")
+    .select("compact_food_log,default_food_action,notifications_enabled")
     .single();
   assert.ifError(inserted.error);
   assert.deepEqual(inserted.data, {
+    compact_food_log: false,
     default_food_action: null,
     notifications_enabled: true,
   });
+
+  const compacted = await owner.client
+    .from("protein_preferences")
+    .update({ compact_food_log: true })
+    .eq("user_id", owner.id)
+    .select("compact_food_log")
+    .single();
+  assert.ifError(compacted.error);
+  assert.deepEqual(compacted.data, { compact_food_log: true });
 
   for (const action of ["take_photo", "photo_library", "nutrition_label", "manual_entry"]) {
     const updated = await owner.client
