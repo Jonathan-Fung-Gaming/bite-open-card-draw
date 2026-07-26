@@ -32,6 +32,7 @@ function claim(index: number, overrides: Partial<ClaimedDelivery> = {}): Claimed
     auth_secret: AUTH,
     reminder_kind: "weight_reminder",
     due_local_date: "2026-07-23",
+    weigh_in_interval_days: 14,
     source_weight_entry_id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
     claim_token: `claim-token-${index}`,
     attempts: 1,
@@ -104,12 +105,13 @@ describe("scheduled push sender batch", () => {
     expect(fixture.claim).toHaveBeenCalledWith(FIXED_NOW.toISOString(), MAX_CLAIM_LIMIT);
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
-        payload: pushPayload("00000000-0000-4000-8000-000000000001"),
+        payload: pushPayload("00000000-0000-4000-8000-000000000001", 14),
         timeoutMs: SEND_TIMEOUT_MS,
       }),
     );
     expect(JSON.parse(sent[0]?.payload ?? "null")).toEqual({
       sourceWeightEntryId: "00000000-0000-4000-8000-000000000001",
+      intervalDays: 14,
     });
     expect(fixture.finish).toHaveBeenCalledWith({
       deliveryId: "delivery-1",
@@ -168,6 +170,19 @@ describe("scheduled push sender batch", () => {
         errorCode: "invalid_subscription_data",
       }),
     );
+    expect(summary.invalidSubscriptions).toBe(1);
+  });
+
+  it("rejects an unsupported stored reminder interval", async () => {
+    const fixture = storeWithClaims([claim(1, { weigh_in_interval_days: 10 as never })]);
+    const send = vi.fn(async () => undefined);
+
+    const summary = await runReminderBatch({
+      store: fixture.store,
+      transport: { send },
+    });
+
+    expect(send).not.toHaveBeenCalled();
     expect(summary.invalidSubscriptions).toBe(1);
   });
 
