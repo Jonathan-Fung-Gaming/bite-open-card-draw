@@ -17,6 +17,7 @@ export type ClaimedDelivery = {
   auth_secret: string;
   reminder_kind: string;
   due_local_date: string;
+  weigh_in_interval_days: 7 | 14 | 30;
   source_weight_entry_id: string;
   claim_token: string;
   attempts: number;
@@ -200,6 +201,7 @@ function validClaim(claim: ClaimedDelivery): boolean {
     p256dh[0] === 4 &&
     auth !== null &&
     auth.length >= 16 &&
+    new Set([7, 14, 30]).has(claim.weigh_in_interval_days) &&
     claim.delivery_id.length > 0 &&
     claim.claim_token.length > 0
   );
@@ -235,8 +237,8 @@ function safeErrorCode(errorCode: string): string {
   return ERROR_CODE_PATTERN.test(errorCode) ? errorCode : "push_transport";
 }
 
-export function pushPayload(sourceWeightEntryId: string): string {
-  return JSON.stringify({ sourceWeightEntryId });
+export function pushPayload(sourceWeightEntryId: string, intervalDays: 7 | 14 | 30): string {
+  return JSON.stringify({ sourceWeightEntryId, intervalDays });
 }
 
 async function processClaim(
@@ -256,7 +258,7 @@ async function processClaim(
           endpoint: claim.endpoint,
           keys: { p256dh: claim.p256dh, auth: claim.auth_secret },
         },
-        payload: pushPayload(claim.source_weight_entry_id),
+        payload: pushPayload(claim.source_weight_entry_id, claim.weigh_in_interval_days),
         timeoutMs: SEND_TIMEOUT_MS,
       });
       outcome = { status: "sent", errorCode: null };
