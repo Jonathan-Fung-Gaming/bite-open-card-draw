@@ -15,13 +15,15 @@ An additive parallel shared-database phase for Karaoke Party was implemented on 
 - Plan: `docs/phase-plans/phase-karaoke-party-shared-schema-2026-07-29.md`
 - Checklist: `docs/karaoke-party-shared-schema-checklist-2026-07-29.md`
 - Migration: `supabase/migrations/20260729010000_karaoke_party_schema.sql`
+- ACL correction: `supabase/migrations/20260729020000_karaoke_party_service_role_acl.sql`
 - Consuming repo/app: `jfung9021/karaoke-party`, Karaoke Party
-- Status: static checks plus the complete loopback-only local database gate now pass: full reset,
+- Status: static checks plus the complete loopback-only local database gate pass: full reset,
   database lint, executable schema/security/queue tests, both concurrency races, tournament and
   Protein Tracker regressions, guarded rollback rehearsal, post-rollback rebuild, and local type
-  generation for the consuming repository. Hosted and repository publication work remains deferred;
-  see `docs/karaoke-party-manual-blockers.md`.
-- The continuation authorizes an intentional local commit only. No push, PR, hosted migration, or remote mutation has been performed.
+  generation for the consuming repository. Schema PR #133 and focused ACL repair PR #134 passed CI
+  and merged. Both migrations are applied to the verified linked project with exact parity,
+  zero-finding linked lint, hosted catalog/ACL verification, read-only sibling smokes, and linked
+  type review; see `docs/karaoke-party-manual-blockers.md`.
 
 Use the active plan one phase at a time. Use its `PRR-*` checklist rows for closure. Before every
 implementation phase, create and self-review the required detailed phase plan under

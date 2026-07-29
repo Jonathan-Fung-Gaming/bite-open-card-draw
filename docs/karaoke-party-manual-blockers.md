@@ -2,8 +2,8 @@
 
 Date: 2026-07-29
 
-The local database gate is complete. The following hosted and publication work remains intentionally
-deferred.
+The local and hosted database release gates are complete. Application deployment, provider setup,
+feature enablement, and production operation remain owned by `jfung9021/karaoke-party`.
 
 ## Local database execution — resolved
 
@@ -17,15 +17,23 @@ container. This environment issue no longer blocks the local gate.
 
 ## Hosted and repository mutations
 
-The continuation authorizes an intentional local commit only; pushes, pull requests, merges, hosted
-migration application, and all remote resource mutation remain forbidden. A later authorized release must recheck the linked
-migration head, confirm the exact Supabase project, dry-run the push, verify only the reviewed
-karaoke migration is pending, apply it, confirm parity/lint, and run tournament plus Protein Tracker
-smoke checks before enabling `jfung9021/karaoke-party`.
+Completed on 2026-07-29 with explicit authorization. Schema PR #133 and focused ACL repair PR #134
+passed CI and merged. The linked `bite-open-card-draw` project was verified before each write; dry
+runs named only `20260729010000` and then `20260729020000`. Both migrations applied once, exact
+local/remote parity and zero-finding linked lint passed, and hosted catalog verification confirmed
+the reviewed RLS/search-path/grant inventory. Read-only REST probes passed for representative
+tournament, Protein Tracker, and Karaoke Party tables, while anonymous Karaoke table access was
+denied.
+
+The first hosted dump exposed project default privileges that gave `service_role` more direct access
+than the reviewed table-SELECT/public-RPC contract. The single focused repair revoked those inherited
+grants, restored seven table `SELECT` grants and 23 public RPC grants, added an executable regression
+assertion, passed local reset/lint/schema-concurrency validation, and was then merged and applied.
 
 ## Application-owned work
 
 The canonical database repository does not own Karaoke Party application code, Vercel setup,
 secrets, YouTube credentials, preview-write flags, or browser end-to-end tests. Fresh database types
-were generated from the verified local stack into the consuming repository as part of this gate;
-all other application-owned work remains in `jfung9021/karaoke-party`.
+were generated from the verified local stack into the consuming repository as part of this gate.
+Linked regeneration was reviewed after the hosted push and added only PostgREST version metadata;
+all deployment and provider work remains in `jfung9021/karaoke-party`.
