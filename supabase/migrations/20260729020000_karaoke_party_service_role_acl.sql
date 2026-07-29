@@ -1,0 +1,82 @@
+-- Supabase's project-level default privileges grant service_role broad access
+-- to newly created public objects. Narrow Karaoke Party to direct read access
+-- on tables and execution of the reviewed server RPC surface only.
+
+revoke all on table public.karaoke_rooms from service_role;
+revoke all on table public.karaoke_participants from service_role;
+revoke all on table public.karaoke_song_requests from service_role;
+revoke all on table public.karaoke_playback_state from service_role;
+revoke all on table public.karaoke_room_actions from service_role;
+revoke all on table public.karaoke_search_cache from service_role;
+revoke all on table public.karaoke_rate_limit_buckets from service_role;
+
+grant select on table public.karaoke_rooms to service_role;
+grant select on table public.karaoke_participants to service_role;
+grant select on table public.karaoke_song_requests to service_role;
+grant select on table public.karaoke_playback_state to service_role;
+grant select on table public.karaoke_room_actions to service_role;
+grant select on table public.karaoke_search_cache to service_role;
+grant select on table public.karaoke_rate_limit_buckets to service_role;
+
+revoke all on function public.karaoke_assert_digest(text, text) from service_role;
+revoke all on function public.karaoke_assert_request(uuid, text) from service_role;
+revoke all on function public.karaoke_lock_room(uuid) from service_role;
+revoke all on function public.karaoke_require_host(uuid, text) from service_role;
+revoke all on function public.karaoke_require_participant(uuid, text) from service_role;
+revoke all on function public.karaoke_replay_result(uuid, uuid, text) from service_role;
+revoke all on function public.karaoke_assert_expected_version(uuid, bigint) from service_role;
+revoke all on function public.karaoke_assert_controller(uuid, uuid) from service_role;
+revoke all on function public.karaoke_song_json(uuid) from service_role;
+revoke all on function public.karaoke_select_next_locked(uuid) from service_role;
+revoke all on function public.karaoke_project_upcoming(uuid, integer) from service_role;
+revoke all on function public.karaoke_finish_mutation(uuid, uuid, text, uuid, text, uuid, text, bigint, bigint, jsonb) from service_role;
+revoke all on function public.karaoke_validate_playback_integrity() from service_role;
+revoke all on function public.karaoke_require_open_room(uuid) from service_role;
+revoke all on function public.karaoke_bump_room_version(uuid) from service_role;
+revoke all on function public.karaoke_create_room(text, uuid, text, text, timestamptz, uuid, text, smallint, smallint, integer) from service_role;
+revoke all on function public.karaoke_recover_host(text, text, text, uuid, text) from service_role;
+revoke all on function public.karaoke_join_room(text, text, text, uuid, text) from service_role;
+revoke all on function public.karaoke_get_room_snapshot(text, text, text, integer) from service_role;
+revoke all on function public.karaoke_touch_participant(text, text, uuid, text) from service_role;
+revoke all on function public.karaoke_add_song(text, text, text, text, text, text, integer, timestamptz, uuid, uuid, text) from service_role;
+revoke all on function public.karaoke_remove_own_song(text, text, uuid, uuid, text) from service_role;
+revoke all on function public.karaoke_host_remove_pending_song(text, text, uuid, uuid, text) from service_role;
+revoke all on function public.karaoke_host_remove_participant(text, text, uuid, uuid, text) from service_role;
+revoke all on function public.karaoke_claim_controller(text, text, uuid, boolean, bigint, uuid, text, integer) from service_role;
+revoke all on function public.karaoke_refresh_controller_lease(text, text, uuid, bigint, uuid, text, integer) from service_role;
+revoke all on function public.karaoke_release_controller(text, text, uuid, bigint, uuid, text) from service_role;
+revoke all on function public.karaoke_claim_next_song(text, text, uuid, bigint, uuid, text) from service_role;
+revoke all on function public.karaoke_mark_song_playing(text, text, uuid, uuid, bigint, uuid, text) from service_role;
+revoke all on function public.karaoke_complete_and_select_next(text, text, uuid, uuid, bigint, text, uuid, text) from service_role;
+revoke all on function public.karaoke_fail_and_select_replacement(text, text, uuid, uuid, bigint, text, text, uuid, text) from service_role;
+revoke all on function public.karaoke_pause_playback(text, text, uuid, uuid, bigint, uuid, text, text) from service_role;
+revoke all on function public.karaoke_resume_playback(text, text, uuid, uuid, bigint, uuid, text) from service_role;
+revoke all on function public.karaoke_close_room(text, text, bigint, uuid, text) from service_role;
+revoke all on function public.karaoke_consume_rate_limit(text, integer, integer, integer) from service_role;
+revoke all on function public.karaoke_get_search_cache(text) from service_role;
+revoke all on function public.karaoke_put_search_cache(text, text, text, text, jsonb, timestamptz) from service_role;
+revoke all on function public.karaoke_cleanup_expired_rooms(timestamptz, integer, interval) from service_role;
+
+grant execute on function public.karaoke_create_room(text, uuid, text, text, timestamptz, uuid, text, smallint, smallint, integer) to service_role;
+grant execute on function public.karaoke_recover_host(text, text, text, uuid, text) to service_role;
+grant execute on function public.karaoke_join_room(text, text, text, uuid, text) to service_role;
+grant execute on function public.karaoke_get_room_snapshot(text, text, text, integer) to service_role;
+grant execute on function public.karaoke_touch_participant(text, text, uuid, text) to service_role;
+grant execute on function public.karaoke_add_song(text, text, text, text, text, text, integer, timestamptz, uuid, uuid, text) to service_role;
+grant execute on function public.karaoke_remove_own_song(text, text, uuid, uuid, text) to service_role;
+grant execute on function public.karaoke_host_remove_pending_song(text, text, uuid, uuid, text) to service_role;
+grant execute on function public.karaoke_host_remove_participant(text, text, uuid, uuid, text) to service_role;
+grant execute on function public.karaoke_claim_controller(text, text, uuid, boolean, bigint, uuid, text, integer) to service_role;
+grant execute on function public.karaoke_refresh_controller_lease(text, text, uuid, bigint, uuid, text, integer) to service_role;
+grant execute on function public.karaoke_release_controller(text, text, uuid, bigint, uuid, text) to service_role;
+grant execute on function public.karaoke_claim_next_song(text, text, uuid, bigint, uuid, text) to service_role;
+grant execute on function public.karaoke_mark_song_playing(text, text, uuid, uuid, bigint, uuid, text) to service_role;
+grant execute on function public.karaoke_complete_and_select_next(text, text, uuid, uuid, bigint, text, uuid, text) to service_role;
+grant execute on function public.karaoke_fail_and_select_replacement(text, text, uuid, uuid, bigint, text, text, uuid, text) to service_role;
+grant execute on function public.karaoke_pause_playback(text, text, uuid, uuid, bigint, uuid, text, text) to service_role;
+grant execute on function public.karaoke_resume_playback(text, text, uuid, uuid, bigint, uuid, text) to service_role;
+grant execute on function public.karaoke_close_room(text, text, bigint, uuid, text) to service_role;
+grant execute on function public.karaoke_consume_rate_limit(text, integer, integer, integer) to service_role;
+grant execute on function public.karaoke_get_search_cache(text) to service_role;
+grant execute on function public.karaoke_put_search_cache(text, text, text, text, jsonb, timestamptz) to service_role;
+grant execute on function public.karaoke_cleanup_expired_rooms(timestamptz, integer, interval) to service_role;
