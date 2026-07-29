@@ -10,6 +10,19 @@ The active production-readiness remediation workstream is:
 - Plan: `docs/production-readiness-remediation-plan-2026-07-13.md`
 - Checklist: `docs/production-readiness-remediation-checklist-2026-07-13.md`
 
+An additive parallel shared-database phase for Karaoke Party was implemented on 2026-07-29:
+
+- Plan: `docs/phase-plans/phase-karaoke-party-shared-schema-2026-07-29.md`
+- Checklist: `docs/karaoke-party-shared-schema-checklist-2026-07-29.md`
+- Migration: `supabase/migrations/20260729010000_karaoke_party_schema.sql`
+- Consuming repo/app: `jfung9021/karaoke-party`, Karaoke Party
+- Status: static checks plus the complete loopback-only local database gate now pass: full reset,
+  database lint, executable schema/security/queue tests, both concurrency races, tournament and
+  Protein Tracker regressions, guarded rollback rehearsal, post-rollback rebuild, and local type
+  generation for the consuming repository. Hosted and repository publication work remains deferred;
+  see `docs/karaoke-party-manual-blockers.md`.
+- The continuation authorizes an intentional local commit only. No push, PR, hosted migration, or remote mutation has been performed.
+
 Use the active plan one phase at a time. Use its `PRR-*` checklist rows for closure. Before every
 implementation phase, create and self-review the required detailed phase plan under
 `docs/phase-plans/`. Do not use documents under `docs/archive/` as current instructions unless the
