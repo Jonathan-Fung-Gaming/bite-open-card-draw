@@ -6098,3 +6098,122 @@ post-merge work owned by the parent Phase 3 workflow.
   authenticated/service-role denial, anonymous v2 denial, canonical values and snapshots, replay
   and conflicting replay, incomplete-profile completion, and child-insert rollback.
 - This was the one focused repair for a proven High finding. No second general review was started.
+
+## Karaoke Party Shared Supabase Schema - 2026-07-29
+
+Status: implemented, statically validated, and validated against the canonical loopback-only local database.
+
+### Scope and decisions
+
+- Added the canonical Phase 1 shared schema for consuming repository `jfung9021/karaoke-party` and
+  application name Karaoke Party. The stale repository/app names in the downloaded canonical plan
+  were not propagated.
+- Confirmed read-only local/remote migration parity through `20260727010000` before choosing
+  `20260729010000_karaoke_party_schema.sql`. No prior `karaoke_` collision existed.
+- Added only seven `public.karaoke_` tables, ten prefixed indexes, two deferred integrity triggers,
+  and 38 fixed-empty-search-path security-definer functions. No sibling relation, Auth object,
+  Realtime publication, global setting, extension, or default privilege was changed.
+- Browser roles have no karaoke table policy/privilege/function execution. `service_role` receives
+  explicit table `SELECT` and execute only on the 23 public server RPCs; 15 internal helpers remain
+  non-executable to that role. Important writes can therefore occur only through the reviewed
+  transaction functions.
+- Room mutations serialize through deterministic transaction advisory locks, authenticate HMAC
+  digests, enforce action request fingerprints, apply current/version/controller fences as relevant,
+  increment `state_version` once, write a sanitized append-only action, and emit one public
+  `realtime.send` invalidation containing only `stateVersion`.
+- Round-robin selection uses immutable room-scoped participant order and per-participant FIFO.
+  Normal completion and host skip consume exactly one turn; skip is a deliberate host action and
+  does not require the automatic controller lease. Preplay failure preserves the cursor; failure
+  after `PLAYING` consumes it. Deferred triggers bind playback state to the sole selected/playing row.
+- Snapshot output is the bounded camelCase application contract only:
+  `room`, `playback`, `participants`, `upcoming`, `ownPending`, `capabilities`, and `realtimeTopic`.
+  It exposes neither credential digests nor action/rate/cache internals.
+- Added server-only recovery, normalized YouTube search cache, coordinated HMAC-key rate/quota, and
+  bounded retention cleanup RPCs. Raw IP addresses are rejected as bucket keys and are never stored.
+
+### Files changed
+
+- `supabase/migrations/20260729010000_karaoke_party_schema.sql`
+- `supabase/tests/karaoke_party_schema_test.sql`
+- `scripts/run-karaoke-schema-tests.ps1`
+- `scripts/psql.ps1`
+- `docs/phase-plans/phase-karaoke-party-shared-schema-2026-07-29.md`
+- `docs/karaoke-party-shared-schema-checklist-2026-07-29.md`
+- `docs/karaoke-party-shared-schema-rollback.md`
+- `docs/karaoke-party-manual-blockers.md`
+- `docs/codex-current-brief.md`
+- `docs/phase-status.md`
+
+### Checks and exact results
+
+- `npx supabase migration list --linked`: passed read-only inspection; all 36 migrations matched
+  locally/remotely through `20260727010000` before the new local migration was created.
+- Final `npx supabase migration list --linked`: passed read-only inspection and showed only local
+  `20260729010000` pending with no remote counterpart; no migration was applied.
+- `npx supabase db lint --linked`: passed with no errors for the unchanged hosted baseline. This does
+  not validate or apply the new local migration.
+- PostgreSQL grammar parse using temporary `pglast==6.2`: passed for 139 migration statements, 13
+  test-harness statements, and 51 rollback-rehearsal statements.
+- Static catalog/security inventory: passed with 7 tables, 10 indexes, 38/38 security-definer
+  functions, 38/38 empty search paths, 38/38 broad-role revokes, 23 public service RPC grants,
+  2 deferred triggers, 7/7 RLS tables, 7/7 table revokes, 7 explicit service table-select grants,
+  and exactly one Realtime send site.
+- Exact signature check: all 38 created function signatures have matching revoke and rollback drops.
+- Rollback static check: 38 functions, two triggers, and seven tables are dropped explicitly; no
+  cascading drop is present. The SQL grammar parse passed.
+- PowerShell harness parse and remote-target-refusal test: passed.
+- `npm run build`: passed (Next.js 15.5.21 production build).
+- `npm run typecheck`: passed after the build generated stable Next types.
+- `npm run lint`: passed with zero warnings.
+- `npm test`: passed, 84 files and 580 tests.
+- An earlier parallel build/typecheck attempt was discarded because those commands raced over
+  `.next/types`; both were rerun sequentially and passed.
+- `npx supabase db reset --local`: passed the complete 37-migration history through
+  `20260729010000_karaoke_party_schema.sql`; the required post-rollback reset also passed.
+- `npx supabase db lint --local`: initially found invalid schema qualification of PostgreSQL
+  `LEAST`/`GREATEST` expressions and one projector loop-shadow warning. The focused migration repair
+  replaced those expressions and the shadowing loop; reset then passed and final lint returned
+  `results: []` / `No schema errors found` before and after rollback.
+- `supabase/tests/karaoke_party_schema_test.sql`: passed directly against the local database.
+- `scripts/run-karaoke-schema-tests.ps1` and the consuming repository's delegated
+  `npm run test:supabase`: passed the schema/security/queue harness, locked duplicate-completion race,
+  and locked cleanup/add race. One completion committed and the duplicate returned a stale no-op;
+  cleanup accepted either serialized add outcome and all terminal invariants passed.
+- Native `psql` was unavailable. Added `scripts/psql.ps1` as a local-only Docker fallback selected
+  only after the configured loopback port and running canonical container are verified; the final
+  delegated suite passed without any temporary PATH adapter.
+- Protein Tracker regressions passed: the consuming repository's shared-schema suite passed 19/19;
+  canonical onboarding/Phase 4/5/6/7/8/training-focus suites passed 5/5, 3/3, 5/5, 5/5, 4/4, 7/7,
+  and 4/4. Canonical tournament/unit regressions passed 84 files / 580 tests.
+- Guarded rollback rehearsal passed with no `CASCADE`: Karaoke relations/functions/triggers moved
+  from 34/38/2 to 0/0/0 inside the transaction and restored to 34/38/2 after `ROLLBACK`. Sibling
+  relations/functions/triggers/policies/default ACLs stayed 135/89/30/15/27, and representative
+  tournament/Protein rows were unchanged.
+- `npm ci`, `npm run lint`, `npm run typecheck`, and `npm run build` passed. `npm ci` reported 11
+  existing high-severity audit findings without failing this requested gate; no dependency repair
+  was attempted outside scope.
+- Fresh TypeScript database types were generated from `supabase gen types typescript --local` into
+  `C:\Users\jfung\karaoke-party\src\types\database.types.ts`; the Karaoke Party typecheck passed.
+
+### Review passes
+
+1. Correctness/concurrency: fixed controller semantics so duplicate automatic completion is fenced
+   while deliberate host skip remains available; added deferred cross-table playback integrity;
+   replaced recursive projection SQL with a deterministic bounded procedural projector; verified
+   stable rotation, FIFO, failure, removal, empty-queue, stale event, and same-room contracts against
+   the canonical plan.
+2. Security/operations: reduced backend table privileges to explicit read-only access plus RPCs,
+   enforced normalized cache result shape, bounded cache/rate cleanup batches, confirmed token/action
+   redaction and public version-only Realtime payloads, matched every revoke/drop signature, and
+   confirmed no global/shared sibling mutation.
+
+### Remaining blockers and release boundary
+
+- The local database gate is complete. Keep the stack loopback-only and rerun the full gate if the
+  migration changes again.
+- The continuation authorizes an intentional local commit only. No push, PR, merge, hosted migration,
+  linked/hosted type generation, or remote resource mutation was authorized or performed. Local types were generated only from the verified loopback
+  stack. A later release must recheck the migration
+  head and exact linked project, dry-run the push, verify only this migration is pending, apply it,
+  verify parity/lint, and run tournament plus Protein Tracker hosted smoke checks before enabling
+  Karaoke Party.
