@@ -6217,3 +6217,33 @@ Status: implemented, statically validated, and validated against the canonical l
   head and exact linked project, dry-run the push, verify only this migration is pending, apply it,
   verify parity/lint, and run tournament plus Protein Tracker hosted smoke checks before enabling
   Karaoke Party.
+
+## Karaoke Party hosted shared-schema release - 2026-07-29
+
+Status: complete for repository publication and shared-database migration. Application deployment
+and feature enablement remain separately gated in `jfung9021/karaoke-party`.
+
+- App PR #1 merged as `63395f669c1297a2ed1c8748f44aea7fb6de6c43` after its Vercel checks passed.
+- Canonical schema PR #133 merged as `389d923c95fa0ce6fd1e76a069915900a25e062e` after the CI Quality Gate passed.
+- The linked project was verified as the healthy `bite-open-card-draw` project. Migration history
+  matched through `20260727010000`, and the first dry run named only
+  `20260729010000_karaoke_party_schema.sql` with checksum
+  `40DAC4FE49E01C1EB805E36C3A4DECF645B99CA707C84439BF85C97722B0CDD4`.
+- The schema migration applied once. Parity and linked lint passed, but the first hosted schema dump
+  proved that project default ACLs had granted `service_role` broad direct table access and helper
+  execution beyond the reviewed least-privilege contract.
+- A single focused repair added `20260729020000_karaoke_party_service_role_acl.sql` and executable
+  ACL assertions. Full local reset, zero-finding local lint, and the complete Karaoke
+  schema/security/queue/concurrency harness passed. PR #134 passed CI and merged as
+  `e8067f5677a4109069ae9c5026fe34e76058341c`.
+- The corrective dry run named only `20260729020000_karaoke_party_service_role_acl.sql` with checksum
+  `059A29934342BC6392D7B9C1EFD0205A522688F03499EA0F5657BDB12259F546`; it applied once.
+- Final migration history is in exact local/remote parity through `20260729020000`, and linked lint
+  returned no findings. Hosted dump assertions passed with seven RLS tables, 38 security-definer
+  functions, 38 empty search paths, two integrity triggers, seven table-SELECT grants, 23 public-RPC
+  grants, and no Karaoke grants for `PUBLIC`, `anon`, or `authenticated`.
+- Read-only REST probes passed for representative tournament, Protein Tracker, and Karaoke Party
+  tables, and anonymous Karaoke table access was denied. No sibling fixture or user data was changed.
+- Linked type generation differed from the reviewed local types only by hosted PostgREST `14.5`
+  metadata; the consuming application type-check passed. No Karaoke application deployment or
+  feature flag was enabled.
