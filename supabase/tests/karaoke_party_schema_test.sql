@@ -92,6 +92,63 @@ begin
   ) then
     raise exception 'PUBLIC can execute a Karaoke Party function';
   end if;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_class as c
+    join pg_catalog.pg_namespace as n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relkind = 'r'
+      and c.relname like 'karaoke\_%' escape '\'
+      and (
+        not pg_catalog.has_table_privilege('service_role', c.oid, 'SELECT')
+        or pg_catalog.has_table_privilege('service_role', c.oid, 'INSERT')
+        or pg_catalog.has_table_privilege('service_role', c.oid, 'UPDATE')
+        or pg_catalog.has_table_privilege('service_role', c.oid, 'DELETE')
+        or pg_catalog.has_table_privilege('service_role', c.oid, 'TRUNCATE')
+        or pg_catalog.has_table_privilege('service_role', c.oid, 'REFERENCES')
+        or pg_catalog.has_table_privilege('service_role', c.oid, 'TRIGGER')
+      )
+  ) then
+    raise exception 'service_role does not have the reviewed read-only Karaoke Party table privileges';
+  end if;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_proc as p
+    join pg_catalog.pg_namespace as n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname like 'karaoke\_%' escape '\'
+      and pg_catalog.has_function_privilege('service_role', p.oid, 'EXECUTE') is distinct from (
+        p.proname = any (array[
+          'karaoke_create_room',
+          'karaoke_recover_host',
+          'karaoke_join_room',
+          'karaoke_get_room_snapshot',
+          'karaoke_touch_participant',
+          'karaoke_add_song',
+          'karaoke_remove_own_song',
+          'karaoke_host_remove_pending_song',
+          'karaoke_host_remove_participant',
+          'karaoke_claim_controller',
+          'karaoke_refresh_controller_lease',
+          'karaoke_release_controller',
+          'karaoke_claim_next_song',
+          'karaoke_mark_song_playing',
+          'karaoke_complete_and_select_next',
+          'karaoke_fail_and_select_replacement',
+          'karaoke_pause_playback',
+          'karaoke_resume_playback',
+          'karaoke_close_room',
+          'karaoke_consume_rate_limit',
+          'karaoke_get_search_cache',
+          'karaoke_put_search_cache',
+          'karaoke_cleanup_expired_rooms'
+        ])
+      )
+  ) then
+    raise exception 'service_role can execute outside the reviewed Karaoke Party RPC surface';
+  end if;
 end;
 $$;
 
