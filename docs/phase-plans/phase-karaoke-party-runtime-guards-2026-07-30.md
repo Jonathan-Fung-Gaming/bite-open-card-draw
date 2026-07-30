@@ -1,7 +1,7 @@
 # Karaoke Party runtime-guard correction plan
 
 Date: 2026-07-30
-Status: implementation and local validation complete; release pending
+Status: complete
 Scope: additive provider-quota guard for the shared Karaoke Party schema
 Consuming application: `jfung9021/karaoke-party`
 
