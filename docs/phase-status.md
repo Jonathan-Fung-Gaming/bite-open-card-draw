@@ -6247,3 +6247,19 @@ and feature enablement remain separately gated in `jfung9021/karaoke-party`.
 - Linked type generation differed from the reviewed local types only by hosted PostgREST `14.5`
   metadata; the consuming application type-check passed. No Karaoke application deployment or
   feature flag was enabled.
+
+## Karaoke Party provider-quota runtime guard - 2026-07-30
+
+Status: implementation and local validation complete; publication and hosted migration pending.
+
+- Added `20260730010000_karaoke_provider_quota_guard.sql`, a service-role-only RPC that atomically
+  reserves the separate YouTube search and total daily allocations against successive Pacific
+  midnights, including daylight-saving transitions.
+- Added executable checks for the Pacific/UTC boundary, rejection without partial consumption, and
+  the 23-hour spring and 25-hour fall provider days.
+- The complete local migration chain reset successfully. Local database lint returned no findings,
+  and the Karaoke schema/security/queue/concurrency harness passed.
+- Repository `lint`, `typecheck`, all 580 unit tests, and the production build passed. The Protein
+  onboarding database regression suite also passed 5/5 against the reset stack.
+- The consuming application must keep YouTube search disabled until this migration is published,
+  applied to the verified linked project, and exact migration parity plus linked lint are confirmed.
