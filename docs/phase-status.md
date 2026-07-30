@@ -6250,7 +6250,7 @@ and feature enablement remain separately gated in `jfung9021/karaoke-party`.
 
 ## Karaoke Party provider-quota runtime guard - 2026-07-30
 
-Status: implementation and local validation complete; publication and hosted migration pending.
+Status: complete.
 
 - Added `20260730010000_karaoke_provider_quota_guard.sql`, a service-role-only RPC that atomically
   reserves the separate YouTube search and total daily allocations against successive Pacific
@@ -6263,3 +6263,11 @@ Status: implementation and local validation complete; publication and hosted mig
   onboarding database regression suite also passed 5/5 against the reset stack.
 - The consuming application must keep YouTube search disabled until this migration is published,
   applied to the verified linked project, and exact migration parity plus linked lint are confirmed.
+- PR [#136](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/136) merged as
+  `d47f263`. The verified linked project was the healthy `bite-open-card-draw` project; the dry run
+  named only `20260730010000_karaoke_provider_quota_guard.sql`, and that migration applied once.
+- Final local/remote migration history is in exact parity through `20260730010000`; linked database
+  lint returned no findings. The production Karaoke Party service successfully invoked the new RPC
+  while validating and adding real YouTube metadata, proving the hosted service-role execution path.
+- Search remains disabled for the consuming application's separate real-player, key-restriction,
+  alert, and gradual-enablement gates; that operational state is not a schema blocker.

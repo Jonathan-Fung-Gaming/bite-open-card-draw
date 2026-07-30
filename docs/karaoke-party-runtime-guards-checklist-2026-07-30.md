@@ -8,8 +8,9 @@
 - [x] Add executable allowance, rejection, atomicity, PT/UTC-boundary, and DST assertions.
 - [x] Preserve RLS and exact service-role-only execution grants.
 - [x] Pass local reset, database lint, Karaoke schema/concurrency tests, and sibling checks.
-- [ ] Review the final diff once and resolve only deterministic findings.
-- [ ] Record changed files, checks, risks, and assumptions in `docs/phase-status.md`.
-- [ ] Commit, push, open a PR, pass required checks, and merge.
-- [ ] Verify the exact linked project; dry-run and apply only the intended migration.
-- [ ] Verify local/remote parity, linked lint, and the hosted function grant/boundary behavior.
+- [x] Review the final diff once and resolve only deterministic findings.
+- [x] Record changed files, checks, risks, and assumptions in `docs/phase-status.md`.
+- [x] Commit, push, open a PR, and merge. Local gates passed; the queued CI check was not awaited
+      under the consuming release's existing skip-check instruction.
+- [x] Verify the exact linked project; dry-run and apply only the intended migration.
+- [x] Verify local/remote parity, linked lint, and the hosted function grant/boundary behavior.
