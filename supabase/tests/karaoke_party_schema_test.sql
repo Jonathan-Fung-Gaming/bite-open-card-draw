@@ -12,8 +12,8 @@ begin
   where n.nspname = 'public'
     and c.relkind = 'r'
     and c.relname like 'karaoke\_%' escape '\';
-  if v_count <> 7 then
-    raise exception 'expected 7 Karaoke Party tables, found %', v_count;
+  if v_count <> 8 then
+    raise exception 'expected 8 Karaoke Party tables, found %', v_count;
   end if;
 
   select count(*) into v_count
@@ -23,7 +23,7 @@ begin
     and c.relkind = 'r'
     and c.relname like 'karaoke\_%' escape '\'
     and c.relrowsecurity;
-  if v_count <> 7 then
+  if v_count <> 8 then
     raise exception 'all Karaoke Party tables must have RLS enabled';
   end if;
 
@@ -141,9 +141,12 @@ begin
           'karaoke_resume_playback',
           'karaoke_close_room',
           'karaoke_consume_rate_limit',
+          'karaoke_consume_rate_limits',
           'karaoke_reserve_youtube_quota',
           'karaoke_get_search_cache',
           'karaoke_put_search_cache',
+          'karaoke_claim_search_fill',
+          'karaoke_release_search_fill',
           'karaoke_cleanup_expired_rooms'
         ])
       )
@@ -194,6 +197,9 @@ declare
   v_bob uuid;
   v_cara uuid;
   v_room_two uuid;
+  v_action_count bigint;
+  v_state_after_mutation bigint;
+  v_room_expires_at timestamptz;
 begin
   v_result := public.karaoke_create_room(
     'ABCDEFG', '00000000-0000-4000-8000-000000000001',
@@ -201,6 +207,7 @@ begin
     '00000000-0000-4000-8000-000000000001', repeat('1', 64)
   );
   if v_result #>> '{room,code}' <> 'ABCDEFG' then raise exception 'room create failed'; end if;
+  v_room_expires_at := (v_result #>> '{room,expiresAt}')::timestamptz;
   begin
     perform public.karaoke_create_room(
       'ABCDEFG', '00000000-0000-4000-8000-000000000099',
@@ -217,6 +224,26 @@ begin
     '00000000-0000-4000-8000-000000000002', repeat('2', 64)
   );
   v_alice := (v_result #>> '{participant,id}')::uuid;
+  if (v_result->>'expiresAt')::timestamptz <> v_room_expires_at then
+    raise exception 'join did not return the room expiry required for cookie retention';
+  end if;
+  select state_version into v_version
+  from public.karaoke_rooms where room_code = 'ABCDEFG';
+  select count(*) into v_action_count
+  from public.karaoke_room_actions as a
+  join public.karaoke_rooms as r on r.id = a.room_id
+  where r.room_code = 'ABCDEFG';
+  v_result := public.karaoke_touch_participant(
+    'ABCDEFG', repeat('c', 64),
+    '00000000-0000-4000-8000-000000000096', repeat('6', 64)
+  );
+  if (v_result->>'stateVersion')::bigint <> v_version
+    or (select state_version from public.karaoke_rooms where room_code = 'ABCDEFG') <> v_version
+    or (select count(*) from public.karaoke_room_actions as a
+        join public.karaoke_rooms as r on r.id = a.room_id
+        where r.room_code = 'ABCDEFG') <> v_action_count then
+    raise exception 'participant heartbeat changed room state or action history';
+  end if;
   v_result := public.karaoke_join_room(
     'ABCDEFG', repeat('d', 64), 'Bob',
     '00000000-0000-4000-8000-000000000003', repeat('3', 64)
@@ -300,6 +327,14 @@ begin
   if v_snapshot ? 'hostTokenHash' or v_snapshot::text like '%aaaaaaaaaaaaaaaa%' then
     raise exception 'snapshot leaked a credential digest';
   end if;
+  v_snapshot := public.karaoke_get_room_snapshot(
+    'ABCDEFG', repeat('0', 64), repeat('c', 64), 20
+  );
+  if (v_snapshot #>> '{capabilities,isHost}')::boolean is true
+    or (v_snapshot #>> '{capabilities,isGuest}')::boolean is not true then
+    raise exception 'snapshot did not fall back from stale host to valid guest credentials';
+  end if;
+  v_snapshot := public.karaoke_get_room_snapshot('ABCDEFG', repeat('a', 64), null, 20);
   if v_snapshot #>> '{upcoming,0,title}' <> 'A1'
     or v_snapshot #>> '{upcoming,1,title}' <> 'B1'
     or v_snapshot #>> '{upcoming,2,title}' <> 'C1'
@@ -313,8 +348,29 @@ begin
     '00000000-0000-4000-8000-000000000009', repeat('9', 64)
   );
   select state_version into v_version from public.karaoke_rooms where room_code = 'ABCDEFG';
-  v_result := public.karaoke_claim_next_song(
+  perform public.karaoke_join_room(
+    'ABCDEFG', repeat('f', 64), 'Drew',
+    '00000000-0000-4000-8000-000000000097', repeat('7', 64)
+  );
+  select state_version into v_state_after_mutation
+  from public.karaoke_rooms where room_code = 'ABCDEFG';
+  select count(*) into v_action_count
+  from public.karaoke_room_actions as a
+  join public.karaoke_rooms as r on r.id = a.room_id
+  where r.room_code = 'ABCDEFG';
+  v_result := public.karaoke_refresh_controller_lease(
     'ABCDEFG', repeat('a', 64), v_controller, v_version,
+    '00000000-0000-4000-8000-000000000098', repeat('8', 64)
+  );
+  if (v_result->>'stateVersion')::bigint <> v_state_after_mutation
+    or (select state_version from public.karaoke_rooms where room_code = 'ABCDEFG') <> v_state_after_mutation
+    or (select count(*) from public.karaoke_room_actions as a
+        join public.karaoke_rooms as r on r.id = a.room_id
+        where r.room_code = 'ABCDEFG') <> v_action_count then
+    raise exception 'controller renewal depended on or changed global room state';
+  end if;
+  v_result := public.karaoke_claim_next_song(
+    'ABCDEFG', repeat('a', 64), v_controller, v_state_after_mutation,
     '00000000-0000-4000-8000-000000000010', repeat('a', 64)
   );
   if v_result #>> '{currentSong,title}' <> 'A1' then raise exception 'A1 was not selected'; end if;
@@ -445,6 +501,25 @@ begin
   v_result := public.karaoke_consume_rate_limit('youtube:hmac:0123456789abcdef', 1, 60, 1);
   if (v_result->>'allowed')::boolean is not false then raise exception 'rate limit was not enforced'; end if;
 
+  v_result := public.karaoke_consume_rate_limits(
+    '[{"key":"unit:atomic:full-bucket","limit":1,"windowSeconds":60}]'::jsonb
+  );
+  if (v_result->>'allowed')::boolean is not true then
+    raise exception 'initial atomic rate bundle was denied';
+  end if;
+  v_result := public.karaoke_consume_rate_limits(
+    '[{"key":"unit:atomic:full-bucket","limit":1,"windowSeconds":60},{"key":"unit:atomic:empty-bucket","limit":1,"windowSeconds":60}]'::jsonb
+  );
+  if (v_result->>'allowed')::boolean is not false then
+    raise exception 'atomic rate bundle did not reject a full member';
+  end if;
+  v_result := public.karaoke_consume_rate_limits(
+    '[{"key":"unit:atomic:empty-bucket","limit":1,"windowSeconds":60}]'::jsonb
+  );
+  if (v_result->>'allowed')::boolean is not true then
+    raise exception 'rejected atomic rate bundle partially consumed another member';
+  end if;
+
   delete from public.karaoke_rate_limit_buckets
   where bucket_key in ('youtube:quota:search', 'youtube:quota:total');
   v_result := public.karaoke_reserve_youtube_quota(
@@ -502,6 +577,120 @@ begin
   );
   if public.karaoke_get_search_cache('search:hmac:0123456789abcdef') #>> '{results,0,title}' <> 'Safe' then
     raise exception 'search cache round trip failed';
+  end if;
+
+  v_result := public.karaoke_claim_search_fill(
+    'search:hmac:lease-0123456789abcdef',
+    '30000000-0000-4000-8000-000000000001', 15
+  );
+  if (v_result->>'claimed')::boolean is not true then
+    raise exception 'first search fill owner did not acquire the lease';
+  end if;
+  v_result := public.karaoke_claim_search_fill(
+    'search:hmac:lease-0123456789abcdef',
+    '30000000-0000-4000-8000-000000000002', 15
+  );
+  if (v_result->>'claimed')::boolean is not false then
+    raise exception 'second search fill owner acquired an active lease';
+  end if;
+  v_result := public.karaoke_release_search_fill(
+    'search:hmac:lease-0123456789abcdef',
+    '30000000-0000-4000-8000-000000000002'
+  );
+  if (v_result->>'released')::boolean is not false then
+    raise exception 'non-owner released a search fill lease';
+  end if;
+  v_result := public.karaoke_release_search_fill(
+    'search:hmac:lease-0123456789abcdef',
+    '30000000-0000-4000-8000-000000000001'
+  );
+  if (v_result->>'released')::boolean is not true then
+    raise exception 'search fill owner could not release its lease';
+  end if;
+end;
+$$;
+
+do $$
+declare
+  v_room_id uuid;
+  v_participant_id uuid;
+  v_snapshot jsonb;
+  v_index integer;
+  v_song integer;
+begin
+  perform public.karaoke_create_room(
+    'GHJKLMN', '50000000-0000-4000-8000-000000000001',
+    repeat('1', 64), repeat('2', 64), statement_timestamp() + interval '12 hours',
+    '50000000-0000-4000-8000-000000000002', repeat('3', 64),
+    10::smallint, 150::smallint, 1200
+  );
+  select id into v_room_id from public.karaoke_rooms where room_code = 'GHJKLMN';
+  for v_index in 1..15 loop
+    insert into public.karaoke_participants (
+      room_id, session_token_hash, display_name, normalized_display_name,
+      rotation_order
+    ) values (
+      v_room_id, pg_catalog.lpad(pg_catalog.to_hex(v_index + 100), 64, '0'),
+      'Queue Singer ' || v_index, pg_catalog.lower('Queue Singer ' || v_index),
+      v_index
+    ) returning id into v_participant_id;
+    for v_song in 1..10 loop
+      insert into public.karaoke_song_requests (
+        room_id, participant_id, youtube_video_id, title, channel_title,
+        thumbnail_url, duration_seconds, metadata_refreshed_at,
+        enqueue_sequence, client_request_id
+      ) values (
+        v_room_id, v_participant_id,
+        pg_catalog.lpad(((v_index - 1) * 10 + v_song)::text, 11, 'a'),
+        'Queue Song ' || v_index || '-' || v_song, 'Queue Channel',
+        'https://i.ytimg.com/vi/aaaaaaaaaaa/default.jpg', 180,
+        statement_timestamp(), (v_index - 1) * 10 + v_song,
+        pg_catalog.gen_random_uuid()
+      );
+    end loop;
+  end loop;
+  update public.karaoke_rooms
+  set next_rotation_order = 16, next_enqueue_sequence = 151
+  where id = v_room_id;
+  v_snapshot := public.karaoke_get_room_snapshot(
+    'GHJKLMN', repeat('1', 64), null, 150
+  );
+  if pg_catalog.jsonb_array_length(v_snapshot->'upcoming') <> 150 then
+    raise exception 'snapshot truncated a valid 150-song queue';
+  end if;
+end;
+$$;
+
+do $$
+declare
+  v_result jsonb;
+begin
+  insert into public.karaoke_rate_limit_buckets (
+    bucket_key, window_start, request_count, expires_at
+  )
+  select
+    'cleanup:capacity:' || value,
+    statement_timestamp() - interval '2 hours', 1,
+    statement_timestamp() - interval '1 hour'
+  from pg_catalog.generate_series(1, 1101) as value;
+  insert into public.karaoke_search_fill_leases (
+    cache_key, lease_token, lease_expires_at, created_at, updated_at
+  ) values (
+    'search:hmac:expired-0123456789abcdef', pg_catalog.gen_random_uuid(),
+    statement_timestamp() - interval '1 minute',
+    statement_timestamp() - interval '2 minutes',
+    statement_timestamp() - interval '2 minutes'
+  );
+  v_result := public.karaoke_cleanup_expired_rooms(
+    statement_timestamp(), 1, interval '7 days'
+  );
+  if (v_result->>'deletedRateLimitBuckets')::integer < 1101
+    or (v_result->>'deletedSearchFillLeases')::integer < 1
+    or exists (
+      select 1 from public.karaoke_rate_limit_buckets
+      where bucket_key like 'cleanup:capacity:%'
+    ) then
+    raise exception 'cleanup capacity left expired admission rows behind: %', v_result;
   end if;
 end;
 $$;
