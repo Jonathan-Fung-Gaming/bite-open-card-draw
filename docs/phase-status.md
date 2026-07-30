@@ -6271,3 +6271,27 @@ Status: complete.
   while validating and adding real YouTube metadata, proving the hosted service-role execution path.
 - Search remains disabled for the consuming application's separate real-player, key-restriction,
   alert, and gradual-enablement gates; that operational state is not a schema blocker.
+
+## Karaoke Party lifecycle and admission corrections - 2026-07-30
+
+Status: implemented and locally validated; publication and hosted application remain pending.
+
+- Added `20260730020000_karaoke_lifecycle_admission_guards.sql`, the sole forward migration after
+  the provider quota guard. It makes participant/controller heartbeats state-version-neutral,
+  returns room expiry from join, supports 150-item snapshots, adds all-or-nothing multi-bucket
+  admission, adds ownership-checked distributed search-fill leases, and raises bounded cleanup
+  capacity for the application admission ceiling.
+- Extended the Karaoke database harness with the new eight-table/RLS and service-RPC inventory,
+  join-expiry, heartbeat/action-history, stale-version-independent controller renewal,
+  stale-host/valid-guest fallback, 150-song projection, atomic-denial, lease-ownership, and
+  greater-than-1,000-row cleanup assertions.
+- Updated the consuming application's server contracts, memory backend, generated database type
+  surface, admission call sites, session retention, snapshot credential handling, close validation,
+  and focused regression tests. The root application remediation owns the separate YouTube
+  provider/player and presentation changes.
+- Two complete local migration resets succeeded. Final local database lint returned no findings,
+  and the full Karaoke schema/security/queue/concurrency harness passed twice. The consuming app
+  type-check and 27 focused unit tests passed.
+- The migration must be published and applied to the verified linked project before deploying the
+  application code that calls the three additive RPCs. Remote parity, linked lint, and hosted
+  service-role probes remain publication gates; no hosted data was changed during local validation.
