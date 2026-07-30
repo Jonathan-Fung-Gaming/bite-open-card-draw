@@ -141,6 +141,7 @@ begin
           'karaoke_resume_playback',
           'karaoke_close_room',
           'karaoke_consume_rate_limit',
+          'karaoke_reserve_youtube_quota',
           'karaoke_get_search_cache',
           'karaoke_put_search_cache',
           'karaoke_cleanup_expired_rooms'
@@ -443,6 +444,56 @@ begin
   if (v_result->>'allowed')::boolean is not true then raise exception 'first rate request denied'; end if;
   v_result := public.karaoke_consume_rate_limit('youtube:hmac:0123456789abcdef', 1, 60, 1);
   if (v_result->>'allowed')::boolean is not false then raise exception 'rate limit was not enforced'; end if;
+
+  delete from public.karaoke_rate_limit_buckets
+  where bucket_key in ('youtube:quota:search', 'youtube:quota:total');
+  v_result := public.karaoke_reserve_youtube_quota(
+    2, 1, 1, 1, '2026-03-08 07:59:59+00'::timestamptz
+  );
+  if (v_result->>'allowed')::boolean is not true
+    or (v_result->>'windowStartsAt')::timestamptz <> '2026-03-07 08:00:00+00'::timestamptz
+    or (v_result->>'windowEndsAt')::timestamptz <> '2026-03-08 08:00:00+00'::timestamptz then
+    raise exception 'Pacific provider-day reservation boundary mismatch: %', v_result;
+  end if;
+
+  v_result := public.karaoke_reserve_youtube_quota(
+    2, 1, 1, 1, '2026-03-08 07:59:59+00'::timestamptz
+  );
+  if (v_result->>'allowed')::boolean is not false
+    or v_result->>'reason' <> 'total' then
+    raise exception 'combined provider quota did not reject atomically: %', v_result;
+  end if;
+  if (
+    select request_count
+    from public.karaoke_rate_limit_buckets
+    where bucket_key = 'youtube:quota:search'
+      and window_start = '2026-03-07 08:00:00+00'::timestamptz
+  ) <> 1 then
+    raise exception 'rejected combined reservation partially consumed search quota';
+  end if;
+
+  v_result := public.karaoke_reserve_youtube_quota(
+    2, 1, 1, 1, '2026-03-08 08:00:00+00'::timestamptz
+  );
+  if (v_result->>'allowed')::boolean is not true
+    or (v_result->>'windowStartsAt')::timestamptz <> '2026-03-08 08:00:00+00'::timestamptz
+    or (v_result->>'windowEndsAt')::timestamptz <> '2026-03-09 07:00:00+00'::timestamptz
+    or pg_catalog.date_part('epoch', (
+      (v_result->>'windowEndsAt')::timestamptz - (v_result->>'windowStartsAt')::timestamptz
+    )) <> 82800 then
+    raise exception 'spring DST provider day was not 23 hours: %', v_result;
+  end if;
+
+  delete from public.karaoke_rate_limit_buckets
+  where bucket_key in ('youtube:quota:search', 'youtube:quota:total');
+  v_result := public.karaoke_reserve_youtube_quota(
+    2, 2, 1, 1, '2026-11-01 07:00:00+00'::timestamptz
+  );
+  if pg_catalog.date_part('epoch', (
+    (v_result->>'windowEndsAt')::timestamptz - (v_result->>'windowStartsAt')::timestamptz
+  )) <> 90000 then
+    raise exception 'fall DST provider day was not 25 hours: %', v_result;
+  end if;
 
   perform public.karaoke_put_search_cache(
     'search:hmac:0123456789abcdef', 'karaoke song', 'JP', 'en',
