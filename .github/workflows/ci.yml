@@ -14,8 +14,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  classify-changes:
+    name: Classify Changes
+    runs-on: ubuntu-latest
+    outputs:
+      pumbility_changed: ${{ steps.classify.outputs.pumbility_changed }}
+      pumbility_only: ${{ steps.classify.outputs.pumbility_only }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify Pumbility database scope
+        id: classify
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "pumbility_changed=false" >> "$GITHUB_OUTPUT"
+            echo "pumbility_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mapfile -t changed_files < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          pumbility_changed=false
+          pumbility_only=true
+
+          for path in "${changed_files[@]}"; do
+            case "$path" in
+              supabase/migrations/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_pumbility_*.sql|\
+              supabase/tests/pumbility_*.sql|\
+              scripts/run-pumbility-*.ps1|\
+              docs/phase-plans/phase-pumbility-*.md|\
+              docs/pumbility-*.md|\
+              docs/phase-status.md|\
+              .github/workflows/ci.yml)
+                pumbility_changed=true
+                ;;
+              *)
+                pumbility_only=false
+                ;;
+            esac
+          done
+
+          if [[ "$pumbility_changed" != "true" ]]; then
+            pumbility_only=false
+          fi
+
+          echo "pumbility_changed=$pumbility_changed" >> "$GITHUB_OUTPUT"
+          echo "pumbility_only=$pumbility_only" >> "$GITHUB_OUTPUT"
+
   quality-gates:
     name: Quality Gates
+    needs: classify-changes
+    if: github.event_name == 'push' || needs.classify-changes.outputs.pumbility_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -44,3 +102,35 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  pumbility-database:
+    name: Pumbility Database Gates
+    needs: classify-changes
+    if: github.event_name == 'pull_request' && needs.classify-changes.outputs.pumbility_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Start disposable local Supabase
+        run: npx --yes supabase@2.114.0 start
+
+      - name: Reset complete migration chain without seed
+        run: npx --yes supabase@2.114.0 db reset --local --no-seed
+
+      - name: Lint local database
+        run: npx --yes supabase@2.114.0 db lint --local --level error --fail-on error
+
+      - name: Run Pumbility database checks
+        shell: pwsh
+        run: ./scripts/run-pumbility-schema-tests.ps1
+
+      - name: Stop disposable local Supabase
+        if: always()
+        run: npx --yes supabase@2.114.0 stop --no-backup
