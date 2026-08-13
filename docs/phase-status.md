@@ -6298,8 +6298,9 @@ Status: implemented and locally validated; publication and hosted application re
 
 ## Pumbility shared-schema Phase 2 - 2026-08-13
 
-Status: locally implemented, executable database-verified, and consumer-backfilled. CI, linked,
-dump/restore, production baseline, shadow, canary, cutover, and hosted gates remain open.
+Status: locally implemented, executable database-verified, consumer-backfilled, recovery-rehearsed,
+and verified by the Pumbility-only PR database gates. Linked publication, shadow, canary, cutover,
+and hosted post-migration gates remain open.
 
 Scope:
 
@@ -6360,15 +6361,15 @@ Evidence:
   integrity, active global/per-player races, job lease fencing, generation/artifact coherence,
   publication atomicity, ACLs, Storage privacy, and rollback dependency order. Deterministic
   findings were repaired once before final static verification.
+- `PUM-S2-CI-01`: draft PR #139 at commit `fdea3c7` contained exactly the nine reviewed
+  Pumbility-schema, focused-test, runner, plan/evidence, rollback, and CI-routing files. GitHub
+  Actions run `31669687451` passed `Classify Changes` and the 3m12s `Pumbility Database Gates` job.
+  The unrelated application `Quality Gates` job was skipped, proving the database-only route did
+  not run application tests.
 
 Unrun gates and blockers:
 
-- The local stack is running, but its initial image pulls reduced C: from approximately 21 GB free
-  to approximately 3 GB. Additional dump/restore, rollback rebuild, and query-plan evidence were
-  stopped rather than risk exhausting the system drive. Docker data should still be relocated to
-  D: before those storage-intensive gates.
-- Production-shaped restore, full sibling catalog fingerprints, schema diff, rollback rehearsal,
-  logical/Storage dump and restore, query plans, CI execution, and all linked/hosted evidence remain
-  unchecked.
-- No application tests were run in this schema-owner repository by policy. No commit, push, pull
-  request, merge, project link, migration push, Storage operation, or other hosted mutation occurred.
+- Full sibling catalog fingerprints, mixed/non-Pumbility routing probes, production query plans,
+  and hosted post-migration evidence remain unchecked.
+- No application tests were run in this schema-owner repository by policy. PR #139 remains a draft;
+  no merge, hosted migration push, or hosted Pumbility data/Storage mutation has occurred.

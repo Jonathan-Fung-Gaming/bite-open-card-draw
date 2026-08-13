@@ -102,9 +102,10 @@ An item with an unexplained mismatch, missing boundary, or unavailable evidence 
       unrelated workflows, or non-Pumbility migrations as mixed. Evidence: PUM-S2-STATIC-01.
 - [x] Detect `pumbility_changed` independently from `pumbility_only`. Evidence:
       PUM-S2-STATIC-01.
-- [ ] Prove a Pumbility-only PR runs the Supabase Pumbility database job.
-- [ ] Prove a Pumbility-only PR skips lint, typecheck, application unit tests, build, Playwright, load,
-      and all sibling application tests.
+- [x] Prove a Pumbility-only PR runs the Supabase Pumbility database job. Evidence:
+      PUM-S2-CI-01.
+- [x] Prove a Pumbility-only PR skips lint, typecheck, application unit tests, build, Playwright,
+      load, and all sibling application tests. Evidence: PUM-S2-CI-01.
 - [ ] Prove a mixed Pumbility/application PR runs both Pumbility database checks and normal CI.
 - [ ] Prove a non-Pumbility PR runs normal CI and skips the Pumbility database job.
 - [ ] Prove pushes to `main` retain the intended existing normal CI behavior.
