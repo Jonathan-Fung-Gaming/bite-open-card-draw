@@ -6295,3 +6295,80 @@ Status: implemented and locally validated; publication and hosted application re
 - The migration must be published and applied to the verified linked project before deploying the
   application code that calls the three additive RPCs. Remote parity, linked lint, and hosted
   service-role probes remain publication gates; no hosted data was changed during local validation.
+
+## Pumbility shared-schema Phase 2 - 2026-08-13
+
+Status: locally implemented, executable database-verified, and consumer-backfilled. CI, linked,
+dump/restore, production baseline, shadow, canary, cutover, and hosted gates remain open.
+
+Scope:
+
+- Added the expand-only `20260813010000_pumbility_schema.sql` migration with an unexposed lowercase
+  `pumbility` schema, typed provenance/catalog/temporal score/sync/analysis/recommendation model,
+  migration metadata, seeded nonsecret PIU Scores mix identities, durable jobs/heads, atomic
+  publication functions, forced RLS, reviewed role/ACL boundaries, and the private
+  `pumbility-artifacts` bucket definition.
+- Added a transaction-rollback SQL catalog/security/behavior harness and loopback-only PowerShell
+  runner with global-analysis and same-player claim races.
+- Added the guarded dependency-ordered no-`CASCADE` compensating rollback procedure.
+- Added pull-request classification so a Pumbility-only PR runs only local Supabase reset, database
+  lint, and Pumbility database checks; mixed Pumbility changes run both database and normal quality
+  gates; non-Pumbility changes retain normal quality gates. Pushes to `main` retain normal gates.
+- Kept application flags, consuming code, existing schemas, Auth configuration, Realtime
+  publications, default privileges, and hosted state unchanged.
+
+Evidence:
+
+- `PUM-S0-HOSTED-01`: GitHub, Vercel, and Supabase authority were verified on 2026-08-13 UTC. The
+  single intended hosted project was healthy in `us-east-2` on PostgreSQL 17.6.1. Local/remote
+  migration history matched through `20260730020000`; only `20260813010000` was pending. Linked
+  lint returned no findings, hosted table inventory contained no Pumbility objects, and the 49 MB
+  database reported 112 MB WAL with 1.00 table/index hit rates. Seven completed daily physical
+  backups were listed; PITR is disabled. A fresh pre-migration roles/schema/data logical backup was
+  written to secured D: evidence storage with SHA-256 checksums before any hosted mutation.
+- `PUM-S2-RESTORE-01`: the local Pumbility schema/data dump restored into a disposable database.
+  All 38 tables and 794,572 rows matched the source counts, after which the disposable database was
+  dropped. A representative 11,081,181-byte private NPZ artifact was backed up, restored through
+  Storage, matched SHA-256, and cleaned up. The populated-schema rollback guard refused correctly.
+  An executable empty-schema compensating rollback then removed every owned object inside a
+  transaction, proved sibling relations remained, rolled back, and proved all Pumbility objects
+  returned. Forward reset, focused database tests, claim races, and local lint passed afterward.
+
+- `PUM-S2-LOCAL-01`: pinned Supabase CLI 2.114.0 reset the complete local migration history with
+  `--no-seed`; error-level database lint returned no findings. The focused transaction-rollback
+  catalog/type/constraint/RLS/grant/function/Storage/publication suite passed, as did concurrent
+  global-analysis and same-player claim races. The consumer then imported both validated mixes
+  twice with identical counts, published a real schema-3 NPZ model to private local Storage, and
+  reconciled with zero unexplained source-row mismatches. Representative tournament, Protein
+  Tracker, and Karaoke relations remained present. Per owner direction, no application tests were
+  run in this schema-owner repository.
+
+- `PUM-S2-STATIC-01`: `.github/workflows/ci.yml` parses as YAML and contains independent
+  `pumbility_changed`/`pumbility_only` outputs, the three-route conditions, a pinned
+  `supabase@2.114.0`, `db reset --local --no-seed`, local error-level lint, the focused runner, and
+  no application command in the database job.
+- `PUM-S2-STATIC-02`: PowerShell AST parsing reports zero syntax errors. The runner parses the URL,
+  accepts only `postgres`/`postgresql` on `127.0.0.1` or `localhost`, verifies the configured local
+  port/container, and contains no hosted/link/push command.
+- `PUM-S2-STATIC-03`: static SQL inventory records 38 Pumbility tables, six private views, six
+  security-definer functions with empty search paths, required current-row and job-concurrency
+  unique indexes, nonunique temporal hash indexes, forced-RLS generation for every base table,
+  browser-role revokes, exact reviewed grants, four service-only Storage policies, no table prefix,
+  no `ALTER DEFAULT PRIVILEGES`, no Auth/Realtime mutation, and no sibling DDL.
+- `PUM-S2-REVIEW-01`: one complete Phase 2 diff review covered consumer column compatibility,
+  mix-specific player watermarks, nullable raw scores, returning temporal hashes, cross-mix song
+  integrity, active global/per-player races, job lease fencing, generation/artifact coherence,
+  publication atomicity, ACLs, Storage privacy, and rollback dependency order. Deterministic
+  findings were repaired once before final static verification.
+
+Unrun gates and blockers:
+
+- The local stack is running, but its initial image pulls reduced C: from approximately 21 GB free
+  to approximately 3 GB. Additional dump/restore, rollback rebuild, and query-plan evidence were
+  stopped rather than risk exhausting the system drive. Docker data should still be relocated to
+  D: before those storage-intensive gates.
+- Production-shaped restore, full sibling catalog fingerprints, schema diff, rollback rehearsal,
+  logical/Storage dump and restore, query plans, CI execution, and all linked/hosted evidence remain
+  unchecked.
+- No application tests were run in this schema-owner repository by policy. No commit, push, pull
+  request, merge, project link, migration push, Storage operation, or other hosted mutation occurred.
