@@ -28,6 +28,7 @@ begin
     or exists (select 1 from public.karaoke_song_requests)
     or exists (select 1 from public.karaoke_participants)
     or exists (select 1 from public.karaoke_rooms)
+    or exists (select 1 from public.karaoke_search_fill_leases)
     or exists (select 1 from public.karaoke_search_cache)
     or exists (select 1 from public.karaoke_rate_limit_buckets) then
     raise exception 'Karaoke Party rollback refused: prefixed tables are not empty';
@@ -36,8 +37,12 @@ end;
 $$;
 
 drop function public.karaoke_cleanup_expired_rooms(timestamptz, integer, interval);
+drop function public.karaoke_release_search_fill(text, uuid);
+drop function public.karaoke_claim_search_fill(text, uuid, integer);
 drop function public.karaoke_put_search_cache(text, text, text, text, jsonb, timestamptz);
 drop function public.karaoke_get_search_cache(text);
+drop function public.karaoke_reserve_youtube_quota(integer, integer, integer, integer, timestamptz);
+drop function public.karaoke_consume_rate_limits(jsonb);
 drop function public.karaoke_consume_rate_limit(text, integer, integer, integer);
 drop function public.karaoke_close_room(text, text, bigint, uuid, text);
 drop function public.karaoke_resume_playback(text, text, uuid, uuid, bigint, uuid, text);
@@ -82,6 +87,7 @@ drop table public.karaoke_playback_state;
 drop table public.karaoke_song_requests;
 drop table public.karaoke_participants;
 drop table public.karaoke_rooms;
+drop table public.karaoke_search_fill_leases;
 drop table public.karaoke_search_cache;
 drop table public.karaoke_rate_limit_buckets;
 
@@ -120,3 +126,18 @@ stop-on-error and no `CASCADE`:
 The required forward reset, full Karaoke Party schema/concurrency runner, and clean local database
 lint passed again afterward. This proves dependency order only; hosted rollback remains prohibited
 after user data or a dependent deployment exists.
+
+## Rehearsal evidence — completed 2026-08-25
+
+The procedure was updated for the provider-quota and lifecycle additions that followed the original
+rehearsal: the search-fill lease table and the claim/release, multi-bucket admission, and YouTube
+quota functions. Against the verified loopback database, all Karaoke tables were empty and the
+guarded transaction ran with stop-on-error and no `CASCADE`:
+
+- prefixed relations/functions/triggers moved from 39/42/2 to 0/0/0 inside the transaction;
+- `ROLLBACK` restored the exact 39/42/2 catalog with zero Karaoke room rows; and
+- a fresh canonical reset through `20260825010000`, the complete Karaoke
+  schema/security/queue/concurrency runner, and database lint with zero findings passed afterward.
+
+This remains a disposable-local rehearsal only. Hosted rollback is prohibited after user data or a
+dependent deployment exists.
