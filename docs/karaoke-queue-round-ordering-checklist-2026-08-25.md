@@ -16,6 +16,6 @@
 - [x] Complete one focused diff review and `git diff --check`.
 - [x] Repair and pass the guarded local Karaoke rollback rehearsal, then prove the forward rebuild.
 - [x] Record local executable evidence and hosted-publication status in phase status.
-- [ ] Merge the reviewed schema-owner PR.
-- [ ] Apply only the reviewed migration to the verified linked project after the app deployment.
-- [ ] Prove hosted parity, linked lint, catalog behavior, sibling smokes, and linked type parity.
+- [x] Merge the reviewed schema-owner PR.
+- [x] Apply only the reviewed migration to the verified linked project after the app deployment.
+- [x] Prove hosted parity, linked lint, catalog behavior, sibling smokes, and linked type parity.

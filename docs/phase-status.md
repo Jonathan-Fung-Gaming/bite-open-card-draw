@@ -6376,8 +6376,8 @@ Unrun gates and blockers:
 
 ## Karaoke Party queue-round ordering - 2026-08-25
 
-Status: implemented and fully validated against the canonical loopback database; publication and
-hosted verification remain pending. No hosted database was changed during local validation.
+Status: merged, deployed application-first, published to the verified linked project, and fully
+validated locally and against the hosted release target.
 
 - Added the sole forward migration
   `supabase/migrations/20260825010000_karaoke_queue_round_ordering.sql`. It adds and safely
@@ -6408,5 +6408,32 @@ hosted verification remain pending. No hosted database was changed during local 
   `queue_round` on the Karaoke request Row/Insert/Update surfaces, and the consuming type-check
   passed.
 - One focused review found no public contract, ACL, sibling-object, data-loss, or deterministic queue
-  regression in the change. Applied migrations were not edited. Hosted migration and verification
-  remain gated on merge and the explicitly requested application-first deployment order.
+  regression in the change. Applied migrations were not edited, and the release followed the
+  explicitly requested application-first deployment order.
+- Database PR [#140](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/140)
+  merged as `8b6801473d88830028eb596f5b6d0cd96ff1400e`; consuming application PR
+  [#11](https://github.com/jfung9021/karaoke-party/pull/11) merged as
+  `7d98c5e116b1424958ea8e98c7773529093c5b51`. Vercel production deployment
+  `dpl_HpMHGn1ka2uJy8GBQThma55dcRhd` reached `Ready`, received the documented
+  `https://jonathans-karaoke.vercel.app` alias, and returned the expected landing page with HTTP 200.
+- The hosted target was independently reverified as healthy project `bite-open-card-draw`
+  (`gsiyqhkcgegjrvqcqioc`). The dry run named only
+  `20260825010000_karaoke_queue_round_ordering.sql`, SHA-256
+  `385C70B443B6488B252D43F448BCA7866D399F523844D317826D33A22C7F9D4D`; the migration then
+  applied once. Local and remote history matched exactly through `20260825010000`, and linked
+  error-level database lint returned no findings.
+- A fresh read-only hosted public-schema dump proved all eight Karaoke tables retain RLS, all eight
+  retain only the reviewed `service_role` table-SELECT grant, browser roles retain no direct
+  Karaoke table grants, and all 42 Karaoke functions remain security-definer functions with empty
+  search paths. It also proved the hosted `queue_round` default, `NOT NULL`, nonnegative check,
+  active-round uniqueness, pending-round index, and matching selector/projector ordering, while
+  representative tournament and Protein Tracker schemas and RLS remained present.
+- Anonymous REST boundary probes returned 200 for the tournament `rounds` surface and the expected
+  401 denial for both `protein_profiles` and `karaoke_song_requests`. Linked type generation matched
+  the reviewed local Karaoke request Row/Insert/Update section exactly after line-ending
+  normalization, including all three `queue_round` fields, and the consuming type-check passed.
+- A disposable production-room smoke rendered the stable 1,000-song popular catalog, propagated
+  `In Queue` to a second browser, and returned the exact upcoming order `Release Bob, Release Cara,
+  Release Alice, Release Bob` for the `B1,C1,A1,B2` late-first/repeat scenario. Both repeat requests
+  remained in the queue, the room was closed after the assertion, and Vercel reported no production
+  5xx logs during the release window.
