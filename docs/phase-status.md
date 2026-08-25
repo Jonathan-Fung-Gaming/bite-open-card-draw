@@ -6373,3 +6373,40 @@ Unrun gates and blockers:
   and hosted post-migration evidence remain unchecked.
 - No application tests were run in this schema-owner repository by policy. PR #139 remains a draft;
   no merge, hosted migration push, or hosted Pumbility data/Storage mutation has occurred.
+
+## Karaoke Party queue-round ordering - 2026-08-25
+
+Status: implemented and fully validated against the canonical loopback database; publication and
+hosted verification remain pending. No hosted database was changed during local validation.
+
+- Added the sole forward migration
+  `supabase/migrations/20260825010000_karaoke_queue_round_ordering.sql`. It adds and safely
+  backfills internal `queue_round`, then enforces a zero default, `NOT NULL`, a nonnegative check,
+  per-participant active-round uniqueness, and queue-round pending selection indexing.
+- Replaced `karaoke_add_song`, `karaoke_select_next_locked`, and `karaoke_project_upcoming` without
+  changing their signatures or public JSON. The add path retains its room lock, authentication,
+  replay, admission, version, action, and Realtime boundaries. First active requests join the tail
+  of the room's current round; later active requests receive subsequent rounds. Selection and
+  projection both order by `(queue_round, enqueue_sequence)`.
+- Extended `supabase/tests/karaoke_party_schema_test.sql` with queue-round catalog/invariant checks,
+  the exact `B1,C1,A1,B2` late-first-request regression, public-JSON non-disclosure, and locked
+  selector/projector parity. The 150-request direct fixture now assigns unique participant rounds.
+- PostgreSQL grammar parsing with temporary `pglast==6.2` passed for the complete migration and SQL
+  harness. `git diff --check`, repository lint, typecheck, all 84 test files / 580 tests, and the
+  production build passed.
+- Docker Desktop was restored and the canonical target was verified at
+  `postgresql://postgres:postgres@127.0.0.1:54322/postgres`. The complete migration history reset
+  through `20260825010000`, database lint returned no findings, and the guarded Karaoke
+  schema/security/queue/concurrency runner passed. All seven Protein Tracker database suites and
+  the newly merged Pumbility schema/security/rollback/concurrency runner passed as sibling gates.
+- The required Karaoke rollback rehearsal initially identified a stale pre-existing inventory for
+  the later search-fill and quota objects. The procedure was repaired once without `CASCADE`; all
+  39 relations, 42 functions, and two triggers disappeared inside the transaction and returned
+  exactly after `ROLLBACK`. A fresh forward reset, complete Karaoke runner, and clean database lint
+  then passed again.
+- Local type generation was reviewed into the consuming repository. Its only schema delta is
+  `queue_round` on the Karaoke request Row/Insert/Update surfaces, and the consuming type-check
+  passed.
+- One focused review found no public contract, ACL, sibling-object, data-loss, or deterministic queue
+  regression in the change. Applied migrations were not edited. Hosted migration and verification
+  remain gated on merge and the explicitly requested application-first deployment order.

@@ -27,6 +27,41 @@ begin
     raise exception 'all Karaoke Party tables must have RLS enabled';
   end if;
 
+  if not exists (
+    select 1
+    from pg_catalog.pg_attribute as a
+    join pg_catalog.pg_class as c on c.oid = a.attrelid
+    join pg_catalog.pg_namespace as n on n.oid = c.relnamespace
+    join pg_catalog.pg_attrdef as d
+      on d.adrelid = a.attrelid and d.adnum = a.attnum
+    where n.nspname = 'public'
+      and c.relname = 'karaoke_song_requests'
+      and a.attname = 'queue_round'
+      and a.attnotnull
+      and not a.attisdropped
+      and pg_catalog.pg_get_expr(d.adbin, d.adrelid) in (
+        '0', '0::bigint', '''0''::bigint'
+      )
+  ) then
+    raise exception 'queue_round must be non-null with a zero default';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_catalog.pg_constraint as constraint_row
+    where constraint_row.conrelid = 'public.karaoke_song_requests'::pg_catalog.regclass
+      and constraint_row.conname = 'karaoke_song_requests_queue_round_check'
+      and constraint_row.contype = 'c'
+      and constraint_row.convalidated
+  ) then
+    raise exception 'queue_round nonnegative constraint is missing';
+  end if;
+
+  if pg_catalog.to_regclass('public.karaoke_song_requests_participant_active_round_idx') is null
+    or pg_catalog.to_regclass('public.karaoke_song_requests_room_pending_round_idx') is null then
+    raise exception 'queue-round uniqueness or selection index is missing';
+  end if;
+
   select count(*) into v_count
   from pg_catalog.pg_policies as p
   where p.schemaname = 'public' and p.tablename like 'karaoke\_%' escape '\';
@@ -612,6 +647,115 @@ $$;
 
 do $$
 declare
+  v_snapshot jsonb;
+  v_projection jsonb;
+  v_room_id uuid;
+  v_projected_first uuid;
+  v_selected_first uuid;
+begin
+  perform public.karaoke_create_room(
+    'QRND234', '70000000-0000-4000-8000-000000000001',
+    repeat('7', 63) || '1', repeat('7', 63) || '2',
+    statement_timestamp() + interval '12 hours',
+    '70000000-0000-4000-8000-000000000002', repeat('1', 64)
+  );
+  select id into v_room_id
+  from public.karaoke_rooms where room_code = 'QRND234';
+
+  perform public.karaoke_join_room(
+    'QRND234', repeat('7', 63) || '3', 'Alice',
+    '70000000-0000-4000-8000-000000000003', repeat('2', 64)
+  );
+  perform public.karaoke_join_room(
+    'QRND234', repeat('7', 63) || '4', 'Bob',
+    '70000000-0000-4000-8000-000000000004', repeat('3', 64)
+  );
+  perform public.karaoke_join_room(
+    'QRND234', repeat('7', 63) || '5', 'Cara',
+    '70000000-0000-4000-8000-000000000005', repeat('4', 64)
+  );
+
+  perform public.karaoke_add_song(
+    'QRND234', repeat('7', 63) || '4', 'bbbbbbbbbb1', 'B1', 'Channel B',
+    'https://i.ytimg.com/vi/bbbbbbbbbb1/default.jpg', 180, statement_timestamp(),
+    '70000000-0000-4000-8000-000000000006',
+    '70000000-0000-4000-8000-000000000007', repeat('5', 64)
+  );
+  perform public.karaoke_add_song(
+    'QRND234', repeat('7', 63) || '5', 'cccccccccc1', 'C1', 'Channel C',
+    'https://i.ytimg.com/vi/cccccccccc1/default.jpg', 180, statement_timestamp(),
+    '70000000-0000-4000-8000-000000000008',
+    '70000000-0000-4000-8000-000000000009', repeat('6', 64)
+  );
+  perform public.karaoke_add_song(
+    'QRND234', repeat('7', 63) || '4', 'bbbbbbbbbb2', 'B2', 'Channel B',
+    'https://i.ytimg.com/vi/bbbbbbbbbb2/default.jpg', 180, statement_timestamp(),
+    '70000000-0000-4000-8000-000000000010',
+    '70000000-0000-4000-8000-000000000011', repeat('7', 64)
+  );
+  perform public.karaoke_add_song(
+    'QRND234', repeat('7', 63) || '3', 'aaaaaaaaaa1', 'A1', 'Channel A',
+    'https://i.ytimg.com/vi/aaaaaaaaaa1/default.jpg', 180, statement_timestamp(),
+    '70000000-0000-4000-8000-000000000012',
+    '70000000-0000-4000-8000-000000000013', repeat('8', 64)
+  );
+
+  if (select queue_round from public.karaoke_song_requests
+      where room_id = v_room_id and title = 'B1') <> 0
+    or (select queue_round from public.karaoke_song_requests
+        where room_id = v_room_id and title = 'C1') <> 0
+    or (select queue_round from public.karaoke_song_requests
+        where room_id = v_room_id and title = 'A1') <> 0
+    or (select queue_round from public.karaoke_song_requests
+        where room_id = v_room_id and title = 'B2') <> 1 then
+    raise exception 'queue-round assignment did not distinguish first and repeat requests';
+  end if;
+
+  begin
+    update public.karaoke_song_requests
+    set queue_round = 0
+    where room_id = v_room_id and title = 'B2';
+    raise exception 'duplicate active round for one participant unexpectedly succeeded';
+  exception when unique_violation then
+    null;
+  end;
+  begin
+    update public.karaoke_song_requests
+    set queue_round = -1
+    where room_id = v_room_id and title = 'B2';
+    raise exception 'negative queue round unexpectedly succeeded';
+  exception when check_violation then
+    null;
+  end;
+
+  v_snapshot := public.karaoke_get_room_snapshot(
+    'QRND234', repeat('7', 63) || '1', null, 20
+  );
+  if v_snapshot #>> '{upcoming,0,title}' <> 'B1'
+    or v_snapshot #>> '{upcoming,1,title}' <> 'C1'
+    or v_snapshot #>> '{upcoming,2,title}' <> 'A1'
+    or v_snapshot #>> '{upcoming,3,title}' <> 'B2' then
+    raise exception 'late first request skipped non-repeat songs: %', v_snapshot->'upcoming';
+  end if;
+  if v_snapshot::text like '%queueRound%' or v_snapshot::text like '%queue_round%' then
+    raise exception 'internal queue_round leaked into public snapshot JSON';
+  end if;
+
+  v_projection := public.karaoke_project_upcoming(v_room_id, 20);
+  if v_projection is distinct from v_snapshot->'upcoming' then
+    raise exception 'snapshot and direct projection ordering diverged';
+  end if;
+  v_projected_first := (v_projection #>> '{0,id}')::uuid;
+  v_selected_first := public.karaoke_select_next_locked(v_room_id);
+  if v_selected_first is distinct from v_projected_first
+    or (select title from public.karaoke_song_requests where id = v_selected_first) <> 'B1' then
+    raise exception 'locked selection diverged from projected queue order';
+  end if;
+end;
+$$;
+
+do $$
+declare
   v_room_id uuid;
   v_participant_id uuid;
   v_snapshot jsonb;
@@ -638,13 +782,13 @@ begin
       insert into public.karaoke_song_requests (
         room_id, participant_id, youtube_video_id, title, channel_title,
         thumbnail_url, duration_seconds, metadata_refreshed_at,
-        enqueue_sequence, client_request_id
+        enqueue_sequence, queue_round, client_request_id
       ) values (
         v_room_id, v_participant_id,
         pg_catalog.lpad(((v_index - 1) * 10 + v_song)::text, 11, 'a'),
         'Queue Song ' || v_index || '-' || v_song, 'Queue Channel',
         'https://i.ytimg.com/vi/aaaaaaaaaaa/default.jpg', 180,
-        statement_timestamp(), (v_index - 1) * 10 + v_song,
+        statement_timestamp(), (v_index - 1) * 10 + v_song, v_song - 1,
         pg_catalog.gen_random_uuid()
       );
     end loop;
