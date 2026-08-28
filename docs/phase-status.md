@@ -6460,3 +6460,6 @@ migration publication remain pending.
 - `git diff --check` and one focused schema review passed. Two linked dry runs named only the new
   migration and made no hosted mutation. Docker Desktop is unavailable, so local reset, database
   lint, and the executable SQL harness could not run before the urgent live-session release.
+- The first hosted apply attempt rolled back atomically because PostgreSQL rejected index creation
+  after the backfill had queued deferred trigger events. The focused repair moves both index
+  definitions before the backfill; no schema object or migration-history row was left behind.
