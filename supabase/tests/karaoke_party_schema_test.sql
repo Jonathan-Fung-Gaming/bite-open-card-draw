@@ -949,6 +949,147 @@ $$;
 do $$
 declare
   v_room_id uuid;
+  v_d1_id uuid;
+  v_selected_id uuid;
+  v_state_version bigint;
+  v_d2_front bigint;
+  v_snapshot jsonb;
+  v_projection jsonb;
+  v_completion jsonb;
+begin
+  perform public.karaoke_create_room(
+    'QHAT234', '72000000-0000-4000-8000-000000000001',
+    repeat('9', 63) || '1', repeat('9', 63) || '2',
+    statement_timestamp() + interval '12 hours',
+    '72000000-0000-4000-8000-000000000002', repeat('a', 64)
+  );
+  select id into v_room_id
+  from public.karaoke_rooms where room_code = 'QHAT234';
+
+  perform public.karaoke_join_room(
+    'QHAT234', repeat('9', 63) || '3', 'Dom',
+    '72000000-0000-4000-8000-000000000003', repeat('b', 64)
+  );
+  perform public.karaoke_join_room(
+    'QHAT234', repeat('9', 63) || '4', 'Jonathan',
+    '72000000-0000-4000-8000-000000000004', repeat('c', 64)
+  );
+  perform public.karaoke_join_room(
+    'QHAT234', repeat('9', 63) || '5', 'Emuwuly',
+    '72000000-0000-4000-8000-000000000005', repeat('d', 64)
+  );
+
+  perform public.karaoke_add_song(
+    'QHAT234', repeat('9', 63) || '3', 'hotfixdom01', 'D1', 'Channel D',
+    'https://i.ytimg.com/vi/hotfixdom01/default.jpg', 180, statement_timestamp(),
+    '72000000-0000-4000-8000-000000000006',
+    '72000000-0000-4000-8000-000000000007', repeat('e', 64)
+  );
+  select id into v_d1_id
+  from public.karaoke_song_requests
+  where room_id = v_room_id and title = 'D1';
+  v_selected_id := public.karaoke_select_next_locked(v_room_id);
+  if v_selected_id is distinct from v_d1_id then
+    raise exception 'hotfix fixture did not select D1 as the current song';
+  end if;
+
+  perform public.karaoke_add_song(
+    'QHAT234', repeat('9', 63) || '4', 'hotfixjon01', 'J1', 'Channel J',
+    'https://i.ytimg.com/vi/hotfixjon01/default.jpg', 180, statement_timestamp(),
+    '72000000-0000-4000-8000-000000000008',
+    '72000000-0000-4000-8000-000000000009', repeat('f', 64)
+  );
+  perform public.karaoke_add_song(
+    'QHAT234', repeat('9', 63) || '5', 'hotfixemu01', 'E1', 'Channel E',
+    'https://i.ytimg.com/vi/hotfixemu01/default.jpg', 180, statement_timestamp(),
+    '72000000-0000-4000-8000-000000000010',
+    '72000000-0000-4000-8000-000000000011', repeat('1', 64)
+  );
+  perform public.karaoke_add_song(
+    'QHAT234', repeat('9', 63) || '4', 'hotfixjon02', 'J2', 'Channel J',
+    'https://i.ytimg.com/vi/hotfixjon02/default.jpg', 180, statement_timestamp(),
+    '72000000-0000-4000-8000-000000000012',
+    '72000000-0000-4000-8000-000000000013', repeat('2', 64)
+  );
+  perform public.karaoke_add_song(
+    'QHAT234', repeat('9', 63) || '5', 'hotfixemu02', 'E2', 'Channel E',
+    'https://i.ytimg.com/vi/hotfixemu02/default.jpg', 180, statement_timestamp(),
+    '72000000-0000-4000-8000-000000000014',
+    '72000000-0000-4000-8000-000000000015', repeat('3', 64)
+  );
+  perform public.karaoke_add_song(
+    'QHAT234', repeat('9', 63) || '4', 'hotfixjon03', 'J3', 'Channel J',
+    'https://i.ytimg.com/vi/hotfixjon03/default.jpg', 180, statement_timestamp(),
+    '72000000-0000-4000-8000-000000000016',
+    '72000000-0000-4000-8000-000000000017', repeat('4', 64)
+  );
+  perform public.karaoke_add_song(
+    'QHAT234', repeat('9', 63) || '3', 'hotfixdom02', 'D2', 'Channel D',
+    'https://i.ytimg.com/vi/hotfixdom02/default.jpg', 180, statement_timestamp(),
+    '72000000-0000-4000-8000-000000000018',
+    '72000000-0000-4000-8000-000000000019', repeat('5', 64)
+  );
+
+  select front_tier_sequence into v_d2_front
+  from public.karaoke_song_requests
+  where room_id = v_room_id and title = 'D2';
+  if v_d2_front is not null then
+    raise exception 'D2 was marked as front before current D1 became terminal';
+  end if;
+
+  v_snapshot := public.karaoke_get_room_snapshot(
+    'QHAT234', repeat('9', 63) || '1', null, 20
+  );
+  v_projection := public.karaoke_project_upcoming(v_room_id, 20);
+  if v_projection is distinct from v_snapshot->'upcoming' then
+    raise exception 'pending-position snapshot and direct projection diverged';
+  end if;
+  if pg_catalog.jsonb_array_length(v_projection) <> 6
+    or v_projection #>> '{0,title}' <> 'J1'
+    or v_projection #>> '{1,title}' <> 'E1'
+    or v_projection #>> '{2,title}' <> 'D2'
+    or v_projection #>> '{3,title}' <> 'J2'
+    or v_projection #>> '{4,title}' <> 'E2'
+    or v_projection #>> '{5,title}' <> 'J3' then
+    raise exception 'pending-position projection was not J1,E1,D2,J2,E2,J3: %',
+      v_projection;
+  end if;
+  if v_snapshot::text like '%queueRound%'
+    or v_snapshot::text like '%queue_round%'
+    or v_snapshot::text like '%frontTierSequence%'
+    or v_snapshot::text like '%front_tier_sequence%' then
+    raise exception 'internal pending-position ordering fields leaked into public JSON';
+  end if;
+
+  select state_version into v_state_version
+  from public.karaoke_rooms where id = v_room_id;
+  perform public.karaoke_claim_controller(
+    'QHAT234', repeat('9', 63) || '1',
+    '72000000-0000-4000-8000-000000000021', false, v_state_version,
+    '72000000-0000-4000-8000-000000000022', repeat('7', 64)
+  );
+  select state_version into v_state_version
+  from public.karaoke_rooms where id = v_room_id;
+  v_completion := public.karaoke_complete_and_select_next(
+    'QHAT234', repeat('9', 63) || '1',
+    '72000000-0000-4000-8000-000000000021', v_d1_id, v_state_version,
+    'host_skip', '72000000-0000-4000-8000-000000000020', repeat('6', 64)
+  );
+  if v_completion #>> '{currentSong,title}' <> 'J1' then
+    raise exception 'locked selector did not preserve the earliest marked pending front: %',
+      v_completion;
+  end if;
+  if (select front_tier_sequence
+      from public.karaoke_song_requests
+      where room_id = v_room_id and title = 'D2') is null then
+    raise exception 'D2 was not promoted when current D1 became terminal';
+  end if;
+end;
+$$;
+
+do $$
+declare
+  v_room_id uuid;
   v_participant_id uuid;
   v_snapshot jsonb;
   v_index integer;

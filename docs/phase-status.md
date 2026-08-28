@@ -6463,3 +6463,37 @@ migration publication remain pending.
 - The first hosted apply attempt rolled back atomically because PostgreSQL rejected index creation
   after the backfill had queued deferred trigger events. The focused repair moves both index
   definitions before the backfill; no schema object or migration-history row was left behind.
+
+## Karaoke Party pending-position ordering hotfix - 2026-08-29
+
+Status: implemented, reviewed, statically verified, and handed off uncommitted for urgent release.
+
+- Added forward-only migration
+  `20260829020000_karaoke_pending_position_ordering.sql` without editing applied history. It
+  replaces only `karaoke_select_next_locked` and `karaoke_project_upcoming`.
+- Both functions now derive a zero-based effective tier with `row_number()` over each active
+  singer's pending requests. Marked tier-zero rows retain stable `front_tier_sequence` order;
+  later tiers use enqueue order. The projector places a tier-zero pending request whose marked
+  front is currently selected/playing after all existing marked pending fronts using the current
+  room version plus one, without mutating stored queue state.
+- Extended the guarded transactional Karaoke SQL harness with the reported current-song shape and
+  exact projection `J1,E1,D2,J2,E2,J3`. Coverage also proves D2 is unmarked while D1 is current,
+  the public snapshot matches direct projection, internal ordering fields remain private, a valid
+  controller-driven terminal transition promotes D2, and locked selection preserves the earliest
+  marked pending front.
+- `pglast==6.2` parsed the complete migration and SQL harness after its psql meta-command.
+  `git diff --check`, untracked-file whitespace checks, and focused function/signature/search-path/
+  ACL/limit checks passed. The tracked harness emitted only its existing Windows line-ending
+  warning.
+- The focused diff/security review found and repaired one fixture defect: the completion assertion
+  now claims a controller and refreshes `state_version` before invoking the lifecycle RPC. Review
+  found no remaining deterministic room-lock, playback, public-JSON, ACL, data-loss, or sibling
+  regression.
+- Verified linked target: healthy `bite-open-card-draw` project `gsiyqhkcgegjrvqcqioc`.
+  `npx supabase db push --dry-run` named only
+  `20260829020000_karaoke_pending_position_ordering.sql`; no hosted mutation occurred. Reviewed
+  migration SHA-256 is
+  `F806AB6EE0FD76D516FEEDAC9F516353628FBA9A07B3974DA4320F79E252B50B`.
+- This parallel workstream intentionally did not run a local reset/executable SQL harness, commit,
+  push, merge, or hosted apply. The release owner must complete those gates, apply only the merged
+  forward migration to the verified target, and prove migration parity plus linked lint.
