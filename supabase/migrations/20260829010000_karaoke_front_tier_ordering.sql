@@ -3,6 +3,23 @@ alter table public.karaoke_song_requests
   add constraint karaoke_song_requests_front_tier_sequence_check
     check (front_tier_sequence is null or front_tier_sequence >= 0);
 
+create unique index karaoke_song_requests_participant_active_front_idx
+  on public.karaoke_song_requests (room_id, participant_id)
+  where status in ('pending', 'selected', 'playing')
+    and front_tier_sequence is not null;
+
+create index karaoke_song_requests_room_pending_effective_tier_idx
+  on public.karaoke_song_requests (
+    room_id,
+    (case when front_tier_sequence is not null then 0 else queue_round end),
+    (case
+      when front_tier_sequence is not null then front_tier_sequence
+      else enqueue_sequence
+    end),
+    enqueue_sequence
+  )
+  where status = 'pending';
+
 with participant_positions as (
   select
     s.id,
@@ -30,23 +47,6 @@ update public.karaoke_song_requests as s
 set front_tier_sequence = ranked.front_tier_sequence
 from ranked_fronts as ranked
 where ranked.id = s.id;
-
-create unique index karaoke_song_requests_participant_active_front_idx
-  on public.karaoke_song_requests (room_id, participant_id)
-  where status in ('pending', 'selected', 'playing')
-    and front_tier_sequence is not null;
-
-create index karaoke_song_requests_room_pending_effective_tier_idx
-  on public.karaoke_song_requests (
-    room_id,
-    (case when front_tier_sequence is not null then 0 else queue_round end),
-    (case
-      when front_tier_sequence is not null then front_tier_sequence
-      else enqueue_sequence
-    end),
-    enqueue_sequence
-  )
-  where status = 'pending';
 
 create function public.karaoke_assign_front_tier_on_insert()
 returns trigger

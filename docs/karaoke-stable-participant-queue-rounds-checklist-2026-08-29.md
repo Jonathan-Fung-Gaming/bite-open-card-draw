@@ -29,6 +29,8 @@
 - `git diff --check`: passed; only the existing Windows line-ending warning was emitted.
 - Linked dry run: passed and named only
   `20260829010000_karaoke_front_tier_ordering.sql`.
+- The first linked apply rolled back atomically on PostgreSQL's pending-trigger-event restriction;
+  the focused repair moves index creation before the backfill update.
 - Local database execution is blocked because Docker Desktop is not running; no hosted mutation was
   attempted before merge.
 - Focused review confirmed selected/playing remain unfinished, late singers receive only one front
