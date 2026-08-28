@@ -6437,3 +6437,26 @@ validated locally and against the hosted release target.
   Release Alice, Release Bob` for the `B1,C1,A1,B2` late-first/repeat scenario. Both repeat requests
   remained in the queue, the room was closed after the assertion, and Vercel reported no production
   5xx logs during the release window.
+
+## Karaoke Party stable front-tier queue repair - 2026-08-29
+
+Status: implemented, reviewed, and statically validated; merge, application deployment, and linked
+migration publication remain pending.
+
+- Added forward migration `20260829010000_karaoke_front_tier_ordering.sql`. It adds and backfills an
+  internal nullable `front_tier_sequence`, enforces one unfinished front marker per singer, assigns
+  a marker only to a singer's first unfinished request, and promotes exactly one successor when the
+  prior front request becomes terminal.
+- Preserved active-only `queue_round` assignment. Selector and projector now treat marked requests
+  as effective tier `0`, retain persisted rounds for later requests, and use stable front-entry then
+  enqueue ordering. Selected/playing requests retain their marker until terminal.
+- Extended the transactional Karaoke schema harness with `C1,B2,A2,D1,D2`, late-singer repeat,
+  marker-invariant, terminal-promotion, public-JSON non-disclosure, and selector/projector parity
+  assertions.
+- The consuming application aligns its pure queue model, selector/projector, generated database
+  type, property oracle, deterministic regression, and current queue contracts. Formatting, lint,
+  typecheck, 14 test files / 88 tests, the focused 20-test queue slice, and the production build
+  passed.
+- `git diff --check` and one focused schema review passed. Two linked dry runs named only the new
+  migration and made no hosted mutation. Docker Desktop is unavailable, so local reset, database
+  lint, and the executable SQL harness could not run before the urgent live-session release.
