@@ -751,6 +751,198 @@ begin
     or (select title from public.karaoke_song_requests where id = v_selected_first) <> 'B1' then
     raise exception 'locked selection diverged from projected queue order';
   end if;
+
+end;
+$$;
+
+do $$
+declare
+  v_snapshot jsonb;
+  v_projection jsonb;
+  v_room_id uuid;
+  v_b1_id uuid;
+  v_a1_id uuid;
+  v_c1_id uuid;
+  v_projected_first uuid;
+  v_selected_first uuid;
+  v_c1_front bigint;
+  v_b2_front bigint;
+  v_a2_front bigint;
+  v_d1_front bigint;
+  v_d2_front bigint;
+begin
+  perform public.karaoke_create_room(
+    'QPOS234', '71000000-0000-4000-8000-000000000001',
+    repeat('8', 63) || '1', repeat('8', 63) || '2',
+    statement_timestamp() + interval '12 hours',
+    '71000000-0000-4000-8000-000000000002', repeat('a', 64)
+  );
+  select id into v_room_id
+  from public.karaoke_rooms where room_code = 'QPOS234';
+
+  perform public.karaoke_join_room(
+    'QPOS234', repeat('8', 63) || '3', 'Alice',
+    '71000000-0000-4000-8000-000000000003', repeat('b', 64)
+  );
+  perform public.karaoke_join_room(
+    'QPOS234', repeat('8', 63) || '4', 'Bob',
+    '71000000-0000-4000-8000-000000000004', repeat('c', 64)
+  );
+  perform public.karaoke_join_room(
+    'QPOS234', repeat('8', 63) || '5', 'Cara',
+    '71000000-0000-4000-8000-000000000005', repeat('d', 64)
+  );
+
+  perform public.karaoke_add_song(
+    'QPOS234', repeat('8', 63) || '4', 'pppppppppp1', 'B1', 'Channel B',
+    'https://i.ytimg.com/vi/pppppppppp1/default.jpg', 180, statement_timestamp(),
+    '71000000-0000-4000-8000-000000000006',
+    '71000000-0000-4000-8000-000000000007', repeat('e', 64)
+  );
+  perform public.karaoke_add_song(
+    'QPOS234', repeat('8', 63) || '3', 'pppppppppp2', 'A1', 'Channel A',
+    'https://i.ytimg.com/vi/pppppppppp2/default.jpg', 180, statement_timestamp(),
+    '71000000-0000-4000-8000-000000000008',
+    '71000000-0000-4000-8000-000000000009', repeat('f', 64)
+  );
+  perform public.karaoke_add_song(
+    'QPOS234', repeat('8', 63) || '5', 'pppppppppp3', 'C1', 'Channel C',
+    'https://i.ytimg.com/vi/pppppppppp3/default.jpg', 180, statement_timestamp(),
+    '71000000-0000-4000-8000-000000000010',
+    '71000000-0000-4000-8000-000000000011', repeat('1', 64)
+  );
+  perform public.karaoke_add_song(
+    'QPOS234', repeat('8', 63) || '4', 'pppppppppp4', 'B2', 'Channel B',
+    'https://i.ytimg.com/vi/pppppppppp4/default.jpg', 180, statement_timestamp(),
+    '71000000-0000-4000-8000-000000000012',
+    '71000000-0000-4000-8000-000000000013', repeat('2', 64)
+  );
+
+  select id into v_b1_id
+  from public.karaoke_song_requests
+  where room_id = v_room_id and title = 'B1';
+  select id into v_a1_id
+  from public.karaoke_song_requests
+  where room_id = v_room_id and title = 'A1';
+  select id into v_c1_id
+  from public.karaoke_song_requests
+  where room_id = v_room_id and title = 'C1';
+
+  perform public.karaoke_remove_own_song(
+    'QPOS234', repeat('8', 63) || '4', v_b1_id,
+    '71000000-0000-4000-8000-000000000021', repeat('7', 64)
+  );
+  perform public.karaoke_remove_own_song(
+    'QPOS234', repeat('8', 63) || '3', v_a1_id,
+    '71000000-0000-4000-8000-000000000022', repeat('8', 64)
+  );
+
+  perform public.karaoke_add_song(
+    'QPOS234', repeat('8', 63) || '3', 'pppppppppp5', 'A2', 'Channel A',
+    'https://i.ytimg.com/vi/pppppppppp5/default.jpg', 180, statement_timestamp(),
+    '71000000-0000-4000-8000-000000000014',
+    '71000000-0000-4000-8000-000000000015', repeat('3', 64)
+  );
+  perform public.karaoke_join_room(
+    'QPOS234', repeat('8', 63) || '6', 'Diego',
+    '71000000-0000-4000-8000-000000000016', repeat('4', 64)
+  );
+  perform public.karaoke_add_song(
+    'QPOS234', repeat('8', 63) || '6', 'pppppppppp6', 'D1', 'Channel D',
+    'https://i.ytimg.com/vi/pppppppppp6/default.jpg', 180, statement_timestamp(),
+    '71000000-0000-4000-8000-000000000017',
+    '71000000-0000-4000-8000-000000000018', repeat('5', 64)
+  );
+  perform public.karaoke_add_song(
+    'QPOS234', repeat('8', 63) || '6', 'pppppppppp7', 'D2', 'Channel D',
+    'https://i.ytimg.com/vi/pppppppppp7/default.jpg', 180, statement_timestamp(),
+    '71000000-0000-4000-8000-000000000019',
+    '71000000-0000-4000-8000-000000000020', repeat('6', 64)
+  );
+
+  if (select queue_round from public.karaoke_song_requests
+      where room_id = v_room_id and title = 'B2') <> 1
+    or (select queue_round from public.karaoke_song_requests
+        where room_id = v_room_id and title = 'A2') <> 0
+    or (select queue_round from public.karaoke_song_requests
+        where room_id = v_room_id and title = 'D1') <> 0
+    or (select queue_round from public.karaoke_song_requests
+        where room_id = v_room_id and title = 'D2') <> 1 then
+    raise exception 'active-only queue-round assignment changed unexpectedly';
+  end if;
+
+  select front_tier_sequence into v_c1_front
+  from public.karaoke_song_requests where room_id = v_room_id and title = 'C1';
+  select front_tier_sequence into v_b2_front
+  from public.karaoke_song_requests where room_id = v_room_id and title = 'B2';
+  select front_tier_sequence into v_a2_front
+  from public.karaoke_song_requests where room_id = v_room_id and title = 'A2';
+  select front_tier_sequence into v_d1_front
+  from public.karaoke_song_requests where room_id = v_room_id and title = 'D1';
+  select front_tier_sequence into v_d2_front
+  from public.karaoke_song_requests where room_id = v_room_id and title = 'D2';
+  if v_c1_front is null or v_b2_front is null or v_a2_front is null or v_d1_front is null
+    or v_d2_front is not null
+    or not (v_c1_front < v_b2_front and v_b2_front < v_a2_front
+      and v_a2_front < v_d1_front) then
+    raise exception 'front-tier entry markers were not stable: C1 %, B2 %, A2 %, D1 %, D2 %',
+      v_c1_front, v_b2_front, v_a2_front, v_d1_front, v_d2_front;
+  end if;
+  if exists (
+    select active.participant_id
+    from public.karaoke_song_requests as active
+    where active.room_id = v_room_id
+      and active.status in ('pending', 'selected', 'playing')
+    group by active.participant_id
+    having pg_catalog.count(*) filter (
+      where active.front_tier_sequence is not null
+    ) <> 1
+  ) then
+    raise exception 'an active singer did not have exactly one front-tier request';
+  end if;
+
+  v_snapshot := public.karaoke_get_room_snapshot(
+    'QPOS234', repeat('8', 63) || '1', null, 20
+  );
+  if v_snapshot #>> '{upcoming,0,title}' <> 'C1'
+    or v_snapshot #>> '{upcoming,1,title}' <> 'B2'
+    or v_snapshot #>> '{upcoming,2,title}' <> 'A2'
+    or v_snapshot #>> '{upcoming,3,title}' <> 'D1'
+    or v_snapshot #>> '{upcoming,4,title}' <> 'D2' then
+    raise exception 'front-tier projection was not C1,B2,A2,D1,D2: %',
+      v_snapshot->'upcoming';
+  end if;
+  if v_snapshot::text like '%frontTierSequence%'
+    or v_snapshot::text like '%front_tier_sequence%' then
+    raise exception 'internal front-tier marker leaked into public snapshot JSON';
+  end if;
+
+  perform public.karaoke_remove_own_song(
+    'QPOS234', repeat('8', 63) || '5', v_c1_id,
+    '71000000-0000-4000-8000-000000000023', repeat('9', 64)
+  );
+
+  v_snapshot := public.karaoke_get_room_snapshot(
+    'QPOS234', repeat('8', 63) || '1', null, 20
+  );
+  if v_snapshot #>> '{upcoming,0,title}' <> 'B2'
+    or v_snapshot #>> '{upcoming,1,title}' <> 'A2'
+    or v_snapshot #>> '{upcoming,2,title}' <> 'D1'
+    or v_snapshot #>> '{upcoming,3,title}' <> 'D2' then
+    raise exception 'promoted second song did not remain first: %',
+      v_snapshot->'upcoming';
+  end if;
+
+  v_projection := public.karaoke_project_upcoming(v_room_id, 20);
+  if v_projection is distinct from v_snapshot->'upcoming' then
+    raise exception 'front-tier snapshot and direct projection diverged';
+  end if;
+  v_projected_first := (v_projection #>> '{0,id}')::uuid;
+  v_selected_first := public.karaoke_select_next_locked(v_room_id);
+  if v_selected_first is distinct from v_projected_first
+    or (select title from public.karaoke_song_requests where id = v_selected_first) <> 'B2' then
+    raise exception 'front-tier locked selection did not choose B2';
+  end if;
 end;
 $$;
 
