@@ -1,0 +1,6 @@
+{
+  "supabase/migrations/20260906010000_piu_trainer_schema.sql": {
+    "setup": ["supabase/tests/piu_trainer_baseline.sql"],
+    "tests": ["supabase/tests/piu_trainer_schema_test.sql"]
+  }
+}

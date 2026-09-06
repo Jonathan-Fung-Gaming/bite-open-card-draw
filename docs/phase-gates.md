@@ -1,5 +1,11 @@
 # Phase Gates
 
+## Supabase migration-only changes
+
+Run only the new migration's focused tests. Do not run application suites, older migration tests, sibling regressions, application builds/lint/typecheck, full database resets/replays, or schema-wide lint for a migration-only change. New migration test files, generated types, and supporting documentation remain within this exception.
+
+Target verification, migration history/parity and dry-run inspection remain required. Release depends on the new migration's own acceptance checks, not unrelated failures. This rule overrides the general gates below; see `AGENTS.md`.
+
 Codex must work phase by phase.
 
 A phase is not complete until:

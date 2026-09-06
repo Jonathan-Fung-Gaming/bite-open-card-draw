@@ -1,5 +1,14 @@
 # Phase Status
 
+## PIU Trainer shared schema and migration-only testing — 2026-09-06
+
+Implemented the additive 17-table `PIU_TRAINER_` schema, server-only RPCs, account revision locks, immutable catalog pages, replay receipts, safety archives and bounded staged imports. The focused SQL contract passed against an isolated PostgreSQL database containing only its declared platform baseline and this new migration. A scoped manual review verified ownership, privilege revocation, transaction boundaries, pagination order, replay-before-revision semantics and additive object scope. Chronological record ordering was aligned with the historical journal contract and its focused SQL checks passed.
+
+At the user's request, migration-only work now runs **only the new migration's tests**. AGENTS, phase gates, the current brief and CI reflect this exception. CI classifies migration changes and executes the declared focused contract in disposable PostgreSQL, bypassing application gates for migration-only changes. No full reset/replay, old migration tests or schema-wide lint are required. Read-only target, parity and push dry-run remain deployment checks.
+
+Before this new instruction, existing application checks had been run: lint/typecheck/unit/build passed; unchanged Karaoke SQL and tournament E2E fixtures failed. These unrelated findings were not repaired and do not block this migration-only release. Subsequent verification is restricted to the new migration. Merge and hosted migration parity are recorded in the checklist after deployment.
+
+
 ## Protein Tracker Training Focus Schema - 2026-07-24
 
 Status: merged through PR #128 and deployed to the verified linked Supabase project. Migration

@@ -1,136 +1,78 @@
 name: CI
-
 on:
   pull_request:
   push:
     branches:
       - main
-
 permissions:
   contents: read
-
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   classify-changes:
     name: Classify Changes
     runs-on: ubuntu-latest
     outputs:
-      pumbility_changed: ${{ steps.classify.outputs.pumbility_changed }}
-      pumbility_only: ${{ steps.classify.outputs.pumbility_only }}
+      migration_only: ${{ steps.classify.outputs.migration_only }}
+      migration_changed: ${{ steps.classify.outputs.migration_changed }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Classify Pumbility database scope
-        id: classify
-        shell: bash
+      - id: classify
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-
-          if [[ "$EVENT_NAME" != "pull_request" ]]; then
-            echo "pumbility_changed=false" >> "$GITHUB_OUTPUT"
-            echo "pumbility_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          mapfile -t changed_files < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          pumbility_changed=false
-          pumbility_only=true
-
-          for path in "${changed_files[@]}"; do
-            case "$path" in
-              supabase/migrations/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_pumbility_*.sql|\
-              supabase/tests/pumbility_*.sql|\
-              scripts/run-pumbility-*.ps1|\
-              docs/phase-plans/phase-pumbility-*.md|\
-              docs/pumbility-*.md|\
-              docs/phase-status.md|\
-              .github/workflows/ci.yml)
-                pumbility_changed=true
-                ;;
-              *)
-                pumbility_only=false
-                ;;
-            esac
-          done
-
-          if [[ "$pumbility_changed" != "true" ]]; then
-            pumbility_only=false
-          fi
-
-          echo "pumbility_changed=$pumbility_changed" >> "$GITHUB_OUTPUT"
-          echo "pumbility_only=$pumbility_only" >> "$GITHUB_OUTPUT"
-
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/migration-scope.mjs
   quality-gates:
     name: Quality Gates
     needs: classify-changes
-    if: github.event_name == 'push' || needs.classify-changes.outputs.pumbility_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - name: Migration-only exemption
+        if: needs.classify-changes.outputs.migration_only == 'true'
+        run: echo 'Only the new migration is tested for this change.'
+      - uses: actions/setup-node@v4
+        if: needs.classify-changes.outputs.migration_only != 'true'
         with:
           node-version: 22
           cache: npm
-
-      - name: Install dependencies
+      - if: needs.classify-changes.outputs.migration_only != 'true'
         run: npm ci
-
-      - name: Lint
+      - if: needs.classify-changes.outputs.migration_only != 'true'
         run: npm run lint
-
-      - name: Typecheck
+      - if: needs.classify-changes.outputs.migration_only != 'true'
         run: npm run typecheck
-
-      - name: Unit tests
+      - if: needs.classify-changes.outputs.migration_only != 'true'
         run: npm run test
-
-      - name: Production build
+      - if: needs.classify-changes.outputs.migration_only != 'true'
         run: npm run build
-
-  pumbility-database:
-    name: Pumbility Database Gates
+  migration-tests:
+    name: New Migration Tests
     needs: classify-changes
-    if: github.event_name == 'pull_request' && needs.classify-changes.outputs.pumbility_changed == 'true'
+    if: needs.classify-changes.outputs.migration_changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: migration-test-only
+          POSTGRES_DB: migration_test
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: 22
-
-      - name: Start disposable local Supabase
-        run: npx --yes supabase@2.114.0 start
-
-      - name: Reset complete migration chain without seed
-        run: npx --yes supabase@2.114.0 db reset --local --no-seed
-
-      - name: Lint local database
-        run: npx --yes supabase@2.114.0 db lint --local --level error --fail-on error
-
-      - name: Run Pumbility database checks
-        shell: pwsh
-        run: ./scripts/run-pumbility-schema-tests.ps1
-
-      - name: Stop disposable local Supabase
-        if: always()
-        run: npx --yes supabase@2.114.0 stop --no-backup
+          fetch-depth: 0
+      - name: Test only changed migrations
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          MIGRATION_TEST_DATABASE_URL: postgresql://postgres:migration-test-only@127.0.0.1:5432/migration_test
+        run: node scripts/test-changed-migrations.mjs

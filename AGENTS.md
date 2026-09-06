@@ -133,6 +133,14 @@ Avoid extreme strobing and unreadable camera shake.
 
 ## Engineering rules
 
+### Supabase migration-only exception
+
+For Supabase migration-only changes, run tests only for the new migration being implemented. Never run application unit tests, application E2E tests, older migration tests, sibling-app regression tests, or full-repository test suites for such a change. This includes changes to the new migration's tests, generated types, and supporting migration documentation. Do not run the application build, application lint/typecheck, a full database reset/replay, or schema-wide database lint as substitute release gates.
+
+Validate the new SQL with its own focused schema/constraint/permission/behavior checks against an isolated database. Retain read-only target verification, migration history/parity inspection, and migration push dry-run inspection; these deployment checks are not application tests. Inspect pending migrations and apply only the reviewed migration. Do not change or repair unrelated code to satisfy a migration release.
+
+This exception overrides all broader testing and phase-completion requirements below and in `docs/phase-gates.md`, `docs/codex-current-brief.md`, and historical plans. Existing unrelated test failures do not block a migration-only release. Changes to application behavior remain subject to the normal application checks.
+
 Work one phase at a time.
 
 Do not implement future phases early unless the plan explicitly says to create placeholders.

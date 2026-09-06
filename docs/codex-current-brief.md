@@ -96,6 +96,8 @@ remediation checklists, reviews, audits, and handovers retained only for histori
 
 ## Phase Working Rules
 
+- For Supabase migration-only work, follow the `AGENTS.md` migration-only exception: test only the new migration. Do not run application suites, old migrations, sibling regressions, full resets, or whole-project verification. Keep target, parity and dry-run deployment checks. This overrides the general check requirements below and in older plans.
+
 - Work one phase at a time.
 - Do not implement future phases early unless the active plan explicitly says to create placeholders.
 - Close checklist items only with route evidence, automated tests, screenshots, or an explicit user
