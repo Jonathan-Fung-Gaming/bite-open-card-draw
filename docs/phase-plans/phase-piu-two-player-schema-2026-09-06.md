@@ -1,0 +1,17 @@
+# PIU two-player schema — 2026-09-06
+
+Scope: the consuming PIU Training Tracker changes to two intentionally shared dropdown profiles, neutral completion events, immutable profile plans and cached official Phoenix 2 leaderboard evidence. No tournament behavior changes.
+
+Accepted user choices: dropdown-only access (no PIN/login), HDS Single/Double/Double with S26/D28 ceilings, and Jonathan app completion as played evidence while all scores/ranks remain official.
+
+Migration: `20260906020000_piu_trainer_two_players.sql`. Preserve existing account UUIDs and all data, remove only PIU's Auth foreign key, seed two new profile accounts, add enrollment and completion storage, extend state/commit RPCs, add a bounded durable cache with refresh leases and cooldown. New accounts use UUIDs independent of Auth; no auth users/provider settings are deleted.
+
+Read-only production preflight: linked project `gsiyqhkcgegjrvqcqioc`; existing migration histories have parity; PIU account inventory is empty. Therefore there is no legacy account ownership mapping to guess. The migration nevertheless preserves unmapped accounts and receipts; the focused fixture proves this.
+
+Validation: only this new migration's tests against disposable PostgreSQL. `piu_two_player_baseline.sql` is a frozen predecessor schema fixture, not a history replay or an older migration test. It supplies only the required PIU schema/platform primitives and one preserved legacy account. Test profile allowlisting/isolation, first enrollment, Auth decoupling, completion/undo events, dynamic snapshot slot counts, replay/archive preservation, cache lease ownership/cooldown/last-good retention, and new/changed object permissions. Do not run application suites, older migration tests, full resets or schema-wide lint in this repository.
+
+Plan review: server code owns profile selection and plan manifests; no client UUID creates a journal. COMMIT never accepts uploaded profile/plan metadata. Dropdown access is intentionally shared. Completion events do not overwrite legacy attempts. Cache is outside journal revisions. All new tables/RPCs remain service-only. Migration occurs before the dependent app release.
+
+Release order: focused tests, one coordinated diff review, merge, verify target/parity/dry-run, apply only this migration, read-only verification, then deploy consuming application. Root coordinator owns hosted mutation/merge approval for the combined change. Rollback disables the new consuming deployment while retaining all new and historical data; no destructive down migration.
+
+Verification: the new migration's focused SQL checks passed on disposable PostgreSQL 17. Only its frozen prerequisite fixture, new SQL and new test were executed. A dollar-quoting typo found during initial compilation was repaired before the passing run. The linked dry-run lists only this migration. The same new migration was applied transactionally to the existing loopback Supabase test backend (without reset or old migration replay); its unrelated local tables were preserved. Merge and hosted apply remain held for the coordinating review.

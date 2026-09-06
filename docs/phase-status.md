@@ -6506,3 +6506,9 @@ Status: implemented, reviewed, statically verified, and handed off uncommitted f
 - This parallel workstream intentionally did not run a local reset/executable SQL harness, commit,
   push, merge, or hosted apply. The release owner must complete those gates, apply only the merged
   forward migration to the verified target, and prove migration parity plus linked lint.
+
+## PIU two shared profiles — 2026-09-06
+
+Implemented the additive two-profile mapping/enrollment, Auth decoupling, neutral completion events, snapshot-based run slot counts and bounded official-leaderboard cache. Existing account UUIDs, attempts, replay receipts and safety archives are retained. Read-only hosted preflight found no PIU accounts and matched migration histories; the linked dry-run lists only `20260906020000_piu_trainer_two_players.sql`.
+
+Only the new migration's focused test passed on disposable PostgreSQL 17 using its frozen prerequisite schema fixture. No old migration tests, application suites, full reset/replay or schema-wide lint ran in this repository. The new DDL also initializes the consuming app's loopback integration backend without touching sibling tables. Coordinated final review, merge and hosted apply remain pending; no production schema mutation has occurred.
