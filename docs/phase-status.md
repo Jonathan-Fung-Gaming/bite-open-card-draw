@@ -6,7 +6,7 @@ Implemented the additive 17-table `PIU_TRAINER_` schema, server-only RPCs, accou
 
 At the user's request, migration-only work now runs **only the new migration's tests**. AGENTS, phase gates, the current brief and CI reflect this exception. CI classifies migration changes and executes the declared focused contract in disposable PostgreSQL, bypassing application gates for migration-only changes. No full reset/replay, old migration tests or schema-wide lint are required. Read-only target, parity and push dry-run remain deployment checks.
 
-Before this new instruction, existing application checks had been run: lint/typecheck/unit/build passed; unchanged Karaoke SQL and tournament E2E fixtures failed. These unrelated findings were not repaired and do not block this migration-only release. Subsequent verification is restricted to the new migration. Merge and hosted migration parity are recorded in the checklist after deployment.
+Before this new instruction, existing application checks had been run: lint/typecheck/unit/build passed; unchanged Karaoke SQL and tournament E2E fixtures failed. These unrelated findings were not repaired and do not block this migration-only release. Subsequent verification is restricted to the new migration. PR #145 merged; only the reviewed PIU migration was pushed to the verified project `gsiyqhkcgegjrvqcqioc`, and local/remote parity passed. The checklist records the deployment. A focused CI correction also classifies migration-support-only follow-ups as migration-only, so documentation/test-file updates do not accidentally trigger application suites.
 
 
 ## Protein Tracker Training Focus Schema - 2026-07-24

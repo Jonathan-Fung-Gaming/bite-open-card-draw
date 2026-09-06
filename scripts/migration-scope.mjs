@@ -11,7 +11,12 @@ const support = (p) =>
   /^(supabase\/|docs\/|scripts\/(migration-scope|test-changed-migrations)\.mjs$|\.github\/workflows\/ci\.yml$|AGENTS\.md$)/.test(
     p,
   );
-const only = changed && paths.every(support);
+const migrationSupport = paths.some((p) =>
+  /^(supabase\/|scripts\/(migration-scope|test-changed-migrations)\.mjs$|docs\/.*(?:schema|migration))/i.test(
+    p,
+  ),
+);
+const only = (changed || migrationSupport) && paths.every(support);
 const output = `migration_changed=${changed}\nmigration_only=${only}\n`;
 if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, output);
 else process.stdout.write(output);
