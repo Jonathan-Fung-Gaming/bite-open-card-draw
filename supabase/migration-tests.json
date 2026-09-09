@@ -10,5 +10,9 @@
   "supabase/migrations/20260909010000_piu_adaptive_workouts.sql": {
     "setup": ["supabase/tests/piu_adaptive_baseline.sql"],
     "tests": ["supabase/tests/piu_adaptive_test.sql"]
+  },
+  "supabase/migrations/20260909020000_piu_twenty_chart_sessions.sql": {
+    "setup": ["supabase/tests/piu_twenty_chart_baseline.sql"],
+    "tests": ["supabase/tests/piu_twenty_chart_test.sql"]
   }
 }
