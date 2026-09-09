@@ -6,5 +6,9 @@
   "supabase/migrations/20260906020000_piu_trainer_two_players.sql": {
     "setup": ["supabase/tests/piu_two_player_baseline.sql"],
     "tests": ["supabase/tests/piu_two_player_test.sql"]
+  },
+  "supabase/migrations/20260909010000_piu_adaptive_workouts.sql": {
+    "setup": ["supabase/tests/piu_adaptive_baseline.sql"],
+    "tests": ["supabase/tests/piu_adaptive_test.sql"]
   }
 }
