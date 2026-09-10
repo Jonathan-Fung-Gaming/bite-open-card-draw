@@ -6524,3 +6524,7 @@ The production trainer is ready after 220 unit/integration and 39 browser checks
 ## PIU twenty-chart sessions - 2026-09-09
 
 Implemented the additive twenty-slot/thirty-two-step format with balanced random and improvement push lanes; historical sixteen-chart sessions and commit fences remain supported. The new migration passed isolated SQL checks, and the scoped code review is complete. Target gsiyqhkcgegjrvqcqioc and predecessor parity are verified; the dry run names only 20260909020000_piu_twenty_chart_sessions.sql. The user requested immediate release without further tests, so release commits skip CI. Merge and apply this migration before the consuming trainer deployment. No history cleanup or session creation is part of this release.
+
+## PIU WAFFLE profile - 2026-09-11
+
+Added the authorized WAFFLE#1473 journal with W17/S22/D24 defaults and official Phoenix 2 top-200 membership using verified player 7548. The scoped migration changes only PIU profile/cache allowlists and the necessary resolver/validator/membership functions. Its isolated SQL checks passed for exact defaults, rank 200/201, journal isolation, saved revision/receipt preservation and service-only grants. One code review is complete. Verified linked target gsiyqhkcgegjrvqcqioc has matching predecessor migrations; the dry run names only 20260911010000_piu_waffle_profile.sql. Merge and apply before the web profile release. No historical sessions or personal account mappings are changed.
