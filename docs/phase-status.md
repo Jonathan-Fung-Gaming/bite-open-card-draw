@@ -1,5 +1,9 @@
 # Phase Status
 
+## Ninth-best Pumbility formula - 2026-09-27
+
+Added v3 formula and full-nine source support via migration 20260927020000. Scope, deployment order and rollback are in [the plan](phase-plans/phase-seeding-ninth-300-schema-2026-09-27.md). Tests, checks and review explicitly skipped by the user; no validation claim. Deploy schema before app, preserving v1/v2 history.
+
 ## Pumbility top-three prediction schema - 2026-09-27
 
 The scoped [plan](phase-plans/phase-seeding-top-three-2026-09-27.md) adds versioned top-three prediction storage/validation, accepts three through nine contributions (or an explained verified shortfall), and preserves legacy ninth-only sources and immutable history. Changed files are the new migration, its frozen baseline/focused tests and runner, migration manifest, and scoped documentation.
