@@ -14,17 +14,24 @@
   "supabase/migrations/20260909020000_piu_twenty_chart_sessions.sql": {
     "setup": ["supabase/tests/piu_twenty_chart_baseline.sql"],
     "tests": ["supabase/tests/piu_twenty_chart_test.sql"]
-  },
+  },
   "supabase/migrations/20260926010000_tournament_seeding.sql": {
     "setup": ["supabase/tests/tournament_seeding_baseline.sql"],
     "tests": ["supabase/tests/tournament_seeding_test.sql"]
   },
   "supabase/migrations/20260911010000_piu_waffle_profile.sql": {
-    "setup": ["supabase/tests/piu_waffle_baseline.sql", "supabase/tests/piu_waffle_precondition.sql"],
+    "setup": [
+      "supabase/tests/piu_waffle_baseline.sql",
+      "supabase/tests/piu_waffle_precondition.sql"
+    ],
     "tests": ["supabase/tests/piu_waffle_test.sql"]
   },
   "supabase/migrations/20260926020000_tournament_seeding_manual_ninth.sql": {
     "setup": ["supabase/tests/seeding_manual_ninth_baseline.sql"],
     "tests": ["supabase/tests/seeding_manual_ninth_test.sql"]
+  },
+  "supabase/migrations/20260927010000_tournament_seeding_top_three.sql": {
+    "setup": ["supabase/tests/seeding_top_three_baseline.sql"],
+    "tests": ["supabase/tests/seeding_top_three_test.sql"]
   }
 }

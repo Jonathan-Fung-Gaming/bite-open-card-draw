@@ -1,0 +1,11 @@
+# Tournament seeding top-three formula - September 27, 2026
+
+Scope: versioned prediction storage and commit validation for Pumbility for Tournaments. New sources accept 3-9 real score contributions, or a documented verified 0-2 shortfall. Exact prediction is sum(top3)*17.18899421-994.93243689. Legacy ninth-only and full-nine source data, constraints, immutable runs, published snapshots and ACLs remain valid. No sibling app behavior changes.
+
+Plan reviewed before implementation: add formula version and top-three sum columns with version-specific check, extend only this commit RPC, preserve immutable source validation and legacy path, add readiness marker. New app derives current drafts while original submissions and publications remain intact. Migration first; app after readiness. Roll back app only, retain additive schema and real data.
+
+Verification: freeze the existing tournament schema as an isolated prerequisite fixture, test only the new migration for exact arithmetic, 3/9/shortfall counts, invalid/tampered data, source immutability, old-format compatibility and service-only RPC ACLs. No old migration tests, application tests or database reset in this repository. Inspect linked target/history/dry run, push and merge scoped PR when CI passes, apply only this migration, verify parity. Application checks belong to the consuming repository. One general diff review.
+
+Checklist: implementation PASS; focused SQL PASS; single diff review PASS; target/history/dry run PASS; CI/merge NOT RUN; hosted apply/parity NOT RUN.
+
+Evidence (September 27): `PGLITE_MODULE=<local ignored install> node supabase/tests/seeding_top_three_pglite.mjs` passed the isolated baseline, new migration, and focused SQL cases, including rollback. No application or older-migration tests were run here. The single review checked source immutability, legacy writes, decimal equality, service-only ACLs and transaction boundaries; no blocking SQL findings. `npx supabase migration list --linked` confirmed 51 matching prior migrations and only this new pending version. `npx supabase db push --linked --dry-run` listed only `20260927010000_tournament_seeding_top_three.sql`; linked target is `gsiyqhkcgegjrvqcqioc`. No unresolved implementation blocker. Post-merge deployment remains to be recorded.

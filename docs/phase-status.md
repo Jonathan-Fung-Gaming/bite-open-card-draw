@@ -1,5 +1,11 @@
 # Phase Status
 
+## Pumbility top-three prediction schema - 2026-09-27
+
+The scoped [plan](phase-plans/phase-seeding-top-three-2026-09-27.md) adds versioned top-three prediction storage/validation, accepts three through nine contributions (or an explained verified shortfall), and preserves legacy ninth-only sources and immutable history. Changed files are the new migration, its frozen baseline/focused tests and runner, migration manifest, and scoped documentation.
+
+Isolated focused SQL passed; one manual diff review passed. The linked target/history and dry run confirm only this migration is pending. CI, merge and post-merge apply/parity are pending at this commit. No application checks, older migration tests, full reset or schema-wide lint were run. Rollback keeps the additive schema and restores the prior consumer app; deploy the new app only after readiness succeeds.
+
 ## PIU Trainer shared schema and migration-only testing — 2026-09-06
 
 Implemented the additive 17-table `PIU_TRAINER_` schema, server-only RPCs, account revision locks, immutable catalog pages, replay receipts, safety archives and bounded staged imports. The focused SQL contract passed against an isolated PostgreSQL database containing only its declared platform baseline and this new migration. A scoped manual review verified ownership, privilege revocation, transaction boundaries, pagination order, replay-before-revision semantics and additive object scope. Chronological record ordering was aligned with the historical journal contract and its focused SQL checks passed.
