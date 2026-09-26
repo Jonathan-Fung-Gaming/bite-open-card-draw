@@ -8,7 +8,7 @@ Verification checklist:
 - [x] New-migration-only isolated SQL tests for normal/shortfall entries, exact prediction, malformed values, wrong source, legacy compatibility, immutable sources, CAS/replay, rollback and RPC permissions.
 - [x] Inspect one diff once and fix only proven defects.
 - [x] Verify linked target/history; dry run contains only the new migration.
-- [ ] PR CI for this migration passes; merge; apply new migration; verify parity and readiness.
+- [x] PR CI for this migration passes; merge; apply new migration; verify parity and readiness.
 - [ ] Deploy the consuming app only after the migration is applied.
 
 Order/rollback: expand database first, then deploy the consumer. Existing code remains compatible. If needed restore the previous app deployment and leave the additive format/schema marker intact; do not delete source records or drop shared tables. No unrelated app tests, older migration tests, reset/replay or schema-wide lint.
@@ -16,3 +16,5 @@ Order/rollback: expand database first, then deploy the consumer. Existing code r
 Plan review: scope is limited to source representation and numeric validation; no seeding, identity, voting, authentication or existing pool rules change. Empty contribution arrays explicitly mean the first eight values were not entered. The admin-only app route remains the authorization boundary; RPC permissions remain service-only.
 
 Evidence: isolated PGlite passed the new migration and its focused SQL test on September 26. Verified linked target `gsiyqhkcgegjrvqcqioc`, all 50 predecessors match, and dry run names only `20260926020000_tournament_seeding_manual_ninth.sql`. One scoped migration review found no behavioral defect. No unrelated tests or hosted data mutations. PR/production deployment remains pending.
+
+PR #155 passed the focused PostgreSQL 17 CI gate and merged as `a3e3712`. Applied only `20260926020000`; final dry run is empty. Hosted read-only verification confirms both version markers, the ninth-only format in the installed RPC, denied anon/authenticated execution and allowed service_role execution. The consuming app release follows after this successful expansion.
