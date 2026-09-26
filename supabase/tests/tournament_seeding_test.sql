@@ -1,0 +1,53 @@
+begin;
+do $$ declare f record; t record; state jsonb; next_state jsonb; result jsonb; source jsonb; entry jsonb; draft jsonb; failed boolean;
+begin
+  for f in select p.oid,p.oid::regprocedure as signature from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'tournament_seeding_%' loop
+    if has_function_privilege('anon',f.oid,'execute') or has_function_privilege('authenticated',f.oid,'execute') or not has_function_privilege('service_role',f.oid,'execute') then raise exception 'RPC ACL failed: %',f.signature; end if;
+  end loop;
+  for t in select c.oid,c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='tournament_seeding' and c.relkind='r' loop
+    if not t.relrowsecurity or has_table_privilege('anon',t.oid,'select') or has_table_privilege('authenticated',t.oid,'insert') then raise exception 'Table ACL/RLS failed'; end if;
+  end loop;
+  draft := '{"id":"00000000-0000-4000-8000-000000000001","inputRevision":0,"run":{"inputRevision":0,"status":"ready","passes":[{"number":1},{"number":2}]},"entrants":[]}'::jsonb;
+  state := jsonb_build_object('slug','sql-test','revision',0,'inputRevision',0,'nextSequence','1','entrants','[]'::jsonb,'submissions','[]'::jsonb,'draft',draft,'published',null);
+  perform public.tournament_seeding_read_event('sql-test',state,'20260926010000');
+  entry := '{"id":"00000000-0000-4000-8000-000000000002","canonicalKey":"player","displayName":"Player","mergedInto":null,"acceptedSubmissionId":null}'::jsonb;
+  source := '{"id":"00000000-0000-4000-8000-000000000003","entrantId":"00000000-0000-4000-8000-000000000002","sequence":"1","actualRating":"12500.12","ninthContribution":"250","predictedRating":"12077.779121","contributions":["300","295","290","285","280","275","270","260","250"],"verifiedShortfall":false,"shortfallNote":"","source":"piugame","status":"pending_review","identityConfirmed":false}'::jsonb;
+  next_state := state || jsonb_build_object('revision',1,'nextSequence','2','entrants',jsonb_build_array(entry),'submissions',jsonb_build_array(source));
+  result := public.tournament_seeding_commit('sql-test',0,next_state,'first','hash1','{"submissionId":"source"}');
+  if result->>'replayed'!='false' or (select count(*) from tournament_seeding.submission_scores where event_slug='sql-test')!=9 then raise exception 'Pending source/score commit failed'; end if;
+  if (select actual_rating from tournament_seeding.submissions where event_slug='sql-test')!=12500.12::numeric then raise exception 'Decimal precision failed'; end if;
+  result := public.tournament_seeding_commit('sql-test',0,next_state,'first','hash1','{}');
+  if result->>'replayed'!='true' or (select revision from tournament_seeding.events where slug='sql-test')!=1 then raise exception 'Replay changed state'; end if;
+  failed := false; begin perform public.tournament_seeding_commit('sql-test',0,next_state,'stale','hash2','{}'); exception when others then if sqlerrm='STALE_REVISION' then failed:=true; else raise; end if; end;
+  if not failed then raise exception 'Stale commit accepted'; end if;
+  failed := false; begin perform public.tournament_seeding_replay('sql-test','first','different'); exception when others then if sqlerrm='IDEMPOTENCY_MISMATCH' then failed:=true; else raise; end if; end;
+  if not failed then raise exception 'Mismatched idempotency accepted'; end if;
+  state := next_state;
+  next_state := state || jsonb_build_object('revision',2,'entrants',jsonb_build_array(entry, entry || '{"id":"00000000-0000-4000-8000-000000000004"}'::jsonb));
+  failed := false; begin perform public.tournament_seeding_commit('sql-test',1,next_state,'duplicate','hash3','{}'); exception when unique_violation then failed:=true; end;
+  if not failed or (select revision from tournament_seeding.events where slug='sql-test')!=1 or (select count(*) from tournament_seeding.entrants where event_slug='sql-test' and active)!=1 then raise exception 'Duplicate failed atomicity'; end if;
+  next_state := state || jsonb_build_object('revision',2,'submissions',jsonb_build_array(source || '{"actualRating":"1"}'::jsonb));
+  failed := false; begin perform public.tournament_seeding_commit('sql-test',1,next_state,'source-mutation','hash4','{}'); exception when others then if sqlerrm='IMMUTABLE_SOURCE' then failed:=true; else raise; end if; end;
+  if not failed then raise exception 'Source mutation accepted'; end if;
+  entry := entry || '{"acceptedSubmissionId":"00000000-0000-4000-8000-000000000003"}'::jsonb;
+  source := source || '{"status":"approved","identityConfirmed":true}'::jsonb;
+  draft := draft || '{"id":"00000000-0000-4000-8000-000000000005","inputRevision":1,"run":{"inputRevision":1,"status":"ready","passes":[{"number":1},{"number":2}]}}'::jsonb;
+  next_state := state || jsonb_build_object('revision',2,'inputRevision',1,'entrants',jsonb_build_array(entry),'submissions',jsonb_build_array(source),'draft',draft);
+  perform public.tournament_seeding_commit('sql-test',1,next_state,'accept','hash5','{}');
+  if (select status from tournament_seeding.submissions where event_slug='sql-test')!='approved' or (select count(*) from tournament_seeding.runs where event_slug='sql-test')!=2 then raise exception 'Accepted run atomic commit failed'; end if;
+  if not public.tournament_seeding_rate_limit('sql-test-rate',2,60) or not public.tournament_seeding_rate_limit('sql-test-rate',2,60) or public.tournament_seeding_rate_limit('sql-test-rate',2,60) then raise exception 'Rate limit failed'; end if;
+  perform public.tournament_seeding_session_put(jsonb_build_object('id','session','tokenHash',repeat('a',64),'kind','organizer','expiresAt',(now()+interval '1 hour')::text));
+  if public.tournament_seeding_session_get(repeat('a',64)) is null then raise exception 'Session missing'; end if;
+  perform public.tournament_seeding_session_delete(repeat('a',64));
+  if public.tournament_seeding_session_get(repeat('a',64)) is not null then raise exception 'Session revocation failed'; end if;
+end $$;
+set local role anon;
+do $$ declare failed boolean:=false; begin
+  begin perform public.tournament_seeding_replay('sql-test','first','hash1'); exception when insufficient_privilege then failed:=true; end;
+  if not failed then raise exception 'Anonymous RPC access accepted'; end if;
+end $$;
+reset role;
+set local role service_role;
+do $$ begin if public.tournament_seeding_replay('sql-test','first','hash1') is null then raise exception 'Service RPC failed'; end if; end $$;
+reset role;
+rollback;
