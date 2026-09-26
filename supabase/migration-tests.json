@@ -22,5 +22,9 @@
   "supabase/migrations/20260911010000_piu_waffle_profile.sql": {
     "setup": ["supabase/tests/piu_waffle_baseline.sql", "supabase/tests/piu_waffle_precondition.sql"],
     "tests": ["supabase/tests/piu_waffle_test.sql"]
+  },
+  "supabase/migrations/20260926020000_tournament_seeding_manual_ninth.sql": {
+    "setup": ["supabase/tests/seeding_manual_ninth_baseline.sql"],
+    "tests": ["supabase/tests/seeding_manual_ninth_test.sql"]
   }
 }
