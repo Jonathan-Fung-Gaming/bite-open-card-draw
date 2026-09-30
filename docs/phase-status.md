@@ -6548,3 +6548,7 @@ Only the new migration's focused SQL tests ran: isolated PGlite locally (Docker 
 ## Tournament manual ninth contribution ? 2026-09-26
 
 The consuming app now needs only overall Pumbility and the ninth contribution for admin entry. Migration `20260926020000` adds an explicit `admin_manual`/`ninth_only` source format, retains old formats and immutable history, and stores only the known position-9 score. The new migration passed isolated PGlite numeric, shortfall, compatibility, permission, CAS/replay and rollback checks. Linked target and 50 predecessors match; dry run names only this migration. One scoped review passed. PR #155 passed focused PostgreSQL 17 CI and merged as `a3e3712`. The migration is applied; final dry run is empty and hosted read-only version/format/service-only ACL checks passed. See the phase plan for evidence. No sibling application or older migration tests ran.
+
+## Tournament predicted reseeding — September 30, 2026
+
+Added the backward-compatible version-aware commit validation and readiness marker for Pumbility's predicted-gap reseeding release. Only this migration's isolated schema/behavior/ACL checks ran and passed. One scoped diff review is complete. Target and predecessor parity are verified; dry run names only the new migration. Focused CI, merge and hosted apply follow the phase plan. No application suites or unrelated database changes run in this migration-only phase.
