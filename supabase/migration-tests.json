@@ -1,4 +1,8 @@
 {
+  "supabase/migrations/20260930020000_crossplay_shared_clock.sql": {
+    "setup": ["supabase/tests/crossplay_baseline.sql", "supabase/migrations/20260928010000_crossplay_schema.sql"],
+    "tests": ["supabase/tests/crossplay_clock_test.sql"]
+  },
   "supabase/migrations/20260928010000_crossplay_schema.sql": {
     "setup": ["supabase/tests/crossplay_baseline.sql"],
     "tests": ["supabase/tests/crossplay_schema_test.sql"]
