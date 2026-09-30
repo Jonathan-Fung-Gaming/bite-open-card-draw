@@ -12,7 +12,7 @@ Checklist:
 - [x] Additive records and SQL boundary implemented.
 - [x] Focused isolated migration checks pass.
 - [x] Single scoped review completed and evidence recorded.
-- [ ] Reviewed migration merged/applied to verified target with parity.
+- [x] Reviewed migration merged/applied to verified target with parity.
 
 Implementation: `supabase/migrations/20260930020000_crossplay_shared_clock.sql`, focused transactional checks in `supabase/tests/crossplay_clock_test.sql`, and observed PostgreSQL lock-contention checks in `supabase/tests/crossplay_clock_concurrency_test.mjs`. `supabase/migration-tests.json` registers only the new migration's focused suite; the existing base migration is prerequisite setup, not an older test run.
 
@@ -20,4 +20,4 @@ Local evidence: `node supabase/tests/crossplay_clock_concurrency_test.mjs` passe
 
 Root completed the single scoped review. Its focused repairs allow pending/disputed same-controller reattachment without creating a clock over manual reports, increment correction epochs to invalidate old local journals, require review on every claimed-controller replacement/revocation even when the last server checkpoint was stopped, and expose confirmation method from the current official revision. Specific SQL regressions cover all four findings, including organizer corrections whose adjusted totals match an older shared report. New focused checks plus all four lock races passed again in `crossplay_clock_1790748635784`. No second general review was performed.
 
-This phase has not yet committed, merged, or deployed; no production records were changed during these checks.
+Release complete: PR https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/161 passed focused CI and merged as `83287bced7b536bdf300694258bc27ded217dc64`. The linked target `gsiyqhkcgegjrvqcqioc` and predecessor parity were verified; the dry run listed only `20260930020000_crossplay_shared_clock.sql`, which was applied successfully. Local/remote migration history matches exactly. Read-only hosted verification confirms the unchanged base version, new clock version, RLS on all seven new tables and no direct runtime table access. The consuming app PR #1 merged and its production Vercel deployment is Ready; read-only HTTP and access-denial smoke checks passed on 2026-09-30. Full consuming-app verification and its physical-device testing limits are recorded in `C:/Users/jfung/crossplay-tournaments/docs/clock-release.md`. No production tournament data was mutated by verification.
