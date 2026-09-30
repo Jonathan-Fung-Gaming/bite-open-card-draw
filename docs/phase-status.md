@@ -6552,3 +6552,10 @@ The consuming app now needs only overall Pumbility and the ninth contribution fo
 ## Tournament predicted reseeding — September 30, 2026
 
 Added the backward-compatible version-aware commit validation and readiness marker for Pumbility's predicted-gap reseeding release. Only this migration's isolated schema/behavior/ACL checks ran and passed. One scoped diff review is complete. Target and predecessor parity are verified; dry run names only the new migration. Focused CI, merge and hosted apply follow the phase plan. No application suites or unrelated database changes run in this migration-only phase.
+
+## Crossplay shared match clock - September 30, 2026
+
+Implemented additive private clock journals, controller epochs, hash-only shared match credentials, balanced first/second records, manual-history corrections, unplayed-forfeit accounting, and revision-bound shared-device score acknowledgements. Frozen milliseconds feed existing score/differential calculations. The original schema version and manual/legacy interface remain compatible; moving clock records never enter pairing snapshots or change tournament versions.
+
+The new migration's transactional SQL checks and four actual PostgreSQL lock races passed in isolated crossplay_clock_1790748252269; see docs/phase-plans/phase-crossplay-shared-clock-2026-09-30.md. A demonstrated simultaneous manual-report/clock-claim race was repaired by locking before selecting the reporting path. Root coordinates the one final review, merge and verified-target deployment after consuming-app acceptance. No production mutation, sibling application suite, older migration test, reset of the shared local stack, or schema-wide lint ran for this migration work.
+The coordinated single review is complete. Focused repairs cover pending/disputed controller reattachment, correction epochs, review-required controller replacement/revocation from any checkpoint state, and authoritative official confirmation metadata. New regression checks and all four observed-lock races pass in crossplay_clock_1790748635784. No second general review was performed. Merge/deployment remain coordinated by the consuming-app root agent.
