@@ -37,5 +37,9 @@
   "supabase/migrations/20260927010000_tournament_seeding_top_three.sql": {
     "setup": ["supabase/tests/seeding_top_three_baseline.sql"],
     "tests": ["supabase/tests/seeding_top_three_test.sql"]
+  },
+  "supabase/migrations/20260930010000_tournament_seeding_reseeding.sql": {
+    "setup": ["supabase/tests/seeding_reseeding_baseline.sql"],
+    "tests": ["supabase/tests/seeding_reseeding_test.sql"]
   }
 }
