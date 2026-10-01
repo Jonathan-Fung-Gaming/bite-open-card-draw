@@ -1,5 +1,9 @@
 # Phase Status
 
+## Real-rating seeding compatibility - 2026-10-01
+
+Migration-only scope: [plan and checklist](phase-plans/phase-seeding-real-sort-schema-2026-10-01.md). Add the real-sort rules version to complete-run validation; retain previous writes and all source/publication protections. Focused isolated SQL and one scoped diff review passed; linked history and dry-run confirm only this migration is pending. CI/merge/deployment pending.
+
 ## Ninth-best Pumbility formula - 2026-09-27
 
 Added v3 formula and full-nine source support via migration 20260927020000. Scope, deployment order and rollback are in [the plan](phase-plans/phase-seeding-ninth-300-schema-2026-09-27.md). Tests, checks and review explicitly skipped by the user; no validation claim. Deploy schema before app, preserving v1/v2 history.

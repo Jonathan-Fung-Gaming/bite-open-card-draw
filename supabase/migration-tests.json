@@ -1,49 +1,100 @@
 {
   "supabase/migrations/20260930020000_crossplay_shared_clock.sql": {
-    "setup": ["supabase/tests/crossplay_baseline.sql", "supabase/migrations/20260928010000_crossplay_schema.sql"],
-    "tests": ["supabase/tests/crossplay_clock_test.sql"]
+    "setup": [
+      "supabase/tests/crossplay_baseline.sql",
+      "supabase/migrations/20260928010000_crossplay_schema.sql"
+    ],
+    "tests": [
+      "supabase/tests/crossplay_clock_test.sql"
+    ]
   },
   "supabase/migrations/20260928010000_crossplay_schema.sql": {
-    "setup": ["supabase/tests/crossplay_baseline.sql"],
-    "tests": ["supabase/tests/crossplay_schema_test.sql"]
+    "setup": [
+      "supabase/tests/crossplay_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/crossplay_schema_test.sql"
+    ]
   },
   "supabase/migrations/20260906010000_piu_trainer_schema.sql": {
-    "setup": ["supabase/tests/piu_trainer_baseline.sql"],
-    "tests": ["supabase/tests/piu_trainer_schema_test.sql"]
+    "setup": [
+      "supabase/tests/piu_trainer_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/piu_trainer_schema_test.sql"
+    ]
   },
   "supabase/migrations/20260906020000_piu_trainer_two_players.sql": {
-    "setup": ["supabase/tests/piu_two_player_baseline.sql"],
-    "tests": ["supabase/tests/piu_two_player_test.sql"]
+    "setup": [
+      "supabase/tests/piu_two_player_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/piu_two_player_test.sql"
+    ]
   },
   "supabase/migrations/20260909010000_piu_adaptive_workouts.sql": {
-    "setup": ["supabase/tests/piu_adaptive_baseline.sql"],
-    "tests": ["supabase/tests/piu_adaptive_test.sql"]
+    "setup": [
+      "supabase/tests/piu_adaptive_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/piu_adaptive_test.sql"
+    ]
   },
   "supabase/migrations/20260909020000_piu_twenty_chart_sessions.sql": {
-    "setup": ["supabase/tests/piu_twenty_chart_baseline.sql"],
-    "tests": ["supabase/tests/piu_twenty_chart_test.sql"]
+    "setup": [
+      "supabase/tests/piu_twenty_chart_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/piu_twenty_chart_test.sql"
+    ]
   },
   "supabase/migrations/20260926010000_tournament_seeding.sql": {
-    "setup": ["supabase/tests/tournament_seeding_baseline.sql"],
-    "tests": ["supabase/tests/tournament_seeding_test.sql"]
+    "setup": [
+      "supabase/tests/tournament_seeding_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/tournament_seeding_test.sql"
+    ]
   },
   "supabase/migrations/20260911010000_piu_waffle_profile.sql": {
     "setup": [
       "supabase/tests/piu_waffle_baseline.sql",
       "supabase/tests/piu_waffle_precondition.sql"
     ],
-    "tests": ["supabase/tests/piu_waffle_test.sql"]
+    "tests": [
+      "supabase/tests/piu_waffle_test.sql"
+    ]
   },
   "supabase/migrations/20260926020000_tournament_seeding_manual_ninth.sql": {
-    "setup": ["supabase/tests/seeding_manual_ninth_baseline.sql"],
-    "tests": ["supabase/tests/seeding_manual_ninth_test.sql"]
+    "setup": [
+      "supabase/tests/seeding_manual_ninth_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/seeding_manual_ninth_test.sql"
+    ]
   },
   "supabase/migrations/20260927010000_tournament_seeding_top_three.sql": {
-    "setup": ["supabase/tests/seeding_top_three_baseline.sql"],
-    "tests": ["supabase/tests/seeding_top_three_test.sql"]
+    "setup": [
+      "supabase/tests/seeding_top_three_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/seeding_top_three_test.sql"
+    ]
   },
   "supabase/migrations/20260930010000_tournament_seeding_reseeding.sql": {
-    "setup": ["supabase/tests/seeding_reseeding_baseline.sql"],
-    "tests": ["supabase/tests/seeding_reseeding_test.sql"]
+    "setup": [
+      "supabase/tests/seeding_reseeding_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/seeding_reseeding_test.sql"
+    ]
+  },
+  "supabase/migrations/20261001010000_tournament_seeding_real_sort.sql": {
+    "setup": [
+      "supabase/tests/seeding_real_sort_baseline.sql"
+    ],
+    "tests": [
+      "supabase/tests/seeding_real_sort_test.sql"
+    ]
   }
 }
