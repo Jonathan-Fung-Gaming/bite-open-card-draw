@@ -1,4 +1,13 @@
 {
+  "supabase/migrations/20261005010000_piu_session_options.sql": {
+    "setup": [
+      "supabase/tests/piu_session_options_baseline.sql",
+      "supabase/tests/piu_session_options_precondition.sql"
+    ],
+    "tests": [
+      "supabase/tests/piu_session_options_test.sql"
+    ]
+  },
   "supabase/migrations/20260930020000_crossplay_shared_clock.sql": {
     "setup": [
       "supabase/tests/crossplay_baseline.sql",

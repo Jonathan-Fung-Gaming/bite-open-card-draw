@@ -1,5 +1,13 @@
 # Phase Status
 
+## PIU session modes, explicit ranges and algorithms - 2026-10-05
+
+The scoped [plan and checklist](phase-plans/phase-piu-session-options-2026-10-05.md) adds version-3 Singles/Doubles/Both sessions, Professional/Standard algorithms, explicit warmup ranges with a level-10 floor, and push ranges with a level-20 floor. Existing sixteen/twenty-chart records, profile journals, revision fences, replay receipts and service-only grants remain supported. Only the daily validator and read capability bodies change.
+
+The new migration passed its focused SQL checks in fresh local database piu_session_options_20261005, using a schema-only current predecessor and three synthetic profile rows. Checks cover all modes/algorithms, equal endpoints, active/inactive range validation, Standard derived metadata/targets, historical compatibility, capability/ACL preservation and commit/replay/profile/revision boundaries. Root verified the linked target and all 57 predecessor pairs; a read-only dry run lists only 20261005010000_piu_session_options.sql. No older migration suite, sibling application gate, production mutation or deployment ran. One coordinated consuming-root review remains pending. Deploy the migration before enabling the consuming app's new creation capability.
+
+Focused fixture repair: browser verification demonstrated the missing catalog-head singleton in the new schema-only setup. The synthetic precondition now seeds it. Only the new migration SQL checks were rerun, passing in fresh database piu_session_options_repaired_20261005 with the updated precondition; the migration itself remained unchanged. No general review or unrelated checks restarted.
+
 ## Real-rating seeding compatibility - 2026-10-01
 
 Migration-only scope: [plan and checklist](phase-plans/phase-seeding-real-sort-schema-2026-10-01.md). Add the real-sort rules version to complete-run validation; retain previous writes and all source/publication protections. Focused isolated SQL and one scoped diff review passed. PR #162 merged; migration 20261001010000 applied alone to the verified target. All 57 migration versions match; readiness/ACLs and unchanged source/publication digests verified.
