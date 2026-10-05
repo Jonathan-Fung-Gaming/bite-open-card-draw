@@ -6577,3 +6577,8 @@ Release complete: schema PR #161 passed focused CI and merged as 83287bced7b536b
 ## PIU session options release authorization - 2026-10-05
 
 The user authorized push, merge and production deployment after the coordinated consuming-root review and focused fixture repair completed. The migration-only release will run only its new-migration CI checks. Release preflight independently confirmed linked project gsiyqhkcgegjrvqcqioc, all 57 predecessor migration pairs, and a dry run naming only 20261005010000_piu_session_options.sql. PR checks, merge, application of that single reviewed migration and read-only parity/capability verification are now authorized; no general review, older migration suite, sibling application gate or shared Auth change is part of this release.
+
+
+## PIU session options release complete - 2026-10-05
+
+Migration PR #163 (https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/163) passed Classify Changes, migration-only Quality Gates and New Migration Tests, then merged as 599c09573688115de93b283855028f488895e64b. After default-branch synchronization, target gsiyqhkcgegjrvqcqioc and the single pending migration were reverified. Only 20261005010000_piu_session_options.sql was applied; all 58 local/remote migration records match and the final dry run is empty. Rollback-only head reads for HDS, Jonathan and WAFFLE advertise sessionOptions 1 alongside workouts 1 and personalSync 1. Both changed functions retain service-only access, and before/after read-only checks show unchanged journal revisions and run/assignment/attempt/receipt counts. No shared Auth, journal data, older tests, sibling application gates, schema-wide lint or additional review cycle was changed or run. The trainer deployment is schema-ready.
