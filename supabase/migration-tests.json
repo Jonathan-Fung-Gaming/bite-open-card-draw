@@ -1,4 +1,13 @@
 {
+  "supabase/migrations/20261005020000_piu_standard_pushes.sql": {
+    "setup": [
+      "supabase/tests/piu_standard_pushes_baseline.sql",
+      "supabase/tests/piu_standard_pushes_precondition.sql"
+    ],
+    "tests": [
+      "supabase/tests/piu_standard_pushes_test.sql"
+    ]
+  },
   "supabase/migrations/20261005010000_piu_session_options.sql": {
     "setup": [
       "supabase/tests/piu_session_options_baseline.sql",
