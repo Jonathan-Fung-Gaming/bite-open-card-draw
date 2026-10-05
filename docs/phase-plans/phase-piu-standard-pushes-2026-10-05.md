@@ -12,9 +12,11 @@ Apply the reviewed additive migration before deploying the consuming app; creati
 - [x] Implement migration and frozen focused fixture.
 - [x] Pass only new-migration isolated tests.
 - [x] Complete one root-coordinated review.
-- [ ] Publish, pass focused CI and merge.
-- [ ] Verify target/parity/sole pending migration; apply and verify.
+- [x] Publish, pass focused CI and merge.
+- [x] Verify target/parity/sole pending migration; apply and verify.
 
 Focused verification passed in isolated PostgreSQL database `piu_standard_pushes_20261005`: all three new Standard modes, exactly twelve Standard lanes, historical Professional/Standard `3.0.0` halves and older formats, invalid/mixed/missing lanes, configuration/version/count errors, frozen target/group/floor constraints, neutral missing-history handling, additive capability, service-only ACLs, commit replay and profile/revision fences. The setup is the frozen current PIU schema with changed predecessor function definitions captured read-only from the existing isolated integration database and compared exactly (ignoring whitespace) with deployed `3.0.0` definitions. No older migration or test was executed.
 
 Read-only preflight confirms healthy linked target `gsiyqhkcgegjrvqcqioc`, all 58 predecessor migration pairs, and a push dry run listing only `20261005020000_piu_standard_pushes.sql`. Per-profile revisions and run/assignment/attempt/receipt counts plus both function grants were captured before deployment for exact comparison. Root completed the one coordinated review across consuming source/API/backup/UI/tests and this SQL predecessor diff/contract; no actionable finding was identified. No additional general review will run. Authorized publication, focused CI, merge and deployment follow.
+
+Release complete: [PR #165](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/165) passed Classify Changes, the migration-only Quality Gates exemption and New Migration Tests and merged as `1bb97a27d02be8802f662021f53b09b584932059`. The synchronized default branch reverified the healthy intended project, all 58 predecessors and a dry run listing only the reviewed new migration. Only `20261005020000_piu_standard_pushes.sql` was applied. All 59 local/remote migration records match and the final dry run is empty. Rollback-only reads for all three existing profiles show `standardPushes: 1`, `sessionOptions: 1`, `workouts: 1` and `personalSync: 1`. Both changed functions retain service-only grants; before/after profile revisions and run/assignment/attempt/receipt counts match exactly. No unresolved blocker or unrelated change remains. See the [migration release record](../piu-standard-pushes-migration-release-2026-10-05.md).
