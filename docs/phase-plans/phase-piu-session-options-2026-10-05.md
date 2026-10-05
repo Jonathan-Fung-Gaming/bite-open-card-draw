@@ -1,0 +1,23 @@
+# PIU Trainer: session modes, ranges and algorithms
+
+Support the consuming trainer's version-3 sessions with explicit Singles/Doubles/Both mode selection, Professional/Standard generation, warmup ranges starting at 10 and push ranges starting at 20. Every new session has twenty distinct slots and thirty-two suggested play steps. Both modes use four warmups and six push slots each; a single mode uses eight warmups and twelve push slots. Push lanes split evenly between random and improvement.
+
+Replace only the existing `PIU_TRAINER_DAILY_VALID` and `PIU_TRAINER_READ` bodies. Preserve historical sixteen/twenty-chart validation, signature/ACL boundaries, current journals, revision fences, replay receipts, personal caches and shared Auth configuration. Read adds `sessionOptions: 1` alongside the existing workout/personal capabilities. Commit already derives assignment counts from the session slots and remains unchanged.
+
+Validate mode/algorithm allowlists, all four integer ranges (10–30 warmups, 20–30 push, minimum at or below maximum), selected-mode slot counts, lane counts, actual/target slot levels inside their selected ranges, and the derived Standard generation snapshot. Keep private synchronization records outside session snapshots. Frozen schema-only predecessor setup is captured read-only from current PIU objects; synthetic profile rows are a separate precondition. Test only this new migration against a fresh isolated PostgreSQL database, with valid Professional/Standard combinations, historical compatibility, invalid configuration/slots, ACL preservation, profile fences and commit/replay behavior.
+
+Read-only linked-target and predecessor-parity verification are owned by the consuming root agent; inspect a push dry run listing only this migration. Apply this additive migration before enabling version-3 creation in the consuming app. Without `sessionOptions: 1`, the app must keep creation disabled. Rollback restores the prior app while retaining the additive validation and saved history.
+
+The user has authorized push, merge and production deployment. Publish the migration-only PR, wait for its required focused checks, merge, synchronize the default branch, reverify the linked target and sole pending migration, then apply and verify parity plus the additive capability. Do not run older migration tests or sibling application suites. The coordinated general review and proven focused fixture repair are complete; do not restart a review cycle. The plan was reviewed before implementation for version compatibility, range floors, mode/lane counts, private-data boundaries, migration ordering and rollback.
+
+- [x] Scoped plan and predecessor capture reviewed.
+- [x] Implement new migration and focused contract.
+- [x] Pass isolated new-migration SQL checks.
+- [x] Record linked target/parity/dry-run evidence.
+- [x] Complete one coordinated review and focused fixture repair.
+- [ ] Pass migration-only PR checks and merge.
+- [ ] Apply reviewed migration before consuming-app deployment and verify parity/capability.
+
+Verification: the frozen predecessor, synthetic precondition and only `20261005010000_piu_session_options.sql` were installed in fresh database `piu_session_options_20261005` inside local PostgreSQL. `piu_session_options_test.sql` passed all mode/algorithm combinations, equal endpoints, invalid active/inactive ranges, Standard no-history/invalid metadata/target cases, historical formats, capability/ACL checks, and commit/replay/revision/profile boundaries. No older migrations/tests or sibling application checks ran. The consuming root agent verified linked target `gsiyqhkcgegjrvqcqioc`, all 57 predecessor migration pairs, and a read-only push dry run listing only this new migration. The coordinated root review is complete. Release preflight independently reconfirmed the target, all 57 predecessor pairs and the sole pending migration after production release was authorized; no remote mutation has occurred yet.
+
+Focused fixture repair: integrated browser verification demonstrated that the schema-only setup omitted the mandatory catalog-head singleton, preventing `PIU_TRAINER_CATALOG_PUT` from publishing a revision and causing reset archives to fail. The synthetic precondition now inserts that singleton. The updated predecessor/precondition, unchanged new migration and only its focused SQL checks passed again in fresh database `piu_session_options_repaired_20261005`. No general review or unrelated checks were restarted.
