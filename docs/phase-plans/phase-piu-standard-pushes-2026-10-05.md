@@ -1,0 +1,20 @@
+# PIU Trainer: all twelve Standard push charts
+
+Change only PIU Trainer validation and capability discovery to accept new Standard sessions whose twelve push slots all use the progression algorithm. The consuming app records selection policy `3.1.0`, order policy `3.0.0` and frozen Standard-generation format `1`. Professional continues using selection `3.0.0` with random/improvement halves. Historical Standard `3.0.0` snapshots retain their existing halves and remain readable and rerollable.
+
+Replace only `PIU_TRAINER_DAILY_VALID` and `PIU_TRAINER_READ`. Extend the existing twenty-slot/thirty-two-step configurable validation to `3.1.0`, require algorithm `standard`, and require every push slot to have lane `standard` (six in each mode for Both, twelve in the selected mode otherwise). Preserve warmup lane exclusion, all ranges, level targets, frozen normalized progression validation, historical policies, signatures and service-only grants. Advertise additive capability `standardPushes: 1` alongside the current capability keys.
+
+Use a frozen schema-only capture of the current PIU predecessor plus synthetic profiles in an isolated local database. Run only this new migration's focused valid-mode, legacy-policy, invalid-lane/configuration/target, capability, ACL, profile, revision and replay checks. No older migrations or older tests, sibling application gates, full resets or schema-wide lint are release gates. The plan was checked before implementation against version compatibility, lane counts, data boundaries, ordering and rollback.
+
+Apply the reviewed additive migration before deploying the consuming app; creation with policy `3.1.0` must require `standardPushes: 1`. Rollback restores the prior app while retaining the additive validator and new history. User authorization for push, merge and deploy persists. Root coordinates the one general review before publication. After review, publish a migration-only PR, wait for focused checks, merge, verify linked project `gsiyqhkcgegjrvqcqioc` and predecessor parity, inspect a dry run naming only the new migration, apply it and verify exact parity, capability, grants and unchanged journal records.
+
+- [x] Scoped plan and compatibility boundaries reviewed.
+- [x] Implement migration and frozen focused fixture.
+- [x] Pass only new-migration isolated tests.
+- [x] Complete one root-coordinated review.
+- [ ] Publish, pass focused CI and merge.
+- [ ] Verify target/parity/sole pending migration; apply and verify.
+
+Focused verification passed in isolated PostgreSQL database `piu_standard_pushes_20261005`: all three new Standard modes, exactly twelve Standard lanes, historical Professional/Standard `3.0.0` halves and older formats, invalid/mixed/missing lanes, configuration/version/count errors, frozen target/group/floor constraints, neutral missing-history handling, additive capability, service-only ACLs, commit replay and profile/revision fences. The setup is the frozen current PIU schema with changed predecessor function definitions captured read-only from the existing isolated integration database and compared exactly (ignoring whitespace) with deployed `3.0.0` definitions. No older migration or test was executed.
+
+Read-only preflight confirms healthy linked target `gsiyqhkcgegjrvqcqioc`, all 58 predecessor migration pairs, and a push dry run listing only `20261005020000_piu_standard_pushes.sql`. Per-profile revisions and run/assignment/attempt/receipt counts plus both function grants were captured before deployment for exact comparison. Root completed the one coordinated review across consuming source/API/backup/UI/tests and this SQL predecessor diff/contract; no actionable finding was identified. No additional general review will run. Authorized publication, focused CI, merge and deployment follow.
