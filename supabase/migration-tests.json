@@ -1,4 +1,12 @@
 {
+  "supabase/migrations/20261008010000_crossplay_lifecycle.sql": {
+    "setup": [
+      "supabase/tests/crossplay_baseline.sql",
+      "supabase/migrations/20260928010000_crossplay_schema.sql",
+      "supabase/migrations/20260930020000_crossplay_shared_clock.sql"
+    ],
+    "tests": ["supabase/tests/crossplay_lifecycle_test.sql"]
+  },
   "supabase/migrations/20261005020000_piu_standard_pushes.sql": {
     "setup": [
       "supabase/tests/piu_standard_pushes_baseline.sql",
