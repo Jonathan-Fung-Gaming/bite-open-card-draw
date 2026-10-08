@@ -6606,3 +6606,11 @@ Crossplay turn-time release complete: PR #169 passed focused CI and merged as 3d
 ## Crossplay table devices - October 8, 2026
 
 The additive table/duty/location/queue capability and atomic shared-device handoff are implemented. New migration behavior/permission/idempotency checks and ten observed-lock races passed in isolated crossplay_tables_20261008; no older migration or sibling-app suites ran in this repository. The one coordinated review is complete. Read-only target/parity preflight and the dry run confirm only this migration is pending for gsiyqhkcgegjrvqcqioc. The user authorized push, merge and deployment after seeing the consuming app phone/iPad screen gallery. See docs/phase-plans/phase-crossplay-table-devices-2026-10-08.md.
+
+
+Crossplay table-device release complete: PR #171 passed focused migration-only CI and merged as 9d00cff7f73c9578491e41dd69c03bbb73dd1bdf. Only migration 20261008030000 was applied to verified project gsiyqhkcgegjrvqcqioc. All 62 migration pairs match, the final dry run is empty, and read-only runtime capability and permissions checks passed. Consumer PR #6 subsequently merged and production is Ready. No production tournament data was mutated; no unresolved blocker remains. See docs/phase-plans/phase-crossplay-table-devices-2026-10-08.md.
+
+
+## Crossplay public TV display - October 8, 2026
+
+Additive migration 20261008040000 exposes an actor-free, published-only display read with private runtime-only grants. Its focused isolated SQL projection/status/privacy/permission checks pass in crossplay_display_20261008. The consuming app passed 206 unit tests and relevant Chromium/WebKit acceptance, including public privacy and nine simultaneous tables. One coordinated review is complete; no SQL repair was needed. Read-only target/parity/dry-run checks name only this migration for gsiyqhkcgegjrvqcqioc. Scoped PR and migration rollout are next. See docs/phase-plans/phase-crossplay-public-display-2026-10-08.md.
