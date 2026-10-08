@@ -19,8 +19,10 @@ Plan review complete: actor authority stays server-verified; replacements create
 - [x] Focused behavior and permission tests
 - [x] Observed-lock concurrency tests
 - [x] One implementation review
-- [ ] Scoped PR and migration rollout evidence
+- [x] Scoped PR and migration rollout evidence
 
 Isolated PostgreSQL 17 database `crossplay_tables_20261008` was cloned from an existing Crossplay acceptance database; only this migration was applied. Its transactional SQL checks passed, including nine pairings on eight tables, precise saved-time handoff, shared acknowledgements, idempotent lost-cookie recovery, old-controller rejection, queue release, closure/history preservation, reset and private permissions. Ten observed-lock races passed. One coordinated implementation review completed. The consumer owns browser/visual acceptance; no old migration suite or unrelated app checks ran here.
 
-Read-only preflight verified the established target `gsiyqhkcgegjrvqcqioc`, all predecessor migration pairs, and a dry run naming only `20261008030000_crossplay_table_devices.sql`. Release is authorized after the consumer screen presentation.
+Read-only preflight verified the established target `gsiyqhkcgegjrvqcqioc`, all predecessor migration pairs, and a dry run naming only `20261008030000_crossplay_table_devices.sql`.
+
+Release completed after the consumer phone/iPad screen presentation. [PR 171](https://github.com/Jonathan-Fung-Gaming/bite-open-card-draw/pull/171) passed Classify Changes, migration-only Quality Gates and New Migration Tests, then merged as `9d00cff7f73c9578491e41dd69c03bbb73dd1bdf`. After synchronizing main and reverifying target and sole pending migration, only `20261008030000_crossplay_table_devices.sql` was applied. All 62 migration pairs match and the final dry run is empty. Read-only runtime verification confirmed the tables capability, private operational tables/helpers and intended function-only grants. No production tournament data was mutated and no database blocker remains. The consumer app subsequently deployed successfully; its release record is `crossplay-tournaments/docs/table-device-workflow-release.md`.

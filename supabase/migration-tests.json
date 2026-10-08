@@ -1,4 +1,15 @@
 {
+  "supabase/migrations/20261008040000_crossplay_public_display.sql": {
+    "setup": [
+      "supabase/tests/crossplay_baseline.sql",
+      "supabase/migrations/20260928010000_crossplay_schema.sql",
+      "supabase/migrations/20260930020000_crossplay_shared_clock.sql",
+      "supabase/migrations/20261008010000_crossplay_lifecycle.sql",
+      "supabase/migrations/20261008020000_crossplay_turn_time.sql",
+      "supabase/migrations/20261008030000_crossplay_table_devices.sql"
+    ],
+    "tests": ["supabase/tests/crossplay_public_display_test.sql"]
+  },
   "supabase/migrations/20261008030000_crossplay_table_devices.sql": {
     "setup": [
       "supabase/tests/crossplay_baseline.sql",
