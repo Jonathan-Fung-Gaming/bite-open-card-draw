@@ -6601,3 +6601,8 @@ Crossplay lifecycle database phase completed October 8, 2026: PR #167 merged (9b
 Additive migration 20261008020000_crossplay_turn_time.sql exposes accepted current-turn time through the existing authorized read, with no accounting, scoring or table changes. Its transactional behavior/permission assertions passed in isolated crossplay_turn_time_20261008. One coordinated diff review completed; no SQL blocker remains. See docs/phase-plans/phase-crossplay-turn-time-2026-10-08.md for scope, rollout and the consumer's old-client compatibility repair. Required CI, merge and verified-target migration deployment are pending. No shared reset or unrelated suite ran.
 
 Crossplay turn-time release complete: PR #169 passed focused CI and merged as 3d6bba2. Only migration 20261008020000 was applied to verified project gsiyqhkcgegjrvqcqioc; complete migration parity and read-only projection/ACL checks pass. No production tournament data was mutated. See docs/crossplay-turn-time-migration-release-2026-10-08.md. No unresolved database blocker remains.
+
+
+## Crossplay table devices - October 8, 2026
+
+The additive table/duty/location/queue capability and atomic shared-device handoff are implemented. New migration behavior/permission/idempotency checks and ten observed-lock races passed in isolated crossplay_tables_20261008; no older migration or sibling-app suites ran in this repository. The one coordinated review is complete. Read-only target/parity preflight and the dry run confirm only this migration is pending for gsiyqhkcgegjrvqcqioc. The user authorized push, merge and deployment after seeing the consuming app phone/iPad screen gallery. See docs/phase-plans/phase-crossplay-table-devices-2026-10-08.md.
