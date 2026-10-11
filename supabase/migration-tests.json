@@ -1,4 +1,8 @@
 {
+  "supabase/migrations/20261011010000_crossplay_tv_live_clocks.sql": {
+    "setup": ["supabase/tests/crossplay_tv_live_baseline.sql"],
+    "tests": ["supabase/tests/crossplay_tv_live_clocks_test.sql"]
+  },
   "supabase/migrations/20261008040000_crossplay_public_display.sql": {
     "setup": [
       "supabase/tests/crossplay_baseline.sql",
