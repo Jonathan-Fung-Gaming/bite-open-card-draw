@@ -6614,3 +6614,12 @@ Crossplay table-device release complete: PR #171 passed focused migration-only C
 ## Crossplay public TV display - October 8, 2026
 
 Additive migration 20261008040000 exposes an actor-free, published-only display read with private runtime-only grants. Its focused isolated SQL projection/status/privacy/permission checks pass in crossplay_display_20261008. The consuming app passed 206 unit tests and relevant Chromium/WebKit acceptance, including public privacy and nine simultaneous tables. One coordinated review is complete; no SQL repair was needed. Read-only target/parity/dry-run checks name only this migration for gsiyqhkcgegjrvqcqioc. Scoped PR and migration rollout are next. See docs/phase-plans/phase-crossplay-public-display-2026-10-08.md.
+
+
+## Crossplay TV live clocks - October 11, 2026
+
+Additive migration 20261011010000 and its focused test source are prepared on codex/crossplay-tv-live-clocks. They add controller-bound spectator checkpoints and public pending adjusted scores without changing official time, scoring, or pairing versions. Consuming app checks pass locally, including seventy focused tests and Chromium/WebKit display fixtures. Docker control is unresponsive and the isolated Crossplay databases are offline, so new SQL execution, real workflow/load checks, and release are blocked pending restart permission. No shared-database reset or production write occurred. See docs/phase-plans/phase-crossplay-tv-live-clocks-2026-10-11.md.
+
+### October 11, 2026 — Crossplay TV verification and authorized release
+
+Docker restarted with explicit user authorization. The focused new migration suite passes on an isolated existing-schema clone and on the schema-only CI baseline; no old migration suites, sibling application tests, or shared database reset ran. The configured linked project is bite-open-card-draw (gsiyqhkcgegjrvqcqioc), and history/dry-run checks identify only 20261011010000 as pending. The user requested push, merge, and production deployment while the real-browser workflow and ten-minute eight-controller timing test continue. Migration-first deployment remains required. One coordinated review is complete; no new general review cycle was started. App acceptance exposed a delayed post-round score correction; one-second polling is retained throughout active tournaments and its affected rerun is pending. Release identifiers and final extended-test evidence will follow after completion.
